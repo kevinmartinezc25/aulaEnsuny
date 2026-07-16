@@ -240,19 +240,20 @@ export async function getAdminCourses(): Promise<AdminCourse[]> {
   try {
     const adminClient = createAdminClient()
 
-    // 1. Obtener la cantidad de estudiantes por grado en profiles
-    const { data: students, error: sError } = await adminClient
-      .from('profiles')
-      .select('grade_level, roles!inner(name)')
-      .eq('roles.name', 'student')
+    // 1. Obtener inscripciones reales de estudiantes por curso en student_courses
+    const { data: enrollments, error: eError } = await adminClient
+      .from('student_courses')
+      .select('course_id')
 
-    if (sError) throw new Error(sError.message)
+    if (eError) {
+      console.error('Error fetching enrollments:', eError.message)
+    }
 
-    // Agrupar conteo de estudiantes por grado
-    const gradeCounts: Record<string, number> = {}
-    students?.forEach(student => {
-      if (student.grade_level) {
-        gradeCounts[student.grade_level] = (gradeCounts[student.grade_level] || 0) + 1
+    // Agrupar conteo de estudiantes por curso
+    const courseCounts: Record<string, number> = {}
+    enrollments?.forEach(enrollment => {
+      if (enrollment.course_id) {
+        courseCounts[enrollment.course_id] = (courseCounts[enrollment.course_id] || 0) + 1
       }
     })
 
@@ -276,7 +277,7 @@ export async function getAdminCourses(): Promise<AdminCourse[]> {
         teacher: teacherName,
         teacherId: course.teacher_id,
         subject: course.subject,
-        students: gradeCounts[course.grade_level] || 0, // Cálculo dinámico según grado
+        students: courseCounts[course.id] || 0, // Cálculo real según inscripciones en student_courses
         status: (course.status || 'active') as 'active' | 'draft' | 'archived',
         grade: course.grade_level || 'General',
         createdAt: new Date(course.created_at).toISOString().split('T')[0]
@@ -807,17 +808,21 @@ export async function getAdminDashboardStats() {
       }
     })
 
-    // 7. Calcular cursos más activos
-    const gradeCounts: Record<string, number> = {}
-    students.forEach(s => {
-      if (s.grade_level) {
-        gradeCounts[s.grade_level] = (gradeCounts[s.grade_level] || 0) + 1
+    // 7. Calcular cursos más activos usando inscripciones reales
+    const { data: dashEnrollments } = await adminClient
+      .from('student_courses')
+      .select('course_id')
+      
+    const dashCourseCounts: Record<string, number> = {}
+    dashEnrollments?.forEach(e => {
+      if (e.course_id) {
+        dashCourseCounts[e.course_id] = (dashCourseCounts[e.course_id] || 0) + 1
       }
     })
 
     const generatedTopCourses = (dbCourses || []).map(c => {
       const courseGrades = dbGrades?.filter(g => g.course_id === c.id) || []
-      const studentsInCourse = gradeCounts[c.grade_level] || 0
+      const studentsInCourse = dashCourseCounts[c.id] || 0
       const completionPct = courseGrades.length > 0
         ? Math.min(Math.round((courseGrades.filter(g => Number(g.score) >= 3.0).length / courseGrades.length) * 100), 100)
         : 0
