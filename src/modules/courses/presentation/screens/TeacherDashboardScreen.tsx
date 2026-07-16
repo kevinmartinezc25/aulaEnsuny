@@ -111,18 +111,7 @@ export function TeacherDashboardScreen() {
             .eq('teacher_id', user.id)
             .order('created_at', { ascending: false })
 
-          // 3. Obtener el conteo de estudiantes por grado académico (para fallback)
-          const { data: students } = await supabase
-            .from('profiles')
-            .select('grade_level, roles!inner(name)')
-            .eq('roles.name', 'student')
-
-          const gradeCounts: Record<string, number> = {}
-          students?.forEach((student: any) => {
-            if (student.grade_level) {
-              gradeCounts[student.grade_level] = (gradeCounts[student.grade_level] || 0) + 1
-            }
-          })
+          // (Se ha eliminado la lógica de fallback por gradeCounts)
 
           // 3b. Obtener el conteo de estudiantes inscritos por curso (student_courses)
           const enrollmentCounts: Record<string, number> = {}
@@ -157,10 +146,7 @@ export function TeacherDashboardScreen() {
             else if (sub.includes('fís')) banner = 'https://images.unsplash.com/photo-1576086213369-97a306d36557?auto=format&fit=crop&q=80&w=300'
             else if (sub.includes('tec') || sub.includes('prog')) banner = 'https://images.unsplash.com/photo-1515879218367-8466d910aaa4?auto=format&fit=crop&q=80&w=300'
 
-            const explicitCount = enrollmentCounts[c.id]
-            const studentsCount = (explicitCount !== undefined && explicitCount > 0)
-              ? explicitCount
-              : (gradeCounts[c.grade_level] || 0)
+            const studentsCount = enrollmentCounts[c.id] || 0
 
             return {
               id: c.id,

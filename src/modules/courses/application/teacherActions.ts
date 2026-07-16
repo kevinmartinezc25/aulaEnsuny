@@ -79,22 +79,10 @@ export async function getTeacherCourseStats(courseId: string): Promise<TeacherCo
     .select('student_id')
     .eq('course_id', courseId)
 
-  if (!enrollErr && enrolledData && enrolledData.length > 0) {
+  if (!enrollErr && enrolledData) {
     studentsCount = enrolledData.length
-  } else if (course.grade_level) {
-    let query = supabase
-      .from('profiles')
-      .select('id, roles!inner(name)', { count: 'exact', head: true })
-      .eq('roles.name', 'student')
-      .eq('grade_level', course.grade_level)
-    
-    if (course.group_name) {
-      query = query.eq('group_name', course.group_name)
-    }
-    
-    const { count } = await query
-    studentsCount = count || 0
   }
+
 
   // 5. Fetch gradebook/performance metrics
   let activeStudents = studentsCount
@@ -455,23 +443,7 @@ export async function getCourseGradebook(courseId: string, categories: CourseGra
     }
   }
 
-  if (students.length === 0 && course.grade_level) {
-    let query = supabase
-      .from('profiles')
-      .select('id, first_name, last_name, avatar_url, roles!inner(name)')
-      .eq('roles.name', 'student')
-      .eq('grade_level', course.grade_level)
-
-    if (course.group_name) {
-      query = query.eq('group_name', course.group_name)
-    }
-
-    const { data: fallbackData } = await query
-    if (fallbackData) {
-      students = fallbackData
-    }
-  }
-  if (!students) return []
+  // (Se ha eliminado la lógica de fallback por grade_level)
 
   // Fetch grades
   const { data: dbGrades } = await supabase
