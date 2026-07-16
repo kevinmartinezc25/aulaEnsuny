@@ -71,25 +71,8 @@ export async function getTeacherStudents(): Promise<TeacherStudent[]> {
       return []
     }
 
-    // 4. Filtrar perfiles que coincidan (vía student_courses o fallback a grado/grupo)
-    let matchingProfiles: any[] = []
-    const hasExplicitEnrollments = enrollmentsByStudent.size > 0
-
-    if (hasExplicitEnrollments) {
-      matchingProfiles = profiles.filter(p => enrollmentsByStudent.has(p.id))
-    } else {
-      // Fallback: match by grade level and group
-      const gradeGroupPairs = courses.map(c => ({
-        grade: c.grade_level,
-        group: c.group_name || '1'
-      }))
-      matchingProfiles = profiles.filter(p => {
-        return gradeGroupPairs.some(pair => 
-          pair.grade === p.grade_level && 
-          pair.group === (p.group_name || '1')
-        )
-      })
-    }
+    // 4. Filtrar perfiles que coincidan estrictamente vía student_courses
+    const matchingProfiles: any[] = profiles.filter(p => enrollmentsByStudent.has(p.id))
 
     if (matchingProfiles.length === 0) {
       return []
