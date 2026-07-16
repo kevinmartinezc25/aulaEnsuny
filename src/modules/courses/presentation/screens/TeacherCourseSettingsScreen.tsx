@@ -8,6 +8,7 @@ import {
   AlertTriangle
 } from 'lucide-react'
 import { getCourseSettings, saveCourseSettings, CourseSettings, CourseGradeCategory } from '../../application/teacherActions'
+import { regenerateCourseJoinCode } from '../../application/joinRequestsActions'
 
 const SETTINGS_TABS = [
   { id: 'general', label: 'Información General', icon: Book },
@@ -24,7 +25,7 @@ const SETTINGS_TABS = [
 
 export function TeacherCourseSettingsScreen({ courseId }: { courseId: string }) {
   const [activeTab, setActiveTab] = useState('general')
-  const [settings, setSettings] = useState<CourseSettings | null>(null)
+  const [, setSettings] = useState<CourseSettings | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   
@@ -32,6 +33,10 @@ export function TeacherCourseSettingsScreen({ courseId }: { courseId: string }) 
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [categories, setCategories] = useState<CourseGradeCategory[]>([])
+  const [joinCode, setJoinCode] = useState('')
+  const [joinEnabled, setJoinEnabled] = useState(true)
+  const [requireTeacherApproval, setRequireTeacherApproval] = useState(true)
+  const [regeneratingCode, setRegeneratingCode] = useState(false)
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -41,6 +46,9 @@ export function TeacherCourseSettingsScreen({ courseId }: { courseId: string }) 
         setTitle(data.title)
         setDescription(data.description)
         setCategories(data.categories)
+        setJoinCode(data.joinCode)
+        setJoinEnabled(data.joinEnabled)
+        setRequireTeacherApproval(data.requireTeacherApproval)
       } catch (err) {
         console.error(err)
       } finally {
@@ -68,6 +76,18 @@ export function TeacherCourseSettingsScreen({ courseId }: { courseId: string }) 
   const totalWeight = categories.reduce((sum, cat) => sum + (Number(cat.weight) || 0), 0)
   const isValidWeight = totalWeight === 100
 
+  const handleRegenerateCode = async () => {
+    setRegeneratingCode(true)
+    try {
+      const newCode = await regenerateCourseJoinCode(courseId)
+      setJoinCode(newCode)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setRegeneratingCode(false)
+    }
+  }
+
   const handleSave = async () => {
     if (!isValidWeight) return
     setSaving(true)
@@ -75,7 +95,10 @@ export function TeacherCourseSettingsScreen({ courseId }: { courseId: string }) 
       await saveCourseSettings(courseId, {
         title,
         description,
-        categories
+        categories,
+        joinCode,
+        joinEnabled,
+        requireTeacherApproval
       })
     } catch (err) {
       console.error(err)
@@ -107,6 +130,12 @@ export function TeacherCourseSettingsScreen({ courseId }: { courseId: string }) 
             <p className="text-sm text-slate-500 dark:text-slate-400">
               Ajusta los detalles generales y el sistema de evaluación independiente.
             </p>
+            {joinCode ? (
+              <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50/80 px-3 py-1.5 text-sm font-semibold text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-400">
+                <span>Código de acceso</span>
+                <span className="font-mono tracking-[0.2em]">{joinCode}</span>
+              </div>
+            ) : null}
           </div>
         </div>
         
@@ -194,12 +223,24 @@ export function TeacherCourseSettingsScreen({ courseId }: { courseId: string }) 
                   </div>
                   
                   <div className="space-y-2">
-                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Código del curso</label>
-                    <input
-                      type="text"
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all focus:border-[#1F4E31] focus:bg-white focus:ring-4 focus:ring-[#1F4E31]/10 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white"
-                      placeholder="Ej. MAT-101"
-                    />
+                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Código de invitación</label>
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <input
+                        type="text"
+                        value={joinCode}
+                        onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all focus:border-[#1F4E31] focus:bg-white focus:ring-4 focus:ring-[#1F4E31]/10 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white"
+                        placeholder="Ej. TEC10A-7F9KQ"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleRegenerateCode}
+                        disabled={regeneratingCode}
+                        className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:text-slate-300"
+                      >
+                        {regeneratingCode ? '...' : 'Regenerar'}
+                      </button>
+                    </div>
                   </div>
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">

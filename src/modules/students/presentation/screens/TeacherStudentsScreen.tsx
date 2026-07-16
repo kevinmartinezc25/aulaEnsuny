@@ -345,9 +345,9 @@ export function TeacherStudentsScreen() {
                             <span 
                               key={c.id} 
                               className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 text-purple-700 dark:bg-purple-950/20 dark:text-purple-400 border border-purple-100/30"
-                              title={c.subject}
+                              title={`${c.subject} - Progreso: ${c.progress ?? 0}%`}
                             >
-                              {c.title}
+                              {c.title} ({c.progress ?? 0}%)
                             </span>
                           ))}
                         </div>

@@ -1,4 +1,4 @@
-﻿# 📓 Bitácora de Desarrollo — aulaEnsuny LMS
+# 📓 Bitácora de Desarrollo — aulaEnsuny LMS
 
 **Proyecto:** aulaEnsuny — Plataforma LMS Educativa para Colegios
 **Stack:** Next.js · TypeScript · Supabase · Tailwind CSS · Framer Motion · Recharts
@@ -18,8 +18,10 @@
 | Vista Docente | ✅ Operativa | Módulos, recursos, calificaciones |
 | Vista Admin | ✅ Operativa | Dashboard, usuarios, cursos |
 | Google Drive | 🔶 En progreso | Upload/download/delete vía GAS |
-| Cloudinary | ⚪ Pendiente | Integración por implementar |
-| Despliegue producción | ❌ Pendiente | Vercel no configurado |
+| Progreso y Avance | ✅ Funcional | Sincronización BD para lecciones y recursos (PDFs), sin localStorage en desarrollo/producción |
+| Cloudinary | 🔶 En progreso | Manejo en base de datos; avatares y recursos con placeholders dinámicos de iniciales |
+| Configuración de Cuenta | ✅ Funcional | Seguridad (Supabase Auth), Notificaciones por ID y Apariencia Visual integradas |
+| Despliegue producción | ✅ Operativo | Desplegado en Vercel con variables de entorno configuradas |
 
 ---
 
@@ -45,6 +47,27 @@
 - [x] Server Actions para operaciones seguras en el backend.
 - [x] Verificación de TypeScript en la capa de recursos.
 
+### Solicitudes de Curso ("Mis solicitudes" - Estudiantes)
+- [x] Se añadió la opción "Mis solicitudes" en el menú de navegación lateral del estudiante.
+- [x] Acciones del servidor `getStudentJoinRequests()` y `cancelJoinRequest(id)` implementadas en `joinRequestsActions.ts`.
+- [x] Listado y cancelación interactiva de solicitudes desde `StudentRequestsScreen.tsx`.
+
+### Notificaciones y Modal Confirmación (SuperAdmin y Profesores)
+- [x] Migración `update_notifications_table.sql` para añadir soporte de comunicados por rol y prioridad.
+- [x] Mapeo multi-rol de comunicados en el layout principal del dashboard.
+- [x] Reemplazo de la confirmación nativa del navegador (`confirm()`) al eliminar estudiantes por una modal interactiva premium.
+
+### Progreso y Avance del Curso (Estudiantes)
+- [x] Desconexión total de `localStorage` para el registro del progreso en recursos y lecciones en producción y desarrollo.
+- [x] Migración completa a Supabase (`student_resource_progress`) como única fuente de verdad.
+- [x] Corrección de carga inicial automática no deseada del avance (17%) en nuevos alumnos matriculados.
+
+### Configuración, Seguridad y Apariencia Visual
+- [x] Soporte de Apariencia Visual (Tema Claro, Oscuro y Sincronizar con el Sistema) en la configuración del docente y estudiante, alternando reactivamente el Layout.
+- [x] Seguridad real implementada con Supabase Auth (`supabase.auth.updateUser`) para el cambio de contraseñas.
+- [x] Persistencia de las opciones del panel de notificaciones en el almacenamiento local bajo la ID del usuario correspondiente.
+- [x] Corrección del error de consola en React ("An empty string was passed to the src attribute") al añadir fallbacks para avatares vacíos basados en la inicial del estudiante.
+
 ---
 
 ## ✅ CHECKLIST VIGENTE
@@ -63,10 +86,59 @@
 - [ ] Revisar manejo de recursos `link` en listas de docentes y estudiantes.
 
 ### Baja prioridad
-- [ ] Configurar despliegue en Vercel con variables de entorno.
+- [x] Configurar despliegue en Vercel con variables de entorno.
 - [ ] Reemplazar imágenes placeholder de Unsplash con Cloudinary real.
 - [ ] Probar la aplicación completa en móvil y tablet.
 - [ ] Documentar el flujo de Google Drive y recursos en README interno.
+
+---
+
+## 🧭 PLAN DE TRABAJO — AUTOINSCRIPCIÓN A CURSOS
+
+### Validación inicial
+- La propuesta es viable y encaja con la arquitectura actual de Next.js App Router, módulos por dominio y el uso de Supabase + RLS.
+- El proyecto ya cuenta con puntos de integración clave: tabla de cursos, tabla de matrículas via student_courses, panel docente de gestión de curso, tabla de notificaciones y flujo de autenticación con Supabase Auth.
+- El trabajo principal no será construir la base desde cero, sino extender los módulos actuales con nuevas tablas, reglas de negocio y vistas para solicitud, aprobación y matrícula automática.
+
+### Fases propuestas
+1. Base de datos y seguridad
+   - Crear la tabla course_join_requests.
+   - Extender courses con join_code, join_enabled y require_teacher_approval.
+   - Definir políticas RLS para estudiantes, docentes y admin.
+   - Preparar la auditoría de acciones de solicitud, aprobación y rechazo.
+
+2. Dominio y casos de uso
+   - Modelar entidades para solicitud de ingreso, invitación y decisión de aprobación.
+   - Implementar reglas de negocio: una solicitud activa por curso, no volver a solicitar si ya está matriculado, control por docente asignado y generación de códigos únicos.
+   - Separar estas reglas en casos de uso claros bajo una estructura modular y escalable.
+
+3. Infraestructura y backend
+   - Crear repositorios para cursos, solicitudes y matrículas.
+   - Implementar server actions para crear solicitud, aprobar, rechazar, regenerar código y consultar solicitudes pendientes.
+   - Integrar notificaciones internas y eventos de auditoría.
+
+4. Experiencia de estudiante
+   - [x] Agregar la entrada “Mis solicitudes” y “Unirse a un curso” en el menú lateral del estudiante.
+   - [x] Crear la vista para ingresar código de invitación y solicitar ingreso.
+   - [x] Mostrar el listado completo de solicitudes, estados (activo/aprobado, pendiente, rechazado) y permitir la cancelación en tiempo real.
+
+5. Experiencia de docente
+   - Añadir una sección “Solicitudes de ingreso” dentro de la gestión del curso.
+   - Mostrar datos del estudiante, fecha de solicitud y estado.
+   - Permitir aprobar, rechazar y ver perfil desde un panel único.
+
+6. Configuración del curso
+   - Extender la configuración del curso con opciones de acceso: solicitudes habilitadas, invitación directa y aprobación manual o automática.
+   - Añadir generación y regeneración de join_code desde la configuración.
+
+7. QA y validación
+   - Probar el flujo completo: solicitud → notificación docente → aprobación/rechazo → matrícula automática → acceso al curso.
+   - Verificar permisos con RLS y asegurar que solo el docente del curso pueda gestionar solicitudes.
+
+### Priorización recomendada
+- Alta prioridad: base de datos, reglas de negocio y flujo de aprobación.
+- Media prioridad: notificaciones y auditoría.
+- Baja prioridad: opciones avanzadas de aprobación automática y mejoras de UX visual.
 
 ---
 
@@ -76,6 +148,8 @@
 - Conexión real establecida.
 - Auth, perfiles, cursos, recursos y foros funcionando.
 - RLS en revisión para garantizar permisos correctos.
+- Se aplicó la migración de `course_join_requests` y columnas de acceso en cursos.
+- Se ajustaron políticas de acceso para estudiantes, docentes y administración.
 
 ### Google Drive (Apps Script)
 - Proxy GAS integrado en la app.

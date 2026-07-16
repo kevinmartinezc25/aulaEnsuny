@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { BookOpen, CheckCircle, Award, TrendingUp, Flame, Rocket, Code2, AlertTriangle, ArrowRight, ChevronLeft, ChevronRight, Zap, Megaphone, Bell } from 'lucide-react'
+import { BookOpen, CheckCircle, Award, TrendingUp, Flame, Rocket, Code2, AlertTriangle, ArrowRight, ChevronLeft, ChevronRight, Zap, Megaphone, Bell, PlusCircle } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/core/config/supabase/client'
 import { getStudentLatestAnnouncements } from '../../application/announcementActions'
@@ -233,7 +233,7 @@ export function StudentDashboardScreen() {
     else setCalMonth(m => m + 1)
   }
 
-  const MONTH_NAMES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+  const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
 
   // Upcoming events (next 5 from today)
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
@@ -270,13 +270,12 @@ export function StudentDashboardScreen() {
         setStatsData([
           { title: 'Cursos activos', value: '4', linkText: 'Ver todos', href: '/student/dashboard', icon: BookOpen, color: 'text-blue-500 bg-blue-50 dark:bg-blue-950/30' },
           { title: 'Actividades pendientes', value: '4', linkText: 'Ver tareas', href: '/student/calendar', icon: CheckCircle, color: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-950/30' },
-          { title: 'Logros obtenidos', value: '4', linkText: 'Ver logros', href: '/student/achievements', icon: Award, color: 'text-amber-500 bg-amber-50 dark:bg-amber-950/30' },
           { title: 'Progreso general', value: '54%', linkText: 'Ver progreso', href: '/student/dashboard', icon: TrendingUp, color: 'text-indigo-500 bg-indigo-50 dark:bg-indigo-950/30' },
         ])
         // Demo calendar events: use dates relative to today
         const t = new Date()
-        const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
-        const add = (days: number) => { const d = new Date(t); d.setDate(d.getDate()+days); return d }
+        const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+        const add = (days: number) => { const d = new Date(t); d.setDate(d.getDate() + days); return d }
         setCalendarEvents([
           { date: fmt(add(1)), title: 'Quiz de Álgebra', type: 'quiz' },
           { date: fmt(add(3)), title: 'Entrega: Taller MRU', type: 'task' },
@@ -311,7 +310,7 @@ export function StudentDashboardScreen() {
             setStudentName(user.user_metadata.first_name)
           }
 
-          // Fetch courses matching student_courses with fallback to grade_level
+          // Fetch courses explicitly enrolled via student_courses (no grade-level fallback)
           let dbCourses: any[] = []
           try {
             const { data: enrolledData, error: enrollErr } = await supabase
@@ -331,17 +330,7 @@ export function StudentDashboardScreen() {
               }
             }
           } catch (e) {
-            console.warn('student_courses table not accessible, falling back to grade_level:', e)
-          }
-
-          // Fallback to grade level if no courses found yet
-          if (dbCourses.length === 0 && profile?.grade_level) {
-            const { data } = await supabase
-              .from('courses')
-              .select('*')
-              .eq('grade_level', profile.grade_level)
-              .eq('status', 'active')
-            dbCourses = data || []
+            console.warn('Error cargando cursos del estudiante:', e)
           }
 
           // Fetch progress details for all active courses
@@ -350,6 +339,7 @@ export function StudentDashboardScreen() {
           let dbLessons: any[] = []
           let dbResources: any[] = []
           let completedLessonIds = new Set<string>()
+          let completedResourceIds = new Set<string>()
 
           if (courseIds.length > 0) {
             const { data: modulesData } = await supabase
@@ -380,6 +370,24 @@ export function StudentDashboardScreen() {
                 .in('lesson_id', dbLessons.map(l => l.id))
               completedLessonIds = new Set((progressData || []).map(p => p.lesson_id))
 
+              // Fetch student resource progress completions
+              const resourceIds = dbResources.map(r => r.id)
+              if (resourceIds.length > 0) {
+                try {
+                  const { data: progressResourcesData } = await supabase
+                    .from('student_resource_progress')
+                    .select('resource_id')
+                    .eq('student_id', user.id)
+                    .eq('completed', true)
+                    .in('resource_id', resourceIds)
+                  completedResourceIds = new Set((progressResourcesData || []).map(p => p.resource_id))
+                } catch (e) {
+                  console.warn('Could not select student_resource_progress:', e)
+                }
+              }
+
+
+
               // Fetch student forum interactions to auto-complete forums they participated in
               const lessonIds = dbLessons.map(l => l.id)
               if (lessonIds.length > 0) {
@@ -388,7 +396,7 @@ export function StudentDashboardScreen() {
                   .select('id, lesson_id')
                   .in('lesson_id', lessonIds)
                 const courseForums = forumsData || []
-                
+
                 const forumIds = courseForums.map(f => f.id)
                 if (forumIds.length > 0) {
                   // Get threads created by this student
@@ -397,7 +405,7 @@ export function StudentDashboardScreen() {
                     .select('forum_id')
                     .eq('author_id', user.id)
                     .in('forum_id', forumIds)
-                  
+
                   const studentThreadForumIds = new Set(studentThreads?.map(t => t.forum_id) || [])
 
                   // Get all thread IDs in these forums
@@ -405,7 +413,7 @@ export function StudentDashboardScreen() {
                     .from('forum_threads')
                     .select('id, forum_id')
                     .in('forum_id', forumIds)
-                  
+
                   const threadIds = allThreads?.map(t => t.id) || []
                   if (threadIds.length > 0) {
                     const { data: studentReplies } = await supabase
@@ -413,7 +421,7 @@ export function StudentDashboardScreen() {
                       .select('thread_id')
                       .eq('author_id', user.id)
                       .in('thread_id', threadIds)
-                    
+
                     if (studentReplies) {
                       studentReplies.forEach(r => {
                         const thread = allThreads?.find(t => t.id === r.thread_id)
@@ -465,8 +473,9 @@ export function StudentDashboardScreen() {
             const courseResources = dbResources.filter(r => courseModuleIds.has(r.module_id))
 
             const totalItems = courseLessons.length + courseResources.length
-            const completedItems = courseLessons.filter(l => completedLessonIds.has(l.id)).length + courseResources.length
-            const courseProgress = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0
+            const completedItems = courseLessons.filter(l => completedLessonIds.has(l.id)).length +
+                                   courseResources.filter(r => completedResourceIds.has(r.id)).length
+            const courseProgress = totalItems > 0 ? Math.min(100, Math.round((completedItems / totalItems) * 100)) : 0
 
             return {
               id: c.id,
@@ -535,10 +544,10 @@ export function StudentDashboardScreen() {
           const calEventsArr: CalendarEvent[] = []
           const toDateStr = (iso: string) => iso.substring(0, 10)
 
-          // 1. From calendars table (tasks/events created by teacher)
-          ;(dbTasks || []).forEach((t: any) => {
-            calEventsArr.push({ date: toDateStr(t.due_date), title: t.title, type: 'task' })
-          })
+            // 1. From calendars table (tasks/events created by teacher)
+            ; (dbTasks || []).forEach((t: any) => {
+              calEventsArr.push({ date: toDateStr(t.due_date), title: t.title, type: 'task' })
+            })
 
           // 2. Quiz end dates
           if (courseIds.length > 0) {
@@ -556,11 +565,11 @@ export function StudentDashboardScreen() {
                     .select('title, end_date')
                     .in('lesson_id', lessonIds2)
                     .not('end_date', 'is', null)
-                  ;(quizzesData || []).forEach((q: any) => {
-                    if (q.end_date) {
-                      calEventsArr.push({ date: toDateStr(q.end_date), title: q.title, type: 'quiz' })
-                    }
-                  })
+                    ; (quizzesData || []).forEach((q: any) => {
+                      if (q.end_date) {
+                        calEventsArr.push({ date: toDateStr(q.end_date), title: q.title, type: 'quiz' })
+                      }
+                    })
                 }
               }
             } catch (e) { console.warn('Could not load quiz dates:', e) }
@@ -575,11 +584,11 @@ export function StudentDashboardScreen() {
                 .select('title, due_date')
                 .in('lesson_id', lessonIds3)
                 .not('due_date', 'is', null)
-              ;(forumsWithDue || []).forEach((f: any) => {
-                if (f.due_date) {
-                  calEventsArr.push({ date: toDateStr(f.due_date), title: f.title, type: 'forum' })
-                }
-              })
+                ; (forumsWithDue || []).forEach((f: any) => {
+                  if (f.due_date) {
+                    calEventsArr.push({ date: toDateStr(f.due_date), title: f.title, type: 'forum' })
+                  }
+                })
             }
           } catch (e) { console.warn('Forum due_date not available:', e) }
 
@@ -629,13 +638,13 @@ export function StudentDashboardScreen() {
 
           // Calculate overall progress across all active courses
           const totalAllItems = dbLessons.length + dbResources.length
-          const completedAllItems = dbLessons.filter(l => completedLessonIds.has(l.id)).length + dbResources.length
-          const progressPercentage = totalAllItems > 0 ? Math.round((completedAllItems / totalAllItems) * 100) : 0
+          const completedAllItems = dbLessons.filter(l => completedLessonIds.has(l.id)).length +
+                                    dbResources.filter(r => completedResourceIds.has(r.id)).length
+          const progressPercentage = totalAllItems > 0 ? Math.min(100, Math.round((completedAllItems / totalAllItems) * 100)) : 0
 
           setStatsData([
             { title: 'Cursos activos', value: String(mappedCourses.length), linkText: 'Ver todos', href: '/student/dashboard', icon: BookOpen, color: 'text-blue-500 bg-blue-50 dark:bg-blue-950/30' },
             { title: 'Actividades pendientes', value: String(mappedTasks.length), linkText: 'Ver tareas', href: '/student/calendar', icon: CheckCircle, color: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-950/30' },
-            { title: 'Logros obtenidos', value: String(mappedAchievements.length), linkText: 'Ver logros', href: '/student/achievements', icon: Award, color: 'text-amber-500 bg-amber-50 dark:bg-amber-950/30' },
             { title: 'Progreso general', value: `${progressPercentage}%`, linkText: 'Ver progreso', href: '/student/dashboard', icon: TrendingUp, color: 'text-indigo-500 bg-indigo-50 dark:bg-indigo-950/30' },
           ])
 
@@ -741,9 +750,14 @@ export function StudentDashboardScreen() {
               <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
                 Mis cursos
               </h2>
-              <Link href="/student/dashboard" className="text-xs font-semibold text-blue-600 hover:underline dark:text-blue-400 flex items-center gap-0.5">
-                Ver todos <ArrowRight className="h-3 w-3" />
-              </Link>
+              <div className="flex items-center gap-3">
+                <Link href="/student/join-course" className="inline-flex items-center gap-1 text-xs font-semibold text-[#1F4E31] hover:underline dark:text-[#388E59]">
+                  <PlusCircle className="h-3.5 w-3.5" /> Unirse a un curso
+                </Link>
+                <Link href="/student/dashboard" className="text-xs font-semibold text-blue-600 hover:underline dark:text-blue-400 flex items-center gap-0.5">
+                  Ver todos <ArrowRight className="h-3 w-3" />
+                </Link>
+              </div>
             </div>
 
             {/* Grid/Scroll de Cursos */}
@@ -772,8 +786,11 @@ export function StudentDashboardScreen() {
                 </div>
                 <h3 className="text-base font-bold text-slate-900 dark:text-white">Sin cursos registrados</h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-xs mx-auto">
-                  Aún no tienes cursos asignados para tu grado. Ponte en contacto con el administrador para más información.
+                  Aún no tienes cursos asignados para tu grado. Puedes solicitar acceso usando un código de invitación o contactar al administrador.
                 </p>
+                <Link href="/student/join-course" className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl bg-[#1F4E31] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#153823]">
+                  <PlusCircle className="h-4 w-4" /> Unirse a un curso
+                </Link>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -867,9 +884,9 @@ export function StudentDashboardScreen() {
                   let typeColor = 'bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400'
                   if (ann.type === 'urgent') typeColor = 'bg-red-500/10 text-red-600 dark:bg-red-500/20 dark:text-red-400'
                   else if (ann.type === 'reminder') typeColor = 'bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400'
-                  
+
                   return (
-                    <div 
+                    <div
                       key={ann.id}
                       className="rounded-2xl border border-slate-100 bg-white p-4 shadow-[0_8px_30px_rgb(0,0,0,0.01)] text-left flex flex-col justify-between dark:border-slate-800/60 dark:bg-slate-900 hover:shadow-[0_12px_35px_rgb(0,0,0,0.02)] transition-shadow"
                     >
@@ -885,10 +902,10 @@ export function StudentDashboardScreen() {
                         </h4>
                         <div className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2" dangerouslySetInnerHTML={{ __html: ann.content }} />
                       </div>
-                      
+
                       <div className="mt-4 pt-3 border-t border-slate-50 dark:border-slate-800/40 flex items-center justify-between text-[10px] text-slate-400 dark:text-slate-500">
                         <span>{new Date(ann.publishAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</span>
-                        <Link 
+                        <Link
                           href={`/student/courses/${ann.courseId}`}
                           className="font-bold text-blue-650 hover:text-blue-550 dark:text-blue-450"
                         >
@@ -956,7 +973,7 @@ export function StudentDashboardScreen() {
                         return { label: 'Tarea', color: 'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/30' }
                     }
                   }
-                  
+
                   const typeBadge = getTypeBadge(task.type)
 
                   return (
@@ -1021,23 +1038,23 @@ export function StudentDashboardScreen() {
 
             {/* Days header */}
             <div className="grid grid-cols-7 gap-y-2 mt-4 text-center text-[10px] font-bold tracking-wider text-slate-400 uppercase">
-              {['L','M','M','J','V','S','D'].map((d, i) => <span key={i}>{d}</span>)}
+              {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((d, i) => <span key={i}>{d}</span>)}
             </div>
 
             {/* Grid days */}
             <div className="grid grid-cols-7 gap-y-1 mt-2 text-center text-xs font-semibold">
               {calendarGrid.map((cell, index) => {
                 const dayEvents = eventsByDate[cell.dateStr] || []
-                const hasQuiz   = dayEvents.some(e => e.type === 'quiz')
-                const hasTask   = dayEvents.some(e => e.type === 'task' || e.type === 'event')
-                const hasForum  = dayEvents.some(e => e.type === 'forum')
-                const hasAny    = dayEvents.length > 0
+                const hasQuiz = dayEvents.some(e => e.type === 'quiz')
+                const hasTask = dayEvents.some(e => e.type === 'task' || e.type === 'event')
+                const hasForum = dayEvents.some(e => e.type === 'forum')
+                const hasAny = dayEvents.length > 0
 
                 return (
                   <div key={index} className="flex flex-col items-center justify-center py-0.5">
                     <span
                       className={`flex h-7 w-7 items-center justify-center rounded-full transition-colors
-                        ${ cell.isToday
+                        ${cell.isToday
                           ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30 font-bold'
                           : cell.currentMonth
                             ? 'text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-default'
@@ -1050,8 +1067,8 @@ export function StudentDashboardScreen() {
                     {/* Event dots */}
                     {hasAny && cell.currentMonth && (
                       <div className="flex items-center justify-center gap-0.5 mt-0.5 h-1.5">
-                        {hasQuiz  && <span className="h-1 w-1 rounded-full bg-purple-500" />}
-                        {hasTask  && <span className="h-1 w-1 rounded-full bg-amber-500" />}
+                        {hasQuiz && <span className="h-1 w-1 rounded-full bg-purple-500" />}
+                        {hasTask && <span className="h-1 w-1 rounded-full bg-amber-500" />}
                         {hasForum && <span className="h-1 w-1 rounded-full bg-emerald-500" />}
                       </div>
                     )}
@@ -1089,61 +1106,7 @@ export function StudentDashboardScreen() {
             )}
           </div>
 
-          {/* Logros Recientes */}
-          <div className="rounded-3xl border border-slate-100 bg-white p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] dark:border-slate-800/60 dark:bg-slate-900">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-50 dark:border-slate-800/40">
-              <h3 className="font-bold text-slate-900 dark:text-white text-base">
-                Logros recientes
-              </h3>
-              <Link href="/student/achievements" className="text-xs font-semibold text-blue-600 hover:underline dark:text-blue-400">
-                Ver todos
-              </Link>
-            </div>
-
-            {loading ? (
-              <div className="space-y-4.5 mt-4">
-                {Array.from({ length: 3 }).map((_, idx) => (
-                  <div key={idx} className="flex items-center gap-3 animate-pulse">
-                    <div className="h-10 w-10 rounded-xl bg-slate-100 dark:bg-slate-800" />
-                    <div className="space-y-1.5 flex-1">
-                      <div className="h-3 w-20 rounded bg-slate-200 dark:bg-slate-700" />
-                      <div className="h-2.5 w-32 rounded bg-slate-100 dark:bg-slate-800" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : achievements.length === 0 ? (
-              <div className="p-4 text-center">
-                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Aún no has desbloqueado ningún logro.</p>
-              </div>
-            ) : (
-              <div className="space-y-4.5 mt-4">
-                {achievements.map((ach) => (
-                  <div key={ach.id} className="flex items-center justify-between text-left">
-                    <div className="flex items-center gap-3">
-                      <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${ach.iconBg}`}>
-                        {ach.icon}
-                      </div>
-                      <div>
-                        <h4 className="text-xs font-bold text-slate-950 dark:text-white">
-                          {ach.title}
-                        </h4>
-                        <p className="text-[11px] text-slate-400 dark:text-slate-500">
-                          {ach.description}
-                        </p>
-                      </div>
-                    </div>
-                    <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
-                      {ach.date}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
         </div>
-
       </div>
     </div>
   )

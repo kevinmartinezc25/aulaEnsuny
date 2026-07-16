@@ -412,10 +412,16 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
   }
 
   // Helper functions
+
   const handleLessonClick = (lesson: Lesson) => {
     setActiveLesson(lesson)
     setTaskResponse(lesson.submissionText || '')
     setIsMobileNavOpen(false)
+
+    // Auto-mark file resources as completed when student opens them
+    if (lesson.type === 'file' && userRole === 'student' && lesson.status !== 'completed' && lesson.status !== 'graded') {
+      handleMarkAsCompleted(lesson.id)
+    }
   }
 
   const getIcon = (type: Lesson['type']) => {
@@ -669,6 +675,25 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
       }
       const completedLessonIds = new Set(progress.filter(p => p.completed).map(p => p.lesson_id))
 
+      // 5b. Fetch student resource progress
+      let resourceProgress: any[] = []
+      const resourceIds = resources.map(r => r.id)
+      if (resourceIds.length > 0) {
+        try {
+          const { data: rpData } = await supabase
+            .from('student_resource_progress')
+            .select('resource_id, completed')
+            .eq('student_id', user.id)
+            .in('resource_id', resourceIds)
+          resourceProgress = rpData || []
+        } catch (e) {
+          console.warn('Could not select student_resource_progress:', e)
+        }
+      }
+      const completedResourceIds = new Set(resourceProgress.filter(p => p.completed).map(p => p.resource_id))
+
+
+
       // 6. Fetch lesson grades (teacher-graded tasks/workshops) and quiz attempts
       let lessonGrades: any[] = []
       if (lessonIds.length > 0) {
@@ -832,7 +857,7 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
               duration: r.file_size ? `${(r.file_size / 1024 / 1024).toFixed(1)} MB` : 'Enlace Web',
               videoUrl: r.drive_url || undefined,
               driveUrl: r.drive_url || undefined,
-              status: 'completed' as const, // resources are auto-completed / readable
+              status: completedResourceIds.has(r.id) ? 'completed' as const : 'pending' as const,
               content: r.description || 'Archivo adjunto del módulo.',
               sort_order: r.sort_order || 0
             }
@@ -849,12 +874,12 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
         }
       })
 
-      // Compute total progress
+      // Compute total progress (lessons AND file resources)
       const totalItems = mappedModules.reduce((acc, m) => acc + m.lessons.length, 0)
       const completedItems = mappedModules.reduce((acc, m) => {
         return acc + m.lessons.filter(l => l.status === 'completed' || l.status === 'graded').length
       }, 0)
-      const progressPercentage = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0
+      const progressPercentage = totalItems > 0 ? Math.min(100, Math.round((completedItems / totalItems) * 100)) : 0
 
       const resolvedCourseDetails: CourseDetails = {
         id: course.id,
@@ -1099,15 +1124,44 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
     const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL ||
       process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
 
-    if (isDemoMode) {
-      toast.success('Lección completada (Modo Demo)')
+    // Check if this is a resource (PDF)
+    const isResource = activeLesson?.type === 'file' && activeLesson?.id === lessonId
+
+    if (isResource && !isDemoMode) {
+      try {
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          const { error } = await supabase
+            .from('student_resource_progress')
+            .upsert({
+              student_id: user.id,
+              resource_id: lessonId,
+              completed: true,
+              completed_at: new Date().toISOString()
+            }, { onConflict: 'student_id,resource_id' })
+          if (error) throw error
+        }
+      } catch (e) {
+        console.error('Error saving resource completion to Supabase:', e)
+      }
+    }
+
+    if (isDemoMode || isResource) {
+      toast.success('Lección completada' + (isDemoMode ? ' (Modo Demo)' : ''))
       setCourseData(prev => {
         if (!prev) return prev
         const updatedModules = prev.modules.map(m => ({
           ...m,
           lessons: m.lessons.map(l => l.id === lessonId ? { ...l, status: 'completed' as const, submissionText } : l)
         }))
-        return { ...prev, modules: updatedModules }
+        const totalItems = updatedModules.reduce((acc, m) => acc + m.lessons.length, 0)
+        const completedItems = updatedModules.reduce((acc, m) => {
+          return acc + m.lessons.filter(l => l.status === 'completed' || l.status === 'graded').length
+        }, 0)
+        const progressPercentage = totalItems > 0 ? Math.min(100, Math.round((completedItems / totalItems) * 100)) : 0
+
+        return { ...prev, modules: updatedModules, progress: progressPercentage }
       })
       if (activeLesson && activeLesson.id === lessonId) {
         setActiveLesson(prev => prev ? { ...prev, status: 'completed' as const, submissionText } : null)
@@ -1158,7 +1212,13 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
           ...m,
           lessons: m.lessons.map(l => l.id === lessonId ? { ...l, status: 'completed' as const, submissionText } : l)
         }))
-        return { ...prev, modules: updatedModules }
+        const totalItems = updatedModules.reduce((acc, m) => acc + m.lessons.length, 0)
+        const completedItems = updatedModules.reduce((acc, m) => {
+          return acc + m.lessons.filter(l => l.status === 'completed' || l.status === 'graded').length
+        }, 0)
+        const progressPercentage = totalItems > 0 ? Math.min(100, Math.round((completedItems / totalItems) * 100)) : 0
+
+        return { ...prev, modules: updatedModules, progress: progressPercentage }
       })
 
       if (activeLesson && activeLesson.id === lessonId) {
@@ -1626,10 +1686,10 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
                   <motion.div
                     initial={{ scale: 0.98, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
-                    className="rounded-3xl border border-blue-100 bg-blue-50/30 p-6 flex flex-col sm:flex-row items-center justify-between gap-4 dark:border-blue-900/30 dark:bg-blue-950/10"
+                    className="rounded-3xl border border-blue-100 bg-blue-50/30 p-6 space-y-4 dark:border-blue-900/30 dark:bg-blue-950/10"
                   >
                     <div className="flex items-center gap-3 text-left">
-                      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:bg-blue-500/20">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:bg-blue-500/20">
                         <FileText className="h-5.5 w-5.5" />
                       </div>
                       <div className="min-w-0 flex-1">
@@ -1639,27 +1699,41 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
                         <p className="text-xs text-slate-500 dark:text-slate-400">Recurso adjunto de tipo Archivo • {activeLesson.duration || 'Enlace'}</p>
                       </div>
                     </div>
-                    <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto mt-4 sm:mt-0">
+                    <div className="flex flex-wrap items-center gap-2">
                       <button
                         onClick={() => setIsPdfModalOpen(true)}
-                        className="w-full sm:w-auto flex justify-center items-center gap-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800 active:scale-[0.98] transition-all px-5 py-3 text-sm font-semibold"
+                        className="inline-flex items-center gap-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800 active:scale-[0.98] transition-all px-4 py-2.5 text-sm font-semibold"
                       >
-                        <Eye className="h-4.5 w-4.5" />
+                        <Eye className="h-4 w-4" />
                         <span>Visualizar</span>
                       </button>
+                      {activeLesson.status === 'completed' || activeLesson.status === 'graded' ? (
+                        <div className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400">
+                          <CheckCircle className="h-4 w-4" />
+                          <span>Completado</span>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => handleMarkAsCompleted(activeLesson.id)}
+                          className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] transition-all px-4 py-2.5 text-sm font-semibold text-white"
+                        >
+                          <CheckCircle2 className="h-4 w-4" />
+                          <span>Marcar como Completado</span>
+                        </button>
+                      )}
                       {activeLesson.driveUrl ? (
                         <a
                           href={activeLesson.driveUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="w-full sm:w-auto flex justify-center items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.98] transition-all px-5 py-3 text-sm font-semibold text-white"
+                          className="inline-flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.98] transition-all px-4 py-2.5 text-sm font-semibold text-white"
                         >
-                          <Download className="h-4.5 w-4.5" />
+                          <Download className="h-4 w-4" />
                           <span>Descargar</span>
                         </a>
                       ) : (
-                        <button className="w-full sm:w-auto flex justify-center items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.98] transition-all px-5 py-3 text-sm font-semibold text-white">
-                          <Download className="h-4.5 w-4.5" />
+                        <button className="inline-flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.98] transition-all px-4 py-2.5 text-sm font-semibold text-white">
+                          <Download className="h-4 w-4" />
                           <span>Descargar</span>
                         </button>
                       )}
@@ -2612,3 +2686,5 @@ const mockTimeData = [
   { name: 'Módulo 1', horas: 5 },
   { name: 'Módulo 2', horas: 8 }
 ]
+
+

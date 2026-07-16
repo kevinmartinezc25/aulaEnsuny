@@ -9,7 +9,7 @@ export interface TeacherStudent {
   email: string
   gradeLevel: string
   groupName: string
-  courses: { id: string; title: string; subject: string }[]
+  courses: { id: string; title: string; subject: string; progress?: number }[]
   averageGrade: number | null
   status: 'active' | 'at_risk'
   joinedDate: string
@@ -116,6 +116,119 @@ export async function getTeacherStudents(): Promise<TeacherStudent[]> {
       })
     }
 
+    // Fetch progress to compute progress percentage per course
+    // a. Get all modules for these courses
+    const { data: dbModules } = await adminClient
+      .from('course_modules')
+      .select('id, course_id')
+      .in('course_id', teacherCourseIds)
+    const moduleIds = dbModules?.map(m => m.id) || []
+
+    // b. Get all lessons and resources for these modules
+    let dbLessons: any[] = []
+    let dbResources: any[] = []
+    if (moduleIds.length > 0) {
+      const { data: lessonsData } = await adminClient
+        .from('lessons')
+        .select('id, module_id')
+        .in('module_id', moduleIds)
+      dbLessons = lessonsData || []
+
+      const { data: resourcesData } = await adminClient
+        .from('resources')
+        .select('id, module_id')
+        .in('module_id', moduleIds)
+      dbResources = resourcesData || []
+    }
+
+    // Map module_id -> course_id
+    const moduleCourseMap = new Map<string, string>()
+    dbModules?.forEach(m => {
+      moduleCourseMap.set(m.id, m.course_id)
+    })
+
+    // Map lesson_id -> course_id
+    const lessonCourseMap = new Map<string, string>()
+    dbLessons?.forEach(l => {
+      const courseId = moduleCourseMap.get(l.module_id)
+      if (courseId) {
+        lessonCourseMap.set(l.id, courseId)
+      }
+    })
+
+    // Map resource_id -> course_id
+    const resourceCourseMap = new Map<string, string>()
+    dbResources?.forEach(r => {
+      const courseId = moduleCourseMap.get(r.module_id)
+      if (courseId) {
+        resourceCourseMap.set(r.id, courseId)
+      }
+    })
+
+    // Count total items per course (lessons + resources)
+    const totalItemsPerCourse = new Map<string, number>()
+    dbLessons?.forEach(l => {
+      const courseId = lessonCourseMap.get(l.id)
+      if (courseId) {
+        totalItemsPerCourse.set(courseId, (totalItemsPerCourse.get(courseId) || 0) + 1)
+      }
+    })
+    dbResources?.forEach(r => {
+      const courseId = resourceCourseMap.get(r.id)
+      if (courseId) {
+        totalItemsPerCourse.set(courseId, (totalItemsPerCourse.get(courseId) || 0) + 1)
+      }
+    })
+
+    // c. Fetch progress for all matching students in these lessons where completed is true
+    let progressData: any[] = []
+    if (dbLessons.length > 0 && studentIds.length > 0) {
+      const lessonIds = dbLessons.map(l => l.id)
+      const { data } = await adminClient
+        .from('student_progress')
+        .select('student_id, lesson_id')
+        .eq('completed', true)
+        .in('student_id', studentIds)
+        .in('lesson_id', lessonIds)
+      progressData = data || []
+    }
+
+    // d. Fetch progress for all matching students in these resources where completed is true
+    let progressResourcesData: any[] = []
+    if (dbResources.length > 0 && studentIds.length > 0) {
+      const resourceIds = dbResources.map(r => r.id)
+      const { data } = await adminClient
+        .from('student_resource_progress')
+        .select('student_id, resource_id')
+        .eq('completed', true)
+        .in('student_id', studentIds)
+        .in('resource_id', resourceIds)
+      progressResourcesData = data || []
+    }
+
+    // Map student_id -> course_id -> completed_items_count
+    const completedItemsMap = new Map<string, Map<string, number>>()
+    progressData.forEach(p => {
+      const courseId = lessonCourseMap.get(p.lesson_id)
+      if (courseId) {
+        if (!completedItemsMap.has(p.student_id)) {
+          completedItemsMap.set(p.student_id, new Map<string, number>())
+        }
+        const courseMap = completedItemsMap.get(p.student_id)!
+        courseMap.set(courseId, (courseMap.get(courseId) || 0) + 1)
+      }
+    })
+    progressResourcesData.forEach(p => {
+      const courseId = resourceCourseMap.get(p.resource_id)
+      if (courseId) {
+        if (!completedItemsMap.has(p.student_id)) {
+          completedItemsMap.set(p.student_id, new Map<string, number>())
+        }
+        const courseMap = completedItemsMap.get(p.student_id)!
+        courseMap.set(courseId, (courseMap.get(courseId) || 0) + 1)
+      }
+    })
+
     // 6. Construir lista final de estudiantes
     return matchingProfiles.map(p => {
       const studentGrades = gradesByStudent.get(p.id) || []
@@ -142,11 +255,18 @@ export async function getTeacherStudents(): Promise<TeacherStudent[]> {
         )
       }
 
-      const studentCourses = studentCoursesData.map(c => ({
-        id: c.id,
-        title: c.title,
-        subject: c.subject
-      }))
+      const studentCourses = studentCoursesData.map(c => {
+        const total = totalItemsPerCourse.get(c.id) || 0
+        const completed = completedItemsMap.get(p.id)?.get(c.id) || 0
+        const progress = total > 0 ? Math.min(100, Math.round((completed / total) * 100)) : 0
+
+        return {
+          id: c.id,
+          title: c.title,
+          subject: c.subject,
+          progress
+        }
+      })
 
       const cleanFirstName = (p.first_name || 'estudiante').toLowerCase().replace(/\s+/g, '')
       const cleanLastName = (p.last_name || 'nuevo').toLowerCase().replace(/\s+/g, '')
@@ -177,8 +297,8 @@ export async function getTeacherStudents(): Promise<TeacherStudent[]> {
         gradeLevel: '8°',
         groupName: '1',
         courses: [
-          { id: 'c1', title: 'Física I - 8°', subject: 'Ciencias Exactas' },
-          { id: 'c2', title: 'Matemáticas - 8°', subject: 'Ciencias Exactas' }
+          { id: 'c1', title: 'Física I - 8°', subject: 'Ciencias Exactas', progress: 85 },
+          { id: 'c2', title: 'Matemáticas - 8°', subject: 'Ciencias Exactas', progress: 60 }
         ],
         averageGrade: 4.55,
         status: 'active',
@@ -191,8 +311,8 @@ export async function getTeacherStudents(): Promise<TeacherStudent[]> {
         gradeLevel: '8°',
         groupName: '1',
         courses: [
-          { id: 'c1', title: 'Física I - 8°', subject: 'Ciencias Exactas' },
-          { id: 'c2', title: 'Matemáticas - 8°', subject: 'Ciencias Exactas' }
+          { id: 'c1', title: 'Física I - 8°', subject: 'Ciencias Exactas', progress: 40 },
+          { id: 'c2', title: 'Matemáticas - 8°', subject: 'Ciencias Exactas', progress: 25 }
         ],
         averageGrade: 3.80,
         status: 'active',
@@ -205,7 +325,7 @@ export async function getTeacherStudents(): Promise<TeacherStudent[]> {
         gradeLevel: '9°',
         groupName: '2',
         courses: [
-          { id: 'c3', title: 'Química General - 9°', subject: 'Ciencias Exactas' }
+          { id: 'c3', title: 'Química General - 9°', subject: 'Ciencias Exactas', progress: 70 }
         ],
         averageGrade: 4.10,
         status: 'active',
@@ -218,7 +338,7 @@ export async function getTeacherStudents(): Promise<TeacherStudent[]> {
         gradeLevel: '10°',
         groupName: '2',
         courses: [
-          { id: 'c4', title: 'Trigonometría - 10°', subject: 'Matemáticas' }
+          { id: 'c4', title: 'Trigonometría - 10°', subject: 'Matemáticas', progress: 15 }
         ],
         averageGrade: 2.85,
         status: 'at_risk',
@@ -231,7 +351,7 @@ export async function getTeacherStudents(): Promise<TeacherStudent[]> {
         gradeLevel: '11°',
         groupName: '1',
         courses: [
-          { id: 'c5', title: 'Física Avanzada - 11°', subject: 'Ciencias Exactas' }
+          { id: 'c5', title: 'Física Avanzada - 11°', subject: 'Ciencias Exactas', progress: 95 }
         ],
         averageGrade: 4.65,
         status: 'active',

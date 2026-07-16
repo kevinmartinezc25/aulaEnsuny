@@ -262,9 +262,9 @@ function SidebarContent({ onClose, isCollapsed = false, user }: SidebarProps) {
 
   let menuItems = [
     { name: 'Mis cursos', href: '/student/dashboard', icon: BookOpen },
+    { name: 'Mis solicitudes', href: '/student/requests', icon: ClipboardList },
     { name: 'Calificaciones', href: '/student/grades', icon: TrendingUp },
     { name: 'Calendario', href: '/student/calendar', icon: Calendar },
-    { name: 'Logros', href: '/student/achievements', icon: Award },
     { name: 'Votaciones', href: '/student/elections', icon: ShieldCheck },
     { name: 'Documentos', href: '/student/docs', icon: FileText },
     { name: 'Configuración', href: '/student/settings', icon: Settings },
@@ -400,10 +400,22 @@ function SidebarContent({ onClose, isCollapsed = false, user }: SidebarProps) {
 }
 
 // ─── Main Layout ────────────────────────────────────────────────────────────────
-const MOCK_NOTIFICATIONS = [
+const STUDENT_MOCK_NOTIFICATIONS = [
   { id: 1, title: 'Tarea Calificada', message: 'Tu ensayo sobre Inercia ha sido calificado con 4.5', time: 'Hace 2 horas', read: false },
   { id: 2, title: 'Nuevo Material', message: 'El profesor subió un nuevo PDF al módulo 2.', time: 'Hace 5 horas', read: false },
   { id: 3, title: 'Recordatorio', message: 'Mañana vence la entrega del Taller Práctico.', time: 'Ayer', read: true },
+]
+
+const TEACHER_MOCK_NOTIFICATIONS = [
+  { id: 1, title: 'Nueva Entrega', message: 'Ana García entregó la Tarea 1.', time: 'Hace 30 min', read: false },
+  { id: 2, title: 'Mensaje de Foro', message: 'Carlos López publicó una duda en el Foro General.', time: 'Hace 2 horas', read: false },
+  { id: 3, title: 'Solicitud de Ingreso', message: 'Diego Fernández solicitó unirse a Física General.', time: 'Ayer', read: true },
+]
+
+const ADMIN_MOCK_NOTIFICATIONS = [
+  { id: 1, title: 'Reporte de Sistema', message: 'Se completó la copia de seguridad diaria con éxito.', time: 'Hace 15 min', read: false },
+  { id: 2, title: 'Nueva Solicitud Académica', message: 'Un docente solicitó la creación de un nuevo curso.', time: 'Hace 3 horas', read: false },
+  { id: 3, title: 'Registro de Auditoría', message: 'Se detectó un cambio de configuración en el módulo de grados.', time: 'Ayer', read: true },
 ]
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -459,15 +471,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   useEffect(() => {
-    const theme = localStorage.getItem('theme')
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-    if (theme === 'dark' || (!theme && prefersDark)) {
-      document.documentElement.classList.add('dark')
-      setIsDark(true)
-    } else {
-      document.documentElement.classList.remove('dark')
-      setIsDark(false)
+    const syncTheme = () => {
+      const theme = localStorage.getItem('theme')
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+      if (theme === 'dark' || (!theme && prefersDark)) {
+        document.documentElement.classList.add('dark')
+        setIsDark(true)
+      } else {
+        document.documentElement.classList.remove('dark')
+        setIsDark(false)
+      }
     }
+
+    syncTheme()
+    window.addEventListener('theme-changed', syncTheme)
+    return () => window.removeEventListener('theme-changed', syncTheme)
   }, [])
 
   // Cargar perfil del usuario actual de manera reactiva/dinámica
@@ -552,14 +570,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             try {
               setNotifications(JSON.parse(localNotifs))
             } catch (e) {
-              setNotifications(MOCK_NOTIFICATIONS)
+              const defaultMocks = user?.role === 'teacher' 
+                ? TEACHER_MOCK_NOTIFICATIONS 
+                : (user?.role === 'admin' || user?.role === 'superadmin' ? ADMIN_MOCK_NOTIFICATIONS : STUDENT_MOCK_NOTIFICATIONS)
+              setNotifications(defaultMocks)
             }
           } else {
-            localStorage.setItem('aulaensuny-demo-notifications', JSON.stringify(MOCK_NOTIFICATIONS))
-            setNotifications(MOCK_NOTIFICATIONS)
+            const defaultMocks = user?.role === 'teacher' 
+              ? TEACHER_MOCK_NOTIFICATIONS 
+              : (user?.role === 'admin' || user?.role === 'superadmin' ? ADMIN_MOCK_NOTIFICATIONS : STUDENT_MOCK_NOTIFICATIONS)
+            localStorage.setItem('aulaensuny-demo-notifications', JSON.stringify(defaultMocks))
+            setNotifications(defaultMocks)
           }
         } else {
-          setNotifications(MOCK_NOTIFICATIONS)
+          const defaultMocks = user?.role === 'teacher' 
+            ? TEACHER_MOCK_NOTIFICATIONS 
+            : (user?.role === 'admin' || user?.role === 'superadmin' ? ADMIN_MOCK_NOTIFICATIONS : STUDENT_MOCK_NOTIFICATIONS)
+          setNotifications(defaultMocks)
         }
         return
       }
@@ -574,11 +601,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         const { data: { user: authUser } } = await supabase.auth.getUser()
 
         // Buscar notificaciones destinadas al rol del usuario, a todos ('all') o dirigidas específicamente al usuario
+        // Si el rol es superadmin, también debe poder ver notificaciones dirigidas al rol admin
+        let roleFilter = `target_role.eq.${user.role}`
+        if (user.role === 'superadmin') {
+          roleFilter = `target_role.eq.superadmin,target_role.eq.admin`
+        }
+
         let query = supabase.from('notifications').select('*')
         if (authUser) {
-          query = query.or(`target_role.eq.all,target_role.eq.${user.role},recipient_id.eq.${authUser.id}`)
+          query = query.or(`target_role.eq.all,${roleFilter},recipient_id.eq.${authUser.id}`)
         } else {
-          query = query.or(`target_role.eq.all,target_role.eq.${user.role}`)
+          query = query.or(`target_role.eq.all,${roleFilter}`)
         }
 
         const { data, error } = await query

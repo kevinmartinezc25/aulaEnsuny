@@ -602,24 +602,7 @@ export async function getStudentPeriodReport(
     }
   })
 
-  // Fallback to grade level if no courses are explicitly enrolled
-  if (courses.length === 0 && profile.grade_level) {
-    const { data: fallbackCourses } = await admin
-      .from('courses')
-      .select('id, title, subject, teacher:profiles!teacher_id(first_name, last_name)')
-      .eq('grade_level', profile.grade_level)
-      .eq('status', 'active')
-
-    courses = (fallbackCourses || []).map((c: any) => {
-      const t = Array.isArray(c?.teacher) ? c.teacher[0] : c?.teacher
-      return {
-        id: c.id,
-        title: c.title,
-        subject: c.subject,
-        teacherName: t ? `${t.first_name} ${t.last_name}` : 'Sin docente'
-      }
-    })
-  }
+  // Sin fallback por grado: solo se muestran cursos explícitamente matriculados
 
   if (courses.length === 0) {
     return { subjects: [], generalAverage: 0, generalPerformanceLevel: 'Bajo' }
