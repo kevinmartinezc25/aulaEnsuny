@@ -1,28 +1,25 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { BookOpen, Users, FolderOpen, TrendingUp, HelpCircle } from 'lucide-react'
+import { Users, FolderOpen, TrendingUp, HelpCircle } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { getTeacherCourseStats, TeacherCourseStats } from '../../application/teacherActions'
-
-const mockPerformanceData = [
-  { name: 'Sem 1', promedio: 3.5 },
-  { name: 'Sem 2', promedio: 3.8 },
-  { name: 'Sem 3', promedio: 4.1 },
-  { name: 'Sem 4', promedio: 4.0 },
-  { name: 'Sem 5', promedio: 4.2 },
-  { name: 'Sem 6', promedio: 4.1 },
-]
+import { getCourseJoinCode } from '../../application/joinRequestsActions'
 
 export function TeacherCourseDashboardScreen({ courseId }: { courseId: string }) {
   const [stats, setStats] = useState<TeacherCourseStats | null>(null)
+  const [joinCode, setJoinCode] = useState('')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const data = await getTeacherCourseStats(courseId)
+        const [data, code] = await Promise.all([
+          getTeacherCourseStats(courseId),
+          getCourseJoinCode(courseId)
+        ])
         setStats(data)
+        setJoinCode(code)
       } catch (err) {
         console.error(err)
       } finally {
@@ -54,6 +51,16 @@ export function TeacherCourseDashboardScreen({ courseId }: { courseId: string })
         <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
           Gestión del Curso
         </h1>
+        {joinCode ? (
+          <div className="mt-3 inline-flex w-fit items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50/80 px-3 py-1.5 text-sm font-semibold text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-400">
+            <span>Código de acceso</span>
+            <span className="font-mono tracking-[0.2em]">{joinCode}</span>
+          </div>
+        ) : (
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+            Aún no hay un código de acceso configurado para este curso.
+          </p>
+        )}
         <p className="text-slate-500 dark:text-slate-400">
           Supervisa el rendimiento y contenido de esta materia.
         </p>

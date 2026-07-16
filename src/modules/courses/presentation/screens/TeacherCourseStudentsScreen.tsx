@@ -42,11 +42,11 @@ export function TeacherCourseStudentsScreen({ courseId }: { courseId: string }) 
 
         if (isDemoMode) {
           setStudents([
-            { id: 's1', name: 'Ana García', email: 'ana.garcia@colegio.edu', status: 'active', attendance: '95%', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&q=80&w=100' },
-            { id: 's2', name: 'Carlos López', email: 'carlos.lopez@colegio.edu', status: 'at_risk', attendance: '70%', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=100' },
-            { id: 's3', name: 'Laura Martínez', email: 'laura.m@colegio.edu', status: 'active', attendance: '100%', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=100' },
-            { id: 's4', name: 'Diego Fernández', email: 'diego.f@colegio.edu', status: 'at_risk', attendance: '60%', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=100' },
-            { id: 's5', name: 'Sofía Castro', email: 'sofia.c@colegio.edu', status: 'active', attendance: '90%', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=100' },
+            { id: 's1', name: 'Ana García', email: 'ana.garcia@colegio.edu', status: 'active', attendance: '95%', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&q=80&w=100', progress: 85 },
+            { id: 's2', name: 'Carlos López', email: 'carlos.lopez@colegio.edu', status: 'at_risk', attendance: '70%', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=100', progress: 45 },
+            { id: 's3', name: 'Laura Martínez', email: 'laura.m@colegio.edu', status: 'active', attendance: '100%', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=100', progress: 95 },
+            { id: 's4', name: 'Diego Fernández', email: 'diego.f@colegio.edu', status: 'at_risk', attendance: '60%', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=100', progress: 30 },
+            { id: 's5', name: 'Sofía Castro', email: 'sofia.c@colegio.edu', status: 'active', attendance: '90%', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=100', progress: 75 },
           ])
           setLoading(false)
           return
@@ -158,6 +158,7 @@ export function TeacherCourseStudentsScreen({ courseId }: { courseId: string }) 
                 <th className="whitespace-nowrap px-6 py-4 font-semibold text-slate-600 dark:text-slate-300">Estudiante</th>
                 <th className="whitespace-nowrap px-6 py-4 font-semibold text-slate-600 dark:text-slate-300">Correo Electrónico</th>
                 <th className="whitespace-nowrap px-6 py-4 font-semibold text-slate-600 dark:text-slate-300">Estado</th>
+                <th className="whitespace-nowrap px-6 py-4 font-semibold text-slate-600 dark:text-slate-300 text-center">Progreso</th>
                 <th className="whitespace-nowrap px-6 py-4 font-semibold text-slate-600 dark:text-slate-300 text-center">Asistencia</th>
                 <th className="px-6 py-4"></th>
               </tr>
@@ -194,6 +195,18 @@ export function TeacherCourseStudentsScreen({ courseId }: { courseId: string }) 
                         En Riesgo
                       </span>
                     )}
+                  </td>
+
+                  <td className="whitespace-nowrap px-6 py-4">
+                    <div className="flex items-center gap-2 justify-center max-w-[120px] mx-auto">
+                      <div className="h-2 w-16 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-blue-600 rounded-full"
+                          style={{ width: `${student.progress ?? 0}%` }}
+                        />
+                      </div>
+                      <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{student.progress ?? 0}%</span>
+                    </div>
                   </td>
 
                   <td className="whitespace-nowrap px-6 py-4 text-center font-medium text-slate-700 dark:text-slate-300">

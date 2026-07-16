@@ -1,0 +1,13 @@
+﻿node.exe : ⨯ Another next build process is already running.
+En C:\Program Files\nodejs\npx.ps1: 29 Carácter: 3
++   & $NODE_EXE $NPX_CLI_JS $args
++   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (⨯ Another next ...lready running.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+  This could be:
+  - A next build still in progress
+  - A previous build that didn't exit cleanly
+
+  Suggestion: Wait for the build to complete.

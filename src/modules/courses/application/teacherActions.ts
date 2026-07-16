@@ -330,6 +330,9 @@ export interface CourseSettings {
   description: string
   status: 'active' | 'draft' | 'archived'
   categories: CourseGradeCategory[]
+  joinCode: string
+  joinEnabled: boolean
+  requireTeacherApproval: boolean
 }
 
 export async function getCourseSettings(courseId: string): Promise<CourseSettings> {
@@ -338,7 +341,7 @@ export async function getCourseSettings(courseId: string): Promise<CourseSetting
   // Fetch course details
   const { data: course } = await supabase
     .from('courses')
-    .select('id, title, description, status')
+    .select('id, title, description, status, join_code, join_enabled, require_teacher_approval')
     .eq('id', courseId)
     .single()
 
@@ -353,6 +356,9 @@ export async function getCourseSettings(courseId: string): Promise<CourseSetting
     title: course?.title || 'Curso',
     description: course?.description || '',
     status: (course?.status as any) || 'active',
+    joinCode: course?.join_code || '',
+    joinEnabled: Boolean(course?.join_enabled),
+    requireTeacherApproval: Boolean(course?.require_teacher_approval),
     categories: (categories || []).map(c => ({
       id: c.id,
       name: c.name,
@@ -369,6 +375,9 @@ export async function saveCourseSettings(courseId: string, settings: Partial<Cou
   if (settings.title !== undefined) courseUpdates.title = settings.title
   if (settings.description !== undefined) courseUpdates.description = settings.description
   if (settings.status !== undefined) courseUpdates.status = settings.status
+  if (settings.joinCode !== undefined) courseUpdates.join_code = settings.joinCode
+  if (settings.joinEnabled !== undefined) courseUpdates.join_enabled = settings.joinEnabled
+  if (settings.requireTeacherApproval !== undefined) courseUpdates.require_teacher_approval = settings.requireTeacherApproval
 
   if (Object.keys(courseUpdates).length > 0) {
     const { error } = await supabase
@@ -412,6 +421,7 @@ export interface GradebookEntry {
   studentAvatar: string
   grades: Record<string, number>
   finalGrade: number
+  progress?: number
 }
 
 export async function getCourseGradebook(courseId: string, categories: CourseGradeCategory[]): Promise<GradebookEntry[]> {
@@ -478,6 +488,71 @@ export async function getCourseGradebook(courseId: string, categories: CourseGra
     gradesMap[g.student_id][g.category_id] = Number(g.score)
   })
 
+  // Fetch progress to compute progress percentage
+  // a. Get modules
+  const { data: dbModules } = await supabase
+    .from('course_modules')
+    .select('id')
+    .eq('course_id', courseId)
+  const moduleIds = dbModules?.map(m => m.id) || []
+
+  // b. Get lessons & resources
+  let lessonsCount = 0
+  let dbLessons: any[] = []
+  let resourcesCount = 0
+  let dbResources: any[] = []
+
+  if (moduleIds.length > 0) {
+    const { data: lessonsData } = await supabase
+      .from('lessons')
+      .select('id')
+      .in('module_id', moduleIds)
+    dbLessons = lessonsData || []
+    lessonsCount = dbLessons.length
+
+    const { data: resourcesData } = await supabase
+      .from('resources')
+      .select('id')
+      .in('module_id', moduleIds)
+    dbResources = resourcesData || []
+    resourcesCount = dbResources.length
+  }
+
+  // c. Fetch progress for all enrolled students in this course (lessons + resources)
+  let progressData: any[] = []
+  if (dbLessons.length > 0 && students.length > 0) {
+    const lessonIds = dbLessons.map(l => l.id)
+    const studentIds = students.map(s => s.id)
+    const { data } = await supabase
+      .from('student_progress')
+      .select('student_id, lesson_id')
+      .eq('completed', true)
+      .in('student_id', studentIds)
+      .in('lesson_id', lessonIds)
+    progressData = data || []
+  }
+
+  let progressResourcesData: any[] = []
+  if (dbResources.length > 0 && students.length > 0) {
+    const resourceIds = dbResources.map(r => r.id)
+    const studentIds = students.map(s => s.id)
+    const { data } = await supabase
+      .from('student_resource_progress')
+      .select('student_id, resource_id')
+      .eq('completed', true)
+      .in('student_id', studentIds)
+      .in('resource_id', resourceIds)
+    progressResourcesData = data || []
+  }
+
+  const completedCountMap: Record<string, number> = {}
+  progressData.forEach(p => {
+    completedCountMap[p.student_id] = (completedCountMap[p.student_id] || 0) + 1
+  })
+  progressResourcesData.forEach(p => {
+    completedCountMap[p.student_id] = (completedCountMap[p.student_id] || 0) + 1
+  })
+
   // 3. Build gradebook entries
   return students.map(student => {
     const studentGrades = gradesMap[student.id] || {}
@@ -495,13 +570,16 @@ export async function getCourseGradebook(courseId: string, categories: CourseGra
     })
     
     const finalGrade = totalWeight > 0 ? (weightedSum / totalWeight) : 0.0
+    const totalItems = lessonsCount + resourcesCount
+    const progress = totalItems > 0 ? Math.min(100, Math.round(((completedCountMap[student.id] || 0) / totalItems) * 100)) : 0
 
     return {
       studentId: student.id,
       studentName: `${student.first_name} ${student.last_name}`,
       studentAvatar: student.avatar_url || '',
       grades: studentGrades,
-      finalGrade: parseFloat(finalGrade.toFixed(2))
+      finalGrade: parseFloat(finalGrade.toFixed(2)),
+      progress
     }
   })
 }
@@ -513,6 +591,7 @@ export interface CourseStudent {
   status: 'active' | 'at_risk'
   attendance: string
   avatar: string
+  progress?: number
 }
 
 export async function getCourseStudents(courseId: string): Promise<CourseStudent[]> {
@@ -574,6 +653,71 @@ export async function getCourseStudents(courseId: string): Promise<CourseStudent
     gradesMap[g.student_id] = Number(g.final_grade)
   })
 
+  // Fetch progress to compute progress percentage
+  // a. Get modules
+  const { data: dbModules } = await supabase
+    .from('course_modules')
+    .select('id')
+    .eq('course_id', courseId)
+  const moduleIds = dbModules?.map(m => m.id) || []
+
+  // b. Get lessons & resources
+  let lessonsCount = 0
+  let dbLessons: any[] = []
+  let resourcesCount = 0
+  let dbResources: any[] = []
+
+  if (moduleIds.length > 0) {
+    const { data: lessonsData } = await supabase
+      .from('lessons')
+      .select('id')
+      .in('module_id', moduleIds)
+    dbLessons = lessonsData || []
+    lessonsCount = dbLessons.length
+
+    const { data: resourcesData } = await supabase
+      .from('resources')
+      .select('id')
+      .in('module_id', moduleIds)
+    dbResources = resourcesData || []
+    resourcesCount = dbResources.length
+  }
+
+  // c. Fetch progress for all enrolled students (lessons + resources)
+  let progressData: any[] = []
+  if (dbLessons.length > 0 && dbStudents.length > 0) {
+    const lessonIds = dbLessons.map(l => l.id)
+    const studentIds = dbStudents.map(s => s.id)
+    const { data } = await supabase
+      .from('student_progress')
+      .select('student_id, lesson_id')
+      .eq('completed', true)
+      .in('student_id', studentIds)
+      .in('lesson_id', lessonIds)
+    progressData = data || []
+  }
+
+  let progressResourcesData: any[] = []
+  if (dbResources.length > 0 && dbStudents.length > 0) {
+    const resourceIds = dbResources.map(r => r.id)
+    const studentIds = dbStudents.map(s => s.id)
+    const { data } = await supabase
+      .from('student_resource_progress')
+      .select('student_id, resource_id')
+      .eq('completed', true)
+      .in('student_id', studentIds)
+      .in('resource_id', resourceIds)
+    progressResourcesData = data || []
+  }
+
+  const completedCountMap: Record<string, number> = {}
+  progressData.forEach(p => {
+    completedCountMap[p.student_id] = (completedCountMap[p.student_id] || 0) + 1
+  })
+  progressResourcesData.forEach(p => {
+    completedCountMap[p.student_id] = (completedCountMap[p.student_id] || 0) + 1
+  })
+
   return dbStudents.map(student => {
     const finalGrade = gradesMap[student.id]
     const status = finalGrade !== undefined && finalGrade < 3.0 ? 'at_risk' : 'active'
@@ -581,6 +725,8 @@ export async function getCourseStudents(courseId: string): Promise<CourseStudent
     const cleanFirstName = (student.first_name || 'estudiante').toLowerCase().replace(/\s+/g, '')
     const cleanLastName = (student.last_name || 'nuevo').toLowerCase().replace(/\s+/g, '')
     const email = `${cleanFirstName}.${cleanLastName}@estudiante.ensuny.edu.co`
+    const totalItems = lessonsCount + resourcesCount
+    const progress = totalItems > 0 ? Math.min(100, Math.round(((completedCountMap[student.id] || 0) / totalItems) * 100)) : 0
 
     return {
       id: student.id,
@@ -588,7 +734,8 @@ export async function getCourseStudents(courseId: string): Promise<CourseStudent
       email,
       status,
       attendance: '95%',
-      avatar: student.avatar_url || ''
+      avatar: student.avatar_url || '',
+      progress
     }
   })
 }

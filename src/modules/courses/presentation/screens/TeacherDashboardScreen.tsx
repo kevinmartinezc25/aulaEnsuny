@@ -21,6 +21,7 @@ interface Course {
   studentsCount: number
   modulesCount: number
   bannerUrl: string
+  joinCode?: string
 }
 
 const analyticsData = [
@@ -34,9 +35,9 @@ const analyticsData = [
 
 export function TeacherDashboardScreen() {
   const [courses, setCourses] = useState<Course[]>([
-    { id: 'fisica-1', title: 'Física I', subject: 'Física', studentsCount: 42, modulesCount: 2, bannerUrl: 'https://images.unsplash.com/photo-1576086213369-97a306d36557?auto=format&fit=crop&q=80&w=300' },
-    { id: 'mate-1', title: 'Matemáticas I', subject: 'Matemáticas', studentsCount: 38, modulesCount: 2, bannerUrl: 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?auto=format&fit=crop&q=80&w=300' },
-    { id: 'prog-1', title: 'Programación', subject: 'Tecnología', studentsCount: 45, modulesCount: 1, bannerUrl: 'https://images.unsplash.com/photo-1515879218367-8466d910aaa4?auto=format&fit=crop&q=80&w=300' },
+    { id: 'fisica-1', title: 'Física I', subject: 'Física', studentsCount: 42, modulesCount: 2, bannerUrl: 'https://images.unsplash.com/photo-1576086213369-97a306d36557?auto=format&fit=crop&q=80&w=300', joinCode: 'FIS-101' },
+    { id: 'mate-1', title: 'Matemáticas I', subject: 'Matemáticas', studentsCount: 38, modulesCount: 2, bannerUrl: 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?auto=format&fit=crop&q=80&w=300', joinCode: 'MAT-202' },
+    { id: 'prog-1', title: 'Programación', subject: 'Tecnología', studentsCount: 45, modulesCount: 1, bannerUrl: 'https://images.unsplash.com/photo-1515879218367-8466d910aaa4?auto=format&fit=crop&q=80&w=300', joinCode: 'PRO-303' },
   ])
 
   const [teacherName, setTeacherName] = useState('Prof. Alejandro')
@@ -167,7 +168,8 @@ export function TeacherDashboardScreen() {
               subject: c.subject || 'General',
               studentsCount,
               modulesCount: modulesCountMap[c.id] || 0,
-              bannerUrl: banner
+              bannerUrl: banner,
+              joinCode: c.join_code || ''
             }
           })
 
@@ -404,6 +406,12 @@ export function TeacherDashboardScreen() {
                       <h3 className="text-lg font-bold text-slate-900 dark:text-white">
                         {course.title}
                       </h3>
+                      {course.joinCode ? (
+                        <div className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50/80 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-400">
+                          <span>Código</span>
+                          <span className="font-mono tracking-[0.18em]">{course.joinCode}</span>
+                        </div>
+                      ) : null}
                       <div className="mt-3 flex items-center justify-between text-xs text-slate-400 dark:text-slate-500">
                         <span>👤 {course.studentsCount} Alumnos</span>
                         <span>📚 {course.modulesCount} Módulos</span>

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   GraduationCap, Search, UserPlus, Trash2, Edit,
   Filter, CheckCircle, Loader2, AlertCircle, BookOpen
@@ -27,6 +28,8 @@ export function AdminStudentsScreen() {
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all')
   const [academicLevels, setAcademicLevels] = useState<AcademicLevel[]>([])
   const [successMsg, setSuccessMsg] = useState('')
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
 
   const mockStudents: Student[] = [
     { id: 's-1', name: 'Ana María Torres', email: 'a.torres@estudiante.ensuny.edu.co', gradeLevel: '8°', groupName: '1', status: 'active', joinedDate: '2025-01-20' },
@@ -86,12 +89,19 @@ export function AdminStudentsScreen() {
     router.push(`/admin/students/${s.id}/edit`)
   }
 
-  const handleDelete = (id: string) => {
-    if (confirm('¿Está seguro de que desea retirar este estudiante del sistema?')) {
-      setStudents(students.filter(s => s.id !== id))
+  const confirmDelete = (id: string) => {
+    setDeleteTargetId(id)
+    setIsDeleteModalOpen(true)
+  }
+
+  const performDelete = () => {
+    if (deleteTargetId) {
+      setStudents(students.filter(s => s.id !== deleteTargetId))
       setSuccessMsg('Estudiante retirado con éxito.')
       setTimeout(() => setSuccessMsg(''), 3000)
     }
+    setIsDeleteModalOpen(false)
+    setDeleteTargetId(null)
   }
 
   return (
@@ -241,7 +251,7 @@ export function AdminStudentsScreen() {
                         <Edit className="h-4 w-4" />
                       </button>
                       <button
-                        onClick={() => handleDelete(s.id)}
+                        onClick={() => confirmDelete(s.id)}
                         className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/20 text-red-500 hover:text-red-700 transition-colors cursor-pointer"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -254,6 +264,48 @@ export function AdminStudentsScreen() {
           </table>
         </div>
       )}
+
+      {/* Custom Confirmation Modal */}
+      <AnimatePresence>
+        {isDeleteModalOpen && (
+          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl p-8 max-w-md w-full shadow-2xl text-center space-y-6"
+            >
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-rose-50 text-rose-600 dark:bg-rose-950/30 dark:text-rose-400">
+                <Trash2 className="h-8 w-8" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white">¿Retirar estudiante?</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  ¿Está seguro de que desea retirar este estudiante del sistema? Esta acción desvinculará sus registros académicos.
+                </p>
+              </div>
+              <div className="flex gap-3 justify-center pt-2">
+                <button
+                  onClick={() => {
+                    setIsDeleteModalOpen(false)
+                    setDeleteTargetId(null)
+                  }}
+                  className="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={performDelete}
+                  className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold transition active:scale-[0.98] cursor-pointer shadow-sm shadow-rose-200 dark:shadow-none"
+                >
+                  Retirar Estudiante
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

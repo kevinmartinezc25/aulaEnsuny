@@ -95,11 +95,17 @@ export function TeacherStudentProfileScreen({ courseId, studentId }: { courseId:
           
           <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-100 dark:border-slate-800/60 shadow-sm">
             <div className="flex items-center gap-6">
-              <img 
-                src={student.studentAvatar} 
-                alt={student.studentName} 
-                className="h-24 w-24 rounded-full object-cover shadow-md border-4 border-slate-50 dark:border-slate-800"
-              />
+              {student.studentAvatar ? (
+                <img 
+                  src={student.studentAvatar} 
+                  alt={student.studentName} 
+                  className="h-24 w-24 rounded-full object-cover shadow-md border-4 border-slate-50 dark:border-slate-800"
+                />
+              ) : (
+                <div className="flex h-24 w-24 items-center justify-center rounded-full bg-indigo-50 text-2xl font-bold text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 border-4 border-slate-50 dark:border-slate-800 shadow-md">
+                  {student.studentName.charAt(0).toUpperCase()}
+                </div>
+              )}
               <div>
                 <h1 className="text-3xl font-black text-slate-900 dark:text-white mb-2">{student.studentName}</h1>
                 <div className="flex items-center gap-3 text-sm text-slate-500 dark:text-slate-400 font-medium">
@@ -196,6 +202,26 @@ export function TeacherStudentProfileScreen({ courseId, studentId }: { courseId:
                     <Award className="h-3.5 w-3.5" />
                     {perfData?.text}
                   </span>
+                </div>
+
+                {/* Progreso del Curso */}
+                <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 border border-slate-100 dark:border-slate-800/60 shadow-sm text-left">
+                  <h3 className="font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5 text-indigo-500" />
+                    Progreso del Curso
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center text-sm font-semibold">
+                      <span className="text-slate-500 dark:text-slate-400">Porcentaje de Avance</span>
+                      <span className="text-slate-950 dark:text-white text-lg font-black">{student.progress ?? 0}%</span>
+                    </div>
+                    <div className="h-2.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-indigo-600 dark:bg-indigo-500 rounded-full transition-all duration-500"
+                        style={{ width: `${student.progress ?? 0}%` }}
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 border border-slate-100 dark:border-slate-800/60 shadow-sm">
@@ -362,11 +388,17 @@ export function TeacherStudentProfileScreen({ courseId, studentId }: { courseId:
               <p className="text-lg font-bold text-black">{student.studentName}</p>
               <p className="text-sm text-gray-600">{`${student.studentName.replace(/\s+/g, '').toLowerCase()}@colegio.edu`}</p>
             </div>
-            <div className="text-right">
-              <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Promedio Final</p>
-              <div className="flex items-center gap-3 justify-end">
-                <span className={`text-sm font-bold px-2 py-0.5 rounded border ${perfData?.pdfClass}`} style={{ WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact' }}>{perfData?.text}</span>
-                <p className="text-3xl font-black text-black">{student.finalGrade.toFixed(2)}</p>
+            <div className="text-right flex flex-col items-end gap-2">
+              <div>
+                <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Promedio Final</p>
+                <div className="flex items-center gap-3 justify-end">
+                  <span className={`text-sm font-bold px-2 py-0.5 rounded border ${perfData?.pdfClass}`} style={{ WebkitPrintColorAdjust: 'exact', colorAdjust: 'exact' }}>{perfData?.text}</span>
+                  <p className="text-3xl font-black text-black">{student.finalGrade.toFixed(2)}</p>
+                </div>
+              </div>
+              <div className="text-right mt-1">
+                <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-0.5">Progreso del Curso</p>
+                <p className="text-sm font-bold text-black">{student.progress ?? 0}%</p>
               </div>
             </div>
           </div>

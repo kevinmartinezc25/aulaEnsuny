@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { motion, Variants } from 'framer-motion'
@@ -18,29 +18,19 @@ export function LoginScreen() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
-  const [isDark, setIsDark] = useState(() => {
-    if (typeof window === 'undefined') return false
 
-    const theme = window.localStorage.getItem('theme')
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-
-    return theme === 'dark' || (!theme && prefersDark)
-  })
-
-  React.useEffect(() => {
+  useEffect(() => {
     const root = document.documentElement
+    const savedTheme = window.localStorage.getItem('theme')
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+    const shouldUseDark = savedTheme === 'dark' || (!savedTheme && prefersDark)
 
-    if (isDark) {
-      root.classList.add('dark')
-    } else {
-      root.classList.remove('dark')
-    }
-  }, [isDark])
+    root.classList.toggle('dark', shouldUseDark)
+  }, [])
 
   const toggleTheme = () => {
     const isDarkNow = document.documentElement.classList.toggle('dark')
-    setIsDark(isDarkNow)
-    localStorage.setItem('theme', isDarkNow ? 'dark' : 'light')
+    window.localStorage.setItem('theme', isDarkNow ? 'dark' : 'light')
   }
 
   const {
@@ -102,7 +92,8 @@ export function LoginScreen() {
           className="rounded-full p-2.5 bg-white/50 border border-slate-200 text-slate-500 hover:bg-white hover:text-slate-900 shadow-sm backdrop-blur-md dark:bg-slate-900/50 dark:border-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-all"
           title="Cambiar tema"
         >
-          {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+          <Sun className="hidden h-5 w-5 dark:block" />
+          <Moon className="block h-5 w-5 dark:hidden" />
         </button>
       </div>
       

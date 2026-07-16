@@ -436,7 +436,13 @@ export function TeacherCourseSubmissionsScreen({ courseId }: { courseId: string 
                   <tr key={student.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
                     <td className="sticky left-0 z-10 bg-white dark:bg-[#0f172a] px-6 py-4 border-r border-slate-100 dark:border-slate-800/60 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.02)] group-hover:bg-slate-50/50">
                       <div className="flex items-center gap-3">
-                        <img src={student.avatar} alt={student.name} className="h-8 w-8 rounded-full object-cover border border-slate-100 dark:border-slate-700" />
+                        {student.avatar ? (
+                          <img src={student.avatar} alt={student.name} className="h-8 w-8 rounded-full object-cover border border-slate-100 dark:border-slate-700" />
+                        ) : (
+                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-50 text-xs font-bold text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 border border-indigo-100/20">
+                            {student.name.charAt(0).toUpperCase()}
+                          </div>
+                        )}
                         <span className="font-semibold text-slate-900 dark:text-white truncate">{student.name}</span>
                       </div>
                     </td>
@@ -514,7 +520,13 @@ export function TeacherCourseSubmissionsScreen({ courseId }: { courseId: string 
                 </button>
                 <div className="w-px h-6 bg-slate-200 dark:bg-slate-700"></div>
                 <div className="flex items-center gap-3">
-                  <img src={activeSubmission.studentAvatar} alt={activeSubmission.studentName} className="h-8 w-8 rounded-full object-cover" />
+                  {activeSubmission.studentAvatar ? (
+                    <img src={activeSubmission.studentAvatar} alt={activeSubmission.studentName} className="h-8 w-8 rounded-full object-cover" />
+                  ) : (
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-50 text-xs font-bold text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 border border-indigo-100/20">
+                      {activeSubmission.studentName.charAt(0).toUpperCase()}
+                    </div>
+                  )}
                   <div>
                     <h2 className="text-sm font-bold text-slate-900 dark:text-white leading-tight">{activeSubmission.studentName}</h2>
                     <p className="text-xs text-slate-500 dark:text-slate-400">{activeSubmission.assignmentName}</p>

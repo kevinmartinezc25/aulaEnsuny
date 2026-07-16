@@ -42,6 +42,51 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
   const [isSaving, setIsSaving] = useState(false)
   const [isLoadingStudent, setIsLoadingStudent] = useState(isEditMode)
   const [activeTab, setActiveTab] = useState<TabType>('basic')
+  const [userRole, setUserRole] = useState<string>('admin')
+
+  // --- Cargar el rol del usuario logueado (SuperAdmin / Admin) ---
+  useEffect(() => {
+    async function loadUserRole() {
+      try {
+        const { createClient } = await import('@/core/config/supabase/client')
+        const supabase = createClient()
+        const { data: { user: authUser } } = await supabase.auth.getUser()
+        if (authUser) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*, roles(name)')
+            .eq('id', authUser.id)
+            .single()
+          
+          if (profile?.roles?.name) {
+            setUserRole(profile.roles.name)
+          } else if (authUser.user_metadata?.role_name) {
+            setUserRole(authUser.user_metadata.role_name)
+          }
+        } else {
+          // Verificar cookie de sesión demo
+          const getCookie = (name: string) => {
+            const value = `; ${document.cookie}`
+            const parts = value.split(`; ${name}=`)
+            if (parts.length === 2) return parts.pop()?.split(';').shift()
+            return null
+          }
+          const demoCookie = getCookie('aulaensuny-demo-session')
+          if (demoCookie) {
+            try {
+              const sess = JSON.parse(decodeURIComponent(demoCookie))
+              if (sess.role) {
+                setUserRole(sess.role)
+              }
+            } catch (e) {}
+          }
+        }
+      } catch (err) {
+        console.error('Error loading user role:', err)
+      }
+    }
+    loadUserRole()
+  }, [])
 
   // --- Estados del Formulario ---
   const [email, setEmail] = useState('')
@@ -190,18 +235,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
     loadGroups()
   }, [enrollment.gradeLevel, academicLevels])
 
-  // --- Auto-seleccionar cursos sugeridos al cambiar el grado ---
-  useEffect(() => {
-    if (!enrollment.gradeLevel || allCourses.length === 0) return
-    
-    // Solo auto-seleccionar si estamos creando o si el estudiante no tiene cursos guardados aún
-    if (!isEditMode) {
-      const matchingCourseIds = allCourses
-        .filter(c => c.grade === enrollment.gradeLevel)
-        .map(c => c.id)
-      setSelectedCourses(matchingCourseIds)
-    }
-  }, [enrollment.gradeLevel, allCourses, isEditMode])
+
 
   // --- Cargar estudiante si es modo edición ---
   useEffect(() => {
@@ -1384,16 +1418,21 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                         value={email}
                         onChange={e => setEmail(e.target.value)}
                         placeholder="Ej: j.torres@estudiante.ensuny.edu.co"
-                        disabled={isEditMode}
+                        disabled={isEditMode && userRole !== 'superadmin'}
                         className="w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 focus:outline-none dark:text-white text-sm disabled:opacity-50"
                       />
                       {!isEditMode && (
                         <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Este correo servirá como usuario de acceso principal.</p>
                       )}
+                      {isEditMode && userRole === 'superadmin' && (
+                        <p className="text-[10px] text-amber-600 dark:text-amber-500 mt-1 font-semibold">
+                          Como SuperAdmin, puedes modificar el correo institucional del estudiante.
+                        </p>
+                      )}
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-slate-450 dark:text-slate-550 uppercase mb-1">Contraseña Temporal</label>
+                      <label className="block text-xs font-bold text-slate-450 dark:text-slate-555 uppercase mb-1">Contraseña Temporal</label>
                       <input 
                         type="text" 
                         value={isEditMode ? '••••••••' : `Ensuny${new Date().getFullYear()}!`} 
@@ -1422,8 +1461,13 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                       <label className="block text-xs font-bold text-slate-450 dark:text-slate-550 uppercase mb-1">Acceso al Sistema</label>
                       <select 
                         value={enrollment.enrollmentStatus === 'active' ? 'active' : 'suspended'}
-                        disabled
-                        className="w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-100 dark:bg-slate-950 text-slate-450 text-sm disabled:opacity-50"
+                        disabled={userRole !== 'superadmin'}
+                        onChange={e => setEnrollment({ ...enrollment, enrollmentStatus: e.target.value as any })}
+                        className={`w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-sm focus:outline-none dark:text-white transition-colors ${
+                          userRole === 'superadmin'
+                            ? 'bg-white dark:bg-slate-950 focus:ring-2 focus:ring-blue-500'
+                            : 'bg-slate-100 dark:bg-slate-950 text-slate-450 disabled:opacity-50'
+                        }`}
                       >
                         <option value="active">Activo</option>
                         <option value="suspended">Inactivo / Suspendido</option>

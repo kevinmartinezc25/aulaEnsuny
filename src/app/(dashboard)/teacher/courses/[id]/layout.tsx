@@ -17,7 +17,8 @@ import {
   BookOpen,
   Inbox,
   MessageSquare,
-  Megaphone
+  Megaphone,
+  UserPlus
 } from 'lucide-react'
 import { createClient } from '@/core/config/supabase/client'
 
@@ -64,6 +65,7 @@ export default function TeacherCourseLayout({
     { name: 'Entregas', href: `${basePath}/submissions`, icon: Inbox },
     { name: 'Calificaciones', href: `${basePath}/grades`, icon: BarChart3 },
     { name: 'Estudiantes', href: `${basePath}/students`, icon: Users },
+    { name: 'Solicitudes', href: `${basePath}/requests`, icon: UserPlus },
     { name: 'Calendario', href: `${basePath}/calendar`, icon: Calendar },
     { name: 'Configuración', href: `${basePath}/settings`, icon: Settings },
   ]

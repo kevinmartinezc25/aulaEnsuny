@@ -9,6 +9,134 @@ export function StudentSettingsScreen() {
   const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'notifications' | 'appearance'>('profile')
   const [isSaving, setIsSaving] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
+  const [theme, setThemeState] = useState<'light' | 'dark' | 'system'>('system')
+  
+  // Custom states for security & notifications
+  const [userId, setUserId] = useState('')
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false)
+  const [passwordError, setPasswordError] = useState<string | null>(null)
+  const [passwordSuccess, setPasswordSuccess] = useState(false)
+
+  const [notifPreferences, setNotifPreferences] = useState({
+    n1: true,
+    n2: true,
+    n3: true,
+    n4: false
+  })
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | 'system' | null
+      setThemeState(savedTheme || 'system')
+    }
+  }, [])
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && userId) {
+      const savedPrefs = localStorage.getItem(`notifications_preferences_${userId}`)
+      if (savedPrefs) {
+        try {
+          setNotifPreferences(JSON.parse(savedPrefs))
+        } catch (e) {
+          console.error(e)
+        }
+      }
+    }
+  }, [userId])
+
+  const handleNotifPreferenceChange = (id: string, checked: boolean) => {
+    setNotifPreferences(prev => ({
+      ...prev,
+      [id]: checked
+    }))
+  }
+
+  const handleSaveNotifications = () => {
+    setIsSaving(true)
+    if (typeof window !== 'undefined') {
+      const uId = userId || 'demo-student-id'
+      localStorage.setItem(`notifications_preferences_${uId}`, JSON.stringify(notifPreferences))
+    }
+    setTimeout(() => {
+      setIsSaving(false)
+      setShowSuccess(true)
+      setTimeout(() => setShowSuccess(false), 3000)
+    }, 850)
+  }
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setPasswordError(null)
+    setPasswordSuccess(false)
+
+    if (!newPassword || !confirmPassword) {
+      setPasswordError('Por favor completa todos los campos de contraseña.')
+      return
+    }
+
+    if (newPassword.length < 6) {
+      setPasswordError('La nueva contraseña debe tener al menos 6 caracteres.')
+      return
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Las contraseñas no coinciden.')
+      return
+    }
+
+    setIsUpdatingPassword(true)
+
+    const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+                       process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
+
+    if (isDemoMode) {
+      setTimeout(() => {
+        setIsUpdatingPassword(false)
+        setPasswordSuccess(true)
+        setCurrentPassword('')
+        setNewPassword('')
+        setConfirmPassword('')
+        setTimeout(() => setPasswordSuccess(false), 3000)
+      }, 1000)
+      return
+    }
+
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.auth.updateUser({ password: newPassword })
+      if (error) {
+        setPasswordError(error.message)
+      } else {
+        setPasswordSuccess(true)
+        setCurrentPassword('')
+        setNewPassword('')
+        setConfirmPassword('')
+        setTimeout(() => setPasswordSuccess(false), 3000)
+      }
+    } catch (err: any) {
+      setPasswordError(err?.message || 'Error al actualizar contraseña.')
+    } finally {
+      setIsUpdatingPassword(false)
+    }
+  }
+
+  const handleThemeChange = (newTheme: 'light' | 'dark' | 'system') => {
+    setThemeState(newTheme)
+    if (typeof window !== 'undefined') {
+      if (newTheme === 'system') {
+        localStorage.removeItem('theme')
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+        document.documentElement.classList.toggle('dark', prefersDark)
+      } else {
+        localStorage.setItem('theme', newTheme)
+        document.documentElement.classList.toggle('dark', newTheme === 'dark')
+      }
+      window.dispatchEvent(new Event('theme-changed'))
+    }
+  }
 
   // Profile fields state
   const [firstName, setFirstName] = useState('')
@@ -44,12 +172,14 @@ export function StudentSettingsScreen() {
             setGrade(session.grade_level ? `Grado ${session.grade_level}` : 'Grado 10°')
             setBio(session.bio || '')
             setAvatarUrl(session.avatar_url || '')
+            setUserId('demo-student-id')
             setLoading(false)
             return
           } catch (e) {
             console.error(e)
           }
         }
+        setUserId('demo-student-id')
         setLoading(false)
         return
       }
@@ -59,6 +189,7 @@ export function StudentSettingsScreen() {
         const { data: { user } } = await supabase.auth.getUser()
         if (user) {
           setEmail(user.email || '')
+          setUserId(user.id)
           
           const { data: profile } = await supabase
             .from('profiles')
@@ -420,11 +551,13 @@ export function StudentSettingsScreen() {
                   </p>
                 </div>
                 
-                <div className="space-y-4 max-w-md">
+                <form onSubmit={handleUpdatePassword} className="space-y-4 max-w-md">
                   <div className="space-y-2">
                     <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Contraseña actual</label>
                     <input
                       type="password"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
                       placeholder="••••••••"
                       className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition-all focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:focus:border-blue-500"
                     />
@@ -433,6 +566,8 @@ export function StudentSettingsScreen() {
                     <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Nueva contraseña</label>
                     <input
                       type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
                       placeholder="••••••••"
                       className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition-all focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:focus:border-blue-500"
                     />
@@ -441,33 +576,40 @@ export function StudentSettingsScreen() {
                     <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Confirmar nueva contraseña</label>
                     <input
                       type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
                       placeholder="••••••••"
                       className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition-all focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:focus:border-blue-500"
                     />
                   </div>
-                </div>
+                </form>
               </div>
-
+ 
               <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/50 px-6 py-4 dark:border-slate-800/60 dark:bg-slate-800/20">
                 <div className="flex items-center gap-2">
-                  {showSuccess && (
+                  {passwordSuccess && (
                     <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-2 text-sm font-medium text-emerald-600 dark:text-emerald-400">
                       <CheckCircle className="h-4 w-4" /> Contraseña actualizada
                     </motion.div>
                   )}
+                  {passwordError && (
+                    <div className="text-sm font-medium text-red-650 dark:text-red-400">
+                      {passwordError}
+                    </div>
+                  )}
                 </div>
                 <button
-                  onClick={handleSave}
-                  disabled={isSaving}
+                  onClick={handleUpdatePassword}
+                  disabled={isUpdatingPassword}
                   className="flex items-center gap-2 rounded-xl bg-slate-900 px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 active:scale-[0.98] disabled:opacity-70 transition-all dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
                 >
-                  {isSaving ? <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-current"></div> : <Save className="h-4 w-4" />}
+                  {isUpdatingPassword ? <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-current"></div> : <Save className="h-4 w-4" />}
                   Actualizar Contraseña
                 </button>
               </div>
             </motion.div>
           )}
-
+ 
           {activeTab === 'notifications' && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
@@ -483,13 +625,13 @@ export function StudentSettingsScreen() {
                     Elige qué notificaciones deseas recibir en tu correo o navegador.
                   </p>
                 </div>
-
+ 
                 <div className="space-y-4">
                   {[
-                    { id: 'n1', title: 'Nuevas Calificaciones', desc: 'Avisarme cuando un profesor haya calificado mi tarea.', defaultChecked: true },
-                    { id: 'n2', title: 'Recordatorios de Tareas', desc: 'Avisarme 24 horas antes de que venza el plazo de entrega.', defaultChecked: true },
-                    { id: 'n3', title: 'Anuncios del Curso', desc: 'Avisarme cuando el profesor publique una noticia o anuncio global.', defaultChecked: true },
-                    { id: 'n4', title: 'Resumen Semanal', desc: 'Recibir un resumen de mi rendimiento cada domingo por correo.', defaultChecked: false },
+                    { id: 'n1', title: 'Nuevas Calificaciones', desc: 'Avisarme cuando un profesor haya calificado mi tarea.' },
+                    { id: 'n2', title: 'Recordatorios de Tareas', desc: 'Avisarme 24 horas antes de que venza el plazo de entrega.' },
+                    { id: 'n3', title: 'Anuncios del Curso', desc: 'Avisarme cuando el profesor publique una noticia o anuncio global.' },
+                    { id: 'n4', title: 'Resumen Semanal', desc: 'Recibir un resumen de mi rendimiento cada domingo por correo.' },
                   ].map((notif) => (
                     <div key={notif.id} className="flex items-start justify-between rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-800/60 dark:bg-slate-800/30">
                       <div>
@@ -497,14 +639,19 @@ export function StudentSettingsScreen() {
                         <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{notif.desc}</p>
                       </div>
                       <label className="relative inline-flex cursor-pointer items-center ml-4 mt-1">
-                        <input type="checkbox" className="peer sr-only" defaultChecked={notif.defaultChecked} />
+                        <input 
+                          type="checkbox" 
+                          className="peer sr-only" 
+                          checked={notifPreferences[notif.id as keyof typeof notifPreferences]}
+                          onChange={(e) => handleNotifPreferenceChange(notif.id, e.target.checked)}
+                        />
                         <div className="peer h-6 w-11 rounded-full bg-slate-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none dark:border-gray-600 dark:bg-slate-700"></div>
                       </label>
                     </div>
                   ))}
                 </div>
               </div>
-
+ 
               <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/50 px-6 py-4 dark:border-slate-800/60 dark:bg-slate-800/20">
                 <div className="flex items-center gap-2">
                   {showSuccess && (
@@ -514,7 +661,7 @@ export function StudentSettingsScreen() {
                   )}
                 </div>
                 <button
-                  onClick={handleSave}
+                  onClick={handleSaveNotifications}
                   disabled={isSaving}
                   className="flex items-center gap-2 rounded-xl bg-slate-900 px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 active:scale-[0.98] disabled:opacity-70 transition-all dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
                 >
@@ -542,23 +689,44 @@ export function StudentSettingsScreen() {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-                  <div className="rounded-2xl border-2 border-blue-500 bg-blue-50 p-4 cursor-pointer dark:bg-blue-900/20">
+                  <div 
+                    onClick={() => handleThemeChange('light')}
+                    className={`rounded-2xl border-2 p-4 cursor-pointer transition-all ${
+                      theme === 'light' 
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/20' 
+                        : 'border-transparent bg-slate-50 dark:bg-slate-800/40 hover:border-slate-200 dark:hover:border-slate-700'
+                    }`}
+                  >
                     <div className="h-20 rounded-xl bg-white shadow-sm border border-slate-200 mb-3 flex flex-col p-2 gap-2">
                       <div className="h-3 w-3/4 rounded bg-slate-200"></div>
                       <div className="h-3 w-1/2 rounded bg-slate-100"></div>
                     </div>
-                    <p className="text-center font-bold text-blue-700 dark:text-blue-400 text-sm">Tema Claro</p>
+                    <p className={`text-center font-bold text-sm ${theme === 'light' ? 'text-blue-700 dark:text-blue-400' : 'text-slate-600 dark:text-slate-350'}`}>Tema Claro</p>
                   </div>
-                  <div className="rounded-2xl border-2 border-transparent bg-slate-50 p-4 hover:border-slate-200 cursor-pointer dark:bg-slate-800 dark:hover:border-slate-700">
+                  <div 
+                    onClick={() => handleThemeChange('dark')}
+                    className={`rounded-2xl border-2 p-4 cursor-pointer transition-all ${
+                      theme === 'dark' 
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/20' 
+                        : 'border-transparent bg-slate-50 dark:bg-slate-800/40 hover:border-slate-200 dark:hover:border-slate-700'
+                    }`}
+                  >
                     <div className="h-20 rounded-xl bg-slate-900 shadow-sm border border-slate-700 mb-3 flex flex-col p-2 gap-2">
                       <div className="h-3 w-3/4 rounded bg-slate-700"></div>
                       <div className="h-3 w-1/2 rounded bg-slate-800"></div>
                     </div>
-                    <p className="text-center font-bold text-slate-600 dark:text-slate-300 text-sm">Tema Oscuro</p>
+                    <p className={`text-center font-bold text-sm ${theme === 'dark' ? 'text-blue-700 dark:text-blue-400' : 'text-slate-600 dark:text-slate-350'}`}>Tema Oscuro</p>
                   </div>
-                  <div className="rounded-2xl border-2 border-transparent bg-slate-50 p-4 hover:border-slate-200 cursor-pointer dark:bg-slate-800 dark:hover:border-slate-700 flex flex-col justify-center">
-                    <div className="text-center text-slate-400 mb-2">💻</div>
-                    <p className="text-center font-bold text-slate-600 dark:text-slate-300 text-sm">Sincronizar con el Sistema</p>
+                  <div 
+                    onClick={() => handleThemeChange('system')}
+                    className={`rounded-2xl border-2 p-4 cursor-pointer transition-all flex flex-col justify-center ${
+                      theme === 'system' 
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/20' 
+                        : 'border-transparent bg-slate-50 dark:bg-slate-800/40 hover:border-slate-200 dark:hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="text-center text-slate-400 mb-2 text-2xl">💻</div>
+                    <p className={`text-center font-bold text-sm ${theme === 'system' ? 'text-blue-700 dark:text-blue-400' : 'text-slate-600 dark:text-slate-350'}`}>Sincronizar con el Sistema</p>
                   </div>
                 </div>
               </div>
