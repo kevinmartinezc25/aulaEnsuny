@@ -226,17 +226,9 @@ export async function getTeacherStudents(): Promise<TeacherStudent[]> {
         isAtRisk = averageGrade < 3.0 || studentGrades.some(g => g.final_grade < 3.0)
       }
 
-      // Obtener cursos asociados (explícitamente inscritos o por fallback de grado/grupo)
-      let studentCoursesData: typeof courses = []
-      if (hasExplicitEnrollments) {
-        const enrolledCourseIds = enrollmentsByStudent.get(p.id) || []
-        studentCoursesData = courses.filter(c => enrolledCourseIds.includes(c.id))
-      } else {
-        studentCoursesData = courses.filter(c => 
-          c.grade_level === p.grade_level && 
-          (c.group_name || '1') === (p.group_name || '1')
-        )
-      }
+      // Obtener cursos asociados estrictamente inscritos
+      const enrolledCourseIds = enrollmentsByStudent.get(p.id) || []
+      const studentCoursesData = courses.filter(c => enrolledCourseIds.includes(c.id))
 
       const studentCourses = studentCoursesData.map(c => {
         const total = totalItemsPerCourse.get(c.id) || 0
