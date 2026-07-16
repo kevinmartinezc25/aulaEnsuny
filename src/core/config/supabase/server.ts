@@ -28,6 +28,9 @@ export async function createClient() {
 }
 
 export function createAdminClient() {
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  console.log('createAdminClient debug: key exists =', !!key, 'length =', key ? key.length : 0)
+
   return createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
