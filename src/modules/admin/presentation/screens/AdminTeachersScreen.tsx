@@ -7,7 +7,7 @@ import {
   BookOpen, Filter, CheckCircle, Loader2, AlertCircle, Phone, Mail, Award
 } from 'lucide-react'
 import { createClient } from '@/core/config/supabase/client'
-import { getAdminTeachers, getAdminCourses } from '../../application/actions'
+import { getAdminTeachers, getAdminCourses, createAdminUser } from '../../application/actions'
 
 interface Teacher {
   id: string
@@ -200,11 +200,20 @@ export function AdminTeachersScreen() {
         } : t))
         setSuccessMsg('Docente actualizado con éxito.')
       } else {
-        // Para crear un docente real se necesita Supabase Auth Admin.
-        // Simulamos la inserción en la interfaz o damos advertencia
-        setErrorMsg('La creación de cuentas de Auth requiere permisos de administrador del sistema. Use la API de Usuarios.')
-        setIsSaving(false)
-        return
+        const res = await createAdminUser({
+          name: form.name,
+          email: form.email,
+          role: 'teacher',
+          status: form.status
+        })
+
+        if (res.error) {
+          throw new Error(res.error)
+        }
+
+        const updatedTeachers = await getAdminTeachers()
+        setTeachers(updatedTeachers)
+        setSuccessMsg('Docente creado con éxito.')
       }
       setIsModalOpen(false)
       setTimeout(() => setSuccessMsg(''), 3000)
