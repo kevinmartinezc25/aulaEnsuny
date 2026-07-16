@@ -12,6 +12,7 @@ export interface CourseJoinRequest {
   reviewed_by: string | null
   comments: string | null
   course_title?: string | null
+  subject?: string | null
   student_name?: string | null
   student_email?: string | null
   student_document?: string | null
