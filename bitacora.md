@@ -2,7 +2,7 @@
 
 **Proyecto:** aulaEnsuny — Plataforma LMS Educativa para Colegios
 **Stack:** Next.js · TypeScript · Supabase · Tailwind CSS · Framer Motion · Recharts
-**Última actualización:** 13 de julio de 2026
+**Última actualización:** 16 de julio de 2026
 
 ---
 
@@ -21,7 +21,9 @@
 | Progreso y Avance | ✅ Funcional | Sincronización BD para lecciones y recursos (PDFs), sin localStorage en desarrollo/producción |
 | Cloudinary | 🔶 En progreso | Manejo en base de datos; avatares y recursos con placeholders dinámicos de iniciales |
 | Configuración de Cuenta | ✅ Funcional | Seguridad (Supabase Auth), Notificaciones por ID y Apariencia Visual integradas |
-| Despliegue producción | ✅ Operativo | Desplegado en Vercel con variables de entorno configuradas |
+| Despliegue producción | ✅ Operativo | Desplegado en Vercel con variables de entorno configuradas (compilación exitosa tras fix de TypeScript) |
+| Recuperación de clave | ✅ Funcional | Flujo completo de restablecimiento de contraseña integrado con Supabase Auth |
+| Email Transaccional (Resend) | 🔶 En progreso | SMTP de Resend configurado en Supabase (Sandbox); pendiente verificar dominio para producción |
 
 ---
 
@@ -67,6 +69,12 @@
 - [x] Seguridad real implementada con Supabase Auth (`supabase.auth.updateUser`) para el cambio de contraseñas.
 - [x] Persistencia de las opciones del panel de notificaciones en el almacenamiento local bajo la ID del usuario correspondiente.
 - [x] Corrección del error de consola en React ("An empty string was passed to the src attribute") al añadir fallbacks para avatares vacíos basados en la inicial del estudiante.
+
+### Recuperación de Contraseña & Resend SMTP
+- [x] Flujo de "Olvidar contraseña" completado de extremo a extremo: `/recovery` (solicitud) -> `/auth/callback` (intercambio de token) -> `/recovery/reset` (nueva contraseña).
+- [x] Configuración de SMTP personalizado en Supabase Auth utilizando Resend para evitar el límite de 3 correos por hora.
+- [x] Diseño de pantallas premium con orbes verdes y grid que heredan el estilo visual de aulaEnsuny.
+- [x] Validaciones robustas con Zod para los formularios de restablecimiento de contraseña.
 
 ---
 
@@ -162,13 +170,17 @@
 - Planeado para avatares, banners y recursos de imagen.
 
 ### Email transaccional
-- Pendiente.
-- Recomendado: Resend.
+- [x] SMTP personalizado configurado con **Resend** en Supabase.
+- [ ] Pendiente: Vincular y verificar el dominio institucional (ej. `ensuny.edu.co`) en Resend para permitir el envío de correos a cualquier dirección (actualmente en modo Sandbox restringido a `kevin.martinez@ensuny.edu.co`).
 
 ---
 
 ## 📌 NOTAS IMPORTANTES
 
+- El proyecto correrá bajo el subdominio oficial solicitado: `https://aula.ensuny.edu.co`.
+  * **Requisito**: Configurar `NEXT_PUBLIC_SITE_URL=https://aula.ensuny.edu.co` en las variables de entorno de producción.
+  * **Requisito**: Registrar `https://aula.ensuny.edu.co/auth/callback` en la lista de *Redirect URLs* permitidas en la consola de Supabase Auth.
+  * **Requisito**: Verificar el dominio `ensuny.edu.co` (o el subdominio `aula.ensuny.edu.co`) en Resend para autorizar envíos generales.
 - Las descargas de recursos usan `drive_download_url` y, si no está disponible, hacen fallback a `drive_url`.
 - La eliminación de Drive exige que el Apps Script acepte JSON y devuelva un JSON válido.
 - El despliegue en producción se realizará cuando las integraciones externas estén validadas.

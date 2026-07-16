@@ -1,4 +1,5 @@
 import { Metadata } from 'next'
+import { Suspense } from 'react'
 import { LoginScreen } from '@/modules/auth/presentation/screens/LoginScreen'
 
 export const metadata: Metadata = {
@@ -7,5 +8,9 @@ export const metadata: Metadata = {
 }
 
 export default function LoginPage() {
-  return <LoginScreen />
+  return (
+    <Suspense fallback={null}>
+      <LoginScreen />
+    </Suspense>
+  )
 }

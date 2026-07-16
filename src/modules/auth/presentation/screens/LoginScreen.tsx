@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { motion, Variants } from 'framer-motion'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { login } from '@/modules/auth/application/actions'
 import { loginSchema, LoginInput } from '@/modules/auth/application/validation'
 import { Button } from '@/components/ui/button'
@@ -15,6 +15,7 @@ import { Loader2, AlertCircle, Eye, EyeOff, Moon, Sun } from 'lucide-react'
 
 export function LoginScreen() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
@@ -26,7 +27,13 @@ export function LoginScreen() {
     const shouldUseDark = savedTheme === 'dark' || (!savedTheme && prefersDark)
 
     root.classList.toggle('dark', shouldUseDark)
-  }, [])
+
+    // Capturar error de parámetros de la URL
+    const errorParam = searchParams.get('error')
+    if (errorParam) {
+      setErrorMsg(errorParam)
+    }
+  }, [searchParams])
 
   const toggleTheme = () => {
     const isDarkNow = document.documentElement.classList.toggle('dark')

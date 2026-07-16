@@ -45,7 +45,9 @@ export async function updateSession(request: NextRequest) {
                      process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
 
   const pathname = request.nextUrl.pathname
-  const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/recovery')
+  const isAuthCallback = pathname.startsWith('/auth/callback')
+  const isRecoveryReset = pathname.startsWith('/recovery/reset')
+  const isAuthPage = pathname.startsWith('/login') || (pathname.startsWith('/recovery') && !isRecoveryReset)
   const isPublicFile = pathname.match(/\.(png|jpg|jpeg|gif|svg|ico|css|js)$/)
 
   if (isDemoMode) {
@@ -53,7 +55,7 @@ export async function updateSession(request: NextRequest) {
     const session = demoSessionCookie ? JSON.parse(demoSessionCookie.value) : null
 
     // 1. Caso: Invitado intentando entrar a ruta protegida
-    if (!session && !isAuthPage && !isPublicFile) {
+    if (!session && !isAuthPage && !isRecoveryReset && !isAuthCallback && !isPublicFile) {
       const url = request.nextUrl.clone()
       url.pathname = '/login'
       return NextResponse.redirect(url)
@@ -129,7 +131,7 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   // 1. Caso: Usuario no autenticado
-  if (!user && !isAuthPage && !isPublicFile) {
+  if (!user && !isAuthPage && !isAuthCallback && !isPublicFile) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)

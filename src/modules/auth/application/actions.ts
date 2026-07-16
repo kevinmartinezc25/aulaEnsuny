@@ -146,10 +146,41 @@ export async function recoverPassword(email: string) {
     return { error: 'Por favor ingresa un correo electrónico válido.' }
   }
 
+  const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL || 
+                     process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
+
+  if (isDemoMode) {
+    return { success: true, isDemo: true }
+  }
+
   const supabase = await createClient()
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/recovery/reset`,
+    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/auth/callback?next=/recovery/reset`,
+  })
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  return { success: true }
+}
+
+/**
+ * Restablecer contraseña con el usuario ya autenticado.
+ */
+export async function resetPassword(password: string) {
+  const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL || 
+                     process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
+
+  if (isDemoMode) {
+    return { success: true }
+  }
+
+  const supabase = await createClient()
+
+  const { error } = await supabase.auth.updateUser({
+    password: password,
   })
 
   if (error) {
