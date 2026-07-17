@@ -47,7 +47,7 @@ export async function updateSession(request: NextRequest) {
   const pathname = request.nextUrl.pathname
   const isAuthCallback = pathname.startsWith('/auth/callback')
   const isRecoveryReset = pathname.startsWith('/recovery/reset')
-  const isAuthPage = pathname.startsWith('/login') || (pathname.startsWith('/recovery') && !isRecoveryReset)
+  const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/register') || (pathname.startsWith('/recovery') && !isRecoveryReset)
   const isPublicFile = pathname.match(/\.(png|jpg|jpeg|gif|svg|ico|css|js)$/)
 
   if (isDemoMode) {

@@ -440,7 +440,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6 text-left">
+    <div className="w-full min-w-0 max-w-7xl mx-auto space-y-4 text-left">
       {/* Botón Volver y Título */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-1">
@@ -475,7 +475,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
       </div>
 
       {/* Navegación por pestañas */}
-      <div className="flex overflow-x-auto gap-2 pb-2 scrollbar-none border-b border-slate-100 dark:border-slate-800/60">
+      <div className="w-full flex overflow-x-auto gap-2 pb-2 scrollbar-none border-b border-slate-100 dark:border-slate-800/60">
         {TAB_CONFIG.map(tab => {
           const Icon = tab.icon
           const isActive = activeTab === tab.id
@@ -515,13 +515,13 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                     <User className="h-4 w-4 text-blue-500" /> Datos de Identificación Personal
                   </h3>
                   
-                  <div className="grid grid-cols-1 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     <div>
                       <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase mb-1">Tipo de Documento *</label>
                       <select 
                         value={details.documentType}
                         onChange={e => setDetails({ ...details, documentType: e.target.value })}
-                        className="w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white text-sm"
+                        className="w-full px-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:text-white text-xs"
                       >
                         <option value="TI">Tarjeta de Identidad (TI)</option>
                         <option value="RC">Registro Civil (RC)</option>
@@ -539,7 +539,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                         value={details.documentNumber}
                         onChange={e => setDetails({ ...details, documentNumber: e.target.value })}
                         placeholder="Ej: 1002345678"
-                        className="w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white text-sm"
+                        className="w-full px-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:text-white text-xs"
                       />
                     </div>
 
@@ -549,7 +549,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                         type="date" 
                         value={details.expeditionDate}
                         onChange={e => setDetails({ ...details, expeditionDate: e.target.value })}
-                        className="w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white text-sm"
+                        className="w-full px-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:text-white text-xs"
                       />
                     </div>
 
@@ -560,7 +560,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                         value={details.expeditionPlace}
                         onChange={e => setDetails({ ...details, expeditionPlace: e.target.value })}
                         placeholder="Municipio / Ciudad"
-                        className="w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white text-sm"
+                        className="w-full px-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:text-white text-xs"
                       />
                     </div>
                   </div>
@@ -574,7 +574,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                       value={details.firstName}
                       onChange={e => setDetails({ ...details, firstName: e.target.value })}
                       placeholder="Ej: Ana"
-                      className="w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white text-sm"
+                      className="w-full px-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:text-white text-xs"
                     />
                   </div>
 
@@ -585,7 +585,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                       value={details.secondName}
                       onChange={e => setDetails({ ...details, secondName: e.target.value })}
                       placeholder="Ej: María"
-                      className="w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white text-sm"
+                      className="w-full px-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:text-white text-xs"
                     />
                   </div>
 
@@ -596,7 +596,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                       value={details.firstSurname}
                       onChange={e => setDetails({ ...details, firstSurname: e.target.value })}
                       placeholder="Ej: Torres"
-                      className="w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white text-sm"
+                      className="w-full px-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:text-white text-xs"
                     />
                   </div>
 
@@ -607,7 +607,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                       value={details.secondSurname}
                       onChange={e => setDetails({ ...details, secondSurname: e.target.value })}
                       placeholder="Ej: Herrera"
-                      className="w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white text-sm"
+                      className="w-full px-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:text-white text-xs"
                     />
                   </div>
                 </div>
@@ -619,7 +619,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                       type="date" 
                       value={details.birthDate}
                       onChange={e => setDetails({ ...details, birthDate: e.target.value })}
-                      className="w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white text-sm"
+                      className="w-full px-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:text-white text-xs"
                     />
                   </div>
 
@@ -638,7 +638,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                     <select 
                       value={details.gender}
                       onChange={e => setDetails({ ...details, gender: e.target.value })}
-                      className="w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white text-sm"
+                      className="w-full px-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:text-white text-xs"
                     >
                       <option value="M">Masculino</option>
                       <option value="F">Femenino</option>
@@ -651,7 +651,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                     <select 
                       value={details.bloodType}
                       onChange={e => setDetails({ ...details, bloodType: e.target.value })}
-                      className="w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white text-sm"
+                      className="w-full px-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:text-white text-xs"
                     >
                       <option value="O">O</option>
                       <option value="A">A</option>
@@ -665,7 +665,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                     <select 
                       value={details.rh}
                       onChange={e => setDetails({ ...details, rh: e.target.value })}
-                      className="w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white text-sm"
+                      className="w-full px-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:text-white text-xs"
                     >
                       <option value="+">Positivo (+)</option>
                       <option value="-">Negativo (-)</option>
@@ -680,7 +680,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                       type="text" 
                       value={details.nationality}
                       onChange={e => setDetails({ ...details, nationality: e.target.value })}
-                      className="w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white text-sm"
+                      className="w-full px-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:text-white text-xs"
                     />
                   </div>
 
@@ -691,7 +691,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                       value={details.birthMunicipality}
                       onChange={e => setDetails({ ...details, birthMunicipality: e.target.value })}
                       placeholder="Ej: Bucaramanga"
-                      className="w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white text-sm"
+                      className="w-full px-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:text-white text-xs"
                     />
                   </div>
 
@@ -702,7 +702,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                       value={details.birthDepartment}
                       onChange={e => setDetails({ ...details, birthDepartment: e.target.value })}
                       placeholder="Ej: Santander"
-                      className="w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white text-sm"
+                      className="w-full px-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:text-white text-xs"
                     />
                   </div>
                 </div>
@@ -712,7 +712,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                     <Home className="h-4 w-4 text-blue-500" /> Información de Residencia y Contacto
                   </h3>
 
-                  <div className="grid grid-cols-1 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     <div className="md:col-span-2">
                       <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase mb-1">Dirección Completa *</label>
                       <input 
@@ -720,7 +720,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                         value={contact.address}
                         onChange={e => setContact({ ...contact, address: e.target.value })}
                         placeholder="Ej: Calle 45 # 12 - 34 Apto 302"
-                        className="w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white text-sm"
+                        className="w-full px-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:text-white text-xs"
                       />
                     </div>
 
@@ -731,7 +731,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                         value={contact.neighborhood}
                         onChange={e => setContact({ ...contact, neighborhood: e.target.value })}
                         placeholder="Ej: San Alonso"
-                        className="w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white text-sm"
+                        className="w-full px-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:text-white text-xs"
                       />
                     </div>
 
@@ -742,7 +742,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                         value={contact.municipality}
                         onChange={e => setContact({ ...contact, municipality: e.target.value })}
                         placeholder="Ej: Floridablanca"
-                        className="w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white text-sm"
+                        className="w-full px-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:text-white text-xs"
                       />
                     </div>
 
@@ -753,7 +753,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                         value={contact.department}
                         onChange={e => setContact({ ...contact, department: e.target.value })}
                         placeholder="Ej: Santander"
-                        className="w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white text-sm"
+                        className="w-full px-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:text-white text-xs"
                       />
                     </div>
 
@@ -762,7 +762,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                       <select 
                         value={contact.zone}
                         onChange={e => setContact({ ...contact, zone: e.target.value as any })}
-                        className="w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white text-sm"
+                        className="w-full px-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:text-white text-xs"
                       >
                         <option value="Urbana">Urbana</option>
                         <option value="Rural">Rural</option>
@@ -778,7 +778,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                         value={contact.phone}
                         onChange={e => setContact({ ...contact, phone: e.target.value })}
                         placeholder="Ej: 6076324567"
-                        className="w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white text-sm"
+                        className="w-full px-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:text-white text-xs"
                       />
                     </div>
 
@@ -789,7 +789,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                         value={contact.studentCellphone}
                         onChange={e => setContact({ ...contact, studentCellphone: e.target.value })}
                         placeholder="Ej: 3154567890"
-                        className="w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white text-sm"
+                        className="w-full px-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:text-white text-xs"
                       />
                     </div>
 
@@ -800,7 +800,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                         value={contact.studentEmail}
                         onChange={e => setContact({ ...contact, studentEmail: e.target.value })}
                         placeholder="estudiante@correo.com"
-                        className="w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white text-sm"
+                        className="w-full px-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:text-white text-xs"
                       />
                     </div>
                   </div>
@@ -816,7 +816,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                   <h3 className="text-base font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2 pb-1.5 border-b border-slate-100 dark:border-slate-850">
                     🧑 Ficha de la Madre
                   </h3>
-                  <div className="grid grid-cols-1 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     <div className="md:col-span-2">
                       <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase mb-1">Nombre Completo</label>
                       <input 
@@ -872,7 +872,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                   <h3 className="text-base font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2 pb-1.5 border-b border-slate-100 dark:border-slate-850">
                     👨 Ficha del Padre
                   </h3>
-                  <div className="grid grid-cols-1 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     <div className="md:col-span-2">
                       <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase mb-1">Nombre Completo</label>
                       <input 
@@ -963,7 +963,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     <div className="md:col-span-2">
                       <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase mb-1">Nombre Completo del Acudiente *</label>
                       <input 
@@ -971,7 +971,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                         value={guardians.guardianName}
                         onChange={e => setGuardians({ ...guardians, guardianName: e.target.value })}
                         placeholder="Ej: Ana María Torres"
-                        className="w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white text-sm"
+                        className="w-full px-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:text-white text-xs"
                       />
                     </div>
 
@@ -980,7 +980,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                       <select 
                         value={guardians.guardianRelationship}
                         onChange={e => setGuardians({ ...guardians, guardianRelationship: e.target.value })}
-                        className="w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white text-sm"
+                        className="w-full px-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:text-white text-xs"
                       >
                         <option value="Madre">Madre</option>
                         <option value="Padre">Padre</option>
@@ -997,7 +997,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                         type="text" 
                         value={guardians.guardianDocument}
                         onChange={e => setGuardians({ ...guardians, guardianDocument: e.target.value })}
-                        className="w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white text-sm"
+                        className="w-full px-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:text-white text-xs"
                       />
                     </div>
 
@@ -1007,7 +1007,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                         type="text" 
                         value={guardians.guardianPhone}
                         onChange={e => setGuardians({ ...guardians, guardianPhone: e.target.value })}
-                        className="w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white text-sm"
+                        className="w-full px-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:text-white text-xs"
                       />
                     </div>
 
@@ -1045,7 +1045,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                     🚑 Ficha Médica y de Salud
                   </h3>
 
-                  <div className="grid grid-cols-1 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     <div>
                       <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase mb-1">EPS del Estudiante *</label>
                       <input 
@@ -1053,7 +1053,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                         value={medical.eps}
                         onChange={e => setMedical({ ...medical, eps: e.target.value })}
                         placeholder="Ej: EPS Sanitas, Sura..."
-                        className="w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white text-sm"
+                        className="w-full px-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:text-white text-xs"
                       />
                     </div>
 
@@ -1134,7 +1134,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                     📋 Información Administrativa y de Protección Social
                   </h3>
 
-                  <div className="grid grid-cols-1 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     <div>
                       <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase mb-1">Estrato Socioeconómico</label>
                       <select 
@@ -1222,7 +1222,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                     🏫 Registro de Matrícula y Ubicación del Curso
                   </h3>
                   
-                  <div className="grid grid-cols-1 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     <div>
                       <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase mb-1">Año Lectivo</label>
                       <input 
@@ -1410,7 +1410,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                     💻 Cuenta y Credenciales del LMS
                   </h3>
                   
-                  <div className="grid grid-cols-1 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     <div className="md:col-span-2">
                       <label className="block text-xs font-bold text-slate-450 dark:text-slate-555 uppercase mb-1">Correo Institucional *</label>
                       <input 
@@ -1601,7 +1601,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                         </div>
 
                         {/* Grid fields */}
-                        <div className="grid grid-cols-1 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                           <div>
                             <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase mb-1">Año *</label>
                             <input 

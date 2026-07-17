@@ -76,6 +76,12 @@
 - [x] Diseño de pantallas premium con orbes verdes y grid que heredan el estilo visual de aulaEnsuny.
 - [x] Validaciones robustas con Zod para los formularios de restablecimiento de contraseña.
 
+### Lógica de Matrículas y Asignación de Cursos
+- [x] Se eliminó la lógica de "fallback" que autocompletaba las listas de estudiantes de un curso basándose únicamente en el `grade_level`.
+- [x] Los dashboards del SuperAdmin y de los Docentes ahora reflejan estrictamente el número de estudiantes a partir de inscripciones formales en la tabla `student_courses`.
+- [x] Los cursos nuevos inician con `0` estudiantes, resolviendo el problema visual de estudiantes "robados" de otros cursos.
+- [x] Limpieza de código y resolución de error de compilación de TypeScript (`hasExplicitEnrollments`) en la vista del docente (`TeacherStudentsScreen`).
+
 ---
 
 ## ✅ CHECKLIST VIGENTE
