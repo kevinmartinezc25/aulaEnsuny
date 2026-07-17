@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   GraduationCap, Search, UserPlus, Trash2, Edit,
-  Filter, CheckCircle, Loader2, AlertCircle, BookOpen
+  Filter, CheckCircle, Loader2, AlertCircle, BookOpen, Link as LinkIcon
 } from 'lucide-react'
 import { getAcademicLevels, AcademicLevel, getAdminStudents } from '../../application/actions'
 
@@ -104,6 +104,14 @@ export function AdminStudentsScreen() {
     setDeleteTargetId(null)
   }
 
+  const copyRegistrationLink = () => {
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://aula.ensuny.edu.co'
+    const link = `${baseUrl}/register/student`
+    navigator.clipboard.writeText(link)
+    setSuccessMsg('¡Enlace de registro copiado al portapapeles!')
+    setTimeout(() => setSuccessMsg(''), 3000)
+  }
+
   return (
     <div className="max-w-7xl mx-auto space-y-8 text-left">
       {/* Header */}
@@ -116,13 +124,23 @@ export function AdminStudentsScreen() {
             Matricula alumnos, asigna grados escolares y controla sus estados académicos.
           </p>
         </div>
-        <button
-          onClick={openCreate}
-          className="flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 text-sm font-semibold active:scale-[0.98] transition-all self-start sm:self-center cursor-pointer"
-        >
-          <UserPlus className="h-4.5 w-4.5" />
-          <span>Matricular Alumno</span>
-        </button>
+        <div className="flex items-center gap-3 self-start sm:self-center">
+          <button
+            onClick={copyRegistrationLink}
+            className="flex items-center gap-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 px-4 py-3 text-sm font-semibold active:scale-[0.98] transition-all cursor-pointer"
+            title="Copiar enlace público de registro"
+          >
+            <LinkIcon className="h-4.5 w-4.5" />
+            <span className="hidden sm:inline">Copiar Enlace</span>
+          </button>
+          <button
+            onClick={openCreate}
+            className="flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 text-sm font-semibold active:scale-[0.98] transition-all cursor-pointer"
+          >
+            <UserPlus className="h-4.5 w-4.5" />
+            <span>Matricular Alumno</span>
+          </button>
+        </div>
       </div>
 
       {successMsg && (

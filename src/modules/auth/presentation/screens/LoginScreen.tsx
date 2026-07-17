@@ -11,7 +11,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
-import { Loader2, AlertCircle, Eye, EyeOff, Moon, Sun } from 'lucide-react'
+import QRCode from 'react-qr-code'
+import { Loader2, AlertCircle, Eye, EyeOff, Moon, Sun, QrCode, X } from 'lucide-react'
 
 export function LoginScreen() {
   const router = useRouter()
@@ -19,6 +20,7 @@ export function LoginScreen() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [showQRModal, setShowQRModal] = useState(false)
 
   useEffect(() => {
     const root = document.documentElement
@@ -226,6 +228,26 @@ export function LoginScreen() {
                     )}
                   </Button>
                 </motion.div>
+
+                <motion.div variants={itemVariants} className="pt-2 text-center flex flex-col items-center gap-2">
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    ¿No tienes una cuenta?{' '}
+                    <a
+                      href="/register/student"
+                      className="font-semibold text-[#1F4E31] hover:text-[#153823] hover:underline transition-colors dark:text-[#388E59] dark:hover:text-[#4AB874]"
+                    >
+                      Regístrate aquí
+                    </a>
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowQRModal(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-full text-xs font-semibold transition-colors mt-1"
+                  >
+                    <QrCode className="w-3.5 h-3.5" />
+                    Mostrar QR de Registro
+                  </button>
+                </motion.div>
               </motion.div>
             </form>
           </CardContent>
@@ -249,6 +271,44 @@ export function LoginScreen() {
         </motion.div>
       </motion.div>
       </div>
+
+      {/* Modal QR */}
+      {showQRModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.95, opacity: 0 }}
+            className="bg-white dark:bg-slate-900 rounded-3xl p-8 max-w-sm w-full shadow-2xl relative"
+          >
+            <button
+              onClick={() => setShowQRModal(false)}
+              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            
+            <div className="text-center space-y-4">
+              <div className="mx-auto w-12 h-12 bg-[#1F4E31]/10 rounded-full flex items-center justify-center mb-2">
+                <QrCode className="w-6 h-6 text-[#1F4E31] dark:text-[#4AB874]" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                Registro Rápido
+              </h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Escanea este código QR desde tu dispositivo móvil para acceder rápidamente al formulario de registro.
+              </p>
+              
+              <div className="bg-white p-4 rounded-2xl inline-block mt-4 shadow-sm border border-slate-100 flex items-center justify-center">
+                <QRCode 
+                  value={typeof window !== 'undefined' ? `${window.location.origin}/register/student` : 'https://aula.ensuny.edu.co/register/student'} 
+                  size={200}
+                />
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   )
 }
