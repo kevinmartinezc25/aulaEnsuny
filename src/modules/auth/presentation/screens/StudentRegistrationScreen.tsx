@@ -20,8 +20,14 @@ const registrationSchema = z.object({
   documentType: z.string().min(1, 'Selecciona un tipo de documento'),
   documentNumber: z.string().min(5, 'El número de documento es requerido'),
   birthDate: z.string().min(1, 'La fecha de nacimiento es requerida'),
+  gradeLevel: z.string().min(1, 'Selecciona tu grado'),
+  groupName: z.string().min(1, 'Selecciona tu grupo'),
   email: z.string().email('Ingresa un correo electrónico válido'),
-  password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres')
+  password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres'),
+  confirmPassword: z.string().min(6, 'Confirma tu contraseña')
+}).refine((data) => data.password === data.confirmPassword, {
+  message: 'Las contraseñas no coinciden',
+  path: ['confirmPassword']
 })
 
 type RegistrationInput = z.infer<typeof registrationSchema>
@@ -51,8 +57,11 @@ export function StudentRegistrationScreen() {
     formState: { errors },
   } = useForm<RegistrationInput>({
     resolver: zodResolver(registrationSchema),
+    mode: 'onChange',
     defaultValues: {
-      documentType: 'TI'
+      documentType: 'TI',
+      gradeLevel: '',
+      groupName: ''
     }
   })
 
@@ -267,6 +276,46 @@ export function StudentRegistrationScreen() {
                     )}
                   </motion.div>
 
+                  <div className="grid grid-cols-2 gap-4">
+                    <motion.div variants={itemVariants} className="space-y-1.5">
+                      <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">Grado *</Label>
+                      <select
+                        {...register('gradeLevel')}
+                        disabled={isLoading}
+                        className="flex h-11 md:h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm transition-all focus:border-[#1F4E31] focus:outline-none focus:ring-2 focus:ring-[#1F4E31] focus:ring-offset-2 dark:border-slate-800 dark:bg-slate-950/50 dark:text-white"
+                      >
+                        <option value="" disabled>Selecciona...</option>
+                        <option value="6°">6°</option>
+                        <option value="7°">7°</option>
+                        <option value="8°">8°</option>
+                        <option value="9°">9°</option>
+                        <option value="10°">10°</option>
+                        <option value="11°">11°</option>
+                        <option value="PFC">PFC</option>
+                      </select>
+                      {errors.gradeLevel && (
+                        <p className="text-[13px] text-red-500 mt-1.5">{errors.gradeLevel.message}</p>
+                      )}
+                    </motion.div>
+
+                    <motion.div variants={itemVariants} className="space-y-1.5">
+                      <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">Grupo *</Label>
+                      <select
+                        {...register('groupName')}
+                        disabled={isLoading}
+                        className="flex h-11 md:h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm transition-all focus:border-[#1F4E31] focus:outline-none focus:ring-2 focus:ring-[#1F4E31] focus:ring-offset-2 dark:border-slate-800 dark:bg-slate-950/50 dark:text-white"
+                      >
+                        <option value="" disabled>Selecciona...</option>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                      </select>
+                      {errors.groupName && (
+                        <p className="text-[13px] text-red-500 mt-1.5">{errors.groupName.message}</p>
+                      )}
+                    </motion.div>
+                  </div>
+
                   <motion.div variants={itemVariants} className="space-y-1.5">
                     <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">Correo Electrónico *</Label>
                     <Input
@@ -281,19 +330,35 @@ export function StudentRegistrationScreen() {
                     )}
                   </motion.div>
 
-                  <motion.div variants={itemVariants} className="space-y-1.5">
-                    <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">Contraseña Inicial *</Label>
-                    <Input
-                      {...register('password')}
-                      type="password"
-                      placeholder="Mínimo 6 caracteres"
-                      disabled={isLoading}
-                      className="h-11 md:h-12 bg-slate-50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 focus:border-[#1F4E31] focus:ring-[#1F4E31] rounded-xl transition-all"
-                    />
-                    {errors.password && (
-                      <p className="text-[13px] text-red-500 mt-1.5">{errors.password.message}</p>
-                    )}
-                  </motion.div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <motion.div variants={itemVariants} className="space-y-1.5">
+                      <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">Contraseña Inicial *</Label>
+                      <Input
+                        {...register('password')}
+                        type="password"
+                        placeholder="Mínimo 6 caracteres"
+                        disabled={isLoading}
+                        className="h-11 md:h-12 bg-slate-50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 focus:border-[#1F4E31] focus:ring-[#1F4E31] rounded-xl transition-all"
+                      />
+                      {errors.password && (
+                        <p className="text-[13px] text-red-500 mt-1.5">{errors.password.message}</p>
+                      )}
+                    </motion.div>
+
+                    <motion.div variants={itemVariants} className="space-y-1.5">
+                      <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">Confirmar Contraseña *</Label>
+                      <Input
+                        {...register('confirmPassword')}
+                        type="password"
+                        placeholder="Repite la contraseña"
+                        disabled={isLoading}
+                        className="h-11 md:h-12 bg-slate-50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 focus:border-[#1F4E31] focus:ring-[#1F4E31] rounded-xl transition-all"
+                      />
+                      {errors.confirmPassword && (
+                        <p className="text-[13px] text-red-500 mt-1.5">{errors.confirmPassword.message}</p>
+                      )}
+                    </motion.div>
+                  </div>
 
                   <motion.div variants={itemVariants} className="pt-2">
                     <Button
