@@ -596,6 +596,8 @@ export interface AdminTeacher {
 export interface AdminStudent {
   id: string
   name: string
+  firstName: string
+  lastName: string
   email: string
   gradeLevel: string
   groupName?: string
@@ -690,6 +692,8 @@ export async function getAdminStudents(): Promise<AdminStudent[]> {
       return {
         id: p.id,
         name: `${p.first_name} ${p.last_name}`,
+        firstName: p.first_name || '',
+        lastName: p.last_name || '',
         email: authUser?.email || (p as any).email || 'sin-correo@ensuny.edu.co',
         gradeLevel: p.grade_level || '8°',
         groupName: p.group_name || '',

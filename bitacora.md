@@ -1,8 +1,8 @@
 # 📓 Bitácora de Desarrollo — aulaEnsuny LMS
 
 **Proyecto:** aulaEnsuny — Plataforma LMS Educativa para Colegios
-**Stack:** Next.js · TypeScript · Supabase · Tailwind CSS · Framer Motion · Recharts
-**Última actualización:** 16 de julio de 2026
+**Stack:** Next.js · TypeScript · Supabase · Tailwind CSS · Framer Motion · Recharts · Sonner
+**Última actualización:** 17 de julio de 2026
 
 ---
 
@@ -24,6 +24,7 @@
 | Despliegue producción | ✅ Operativo | Desplegado en Vercel con variables de entorno configuradas (compilación exitosa tras fix de TypeScript) |
 | Recuperación de clave | ✅ Funcional | Flujo completo de restablecimiento de contraseña integrado con Supabase Auth |
 | Email Transaccional (Resend) | 🔶 En progreso | SMTP de Resend configurado en Supabase (Sandbox); pendiente verificar dominio para producción |
+| Notificaciones UI (Sonner) | ✅ Estándar global | Librería oficial para todos los toasts del proyecto: éxito, error, warning y confirmaciones con action/cancel |
 
 ---
 
@@ -81,6 +82,27 @@
 - [x] Los dashboards del SuperAdmin y de los Docentes ahora reflejan estrictamente el número de estudiantes a partir de inscripciones formales en la tabla `student_courses`.
 - [x] Los cursos nuevos inician con `0` estudiantes, resolviendo el problema visual de estudiantes "robados" de otros cursos.
 - [x] Limpieza de código y resolución de error de compilación de TypeScript (`hasExplicitEnrollments`) en la vista del docente (`TeacherStudentsScreen`).
+
+### Gestión y Monitoreo de Estudiantes
+- [x] Formateo automático de nombres a *Title Case* (ej. "ana maría torres" -> "Ana María Torres").
+- [x] Reordenamiento de la visualización en tablas y listados para mostrar siempre "Apellidos Nombres" (ej. "Torres Ana María").
+- [x] Ordenamiento alfabético estricto por apellido en las listas de SuperAdmin y Docentes, ajustando las consultas de base de datos en `actions.ts`.
+- [x] Integración de un nuevo filtro dinámico por "Grupo" en la vista de estudiantes del SuperAdmin.
+- [x] Actualización de la generación de avatares para que las iniciales coincidan con el nuevo esquema de visualización invertido.
+
+### Centro de Documentación y Autenticación UI
+- [x] Corrección de error de runtime en Next.js reemplazando modales custom destructivos por el estándar de notificaciones Sonner con botones interactivos `action`/`cancel`.
+- [x] Restricción de acceso al Centro de Documentación: el módulo está oculto para estudiantes y su ruta `/student/docs` retorna `notFound()` (Error 404).
+- [x] Acceso público al Centro de Documentación (`/docs`): habilitado el acceso público sin inicio de sesión (rol `guest`) omitiendo la redirección de autenticación en el `middleware`.
+- [x] Rol de Invitado (`guest`) limitado a lectura: solo visualiza documentos con estado `published` y se inhabilitan todos los controles de creación, edición e historial. El texto explicativo de bienvenida se ajusta dinámicamente para no incentivar la creación/organización cuando el usuario no tiene permisos de edición.
+- [x] Implementación de **Landing Page Premium (`src/app/page.tsx`)** en la raíz del proyecto, sirviendo como página de presentación de alta fidelidad, interactiva y responsiva con soporte de tema claro/oscuro.
+- [x] Configuración en el `middleware` para permitir acceso público sin sesión a la raíz `/` (Landing Page), manteniendo la redirección automática a tableros para usuarios con sesión activa.
+- [x] Limpieza en la pantalla de inicio de sesión (`LoginScreen.tsx`): se removió el enlace de acceso a la documentación pública y se integró un botón premium de "Volver al Inicio" en la esquina superior izquierda para permitir el retorno a la Landing Page.
+- [x] Configuración en el Centro de Documentación público (`DocCenterScreen.tsx`): se añadió un botón premium "Volver al Inicio" en la cabecera para los usuarios invitados (`guest`) para permitir el retorno a la Landing Page.
+- [x] Se añadió un botón premium "Volver al Inicio" en la esquina superior izquierda de la pantalla de registro de estudiantes (`StudentRegistrationScreen.tsx`).
+- [x] Optimización móvil y tablet del flujo de inicio de sesión (`LoginScreen.tsx`) y registro de estudiantes (`StudentRegistrationScreen.tsx`), implementando scroll seguro (`min-h-screen`), layouts responsivos, inputs touch-friendly (altura fija de 12 y 11) y márgenes de marca seguros.
+- [x] Rediseño de **Logotipos Vectoriales (Puro SVG)**: se eliminaron los antiguos SVG de 1.3 MB con base64 incrustado. Se crearon los nuevos activos vectoriales optimizados `/logo.svg` y `/logo_1.svg` (peso inferior a 4 KB) incorporando el isotipo de squircle verde con el libro abierto (centrado con factor de escala 2.0 y traslación matemática óptima), y el texto "aulaEnsuny" impreso de forma continua (pegado).
+- [x] Integración de Logotipos en Sidebar y Cabecera del Dashboard (`layout.tsx`): reemplazo de `/logo_1.png` por `/logo_1.svg`.
 
 ---
 
@@ -179,6 +201,17 @@
 - [x] SMTP personalizado configurado con **Resend** en Supabase.
 - [ ] Pendiente: Vincular y verificar el dominio institucional (ej. `ensuny.edu.co`) en Resend para permitir el envío de correos a cualquier dirección (actualmente en modo Sandbox restringido a `kevin.martinez@ensuny.edu.co`).
 
+### Notificaciones UI — Sonner
+- [x] **Sonner es la librería estándar y única** para notificaciones toast en todo el proyecto.
+- [x] El componente `<Toaster />` global ya está montado en el layout raíz del dashboard.
+- [x] **Convención de uso establecida:**
+  - `toast.success('...')` → operación completada con éxito.
+  - `toast.error('...')` → errores de red, BD o validación.
+  - `toast.warning('...', { action, cancel })` → confirmaciones destructivas (eliminar, retirar, archivar). El botón `action` ejecuta la operación; `cancel` la descarta.
+  - `toast.info('...')` → modo demo o información contextual.
+- [x] **Prohibido usar** `window.confirm()`, `window.prompt()`, `window.alert()` ni modales custom con funciones en estado para flujos de confirmación. Usar siempre `toast.warning` con `action`/`cancel`.
+- [x] Corrección aplicada en `DocCenterScreen.tsx`: se reemplazaron `confirm()` y `prompt()` nativos del navegador por los modales premium de Framer Motion (para crear/renombrar carpetas) y por `toast.warning` (para eliminaciones), eliminando el error de runtime de Next.js causado por almacenar funciones en el estado de React.
+
 ---
 
 ## 📌 NOTAS IMPORTANTES
@@ -191,3 +224,4 @@
 - La eliminación de Drive exige que el Apps Script acepte JSON y devuelva un JSON válido.
 - El despliegue en producción se realizará cuando las integraciones externas estén validadas.
 - Esta bitácora se centra en el estado actual de recursos/Drive y la lista de prioridades.
+- **Sonner es el sistema de notificaciones estándar** del proyecto. No usar `confirm()`, `prompt()` ni `alert()` del navegador. Toda confirmación destructiva debe implementarse con `toast.warning({ action, cancel })`.

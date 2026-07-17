@@ -20,7 +20,7 @@ interface DocExplorerProps {
   folders: DocFolder[]
   documents: Document[]
   selectedDocId?: string | null
-  userRole: 'admin' | 'teacher' | 'student'
+  userRole: 'admin' | 'teacher' | 'student' | 'guest'
   onSelectDoc: (doc: Document) => void
   onNewDocument: (folderId?: string | null) => void
   onNewFolder: (parentId?: string | null) => void
@@ -63,7 +63,7 @@ function FolderNode({
   folder: TreeFolder
   depth: number
   selectedDocId?: string | null
-  userRole: 'admin' | 'teacher' | 'student'
+  userRole: 'admin' | 'teacher' | 'student' | 'guest'
   onSelectDoc: (doc: Document) => void
   onNewDocument: (folderId?: string | null) => void
   onNewFolder: (parentId?: string | null) => void
@@ -74,7 +74,7 @@ function FolderNode({
   const [isOpen, setIsOpen] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
   const hasContent = folder.children.length > 0 || folder.documents.length > 0
-  const canEdit = userRole !== 'student'
+  const canEdit = userRole !== 'student' && userRole !== 'guest'
 
   return (
     <div>
@@ -206,12 +206,12 @@ function DocNode({ doc, depth, isSelected, userRole, onSelect, onDelete }: {
   doc: Document
   depth: number
   isSelected: boolean
-  userRole: 'admin' | 'teacher' | 'student'
+  userRole: 'admin' | 'teacher' | 'student' | 'guest'
   onSelect: () => void
   onDelete: () => void
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
-  const canEdit = userRole !== 'student'
+  const canEdit = userRole !== 'student' && userRole !== 'guest'
 
   return (
     <div
@@ -267,7 +267,7 @@ export function DocExplorer({
 }: DocExplorerProps) {
   const tree = buildTree(folders, documents)
   const rootDocuments = documents.filter(d => !d.folderId)
-  const canEdit = userRole !== 'student'
+  const canEdit = userRole !== 'student' && userRole !== 'guest'
 
   return (
     <div className="flex flex-col h-full">

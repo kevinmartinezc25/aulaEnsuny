@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { motion, Variants } from 'framer-motion'
 import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import { login } from '@/modules/auth/application/actions'
 import { loginSchema, LoginInput } from '@/modules/auth/application/validation'
 import { Button } from '@/components/ui/button'
@@ -12,7 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
 import QRCode from 'react-qr-code'
-import { Loader2, AlertCircle, Eye, EyeOff, Moon, Sun, QrCode, X } from 'lucide-react'
+import { Loader2, AlertCircle, Eye, EyeOff, Moon, Sun, QrCode, X, ArrowLeft } from 'lucide-react'
 
 export function LoginScreen() {
   const router = useRouter()
@@ -92,184 +93,208 @@ export function LoginScreen() {
   }
 
   return (
-    <div className="relative flex h-screen w-full overflow-hidden bg-[#f8f9fa] dark:bg-slate-950">
-      
-      {/* Theme Toggle Button */}
+    <div className="relative min-h-screen w-full overflow-hidden bg-[#f8f9fa] dark:bg-slate-950">
+
+      {/* Back to Landing */}
+      <div className="absolute top-4 left-4 z-50">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 rounded-full px-4 py-2 bg-white/60 border border-slate-200 text-slate-500 hover:bg-white hover:text-slate-900 shadow-sm backdrop-blur-md dark:bg-slate-900/60 dark:border-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-all text-xs font-semibold cursor-pointer"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          <span>Volver al Inicio</span>
+        </Link>
+      </div>
+
+      {/* Theme Toggle */}
       <div className="absolute top-4 right-4 z-50">
         <button
           onClick={toggleTheme}
-          className="rounded-full p-2.5 bg-white/50 border border-slate-200 text-slate-500 hover:bg-white hover:text-slate-900 shadow-sm backdrop-blur-md dark:bg-slate-900/50 dark:border-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-all"
+          className="rounded-full p-2.5 bg-white/60 border border-slate-200 text-slate-500 hover:bg-white hover:text-slate-900 shadow-sm backdrop-blur-md dark:bg-slate-900/60 dark:border-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-all"
           title="Cambiar tema"
         >
-          <Sun className="hidden h-5 w-5 dark:block" />
-          <Moon className="block h-5 w-5 dark:hidden" />
+          <Sun className="hidden h-4 w-4 dark:block" />
+          <Moon className="block h-4 w-4 dark:hidden" />
         </button>
       </div>
-      
-      {/* Premium Decorative Background Elements */}
+
+      {/* Decorative Background */}
       <div className="absolute inset-0 z-0 pointer-events-none">
-        {/* Soft Grid Pattern */}
-        <div className="absolute inset-0 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px] opacity-40 dark:bg-[radial-gradient(#1e293b_1px,transparent_1px)]"></div>
-        {/* Glowing Orbs */}
-        <div className="absolute top-[-10%] left-[-5%] w-[300px] sm:w-[500px] h-[300px] sm:h-[500px] rounded-full bg-emerald-400/20 blur-[80px] sm:blur-[120px] dark:bg-emerald-900/30" />
-        <div className="absolute bottom-[-10%] right-[-5%] w-[350px] sm:w-[600px] h-[350px] sm:h-[600px] rounded-full bg-[#1F4E31]/15 blur-[90px] sm:blur-[150px] dark:bg-[#1F4E31]/20" />
+        <div className="absolute inset-0 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px] opacity-40 dark:bg-[radial-gradient(#1e293b_1px,transparent_1px)]" />
+        <div className="absolute top-[-10%] left-[-5%] w-[250px] sm:w-[500px] h-[250px] sm:h-[500px] rounded-full bg-emerald-400/20 blur-[80px] sm:blur-[120px] dark:bg-emerald-900/30" />
+        <div className="absolute bottom-[-10%] right-[-5%] w-[280px] sm:w-[600px] h-[280px] sm:h-[600px] rounded-full bg-[#1F4E31]/15 blur-[90px] sm:blur-[150px] dark:bg-[#1F4E31]/20" />
       </div>
 
-      {/* Scrollable Content Shell (Solo hace scroll si la pantalla es enana, sino 0 scrollbar) */}
-      <div className="relative z-10 flex flex-1 flex-col items-center justify-center overflow-y-auto p-4 sm:p-8">
+      {/* Scroll container — centres content vertically on tall screens, scrolls on short ones */}
+      <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-4 py-10 sm:py-16 overflow-y-auto">
         <motion.div
           initial={{ opacity: 0, scale: 0.97 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.4, ease: 'easeOut' }}
-          className="w-full max-w-[420px] px-4 sm:px-0 flex flex-col items-center"
+          className="w-full max-w-[400px] flex flex-col items-center"
         >
-        {/* Logo encima de la card */}
-        <motion.div 
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1, type: 'spring' }}
-          className="mb-8 sm:mb-10 flex justify-center w-full px-2 sm:px-0"
-        >
-          <div className="relative w-full max-w-[416px] aspect-[416/145]">
-            <img 
-              src="/logo.svg?v=2" 
-              alt="aulaEnsuny Logo" 
-              className="object-contain w-full h-full"
-            />
-          </div>
-        </motion.div>
+          {/* Logo */}
+          <motion.div
+            initial={{ opacity: 0, y: -16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1, type: 'spring' }}
+            className="mb-6 sm:mb-8 w-full flex justify-center px-6 sm:px-0"
+          >
+            <div className="relative w-full max-w-[280px] sm:max-w-[360px] aspect-[416/145]">
+              <img
+                src="/logo.svg?v=2"
+                alt="aulaEnsuny Logo"
+                className="object-contain w-full h-full"
+              />
+            </div>
+          </motion.div>
 
-        <Card className="w-full border-0 bg-white shadow-[0_8px_30px_rgb(0,0,0,0.08)] rounded-2xl dark:bg-slate-900 dark:shadow-none">
-          <CardContent className="p-6 pt-8 sm:p-8 sm:pt-10">
-            {errorMsg && (
-              <motion.div
-                initial={{ opacity: 0, y: -5 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mb-4 flex items-center gap-2 rounded-xl bg-red-50 p-3 text-sm text-red-700 border border-red-100 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/30"
-              >
-                <AlertCircle className="h-4.5 w-4.5 shrink-0" />
-                <span>{errorMsg}</span>
-              </motion.div>
-            )}
+          {/* Card */}
+          <Card className="w-full border-0 bg-white shadow-[0_8px_30px_rgb(0,0,0,0.08)] rounded-2xl dark:bg-slate-900 dark:shadow-none">
+            <CardContent className="p-5 sm:p-8">
 
-            <form onSubmit={handleSubmit(onSubmit)}>
-              <motion.div
-                variants={containerVariants}
-                initial="hidden"
-                animate="show"
-                className="space-y-4"
-              >
-                <motion.div variants={itemVariants} className="space-y-1.5">
-                  <Label htmlFor="email" className="text-slate-700 dark:text-slate-300 font-semibold text-sm">
-                    Correo electrónico
-                  </Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="Correo electrónico"
-                    className={`rounded-lg border-slate-200/80 bg-slate-50/50 py-4 sm:py-5 text-sm focus:bg-white focus:ring-[#1F4E31] dark:border-slate-800 dark:bg-slate-950/50 ${
-                      errors.email ? 'border-red-500 focus:ring-red-500' : ''
-                    }`}
-                    {...register('email')}
-                  />
-                  {errors.email && (
-                    <p className="text-xs text-red-500 mt-1">{errors.email.message}</p>
-                  )}
+              {/* Cabecera de la card */}
+              <div className="mb-5 text-center">
+                <h1 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+                  Bienvenido
+                </h1>
+                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+                  Ingresa tus credenciales para continuar
+                </p>
+              </div>
+
+              {errorMsg && (
+                <motion.div
+                  initial={{ opacity: 0, y: -5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mb-4 flex items-start gap-2 rounded-xl bg-red-50 p-3 text-sm text-red-700 border border-red-100 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/30"
+                >
+                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <span>{errorMsg}</span>
                 </motion.div>
+              )}
 
-                <motion.div variants={itemVariants} className="space-y-1.5">
-                  <Label htmlFor="password" className="text-slate-700 dark:text-slate-300 font-semibold text-sm">
-                    Contraseña
-                  </Label>
-                  <div className="relative">
+              <form onSubmit={handleSubmit(onSubmit)}>
+                <motion.div
+                  variants={containerVariants}
+                  initial="hidden"
+                  animate="show"
+                  className="space-y-4"
+                >
+                  {/* Email */}
+                  <motion.div variants={itemVariants} className="space-y-1.5">
+                    <Label htmlFor="email" className="text-slate-700 dark:text-slate-300 font-semibold text-sm">
+                      Correo electrónico
+                    </Label>
                     <Input
-                      id="password"
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="Contraseña"
-                      className={`rounded-lg border-slate-200/80 bg-slate-50/50 py-4 sm:py-5 pr-10 text-sm focus:bg-white focus:ring-[#1F4E31] dark:border-slate-800 dark:bg-slate-950/50 ${
-                        errors.password ? 'border-red-500 focus:ring-red-500' : ''
-                      }`}
-                      {...register('password')}
+                      id="email"
+                      type="email"
+                      placeholder="usuario@ensuny.edu.co"
+                      className={`rounded-xl border-slate-200/80 bg-slate-50/50 h-12 text-sm focus:bg-white focus:ring-[#1F4E31] dark:border-slate-800 dark:bg-slate-950/50 ${errors.email ? 'border-red-500 focus:ring-red-500' : ''
+                        }`}
+                      {...register('email')}
                     />
+                    {errors.email && (
+                      <p className="text-xs text-red-500 mt-1">{errors.email.message}</p>
+                    )}
+                  </motion.div>
+
+                  {/* Password */}
+                  <motion.div variants={itemVariants} className="space-y-1.5">
+                    <Label htmlFor="password" className="text-slate-700 dark:text-slate-300 font-semibold text-sm">
+                      Contraseña
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        id="password"
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="••••••••"
+                        className={`rounded-xl border-slate-200/80 bg-slate-50/50 h-12 pr-11 text-sm focus:bg-white focus:ring-[#1F4E31] dark:border-slate-800 dark:bg-slate-950/50 ${errors.password ? 'border-red-500 focus:ring-red-500' : ''
+                          }`}
+                        {...register('password')}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors p-1"
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    <div className="flex justify-between items-center pt-1">
+                      {errors.password
+                        ? <p className="text-xs text-red-500">{errors.password.message}</p>
+                        : <span />
+                      }
+                      <a
+                        href="/recovery"
+                        className="text-[13px] font-medium text-[#1F4E31] hover:text-[#153823] hover:underline transition-colors dark:text-[#388E59] dark:hover:text-[#4AB874] ml-auto"
+                      >
+                        ¿Olvidé mi contraseña?
+                      </a>
+                    </div>
+                  </motion.div>
+
+                  {/* Submit */}
+                  <motion.div variants={itemVariants} className="pt-1">
+                    <Button
+                      type="submit"
+                      disabled={isLoading}
+                      className="w-full rounded-xl bg-[#1F4E31] h-12 text-[15px] text-white font-semibold hover:bg-[#153823] active:scale-[0.99] transition-all duration-200 dark:bg-[#2A6B43] dark:hover:bg-[#1F4E31]"
+                    >
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                          Iniciando...
+                        </>
+                      ) : (
+                        'Iniciar Sesión'
+                      )}
+                    </Button>
+                  </motion.div>
+
+                  {/* Footer links */}
+                  <motion.div variants={itemVariants} className="pt-1 text-center flex flex-col items-center gap-2.5">
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                      ¿No tienes una cuenta?{' '}
+                      <a
+                        href="/register/student"
+                        className="font-semibold text-[#1F4E31] hover:text-[#153823] hover:underline transition-colors dark:text-[#388E59] dark:hover:text-[#4AB874]"
+                      >
+                        Regístrate aquí
+                      </a>
+                    </p>
                     <button
                       type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                      onClick={() => setShowQRModal(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-full text-xs font-semibold transition-colors"
                     >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      <QrCode className="w-3.5 h-3.5" />
+                      Mostrar QR de Registro
                     </button>
-                  </div>
-                  <div className="flex justify-end pt-1">
-                    <a
-                      href="/recovery"
-                      className="text-[13px] font-medium text-[#1F4E31] hover:text-[#153823] hover:underline transition-colors dark:text-[#388E59] dark:hover:text-[#4AB874]"
-                    >
-                      ¿Olvidé mi contraseña?
-                    </a>
-                  </div>
-                  {errors.password && (
-                    <p className="text-xs text-red-500 mt-1">{errors.password.message}</p>
-                  )}
+                  </motion.div>
                 </motion.div>
+              </form>
+            </CardContent>
+          </Card>
 
-                <motion.div variants={itemVariants} className="pt-2 pb-2">
-                  <Button
-                    type="submit"
-                    disabled={isLoading}
-                    className="w-full rounded-lg bg-[#1F4E31] py-5 sm:py-6 text-[15px] sm:text-base text-white font-medium hover:bg-[#153823] active:scale-[0.99] transition-all duration-200 dark:bg-[#2A6B43] dark:hover:bg-[#1F4E31]"
-                  >
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                        Iniciando...
-                      </>
-                    ) : (
-                      'Iniciar Sesión'
-                    )}
-                  </Button>
-                </motion.div>
-
-                <motion.div variants={itemVariants} className="pt-2 text-center flex flex-col items-center gap-2">
-                  <p className="text-sm text-slate-500 dark:text-slate-400">
-                    ¿No tienes una cuenta?{' '}
-                    <a
-                      href="/register/student"
-                      className="font-semibold text-[#1F4E31] hover:text-[#153823] hover:underline transition-colors dark:text-[#388E59] dark:hover:text-[#4AB874]"
-                    >
-                      Regístrate aquí
-                    </a>
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setShowQRModal(true)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-full text-xs font-semibold transition-colors mt-1"
-                  >
-                    <QrCode className="w-3.5 h-3.5" />
-                    Mostrar QR de Registro
-                  </button>
-                </motion.div>
-              </motion.div>
-            </form>
-          </CardContent>
-        </Card>
-
-        {/* Enlace institucional inferior */}
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4, duration: 0.5 }}
-          className="mt-6 text-center"
-        >
-          <a 
-            href="https://www.ensuny.edu.co" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="text-sm font-medium text-slate-500 hover:text-[#1F4E31] transition-colors dark:text-slate-400 dark:hover:text-[#4AB874] tracking-wide"
+          {/* Enlace institucional */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4, duration: 0.5 }}
+            className="mt-5 text-center"
           >
-            www.ensuny.edu.co
-          </a>
+            <a
+              href="https://www.ensuny.edu.co"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs font-medium text-slate-400 hover:text-[#1F4E31] transition-colors dark:text-slate-500 dark:hover:text-[#4AB874] tracking-wide"
+            >
+              www.ensuny.edu.co
+            </a>
+          </motion.div>
         </motion.div>
-      </motion.div>
       </div>
 
       {/* Modal QR */}
@@ -279,30 +304,29 @@ export function LoginScreen() {
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.95, opacity: 0 }}
-            className="bg-white dark:bg-slate-900 rounded-3xl p-8 max-w-sm w-full shadow-2xl relative"
+            className="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl relative"
           >
             <button
               onClick={() => setShowQRModal(false)}
-              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800"
             >
               <X className="w-5 h-5" />
             </button>
-            
-            <div className="text-center space-y-4">
-              <div className="mx-auto w-12 h-12 bg-[#1F4E31]/10 rounded-full flex items-center justify-center mb-2">
+
+            <div className="text-center space-y-3">
+              <div className="mx-auto w-12 h-12 bg-[#1F4E31]/10 rounded-full flex items-center justify-center">
                 <QrCode className="w-6 h-6 text-[#1F4E31] dark:text-[#4AB874]" />
               </div>
               <h3 className="text-xl font-bold text-slate-900 dark:text-white">
                 Registro Rápido
               </h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                Escanea este código QR desde tu dispositivo móvil para acceder rápidamente al formulario de registro.
+              <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+                Escanea este código QR desde tu dispositivo móvil para acceder al formulario de registro.
               </p>
-              
-              <div className="bg-white p-4 rounded-2xl inline-block mt-4 shadow-sm border border-slate-100 flex items-center justify-center">
-                <QRCode 
-                  value={typeof window !== 'undefined' ? `${window.location.origin}/register/student` : 'https://aula.ensuny.edu.co/register/student'} 
-                  size={200}
+              <div className="bg-white p-4 rounded-2xl inline-flex items-center justify-center mt-2 shadow-sm border border-slate-100">
+                <QRCode
+                  value={typeof window !== 'undefined' ? `${window.location.origin}/register/student` : 'https://aula.ensuny.edu.co/register/student'}
+                  size={180}
                 />
               </div>
             </div>
@@ -312,3 +336,5 @@ export function LoginScreen() {
     </div>
   )
 }
+
+
