@@ -125,7 +125,7 @@ function AdminSidebar({ onClose, user, enabledModules = [] }: { onClose?: () => 
     <div className="flex h-full flex-col bg-white dark:bg-slate-900 border-r border-slate-100 dark:border-slate-800/60">
       {/* Logo */}
       <div className="flex h-16 shrink-0 items-center gap-3 px-5 border-b border-slate-100 dark:border-slate-800/60">
-        <img src="/logo_1.png" alt="aulaEnsuny" className="h-8 object-contain" />
+        <img src="/logo_1.svg" alt="aulaEnsuny" className="h-8 object-contain" />
         <div>
           <p className="text-sm font-bold text-slate-900 dark:text-white tracking-tight">aulaEnsuny</p>
           <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
@@ -266,7 +266,6 @@ function SidebarContent({ onClose, isCollapsed = false, user }: SidebarProps) {
     { name: 'Calificaciones', href: '/student/grades', icon: TrendingUp },
     { name: 'Calendario', href: '/student/calendar', icon: Calendar },
     { name: 'Votaciones', href: '/student/elections', icon: ShieldCheck },
-    { name: 'Documentos', href: '/student/docs', icon: FileText },
     { name: 'Configuración', href: '/student/settings', icon: Settings },
   ]
 
@@ -302,7 +301,7 @@ function SidebarContent({ onClose, isCollapsed = false, user }: SidebarProps) {
       <div className="space-y-8">
         {/* Logo */}
         <Link href="/" className={`flex items-center gap-2.5 ${isCollapsed ? 'justify-center' : 'px-2'}`} onClick={onClose}>
-          <img src="/logo_1.png" alt="aulaEnsuny Logo" className="h-10 shrink-0 object-contain" />
+          <img src="/logo_1.svg" alt="aulaEnsuny Logo" className="h-10 shrink-0 object-contain" />
           {!isCollapsed && (
             <span className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">aulaEnsuny</span>
           )}
@@ -795,7 +794,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </button>
             {isCourseSection && (
               <Link href={pathname.includes('/student') ? '/student/dashboard' : '/teacher/dashboard'} className="hidden md:flex items-center gap-2 px-2 hover:opacity-80 transition-opacity">
-                <img src="/logo_1.png" alt="aulaEnsuny Logo" className="h-8 shrink-0 object-contain" />
+                <img src="/logo_1.svg" alt="aulaEnsuny Logo" className="h-8 shrink-0 object-contain" />
                 <span className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">aulaEnsuny</span>
               </Link>
             )}

@@ -12,6 +12,8 @@ import { getAcademicLevels, AcademicLevel, getAdminStudents } from '../../applic
 interface Student {
   id: string
   name: string
+  firstName?: string
+  lastName?: string
   email: string
   gradeLevel: string
   groupName?: string
@@ -25,6 +27,7 @@ export function AdminStudentsScreen() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterGrade, setFilterGrade] = useState<string>('all')
+  const [filterGroup, setFilterGroup] = useState<string>('all')
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all')
   const [academicLevels, setAcademicLevels] = useState<AcademicLevel[]>([])
   const [successMsg, setSuccessMsg] = useState('')
@@ -32,11 +35,11 @@ export function AdminStudentsScreen() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
 
   const mockStudents: Student[] = [
-    { id: 's-1', name: 'Ana María Torres', email: 'a.torres@estudiante.ensuny.edu.co', gradeLevel: '8°', groupName: '1', status: 'active', joinedDate: '2025-01-20' },
-    { id: 's-2', name: 'José Daniel Ramírez', email: 'j.ramirez@estudiante.ensuny.edu.co', gradeLevel: '8°', groupName: '1', status: 'active', joinedDate: '2025-01-22' },
-    { id: 's-3', name: 'Luis Alfredo Sandoval', email: 'l.sandoval@estudiante.ensuny.edu.co', gradeLevel: '9°', groupName: '2', status: 'active', joinedDate: '2024-01-15' },
-    { id: 's-4', name: 'María Camila Herrera', email: 'm.herrera@estudiante.ensuny.edu.co', gradeLevel: '10°', groupName: '2', status: 'inactive', joinedDate: '2024-02-05' },
-    { id: 's-5', name: 'Kevin Martinez', email: 'kevin@estudiante.ensuny.edu.co', gradeLevel: '11°', groupName: '1', status: 'active', joinedDate: '2023-01-10' }
+    { id: 's-1', name: 'Ana María Torres', firstName: 'Ana María', lastName: 'Torres', email: 'a.torres@estudiante.ensuny.edu.co', gradeLevel: '8°', groupName: '1', status: 'active', joinedDate: '2025-01-20' },
+    { id: 's-2', name: 'José Daniel Ramírez', firstName: 'José Daniel', lastName: 'Ramírez', email: 'j.ramirez@estudiante.ensuny.edu.co', gradeLevel: '8°', groupName: '1', status: 'active', joinedDate: '2025-01-22' },
+    { id: 's-3', name: 'Luis Alfredo Sandoval', firstName: 'Luis Alfredo', lastName: 'Sandoval', email: 'l.sandoval@estudiante.ensuny.edu.co', gradeLevel: '9°', groupName: '2', status: 'active', joinedDate: '2024-01-15' },
+    { id: 's-4', name: 'María Camila Herrera', firstName: 'María Camila', lastName: 'Herrera', email: 'm.herrera@estudiante.ensuny.edu.co', gradeLevel: '10°', groupName: '2', status: 'inactive', joinedDate: '2024-02-05' },
+    { id: 's-5', name: 'Kevin Martinez', firstName: 'Kevin', lastName: 'Martinez', email: 'kevin@estudiante.ensuny.edu.co', gradeLevel: '11°', groupName: '1', status: 'active', joinedDate: '2023-01-10' }
   ]
 
   useEffect(() => {
@@ -72,14 +75,38 @@ export function AdminStudentsScreen() {
     loadStudents()
   }, [])
 
+  const availableGroups = useMemo(() => {
+    const groups = new Set<string>()
+    students.forEach(s => {
+      if (s.groupName) groups.add(s.groupName)
+    })
+    return Array.from(groups).sort()
+  }, [students])
+
   const filteredStudents = useMemo(() => {
-    return students.filter(s => {
+    const filtered = students.filter(s => {
       const matchSearch = s.name.toLowerCase().includes(search.toLowerCase()) || s.email.toLowerCase().includes(search.toLowerCase())
       const matchGrade = filterGrade === 'all' || s.gradeLevel === filterGrade
+      const matchGroup = filterGroup === 'all' || s.groupName === filterGroup
       const matchStatus = filterStatus === 'all' || s.status === filterStatus
-      return matchSearch && matchGrade && matchStatus
+      return matchSearch && matchGrade && matchGroup && matchStatus
     })
-  }, [students, search, filterGrade, filterStatus])
+
+    return filtered.sort((a, b) => {
+      const lastA = (a.lastName || '').toLowerCase()
+      const lastB = (b.lastName || '').toLowerCase()
+      return lastA.localeCompare(lastB)
+    })
+  }, [students, search, filterGrade, filterGroup, filterStatus])
+
+  const toTitleCase = (str: string) => {
+    if (!str) return ''
+    return str
+      .toLowerCase()
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ')
+  }
 
   const openCreate = () => {
     router.push('/admin/students/new')
@@ -200,6 +227,17 @@ export function AdminStudentsScreen() {
           </div>
 
           <select
+            value={filterGroup}
+            onChange={e => setFilterGroup(e.target.value)}
+            className="border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-950 text-xs focus:outline-none dark:text-white"
+          >
+            <option value="all">Todos los Grupos</option>
+            {availableGroups.map(group => (
+              <option key={group} value={group}>Grupo {group}</option>
+            ))}
+          </select>
+
+          <select
             value={filterStatus}
             onChange={e => setFilterStatus(e.target.value as any)}
             className="border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-950 text-xs focus:outline-none dark:text-white"
@@ -238,7 +276,7 @@ export function AdminStudentsScreen() {
               {filteredStudents.map(s => (
                 <tr key={s.id} className="hover:bg-slate-55/50 dark:hover:bg-slate-800/10 transition-colors">
                   <td className="px-6 py-4 font-semibold text-slate-900 dark:text-white">
-                    {s.name}
+                    {toTitleCase(s.lastName ? `${s.lastName} ${s.firstName}` : s.name)}
                   </td>
                   <td className="px-6 py-4">
                     <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400 border border-purple-100/30">

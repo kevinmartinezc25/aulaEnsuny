@@ -42,7 +42,6 @@ export function StudentRegistrationScreen() {
     const savedTheme = window.localStorage.getItem('theme')
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
     const shouldUseDark = savedTheme === 'dark' || (!savedTheme && prefersDark)
-
     root.classList.toggle('dark', shouldUseDark)
   }, [])
 
@@ -69,14 +68,13 @@ export function StudentRegistrationScreen() {
     setIsLoading(true)
     setErrorMsg(null)
     setSuccessMsg(null)
-    
+
     try {
       const response = await selfRegisterStudent(data)
       if (response && !response.success) {
         setErrorMsg(response.error || 'No se pudo crear la cuenta.')
         return
       }
-
       setSuccessMsg(
         '¡Registro exitoso! Tu cuenta ha sido creada y ahora puedes iniciar sesión con tu correo y contraseña.'
       )
@@ -89,12 +87,7 @@ export function StudentRegistrationScreen() {
 
   const containerVariants: Variants = {
     hidden: { opacity: 0 },
-    show: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1,
-      },
-    },
+    show: { opacity: 1, transition: { staggerChildren: 0.08 } },
   }
 
   const itemVariants: Variants = {
@@ -102,95 +95,108 @@ export function StudentRegistrationScreen() {
     show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 100 } },
   }
 
+  const selectClass = 'flex h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm transition-all focus:border-[#1F4E31] focus:outline-none focus:ring-2 focus:ring-[#1F4E31] dark:border-slate-800 dark:bg-slate-950/50 dark:text-white'
+  const inputClass = 'h-11 bg-slate-50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 focus:border-[#1F4E31] focus:ring-[#1F4E31] rounded-xl transition-all'
+
   return (
-    <div className="relative flex h-screen w-full overflow-hidden bg-[#f8f9fa] dark:bg-slate-950">
-      {/* Theme Toggle Button */}
+    <div className="relative min-h-screen w-full overflow-hidden bg-[#f8f9fa] dark:bg-slate-950">
+
+      {/* Back to Landing */}
+      <div className="absolute top-4 left-4 z-50">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 rounded-full px-4 py-2 bg-white/60 border border-slate-200 text-slate-500 hover:bg-white hover:text-slate-900 shadow-sm backdrop-blur-md dark:bg-slate-900/60 dark:border-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-all text-xs font-semibold cursor-pointer"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          <span>Volver al Inicio</span>
+        </Link>
+      </div>
+
+      {/* Theme toggle */}
       <div className="absolute top-4 right-4 z-50">
         <button
           onClick={toggleTheme}
-          className="rounded-full p-2.5 bg-white/50 border border-slate-200 text-slate-500 hover:bg-white hover:text-slate-900 shadow-sm backdrop-blur-md dark:bg-slate-900/50 dark:border-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-all"
+          className="rounded-full p-2.5 bg-white/60 border border-slate-200 text-slate-500 hover:bg-white hover:text-slate-900 shadow-sm backdrop-blur-md dark:bg-slate-900/60 dark:border-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-all"
           title="Cambiar tema"
         >
-          <Sun className="hidden h-5 w-5 dark:block" />
-          <Moon className="block h-5 w-5 dark:hidden" />
+          <Sun className="hidden h-4 w-4 dark:block" />
+          <Moon className="block h-4 w-4 dark:hidden" />
         </button>
       </div>
 
-      {/* Premium Decorative Background Elements */}
+      {/* Decorative background */}
       <div className="absolute inset-0 z-0 pointer-events-none">
-        <div className="absolute inset-0 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px] opacity-40 dark:bg-[radial-gradient(#1e293b_1px,transparent_1px)]"></div>
-        <div className="absolute top-[-10%] left-[-5%] w-[300px] sm:w-[500px] h-[300px] sm:h-[500px] rounded-full bg-emerald-400/20 blur-[80px] sm:blur-[120px] dark:bg-emerald-900/30" />
-        <div className="absolute bottom-[-10%] right-[-5%] w-[350px] sm:w-[600px] h-[350px] sm:h-[600px] rounded-full bg-[#1F4E31]/15 blur-[90px] sm:blur-[150px] dark:bg-[#1F4E31]/20" />
+        <div className="absolute inset-0 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px] opacity-40 dark:bg-[radial-gradient(#1e293b_1px,transparent_1px)]" />
+        <div className="absolute top-[-10%] left-[-5%] w-[250px] sm:w-[500px] h-[250px] sm:h-[500px] rounded-full bg-emerald-400/20 blur-[80px] sm:blur-[120px] dark:bg-emerald-900/30" />
+        <div className="absolute bottom-[-10%] right-[-5%] w-[280px] sm:w-[600px] h-[280px] sm:h-[600px] rounded-full bg-[#1F4E31]/15 blur-[90px] sm:blur-[150px] dark:bg-[#1F4E31]/20" />
       </div>
 
-      {/* Scrollable Content Shell */}
-      <div className="relative z-10 flex flex-1 flex-col items-center justify-center overflow-y-auto p-4 sm:p-8">
+      {/* Scroll container */}
+      <div className="relative z-10 flex min-h-screen flex-col items-center justify-start px-4 py-10 sm:py-16 overflow-y-auto">
         <motion.div
           initial={{ opacity: 0, scale: 0.97 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.4, ease: 'easeOut' }}
-          className="w-full max-w-[500px] px-4 sm:px-0 flex flex-col items-center"
+          className="w-full max-w-[480px] flex flex-col items-center"
         >
           {/* Logo */}
           <motion.div
-            initial={{ opacity: 0, y: -20 }}
+            initial={{ opacity: 0, y: -16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1, type: 'spring' }}
-            className="mb-8 sm:mb-10 flex justify-center w-full px-2 sm:px-0"
+            className="mb-6 sm:mb-8 w-full flex justify-center px-6 sm:px-0"
           >
-            <div className="relative w-full max-w-[416px] aspect-[416/145]">
+            <div className="relative w-full max-w-[240px] sm:max-w-[320px] aspect-[416/145]">
               <img src="/logo.svg?v=2" alt="aulaEnsuny Logo" className="object-contain w-full h-full" />
             </div>
           </motion.div>
 
+          {/* Card */}
           <Card className="w-full border-0 bg-white shadow-[0_8px_30px_rgb(0,0,0,0.08)] rounded-2xl dark:bg-slate-900 dark:shadow-none">
-            <CardContent className="p-6 pt-8 sm:p-8 sm:pt-10">
-              <div className="mb-6 text-center">
-                <h1 className="text-xl sm:text-2xl font-bold text-slate-950 dark:text-white">
+            <CardContent className="p-5 sm:p-8">
+
+              {/* Header */}
+              <div className="mb-5 text-center">
+                <h1 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white tracking-tight">
                   Registro de Estudiante
                 </h1>
-                <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                  Completa tus datos para crear tu cuenta en la plataforma.
+                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+                  Completa tus datos para crear tu cuenta
                 </p>
               </div>
 
+              {/* Error banner */}
               {errorMsg && (
                 <motion.div
                   initial={{ opacity: 0, y: -5 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="mb-4 flex items-center gap-2 rounded-xl bg-red-50 p-3 text-sm text-red-700 border border-red-100 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/30"
+                  className="mb-4 flex items-start gap-2 rounded-xl bg-red-50 p-3 text-sm text-red-700 border border-red-100 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/30"
                 >
-                  <AlertCircle className="h-4.5 w-4.5 shrink-0" />
+                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
                   <span>{errorMsg}</span>
                 </motion.div>
               )}
 
               {successMsg ? (
-                <motion.div
-                  initial={{ opacity: 0, y: -5 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="space-y-6"
-                >
-                  <div className="rounded-xl bg-emerald-50 p-4 border border-emerald-100 dark:bg-emerald-950/30 dark:border-emerald-900/30">
-                    <div className="flex items-start gap-3">
-                      <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400 mt-0.5" />
-                      <div className="space-y-1">
-                        <h3 className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">
-                          Registro completado
-                        </h3>
-                        <p className="text-sm text-emerald-700 dark:text-emerald-400 leading-relaxed">
-                          {successMsg}
-                        </p>
-                      </div>
-                    </div>
+                /* ── Success state ── */
+                <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
+                  <div className="rounded-2xl bg-emerald-50 p-5 border border-emerald-100 dark:bg-emerald-950/30 dark:border-emerald-900/30 text-center">
+                    <CheckCircle2 className="h-10 w-10 text-emerald-500 mx-auto mb-3" />
+                    <h3 className="text-base font-bold text-emerald-800 dark:text-emerald-300 mb-1">
+                      ¡Registro completado!
+                    </h3>
+                    <p className="text-sm text-emerald-700 dark:text-emerald-400 leading-relaxed">
+                      {successMsg}
+                    </p>
                   </div>
                   <Link href="/login" className="block w-full">
-                    <Button className="w-full bg-[#1F4E31] text-white hover:bg-[#1a4229] transition-all py-6 rounded-xl font-semibold text-base shadow-md dark:shadow-none">
+                    <Button className="w-full bg-[#1F4E31] text-white hover:bg-[#1a4229] transition-all h-12 rounded-xl font-semibold text-sm sm:text-base shadow-md dark:shadow-none">
                       Ir a Iniciar Sesión
                     </Button>
                   </Link>
                 </motion.div>
               ) : (
+                /* ── Registration form ── */
                 <motion.form
                   variants={containerVariants}
                   initial="hidden"
@@ -198,7 +204,13 @@ export function StudentRegistrationScreen() {
                   onSubmit={handleSubmit(onSubmit)}
                   className="space-y-4"
                 >
-                  <div className="grid grid-cols-2 gap-4">
+                  {/* ─ Sección: Datos personales ─ */}
+                  <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500 pt-1">
+                    Datos personales
+                  </p>
+
+                  {/* Nombres & Apellidos — stacked on mobile, 2-col on sm+ */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <motion.div variants={itemVariants} className="space-y-1.5">
                       <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">Nombres *</Label>
                       <Input
@@ -206,11 +218,9 @@ export function StudentRegistrationScreen() {
                         type="text"
                         placeholder="Ej. Juan Carlos"
                         disabled={isLoading}
-                        className="h-11 md:h-12 bg-slate-50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 focus:border-[#1F4E31] focus:ring-[#1F4E31] rounded-xl transition-all"
+                        className={inputClass}
                       />
-                      {errors.firstName && (
-                        <p className="text-[13px] text-red-500 mt-1.5">{errors.firstName.message}</p>
-                      )}
+                      {errors.firstName && <p className="text-[12px] text-red-500 mt-1">{errors.firstName.message}</p>}
                     </motion.div>
 
                     <motion.div variants={itemVariants} className="space-y-1.5">
@@ -220,22 +230,17 @@ export function StudentRegistrationScreen() {
                         type="text"
                         placeholder="Ej. Pérez Gómez"
                         disabled={isLoading}
-                        className="h-11 md:h-12 bg-slate-50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 focus:border-[#1F4E31] focus:ring-[#1F4E31] rounded-xl transition-all"
+                        className={inputClass}
                       />
-                      {errors.lastName && (
-                        <p className="text-[13px] text-red-500 mt-1.5">{errors.lastName.message}</p>
-                      )}
+                      {errors.lastName && <p className="text-[12px] text-red-500 mt-1">{errors.lastName.message}</p>}
                     </motion.div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4">
-                    <motion.div variants={itemVariants} className="space-y-1.5 col-span-1">
+                  {/* Tipo doc & N° — tipo siempre compacto, número ocupa el resto */}
+                  <div className="grid grid-cols-[auto_1fr] gap-3">
+                    <motion.div variants={itemVariants} className="space-y-1.5">
                       <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">Tipo *</Label>
-                      <select
-                        {...register('documentType')}
-                        disabled={isLoading}
-                        className="flex h-11 md:h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm transition-all focus:border-[#1F4E31] focus:outline-none focus:ring-2 focus:ring-[#1F4E31] focus:ring-offset-2 dark:border-slate-800 dark:bg-slate-950/50 dark:text-white"
-                      >
+                      <select {...register('documentType')} disabled={isLoading} className={selectClass}>
                         <option value="TI">TI</option>
                         <option value="CC">CC</option>
                         <option value="CE">CE</option>
@@ -243,48 +248,40 @@ export function StudentRegistrationScreen() {
                         <option value="PEP">PEP</option>
                         <option value="PPT">PPT</option>
                       </select>
-                      {errors.documentType && (
-                        <p className="text-[13px] text-red-500 mt-1.5">{errors.documentType.message}</p>
-                      )}
+                      {errors.documentType && <p className="text-[12px] text-red-500 mt-1">{errors.documentType.message}</p>}
                     </motion.div>
 
-                    <motion.div variants={itemVariants} className="space-y-1.5 col-span-2">
+                    <motion.div variants={itemVariants} className="space-y-1.5">
                       <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">N° de Documento *</Label>
                       <Input
                         {...register('documentNumber')}
                         type="text"
                         placeholder="1002300400"
                         disabled={isLoading}
-                        className="h-11 md:h-12 bg-slate-50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 focus:border-[#1F4E31] focus:ring-[#1F4E31] rounded-xl transition-all"
+                        className={inputClass}
                       />
-                      {errors.documentNumber && (
-                        <p className="text-[13px] text-red-500 mt-1.5">{errors.documentNumber.message}</p>
-                      )}
+                      {errors.documentNumber && <p className="text-[12px] text-red-500 mt-1">{errors.documentNumber.message}</p>}
                     </motion.div>
                   </div>
 
+                  {/* Fecha de nacimiento */}
                   <motion.div variants={itemVariants} className="space-y-1.5">
                     <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">Fecha de Nacimiento *</Label>
                     <Input
                       {...register('birthDate')}
                       type="date"
                       disabled={isLoading}
-                      className="h-11 md:h-12 bg-slate-50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 focus:border-[#1F4E31] focus:ring-[#1F4E31] rounded-xl transition-all"
+                      className={inputClass}
                     />
-                    {errors.birthDate && (
-                      <p className="text-[13px] text-red-500 mt-1.5">{errors.birthDate.message}</p>
-                    )}
+                    {errors.birthDate && <p className="text-[12px] text-red-500 mt-1">{errors.birthDate.message}</p>}
                   </motion.div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  {/* Grado & Grupo — 2 columnas siempre (etiquetas cortas) */}
+                  <div className="grid grid-cols-2 gap-3">
                     <motion.div variants={itemVariants} className="space-y-1.5">
                       <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">Grado *</Label>
-                      <select
-                        {...register('gradeLevel')}
-                        disabled={isLoading}
-                        className="flex h-11 md:h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm transition-all focus:border-[#1F4E31] focus:outline-none focus:ring-2 focus:ring-[#1F4E31] focus:ring-offset-2 dark:border-slate-800 dark:bg-slate-950/50 dark:text-white"
-                      >
-                        <option value="" disabled>Selecciona...</option>
+                      <select {...register('gradeLevel')} disabled={isLoading} className={selectClass}>
+                        <option value="" disabled>Grado…</option>
                         <option value="6°">6°</option>
                         <option value="7°">7°</option>
                         <option value="8°">8°</option>
@@ -293,29 +290,27 @@ export function StudentRegistrationScreen() {
                         <option value="11°">11°</option>
                         <option value="PFC">PFC</option>
                       </select>
-                      {errors.gradeLevel && (
-                        <p className="text-[13px] text-red-500 mt-1.5">{errors.gradeLevel.message}</p>
-                      )}
+                      {errors.gradeLevel && <p className="text-[12px] text-red-500 mt-1">{errors.gradeLevel.message}</p>}
                     </motion.div>
 
                     <motion.div variants={itemVariants} className="space-y-1.5">
                       <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">Grupo *</Label>
-                      <select
-                        {...register('groupName')}
-                        disabled={isLoading}
-                        className="flex h-11 md:h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm transition-all focus:border-[#1F4E31] focus:outline-none focus:ring-2 focus:ring-[#1F4E31] focus:ring-offset-2 dark:border-slate-800 dark:bg-slate-950/50 dark:text-white"
-                      >
-                        <option value="" disabled>Selecciona...</option>
+                      <select {...register('groupName')} disabled={isLoading} className={selectClass}>
+                        <option value="" disabled>Grupo…</option>
                         <option value="1">1</option>
                         <option value="2">2</option>
                         <option value="3">3</option>
                       </select>
-                      {errors.groupName && (
-                        <p className="text-[13px] text-red-500 mt-1.5">{errors.groupName.message}</p>
-                      )}
+                      {errors.groupName && <p className="text-[12px] text-red-500 mt-1">{errors.groupName.message}</p>}
                     </motion.div>
                   </div>
 
+                  {/* ─ Sección: Acceso ─ */}
+                  <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500 pt-2">
+                    Acceso a la plataforma
+                  </p>
+
+                  {/* Correo */}
                   <motion.div variants={itemVariants} className="space-y-1.5">
                     <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">Correo Electrónico *</Label>
                     <Input
@@ -323,48 +318,44 @@ export function StudentRegistrationScreen() {
                       type="email"
                       placeholder="estudiante@ejemplo.com"
                       disabled={isLoading}
-                      className="h-11 md:h-12 bg-slate-50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 focus:border-[#1F4E31] focus:ring-[#1F4E31] rounded-xl transition-all"
+                      className={inputClass}
                     />
-                    {errors.email && (
-                      <p className="text-[13px] text-red-500 mt-1.5">{errors.email.message}</p>
-                    )}
+                    {errors.email && <p className="text-[12px] text-red-500 mt-1">{errors.email.message}</p>}
                   </motion.div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Contraseñas — stacked on mobile, 2-col on sm+ */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <motion.div variants={itemVariants} className="space-y-1.5">
-                      <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">Contraseña Inicial *</Label>
+                      <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">Contraseña *</Label>
                       <Input
                         {...register('password')}
                         type="password"
-                        placeholder="Mínimo 6 caracteres"
+                        placeholder="Mín. 6 caracteres"
                         disabled={isLoading}
-                        className="h-11 md:h-12 bg-slate-50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 focus:border-[#1F4E31] focus:ring-[#1F4E31] rounded-xl transition-all"
+                        className={inputClass}
                       />
-                      {errors.password && (
-                        <p className="text-[13px] text-red-500 mt-1.5">{errors.password.message}</p>
-                      )}
+                      {errors.password && <p className="text-[12px] text-red-500 mt-1">{errors.password.message}</p>}
                     </motion.div>
 
                     <motion.div variants={itemVariants} className="space-y-1.5">
-                      <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">Confirmar Contraseña *</Label>
+                      <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">Confirmar *</Label>
                       <Input
                         {...register('confirmPassword')}
                         type="password"
                         placeholder="Repite la contraseña"
                         disabled={isLoading}
-                        className="h-11 md:h-12 bg-slate-50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 focus:border-[#1F4E31] focus:ring-[#1F4E31] rounded-xl transition-all"
+                        className={inputClass}
                       />
-                      {errors.confirmPassword && (
-                        <p className="text-[13px] text-red-500 mt-1.5">{errors.confirmPassword.message}</p>
-                      )}
+                      {errors.confirmPassword && <p className="text-[12px] text-red-500 mt-1">{errors.confirmPassword.message}</p>}
                     </motion.div>
                   </div>
 
+                  {/* Submit */}
                   <motion.div variants={itemVariants} className="pt-2">
                     <Button
                       type="submit"
                       disabled={isLoading}
-                      className="w-full bg-[#1F4E31] text-white hover:bg-[#1a4229] transition-all py-6 rounded-xl font-semibold text-base shadow-md dark:shadow-none"
+                      className="w-full bg-[#1F4E31] text-white hover:bg-[#1a4229] transition-all h-12 rounded-xl font-semibold text-sm sm:text-base shadow-md dark:shadow-none"
                     >
                       {isLoading ? (
                         <>
@@ -377,12 +368,13 @@ export function StudentRegistrationScreen() {
                     </Button>
                   </motion.div>
 
-                  <motion.div variants={itemVariants} className="mt-6 text-center">
+                  {/* Back link */}
+                  <motion.div variants={itemVariants} className="text-center pt-1">
                     <Link
                       href="/login"
-                      className="inline-flex items-center text-sm font-medium text-slate-500 hover:text-[#1F4E31] dark:text-slate-400 dark:hover:text-emerald-400 transition-colors"
+                      className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-[#1F4E31] dark:text-slate-400 dark:hover:text-emerald-400 transition-colors"
                     >
-                      <ArrowLeft className="mr-2 h-4 w-4" />
+                      <ArrowLeft className="h-3.5 w-3.5" />
                       Volver al Inicio de Sesión
                     </Link>
                   </motion.div>
@@ -390,6 +382,23 @@ export function StudentRegistrationScreen() {
               )}
             </CardContent>
           </Card>
+
+          {/* Enlace institucional */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4, duration: 0.5 }}
+            className="mt-5 text-center"
+          >
+            <a
+              href="https://www.ensuny.edu.co"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs font-medium text-slate-400 hover:text-[#1F4E31] transition-colors dark:text-slate-500 dark:hover:text-[#4AB874] tracking-wide"
+            >
+              www.ensuny.edu.co
+            </a>
+          </motion.div>
         </motion.div>
       </div>
     </div>

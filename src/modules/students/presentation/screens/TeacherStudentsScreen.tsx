@@ -56,7 +56,7 @@ export function TeacherStudentsScreen() {
 
   // Filtrar estudiantes
   const filteredStudents = useMemo(() => {
-    return students.filter(s => {
+    const filtered = students.filter(s => {
       const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                             s.email.toLowerCase().includes(searchQuery.toLowerCase())
       
@@ -68,7 +68,22 @@ export function TeacherStudentsScreen() {
       
       return matchesSearch && matchesCourse && matchesGradeGroup
     })
+
+    return filtered.sort((a, b) => {
+      const lastA = (a.lastName || '').toLowerCase()
+      const lastB = (b.lastName || '').toLowerCase()
+      return lastA.localeCompare(lastB)
+    })
   }, [students, searchQuery, selectedCourse, selectedGradeGroup])
+
+  const toTitleCase = (str: string) => {
+    if (!str) return ''
+    return str
+      .toLowerCase()
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ')
+  }
 
   // Estadísticas calculadas sobre los estudiantes filtrados
   const stats = useMemo(() => {
@@ -319,15 +334,17 @@ export function TeacherStudentsScreen() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                  {filteredStudents.map(student => (
+                  {filteredStudents.map(student => {
+                    const displayName = toTitleCase(student.lastName ? `${student.lastName} ${student.firstName}` : student.name)
+                    return (
                     <tr key={student.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-850/10 transition-colors">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className={`h-9 w-9 rounded-xl bg-gradient-to-br ${getAvatarGradient(student.name)} text-white flex items-center justify-center font-bold text-xs shadow-sm`}>
-                            {getInitials(student.name)}
+                          <div className={`h-9 w-9 rounded-xl bg-gradient-to-br ${getAvatarGradient(displayName)} text-white flex items-center justify-center font-bold text-xs shadow-sm`}>
+                            {getInitials(displayName)}
                           </div>
                           <div>
-                            <p className="font-semibold text-slate-900 dark:text-white leading-none mb-1">{student.name}</p>
+                            <p className="font-semibold text-slate-900 dark:text-white leading-none mb-1">{displayName}</p>
                             <p className="text-xs text-slate-450 dark:text-slate-500 font-mono">{student.email}</p>
                           </div>
                         </div>
@@ -396,7 +413,7 @@ export function TeacherStudentsScreen() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                  )})}
 
                   {filteredStudents.length === 0 && (
                     <tr>

@@ -5,9 +5,11 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from 'react-resizable-panels'
 import {
   Search, Plus, BookOpen, Loader2, AlertCircle, X, Check,
-  FileText, Clock, Tag, Share2, History, PanelLeftClose, PanelLeftOpen, Sparkles
+  FileText, Clock, Tag, Share2, History, PanelLeftClose, PanelLeftOpen, Sparkles,
+  FolderPlus, ArrowLeft
 } from 'lucide-react'
 import { toast } from 'sonner'
+import Link from 'next/link'
 
 import type { Document, DocFolder } from '@/modules/docs/domain/entities/Document'
 import type { DocumentStatus } from '@/modules/docs/domain/value-objects/DocumentStatus'
@@ -26,7 +28,7 @@ import {
 
 // ─── Props ─────────────────────────────────────────────────────────────────────
 interface DocCenterScreenProps {
-  userRole: 'admin' | 'teacher' | 'student'
+  userRole: 'admin' | 'teacher' | 'student' | 'guest'
 }
 
 // ─── New Document Modal ────────────────────────────────────────────────────────
@@ -113,27 +115,44 @@ function RenameFolderModal({ folder, onConfirm, onClose }: {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4"
       onClick={onClose}
     >
       <motion.div
-        initial={{ scale: 0.96, opacity: 0 }}
+        initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.96, opacity: 0 }}
-        className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 p-6 w-full max-w-sm mx-4"
+        exit={{ scale: 0.95, opacity: 0 }}
+        transition={{ duration: 0.15 }}
+        className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl p-8 max-w-md w-full shadow-2xl text-center space-y-5"
         onClick={e => e.stopPropagation()}
       >
-        <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-4">Renombrar carpeta</h3>
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400">
+          <FolderPlus className="h-7 w-7" />
+        </div>
+        <div className="space-y-1 text-left">
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white">Renombrar carpeta</h3>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Ingresa el nuevo nombre para la carpeta "{folder.name}".</p>
+        </div>
         <input
           autoFocus
           value={name}
           onChange={e => setName(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && onConfirm(name)}
-          className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-400 mb-4"
+          onKeyDown={e => e.key === 'Enter' && name.trim() && onConfirm(name)}
+          className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-3.5 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
+          placeholder="Nombre de la carpeta"
         />
-        <div className="flex justify-end gap-2">
-          <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">Cancelar</button>
-          <button onClick={() => onConfirm(name)} className="px-4 py-2 rounded-xl text-sm font-medium bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:opacity-90">
+        <div className="flex gap-3 justify-center pt-1">
+          <button
+            onClick={onClose}
+            className="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition cursor-pointer"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={() => name.trim() && onConfirm(name)}
+            disabled={!name.trim()}
+            className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition active:scale-[0.98] cursor-pointer disabled:opacity-40 shadow-sm"
+          >
             Guardar
           </button>
         </div>
@@ -141,6 +160,64 @@ function RenameFolderModal({ folder, onConfirm, onClose }: {
     </motion.div>
   )
 }
+
+// ─── New Folder Modal ──────────────────────────────────────────────────────────
+function NewFolderModal({ onConfirm, onClose }: {
+  onConfirm: (name: string) => void
+  onClose: () => void
+}) {
+  const [name, setName] = useState('')
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        transition={{ duration: 0.15 }}
+        className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl p-8 max-w-md w-full shadow-2xl text-center space-y-5"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-indigo-50 text-indigo-600 dark:bg-indigo-950/30 dark:text-indigo-400">
+          <FolderPlus className="h-7 w-7" />
+        </div>
+        <div className="space-y-1 text-left">
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white">Nueva carpeta</h3>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Asigna un nombre para organizar tus documentos.</p>
+        </div>
+        <input
+          autoFocus
+          value={name}
+          onChange={e => setName(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && name.trim() && onConfirm(name)}
+          className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-3.5 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-shadow"
+          placeholder="Ej: Circulares académicas"
+        />
+        <div className="flex gap-3 justify-center pt-1">
+          <button
+            onClick={onClose}
+            className="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition cursor-pointer"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={() => name.trim() && onConfirm(name)}
+            disabled={!name.trim()}
+            className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition active:scale-[0.98] cursor-pointer disabled:opacity-40 shadow-sm"
+          >
+            Crear carpeta
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
 
 // ─── Main Screen ───────────────────────────────────────────────────────────────
 export function DocCenterScreen({ userRole }: DocCenterScreenProps) {
@@ -164,7 +241,7 @@ export function DocCenterScreen({ userRole }: DocCenterScreenProps) {
 
   const saveTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const canEdit = userRole !== 'student'
+  const canEdit = userRole !== 'student' && userRole !== 'guest'
 
   // ─── Load data ──────────────────────────────────────────────────────────────
   const loadData = useCallback(async () => {
@@ -173,8 +250,8 @@ export function DocCenterScreen({ userRole }: DocCenterScreenProps) {
     if (foldersRes.error) toast.error('Error al cargar carpetas')
     if (docsRes.error) toast.error('Error al cargar documentos')
     setFolders(foldersRes.data)
-    // Students only see published
-    const visibleDocs = userRole === 'student'
+    // Students and guests only see published docs
+    const visibleDocs = (userRole === 'student' || userRole === 'guest')
       ? docsRes.data.filter(d => d.status === 'published')
       : docsRes.data
     setDocuments(visibleDocs)
@@ -259,24 +336,42 @@ export function DocCenterScreen({ userRole }: DocCenterScreenProps) {
     if (data) setFolders(prev => prev.map(f => f.id === data.id ? data : f))
   }
 
-  // ─── Delete folder ──────────────────────────────────────────────────────────
-  const handleDeleteFolder = async (folder: DocFolder) => {
-    if (!confirm(`¿Eliminar la carpeta "${folder.name}" y todo su contenido?`)) return
-    const { error } = await deleteFolder(folder.id)
-    if (error) { toast.error('Error al eliminar', { description: error }); return }
-    setFolders(prev => prev.filter(f => f.id !== folder.id))
-    if (selectedDoc?.folderId === folder.id) setSelectedDoc(null)
-    toast.success('Carpeta eliminada')
+  // ─── Delete folder ────────────────────────────────────────────────────────
+  const handleDeleteFolder = (folder: DocFolder) => {
+    toast.warning(`¿Eliminar "${folder.name}"?`, {
+      description: 'Se eliminará la carpeta y todo su contenido. Esta acción es irreversible.',
+      action: {
+        label: 'Eliminar',
+        onClick: async () => {
+          const { error } = await deleteFolder(folder.id)
+          if (error) { toast.error('Error al eliminar', { description: error }); return }
+          setFolders(prev => prev.filter(f => f.id !== folder.id))
+          if (selectedDoc?.folderId === folder.id) setSelectedDoc(null)
+          toast.success('Carpeta eliminada')
+        }
+      },
+      cancel: { label: 'Cancelar', onClick: () => {} },
+      duration: 8000,
+    })
   }
 
   // ─── Delete document ────────────────────────────────────────────────────────
-  const handleDeleteDoc = async (doc: Document) => {
-    if (!confirm(`¿Eliminar "${doc.title}"? Esta acción es irreversible.`)) return
-    const { error } = await deleteDocument(doc.id)
-    if (error) { toast.error('Error al eliminar', { description: error }); return }
-    setDocuments(prev => prev.filter(d => d.id !== doc.id))
-    if (selectedDoc?.id === doc.id) setSelectedDoc(null)
-    toast.success('Documento eliminado')
+  const handleDeleteDoc = (doc: Document) => {
+    toast.warning(`¿Eliminar "${doc.title}"?`, {
+      description: 'Esta acción desvincula el historial de versiones y no se puede deshacer.',
+      action: {
+        label: 'Eliminar',
+        onClick: async () => {
+          const { error } = await deleteDocument(doc.id)
+          if (error) { toast.error('Error al eliminar', { description: error }); return }
+          setDocuments(prev => prev.filter(d => d.id !== doc.id))
+          if (selectedDoc?.id === doc.id) setSelectedDoc(null)
+          toast.success('Documento eliminado')
+        }
+      },
+      cancel: { label: 'Cancelar', onClick: () => {} },
+      duration: 8000,
+    })
   }
 
   // ─── Status change ──────────────────────────────────────────────────────────
@@ -324,7 +419,7 @@ export function DocCenterScreen({ userRole }: DocCenterScreenProps) {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-64px)] -mx-6 md:-mx-8 -mt-6 md:-mt-8 overflow-hidden">
+    <div className={`flex flex-col ${userRole === 'guest' ? 'h-full' : 'h-[calc(100vh-64px)] -mx-6 md:-mx-8 -mt-6 md:-mt-8'} overflow-hidden`}>
       {/* ── Top bar ── */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
         {/* Toggle explorer */}
@@ -349,6 +444,19 @@ export function DocCenterScreen({ userRole }: DocCenterScreenProps) {
 
         {/* Spacer */}
         <div className="flex-1" />
+
+        {/* Back to Landing for Guest */}
+        {userRole === 'guest' && (
+          <Link
+            href="/"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/50 hover:bg-white hover:text-slate-900 dark:bg-slate-950/50 text-slate-600 dark:text-slate-300 text-xs font-semibold transition-colors mr-2"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            <span>Volver al Inicio</span>
+          </Link>
+        )}
+
+
 
         {/* Actions */}
         <div className="flex items-center gap-1.5">
@@ -398,9 +506,7 @@ export function DocCenterScreen({ userRole }: DocCenterScreenProps) {
                   onSelectDoc={handleSelectDoc}
                   onNewDocument={(folderId) => setNewDocModal({ parentFolderId: folderId ?? null })}
                   onNewFolder={(parentId) => {
-                    // Inline for simplicity: prompt
-                    const name = prompt('Nombre de la carpeta:')
-                    if (name?.trim()) handleCreateFolder(name.trim(), parentId ?? null)
+                    setNewFolderModal({ parentId: parentId ?? null })
                   }}
                   onRenameFolder={setRenameFolderTarget}
                   onDeleteFolder={handleDeleteFolder}
@@ -512,7 +618,10 @@ export function DocCenterScreen({ userRole }: DocCenterScreenProps) {
                     Centro de Documentación Académica
                   </h2>
                   <p className="text-sm text-slate-400 max-w-sm leading-relaxed mb-6">
-                    Repositorio oficial del conocimiento institucional. Crea, organiza y comparte documentación académica y administrativa.
+                    {canEdit
+                      ? 'Repositorio oficial del conocimiento institucional. Crea, organiza y comparte documentación académica y administrativa.'
+                      : 'Repositorio oficial del conocimiento institucional. Consulta la documentación académica y administrativa.'
+                    }
                   </p>
                   {canEdit ? (
                     <div className="flex items-center gap-2 justify-center">
@@ -549,6 +658,15 @@ export function DocCenterScreen({ userRole }: DocCenterScreenProps) {
             onClose={() => setNewDocModal(null)}
           />
         )}
+        {newFolderModal && (
+          <NewFolderModal
+            onConfirm={(name) => {
+              handleCreateFolder(name, newFolderModal.parentId)
+              setNewFolderModal(null)
+            }}
+            onClose={() => setNewFolderModal(null)}
+          />
+        )}
         {renameFolderTarget && (
           <RenameFolderModal
             folder={renameFolderTarget}
@@ -556,6 +674,7 @@ export function DocCenterScreen({ userRole }: DocCenterScreenProps) {
             onClose={() => setRenameFolderTarget(null)}
           />
         )}
+
         {showSearch && (
           <DocSearch
             onSelect={handleSelectDoc}

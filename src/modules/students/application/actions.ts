@@ -6,6 +6,8 @@ import { revalidatePath } from 'next/cache'
 export interface TeacherStudent {
   id: string
   name: string
+  firstName?: string
+  lastName?: string
   email: string
   gradeLevel: string
   groupName: string
@@ -250,6 +252,8 @@ export async function getTeacherStudents(): Promise<TeacherStudent[]> {
       return {
         id: p.id,
         name: `${p.first_name} ${p.last_name}`,
+        firstName: p.first_name || '',
+        lastName: p.last_name || '',
         email: p.email || fallbackEmail,
         gradeLevel: p.grade_level || '8°',
         groupName: p.group_name || '1',
@@ -268,6 +272,8 @@ export async function getTeacherStudents(): Promise<TeacherStudent[]> {
       {
         id: 's-1',
         name: 'Ana María Torres',
+        firstName: 'Ana María',
+        lastName: 'Torres',
         email: 'a.torres@estudiante.ensuny.edu.co',
         gradeLevel: '8°',
         groupName: '1',
@@ -282,6 +288,8 @@ export async function getTeacherStudents(): Promise<TeacherStudent[]> {
       {
         id: 's-2',
         name: 'José Daniel Ramírez',
+        firstName: 'José Daniel',
+        lastName: 'Ramírez',
         email: 'j.ramirez@estudiante.ensuny.edu.co',
         gradeLevel: '8°',
         groupName: '1',
@@ -296,6 +304,8 @@ export async function getTeacherStudents(): Promise<TeacherStudent[]> {
       {
         id: 's-3',
         name: 'Luis Alfredo Sandoval',
+        firstName: 'Luis Alfredo',
+        lastName: 'Sandoval',
         email: 'l.sandoval@estudiante.ensuny.edu.co',
         gradeLevel: '9°',
         groupName: '2',
@@ -309,6 +319,8 @@ export async function getTeacherStudents(): Promise<TeacherStudent[]> {
       {
         id: 's-4',
         name: 'María Camila Herrera',
+        firstName: 'María Camila',
+        lastName: 'Herrera',
         email: 'm.herrera@estudiante.ensuny.edu.co',
         gradeLevel: '10°',
         groupName: '2',
@@ -322,6 +334,8 @@ export async function getTeacherStudents(): Promise<TeacherStudent[]> {
       {
         id: 's-5',
         name: 'Kevin Martinez',
+        firstName: 'Kevin',
+        lastName: 'Martinez',
         email: 'kevin@estudiante.ensuny.edu.co',
         gradeLevel: '11°',
         groupName: '1',
