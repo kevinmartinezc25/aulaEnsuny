@@ -8,6 +8,8 @@ export async function selfRegisterStudent(data: {
   documentType: string
   documentNumber: string
   birthDate: string
+  gradeLevel: string
+  groupName: string
   email: string
   password: string
 }) {
@@ -39,6 +41,19 @@ export async function selfRegisterStudent(data: {
     }
 
     const studentId = newUser.user.id
+
+    // 1.5 Actualizar Grado y Grupo en la tabla de perfiles (creada automáticamente por el Trigger)
+    const { error: profileError } = await adminClient
+      .from('profiles')
+      .update({
+        grade_level: data.gradeLevel,
+        group_name: data.groupName
+      })
+      .eq('id', studentId)
+
+    if (profileError) {
+      console.error('Error actualizando grado y grupo en profiles:', profileError)
+    }
 
     // 2. Insertar los detalles mínimos en student_details para que aparezcan en la Ficha Académica del SuperAdmin
     const { error: detailsError } = await adminClient.from('student_details').insert({
