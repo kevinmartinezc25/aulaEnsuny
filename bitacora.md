@@ -103,6 +103,10 @@
 - [x] Optimización móvil y tablet del flujo de inicio de sesión (`LoginScreen.tsx`) y registro de estudiantes (`StudentRegistrationScreen.tsx`), implementando scroll seguro (`min-h-screen`), layouts responsivos, inputs touch-friendly (altura fija de 12 y 11) y márgenes de marca seguros.
 - [x] Rediseño de **Logotipos Vectoriales (Puro SVG)**: se eliminaron los antiguos SVG de 1.3 MB con base64 incrustado. Se crearon los nuevos activos vectoriales optimizados `/logo.svg` y `/logo_1.svg` (peso inferior a 4 KB) incorporando el isotipo de squircle verde con el libro abierto (centrado con factor de escala 2.0 y traslación matemática óptima), y el texto "aulaEnsuny" impreso de forma continua (pegado).
 - [x] Integración de Logotipos en Sidebar y Cabecera del Dashboard (`layout.tsx`): reemplazo de `/logo_1.png` por `/logo_1.svg`.
+- [x] **Explorador de Documentos (Árbol recursivo)**: Refactorizado `DocExplorer.tsx` para soportar subcarpetas infinitas. Los nodos de carpetas se colapsan por defecto.
+- [x] **Permisos y RLS del DocCenter**: Se ajustaron las políticas RLS y se implementó `createAdminClient` para accesos públicos de sólo lectura sin errores de base de datos.
+- [x] **UI/UX Google Drive-like**: Implementado un selector de color interactivo (13 colores) en el menú contextual ("tres puntos") de las carpetas, con persistencia en Supabase (nueva columna `color`).
+- [x] **Tabla de Documentos**: Mejorada la columna "Categoría" para mostrar la ruta jerárquica completa (ej: "Principal / Subcarpeta / ...") en lugar de únicamente la carpeta inmediata o mostrar "General" por error de join.
 
 ---
 

@@ -5,6 +5,13 @@ export interface Document {
   id: string
   title: string
   slug: string | null
+  description: string | null
+  driveFileId: string | null
+  driveUrl: string | null
+  mimeType: string | null
+  fileSize: number | null
+  versionLabel: string
+  isStarred: boolean
   content: string
   contentHtml: string | null
   folderId: string | null
@@ -33,6 +40,7 @@ export interface DocFolder {
   id: string
   name: string
   parentId: string | null
+  color: string | null
   createdBy: string
   sortOrder: number
   createdAt: string

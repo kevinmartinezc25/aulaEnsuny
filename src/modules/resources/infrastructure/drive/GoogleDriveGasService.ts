@@ -22,7 +22,8 @@ export class GoogleDriveGasService implements IDriveService {
       mimeType: options.mimeType,
       base64: base64File,
       courseName: options.courseName,
-      moduleName: options.moduleName
+      moduleName: options.moduleName,
+      docsFolderId: process.env.GOOGLE_DRIVE_DOCS_FOLDER_ID || ''
     })
 
     // Google Apps Script devuelve una redirección 302 antes del endpoint real.
