@@ -422,6 +422,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter()
   const isAdmin = pathname.startsWith('/admin') || pathname.startsWith('/superadmin')
   const isCourseSection = pathname.includes('/teacher/courses/') || pathname.includes('/student/courses/')
+  const isDocsPage = pathname.endsWith('/docs')
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [isAdminSidebarVisible, setIsAdminSidebarVisible] = useState(true)
@@ -669,22 +670,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
     toggleAdminSidebar()
   }
-
-  // Admin layout: fixed 72px sidebar, no collapse button, no header for courses
   if (isAdmin) {
     return (
       <div className="flex min-h-screen bg-slate-50 dark:bg-slate-950">
         {/* Admin Sidebar Desktop */}
-        {isAdminSidebarVisible && (
+        {isAdminSidebarVisible && !isDocsPage && (
           <aside className="fixed inset-y-0 left-0 z-20 hidden w-60 md:flex flex-col">
             <AdminSidebar user={user} enabledModules={enabledModules} />
           </aside>
         )}
 
         {/* Admin Main */}
-        <div className={`flex flex-1 flex-col ${isAdminSidebarVisible ? 'md:pl-60' : 'md:pl-0'}`}>
+        <div className={`flex flex-1 flex-col ${(isAdminSidebarVisible && !isDocsPage) ? 'md:pl-60' : 'md:pl-0'}`}>
           {/* Admin Header */}
-          <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b border-slate-100 bg-white px-6 dark:border-slate-800/60 dark:bg-slate-900">
+          {!isDocsPage && (
+            <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b border-slate-100 bg-white px-6 dark:border-slate-800/60 dark:bg-slate-900">
             <div className="flex items-center gap-2">
               
               <button
@@ -744,8 +744,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </button>
             </div>
           </header>
+          )}
 
-          <main className="flex-1 p-6 md:p-8">{children}</main>
+          <main className={`flex-1 ${isDocsPage ? 'p-0' : 'p-6 md:p-8'}`}>{children}</main>
         </div>
 
         {/* Mobile Drawer for Admin */}
@@ -773,7 +774,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex min-h-screen bg-[#f9fafb] dark:bg-slate-950 transition-all duration-300">
       {/* Sidebar Desktop */}
-      {!isCourseSection && (
+      {!isCourseSection && !isDocsPage && (
         <aside className={`fixed inset-y-0 left-0 z-20 hidden border-r border-slate-100 bg-white/70 backdrop-blur-md dark:border-slate-800/60 dark:bg-slate-900/70 md:block transition-all duration-300 ${isSidebarCollapsed ? 'w-20' : 'w-64'}`}>
           <SidebarContent user={user} isCollapsed={isSidebarCollapsed} />
           <button onClick={toggleSidebar}
@@ -785,9 +786,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       )}
 
       {/* Main Container */}
-      <div className={`flex flex-1 flex-col transition-all duration-300 ${isCourseSection ? 'pl-0' : (isSidebarCollapsed ? 'md:pl-20' : 'md:pl-64')}`}>
+      <div className={`flex flex-1 flex-col transition-all duration-300 ${(isCourseSection || isDocsPage) ? 'pl-0' : (isSidebarCollapsed ? 'md:pl-20' : 'md:pl-64')}`}>
         {/* Header */}
-        <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-slate-100 bg-white px-6 dark:border-slate-800/60 dark:bg-slate-950 print:hidden">
+        {!isDocsPage && (
+          <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-slate-100 bg-white px-6 dark:border-slate-800/60 dark:bg-slate-950 print:hidden">
           <div className="flex items-center gap-4">
             <button onClick={() => setIsMobileMenuOpen(true)} className={`rounded-lg p-2 hover:bg-slate-55 dark:hover:bg-slate-800/50 ${isCourseSection ? 'block' : 'md:hidden'}`}>
               <Menu className="h-5 w-5 text-slate-600 dark:text-slate-400" />
@@ -847,11 +849,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
           </div>
         </header>
+        )}
 
-        <main className="flex-1 p-6 md:p-8">{children}</main>
-        <footer className="border-t border-slate-100 py-6 text-center text-xs text-slate-400 dark:border-slate-800/60 dark:text-slate-500">
-          <p>© {new Date().getFullYear()} aulaEnsuny. Todos los derechos reservados.</p>
-        </footer>
+        <main className={`flex-1 ${isDocsPage ? 'p-0' : 'p-6 md:p-8'}`}>{children}</main>
+        {!isDocsPage && (
+          <footer className="border-t border-slate-100 py-6 text-center text-xs text-slate-400 dark:border-slate-800/60 dark:text-slate-500">
+            <p>© {new Date().getFullYear()} aulaEnsuny. Todos los derechos reservados.</p>
+          </footer>
+        )}
       </div>
 
       {/* Mobile Drawer */}

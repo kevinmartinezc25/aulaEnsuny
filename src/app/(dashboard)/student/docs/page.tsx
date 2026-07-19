@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation'
+import { DocCenterScreen } from '@/modules/docs/presentation/screens/DocCenterScreen'
 
 export const metadata = {
   title: 'Documentos | aulaEnsuny',
@@ -6,5 +6,5 @@ export const metadata = {
 }
 
 export default function StudentDocsPage() {
-  notFound()
+  return <DocCenterScreen userRole="student" />
 }
