@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Loader2, Save } from 'lucide-react'
 import { createClient } from '@/core/config/supabase/client'
+import { toast } from 'sonner'
 
 interface SlotEditorModalProps {
   isOpen: boolean

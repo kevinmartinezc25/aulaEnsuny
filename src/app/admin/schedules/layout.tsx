@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, Suspense } from 'react'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -33,7 +33,7 @@ const SIDEBAR_ITEMS = [
   { name: 'Ajustes', href: '/admin/schedules/settings', query: null, icon: Settings2, color: 'text-slate-500 dark:text-slate-400' },
 ]
 
-export default function SchedulesLayout({ children }: { children: React.ReactNode }) {
+function SchedulesLayoutInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const activePanel = searchParams.get('panel')
@@ -173,5 +173,13 @@ export default function SchedulesLayout({ children }: { children: React.ReactNod
       </main>
 
     </div>
+  )
+}
+
+export default function SchedulesLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense fallback={<div className="h-screen w-full bg-slate-50 dark:bg-[#0a0f1c]" />}>
+      <SchedulesLayoutInner>{children}</SchedulesLayoutInner>
+    </Suspense>
   )
 }

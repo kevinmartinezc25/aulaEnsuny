@@ -224,7 +224,7 @@ export default function ScheduleCanvas({ entityType = 'group', entityId, entityN
     const breakPeriods = breaks.map((b: any) => b.afterPeriod)
     
     const groupPeriods = JSON.parse(localStorage.getItem('sch_group_periods') || '{}')
-    const periodsPerDay = groupPeriods[groupId] || parseInt(settings.periodsPerDay || '7', 10)
+    const periodsPerDay = groupPeriods[entityId] || parseInt(settings.periodsPerDay || '7', 10)
 
     const context: RuleContext = {
       constraints: constraintsData || [],
