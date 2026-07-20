@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   BookOpen, Calendar, Settings, Bell, Menu, X, ChevronDown, LogOut, Award, TrendingUp,
   PanelLeftClose, PanelLeftOpen, Moon, Sun, LayoutDashboard, Users, GraduationCap,
-  ClipboardList, BarChart2, BellRing, FolderOpen, ShieldCheck, UserCog, Activity, ChevronRight, FileText
+  ClipboardList, BarChart2, BellRing, FolderOpen, ShieldCheck, UserCog, Activity, ChevronRight, FileText, CalendarDays
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
@@ -23,6 +23,7 @@ const ADMIN_NAV = [
   {
     section: 'Gestión Académica',
     items: [
+      { name: 'Horarios', href: '/admin/schedules', icon: CalendarDays },
       { name: 'Usuarios', href: '/admin/users', icon: Users },
       { name: 'Grados', href: '/admin/grade-levels', icon: ClipboardList },
       { name: 'Cursos', href: '/admin/courses', icon: BookOpen },
@@ -71,7 +72,7 @@ function getInitials(name?: string) {
   return parts[0][0].toUpperCase()
 }
 
-function AdminSidebar({ onClose, user, enabledModules = [] }: { onClose?: () => void; user: UserSessionInfo | null; enabledModules?: string[] }) {
+function AdminSidebar({ onClose, user, enabledModules = [], isCollapsed = false }: { onClose?: () => void; user: UserSessionInfo | null; enabledModules?: string[], isCollapsed?: boolean }) {
   const pathname = usePathname()
   const router = useRouter()
   const [isProfileOpen, setIsProfileOpen] = useState(false)
@@ -94,7 +95,7 @@ function AdminSidebar({ onClose, user, enabledModules = [] }: { onClose?: () => 
       ...group,
       items: group.items.filter(item => {
         const key = item.href.split('/').pop()!
-        if (key === 'dashboard') return true
+        if (key === 'dashboard' || key === 'schedules') return true
         return enabledModules.includes(key)
       })
     }
@@ -124,32 +125,43 @@ function AdminSidebar({ onClose, user, enabledModules = [] }: { onClose?: () => 
   return (
     <div className="flex h-full flex-col bg-white dark:bg-slate-900 border-r border-slate-100 dark:border-slate-800/60">
       {/* Logo */}
-      <div className="flex h-16 shrink-0 items-center gap-3 px-5 border-b border-slate-100 dark:border-slate-800/60">
+      <div className={`flex h-16 shrink-0 items-center border-b border-slate-100 dark:border-slate-800/60 ${isCollapsed ? 'justify-center px-2' : 'gap-3 px-5'}`}>
         <img src="/logo_1.svg" alt="aulaEnsuny" className="h-8 object-contain" />
-        <div>
-          <p className="text-sm font-bold text-slate-900 dark:text-white tracking-tight">aulaEnsuny</p>
-          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-            {user?.role === 'superadmin' ? 'SuperAdmin' : 'Admin'}
-          </span>
-        </div>
+        {!isCollapsed && (
+          <div>
+            <p className="text-sm font-bold text-slate-900 dark:text-white tracking-tight">aulaEnsuny</p>
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              {user?.role === 'superadmin' ? 'SuperAdmin' : 'Admin'}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Nav Sections */}
-      <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-2">
+      <nav className="flex-1 overflow-y-auto overflow-x-hidden py-4 px-3 space-y-2 custom-scrollbar">
         {navItems.map((group) => {
           const isOpen = openSections[group.section] ?? true
           return (
             <div key={group.section}>
               {/* Section Header — Clickable Toggle */}
               <button
-                onClick={() => toggleSection(group.section)}
-                className="w-full flex items-center justify-between px-3 py-1.5 mb-0.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/40 group transition-colors"
+                onClick={() => !isCollapsed && toggleSection(group.section)}
+                className={`w-full flex items-center px-3 py-1.5 mb-0.5 rounded-lg transition-colors ${
+                  isCollapsed ? 'justify-center cursor-default' : 'justify-between hover:bg-slate-50 dark:hover:bg-slate-800/40 cursor-pointer group'
+                }`}
+                title={isCollapsed ? group.section : undefined}
               >
-                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-600 group-hover:text-slate-500 dark:group-hover:text-slate-500 transition-colors">
-                  {group.section}
-                </span>
-                <ChevronDown className={`h-3 w-3 text-slate-300 dark:text-slate-700 transition-transform duration-200 ${isOpen ? 'rotate-0' : '-rotate-90'}`} />
+                {!isCollapsed ? (
+                  <>
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-600 group-hover:text-slate-500 dark:group-hover:text-slate-500 transition-colors">
+                      {group.section}
+                    </span>
+                    <ChevronDown className={`h-3 w-3 text-slate-300 dark:text-slate-700 transition-transform duration-200 ${isOpen ? 'rotate-0' : '-rotate-90'}`} />
+                  </>
+                ) : (
+                  <div className="w-4 border-t-2 border-slate-200 dark:border-slate-700 rounded my-2"></div>
+                )}
               </button>
 
               {/* Section Items */}
@@ -172,22 +184,25 @@ function AdminSidebar({ onClose, user, enabledModules = [] }: { onClose?: () => 
                             key={item.name}
                             href={item.href}
                             onClick={onClose}
-                            className={`group flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150 ${
+                            title={isCollapsed ? item.name : undefined}
+                            className={`group flex items-center rounded-xl transition-colors duration-150 ${
+                              isCollapsed ? 'justify-center p-3' : 'justify-between px-3 py-2.5'
+                            } text-sm font-medium ${
                               isActive
                                 ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
                                 : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-white'
                             }`}
                           >
-                            <span className="flex items-center gap-3">
+                            <span className={`flex items-center gap-3 ${isCollapsed ? '' : 'truncate'}`}>
                               <Icon className="h-4 w-4 shrink-0" />
-                              {item.name}
+                              {!isCollapsed && <span className="truncate">{item.name}</span>}
                             </span>
-                            {(item as any).badge && !isActive && (
+                            {!isCollapsed && (item as any).badge && !isActive && (
                               <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 text-[10px] font-bold text-white">
                                 {(item as any).badge}
                               </span>
                             )}
-                            {isActive && <ChevronRight className="h-3.5 w-3.5 opacity-60" />}
+                            {!isCollapsed && isActive && <ChevronRight className="h-3.5 w-3.5 opacity-60" />}
                           </Link>
                         )
                       })}
@@ -228,20 +243,27 @@ function AdminSidebar({ onClose, user, enabledModules = [] }: { onClose?: () => 
 
         <button
           onClick={() => setIsProfileOpen(!isProfileOpen)}
-          className="flex w-full items-center gap-3 rounded-2xl p-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
+          className={`flex w-full items-center rounded-2xl p-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer ${
+            isCollapsed ? 'justify-center' : 'gap-3'
+          }`}
+          title={isCollapsed ? user?.name || 'Administrador' : undefined}
         >
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-slate-700 to-slate-900 text-white text-sm font-bold dark:from-slate-200 dark:to-white dark:text-slate-900">
             {user?.name ? user.name[0].toUpperCase() : 'A'}
           </div>
-          <div className="flex-1 text-left min-w-0">
-            <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">
-              {user?.name || 'Administrador'}
-            </p>
-            <p className="text-xs text-slate-400 dark:text-slate-500 truncate">
-              {user?.email || 'admin@ensuny.edu.co'}
-            </p>
-          </div>
-          <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform shrink-0 ${isProfileOpen ? 'rotate-180' : ''}`} />
+          {!isCollapsed && (
+            <>
+              <div className="flex-1 text-left min-w-0">
+                <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">
+                  {user?.name || 'Administrador'}
+                </p>
+                <p className="text-xs text-slate-400 dark:text-slate-500 truncate">
+                  {user?.email || 'admin@ensuny.edu.co'}
+                </p>
+              </div>
+              <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform shrink-0 ${isProfileOpen ? 'rotate-180' : ''}`} />
+            </>
+          )}
         </button>
       </div>
     </div>
@@ -272,6 +294,7 @@ function SidebarContent({ onClose, isCollapsed = false, user }: SidebarProps) {
   if (pathname.startsWith('/teacher')) {
     menuItems = [
       { name: 'Panel Docente', href: '/teacher/dashboard', icon: BookOpen },
+      { name: 'Horario (Docente)', href: '/teacher/schedule', icon: CalendarDays },
       { name: 'Calificaciones', href: '/teacher/grades', icon: ClipboardList },
       { name: 'Mis Estudiantes', href: '/teacher/students', icon: TrendingUp },
       { name: 'Calendario', href: '/teacher/calendar', icon: Calendar },
@@ -318,7 +341,7 @@ function SidebarContent({ onClose, isCollapsed = false, user }: SidebarProps) {
                 href={item.href}
                 onClick={onClose}
                 title={isCollapsed ? item.name : undefined}
-                className={`group flex items-center rounded-xl transition-all duration-200 ${
+                className={`group flex items-center rounded-xl transition-colors duration-200 ${
                   isCollapsed ? 'justify-center p-3' : 'gap-3 px-4 py-3'
                 } text-sm font-medium ${
                   isActive
@@ -327,7 +350,7 @@ function SidebarContent({ onClose, isCollapsed = false, user }: SidebarProps) {
                 }`}
               >
                 <Icon className={`h-5 w-5 shrink-0 ${isActive ? 'text-blue-600 dark:text-blue-400' : ''}`} />
-                {!isCollapsed && <span>{item.name}</span>}
+                {!isCollapsed && <span className="truncate">{item.name}</span>}
               </Link>
             )
           })}
@@ -674,14 +697,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return (
       <div className="flex min-h-screen bg-slate-50 dark:bg-slate-950">
         {/* Admin Sidebar Desktop */}
-        {isAdminSidebarVisible && !isDocsPage && (
-          <aside className="fixed inset-y-0 left-0 z-20 hidden w-60 md:flex flex-col">
-            <AdminSidebar user={user} enabledModules={enabledModules} />
+        {!isDocsPage && (
+          <aside className={`fixed inset-y-0 left-0 z-20 hidden md:flex flex-col transition-all duration-300 ${isAdminSidebarVisible ? 'w-60' : 'w-20'}`}>
+            <AdminSidebar user={user} enabledModules={enabledModules} isCollapsed={!isAdminSidebarVisible} />
           </aside>
         )}
 
         {/* Admin Main */}
-        <div className={`flex flex-1 flex-col ${(isAdminSidebarVisible && !isDocsPage) ? 'md:pl-60' : 'md:pl-0'}`}>
+        <div className={`flex flex-1 flex-col transition-all duration-300 ${!isDocsPage ? (isAdminSidebarVisible ? 'md:pl-60' : 'md:pl-20') : 'md:pl-0'}`}>
           {/* Admin Header */}
           {!isDocsPage && (
             <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b border-slate-100 bg-white px-6 dark:border-slate-800/60 dark:bg-slate-900">
