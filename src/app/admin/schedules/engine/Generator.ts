@@ -80,9 +80,9 @@ export class ScheduleGenerator {
           // Crear sesión candidata
           const candidateSession: ClassSession = {
             id: `temp-${processed}`,
-            groupId: block.group_id,
-            teacherId: block.teacher_id,
-            subjectId: block.subject_id,
+            groupId: block.group_id || '',
+            teacherId: block.teacher_id || '',
+            subjectId: block.subject_id || '',
             dayOfWeek: day,
             periodId: p,
             duration: block.duration
@@ -110,9 +110,9 @@ export class ScheduleGenerator {
       if (bestSlot) {
         currentSchedule.push({
           id: `assigned-${processed}`,
-          groupId: block.group_id,
-          teacherId: block.teacher_id,
-          subjectId: block.subject_id,
+          groupId: block.group_id || '',
+          teacherId: block.teacher_id || '',
+          subjectId: block.subject_id || '',
           dayOfWeek: bestSlot.day,
           periodId: bestSlot.periodId,
           duration: block.duration
