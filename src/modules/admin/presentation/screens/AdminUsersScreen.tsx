@@ -7,9 +7,10 @@ import {
   Shield, GraduationCap, BookOpen, Filter, CheckCircle, Loader2, AlertCircle
 } from 'lucide-react'
 import {
-  getAdminUsers, createAdminUser, updateAdminUser, deleteAdminUser, AdminUser,
-  getAcademicLevels, AcademicLevel
+  getAdminUsers, createAdminUser, updateAdminUser, deleteAdminUser,
+  getAcademicLevels
 } from '../../application/actions'
+import { AdminUser, AcademicLevel } from '../../application/types'
 
 type Role = 'student' | 'teacher' | 'admin' | 'superadmin'
 type Status = 'active' | 'inactive'
@@ -36,7 +37,7 @@ export function AdminUsersScreen() {
   const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null)
   const [showSuccess, setShowSuccess] = useState('')
 
-  const [form, setForm] = useState({ name: '', email: '', role: 'student' as Role, status: 'active' as Status, grade: '' })
+  const [form, setForm] = useState({ name: '', email: '', role: 'student' as Role, status: 'active' as Status, grade: '', password: '' })
 
   // Cargar usuarios al montar
   useEffect(() => {
@@ -70,14 +71,14 @@ export function AdminUsersScreen() {
   const openCreate = () => {
     setEditingUser(null)
     setErrorMsg('')
-    setForm({ name: '', email: '', role: 'student', status: 'active', grade: '' })
+    setForm({ name: '', email: '', role: 'student', status: 'active', grade: '', password: '' })
     setIsModalOpen(true)
   }
 
   const openEdit = (user: AdminUser) => {
     setEditingUser(user)
     setErrorMsg('')
-    setForm({ name: user.name, email: user.email, role: user.role, status: user.status, grade: user.grade || '' })
+    setForm({ name: user.name, email: user.email, role: user.role, status: user.status, grade: user.grade || '', password: '' })
     setIsModalOpen(true)
   }
 
@@ -304,6 +305,13 @@ export function AdminUsersScreen() {
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Correo Institucional</label>
                   <input disabled={isSaving} value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="correo@ensuny.edu" type="email"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white disabled:opacity-60" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                    Contraseña {editingUser && <span className="text-xs font-normal text-slate-500">(Opcional. Llenar solo para cambiarla)</span>}
+                  </label>
+                  <input disabled={isSaving} value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder={editingUser ? 'Nueva contraseña...' : 'Contraseña por defecto...'} type="password"
                     className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white disabled:opacity-60" />
                 </div>
                 <div className="grid grid-cols-2 gap-4">

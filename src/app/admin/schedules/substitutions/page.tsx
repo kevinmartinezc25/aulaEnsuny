@@ -4,6 +4,8 @@ import React, { useState, useEffect } from 'react'
 import { createClient } from '@/core/config/supabase/client'
 import { Calendar, UserMinus, Plus, Trash2, ArrowRight, Save, ShieldCheck, Ban, CheckCircle2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { getTeachersList } from '@/modules/admin/application/actions'
+import DailyImpactCanvas from '../components/DailyImpactCanvas'
 
 export default function SubstitutionsPage() {
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0])
@@ -40,7 +42,7 @@ export default function SubstitutionsPage() {
   }, [activeAbsence])
 
   const fetchTeachers = async () => {
-    const { data } = await supabase.from('sch_teachers').select('*').order('name')
+    const data = await getTeachersList()
     if (data) setTeachers(data)
   }
 
@@ -48,10 +50,16 @@ export default function SubstitutionsPage() {
     setLoading(true)
     const { data, error } = await supabase
       .from('sch_absences')
-      .select('*, teacher:sch_teachers(name)')
+      .select('*, teacher:profiles!teacher_id(first_name, last_name)')
       .eq('absence_date', selectedDate)
     
-    if (data) setAbsences(data)
+    if (data) {
+      const mapped = data.map((ab: any) => ({
+        ...ab,
+        teacher: { name: ab.teacher ? `${ab.teacher.first_name} ${ab.teacher.last_name}` : 'Desconocido' }
+      }))
+      setAbsences(mapped)
+    }
     setLoading(false)
   }
 
@@ -158,10 +166,13 @@ export default function SubstitutionsPage() {
   const displayDayName = dateObjForDisplay.toLocaleDateString('es-ES', { weekday: 'long' })
   const displayFullDate = dateObjForDisplay.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
 
+  // Tab State
+  const [activeTab, setActiveTab] = useState<'manage' | 'impact'>('manage')
+
   return (
     <div className="w-full h-full p-6 flex flex-col gap-6">
       {/* Header & Date Picker */}
-      <div className="flex items-center justify-between bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+      <div className="flex flex-col md:flex-row md:items-center justify-between bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-3">
             <UserMinus className="h-7 w-7 text-rose-500" />
@@ -169,18 +180,37 @@ export default function SubstitutionsPage() {
           </h1>
           <p className="text-sm text-slate-500 mt-1">Gestiona los reemplazos diarios sin alterar el Horario Maestro</p>
         </div>
-        <div className="flex items-center gap-3">
-          <Calendar className="h-5 w-5 text-slate-400" />
-          <input 
-            type="date" 
-            value={selectedDate}
-            onChange={e => setSelectedDate(e.target.value)}
-            className="px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-medium focus:ring-2 focus:ring-indigo-500"
-          />
+        
+        <div className="flex flex-col sm:flex-row items-center gap-4">
+          <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+            <button
+              onClick={() => setActiveTab('manage')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'manage' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+            >
+              Gestión de Ausencias
+            </button>
+            <button
+              onClick={() => setActiveTab('impact')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'impact' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+            >
+              Impacto General
+            </button>
+          </div>
+
+          <div className="flex items-center gap-3 pl-0 sm:pl-4 sm:border-l border-slate-200 dark:border-slate-700">
+            <Calendar className="h-5 w-5 text-slate-400" />
+            <input 
+              type="date" 
+              value={selectedDate}
+              onChange={e => setSelectedDate(e.target.value)}
+              className="px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-medium focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
         </div>
       </div>
 
-      <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-6 min-h-0">
+      {activeTab === 'manage' ? (
+        <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-6 min-h-0">
         
         {/* Panel Izquierdo: Ausencias del Día */}
         <div className="md:col-span-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden flex flex-col">
@@ -302,7 +332,10 @@ export default function SubstitutionsPage() {
             </div>
           )}
         </div>
-      </div>
+        </div>
+      ) : (
+        <DailyImpactCanvas selectedDate={selectedDate} />
+      )}
 
       {/* MODAL NUEVA AUSENCIA */}
       {isAddModalOpen && (

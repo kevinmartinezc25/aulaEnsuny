@@ -7,9 +7,10 @@ import {
   CheckCircle, Filter, ChevronDown, Calendar, Loader2, AlertCircle
 } from 'lucide-react'
 import {
-  getAdminCourses, getTeachersList, createAdminCourse, updateAdminCourse, deleteAdminCourse, AdminCourse,
-  getAcademicLevels, AcademicLevel
+  getAdminCourses, getTeachersList, createAdminCourse, updateAdminCourse, deleteAdminCourse,
+  getAcademicLevels
 } from '../../application/actions'
+import { AdminCourse, AcademicLevel } from '../../application/types'
 
 type CourseStatus = 'active' | 'draft' | 'archived'
 

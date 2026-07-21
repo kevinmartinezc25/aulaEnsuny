@@ -14,8 +14,29 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Institución Educativa Escuela Normal Superior del Nordeste - ENSUNY",
-  description: "Sistema de gestión escolar aulaEnsuny",
+  title: "aulaEnsuny - Sistema de Gestión Escolar",
+  description: "Sistema de gestión escolar aulaEnsuny. Plataforma educativa integral para estudiantes, docentes y administradores de la Institución Educativa Escuela Normal Superior del Nordeste.",
+  keywords: ["ENSUNY", "Escuela Normal Superior del Nordeste", "aulaEnsuny", "Educación", "Sistema Escolar", "LMS"],
+  openGraph: {
+    title: "aulaEnsuny - Sistema de Gestión Escolar",
+    description: "Sistema de gestión escolar aulaEnsuny",
+    url: "https://aula.ensuny.edu.co",
+    siteName: "aulaEnsuny",
+    images: [
+      {
+        url: "/logo_1.svg",
+        width: 800,
+        height: 600,
+      },
+    ],
+    locale: "es_CO",
+    type: "website",
+  },
+  icons: {
+    icon: "/icon.svg",
+    shortcut: "/icon.svg",
+    apple: "/icon.svg",
+  },
 };
 
 export default function RootLayout({

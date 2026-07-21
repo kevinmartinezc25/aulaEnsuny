@@ -147,7 +147,16 @@ function SchedulesLayoutInner({ children }: { children: React.ReactNode }) {
 
         {/* Footer Actions */}
         <div className="p-3 border-t border-slate-200/50 dark:border-slate-700/50 space-y-1">
-          <button className="w-full flex items-center px-3 py-2.5 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-800/80 transition-colors">
+          <button onClick={() => {
+            const isDark = document.documentElement.classList.contains('dark')
+            if (isDark) {
+              document.documentElement.classList.remove('dark')
+              localStorage.setItem('theme', 'light')
+            } else {
+              document.documentElement.classList.add('dark')
+              localStorage.setItem('theme', 'dark')
+            }
+          }} className="w-full flex items-center px-3 py-2.5 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-800/80 transition-colors">
             <SunMoon className="h-5 w-5 shrink-0" />
             <AnimatePresence>
               {isSidebarOpen && <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="ml-3 text-sm whitespace-nowrap overflow-hidden">Tema</motion.span>}

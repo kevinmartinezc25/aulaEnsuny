@@ -6,11 +6,12 @@ import { motion } from 'framer-motion'
 import { AlertTriangle, User, MapPin, Loader2, Plus, Trash2, Sparkles, Download, Coffee } from 'lucide-react'
 import { createClient } from '@/core/config/supabase/client'
 import { generateTimeSlots, TimeSlot } from '../utils/timeCalculator'
-import SlotEditorModal from './SlotEditorModal'
-import PrintableSchedule from './PrintableSchedule'
+import MobileTeacherSchedule from '@/app/(dashboard)/teacher/schedule/components/MobileTeacherSchedule'
 import { toast } from 'sonner'
 import { ScheduleGenerator, GeneratorConfig } from '../engine/Generator'
 import { RuleContext } from '../engine/types'
+import SlotEditorModal from './SlotEditorModal'
+import PrintableSchedule from './PrintableSchedule'
 
 const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes']
 
@@ -29,6 +30,9 @@ export default function ScheduleCanvas({ entityType = 'group', entityId, entityN
   const [portalNode, setPortalNode] = useState<HTMLElement | null>(null)
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([])
   
+  // Responsive
+  const [isMobile, setIsMobile] = useState(false)
+  
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedDay, setSelectedDay] = useState('')
@@ -44,6 +48,13 @@ export default function ScheduleCanvas({ entityType = 'group', entityId, entityN
   const [activeSubstitutions, setActiveSubstitutions] = useState<any[]>([])
 
   const supabase = createClient()
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768)
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   useEffect(() => {
     loadSettings()
@@ -304,8 +315,19 @@ export default function ScheduleCanvas({ entityType = 'group', entityId, entityN
   }
 
   return (
-    <div className="w-full h-full relative">
-      <div className="w-full h-full flex flex-col px-4 pt-0 pb-2 print:hidden relative">
+    <>
+      <div className="block lg:hidden print:hidden h-full">
+        <MobileTeacherSchedule 
+          classes={classes} 
+          timeSlots={timeSlots} 
+          entityType={entityType} 
+          entityId={entityId} 
+          entityName={entityName}
+          onUpdate={fetchSchedule} 
+        />
+      </div>
+      <div className="hidden lg:block print:block w-full h-full relative">
+        <div className="w-full h-full flex flex-col px-4 pt-0 pb-2 print:hidden relative">
         {portalNode && !readOnly && createPortal(
           <div className="flex items-center gap-2 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md px-3 py-2 rounded-xl shadow-sm border border-slate-200/50 dark:border-slate-800/50 mr-2 pointer-events-auto">
             <button onClick={autoGenerateSchedule} className="flex items-center gap-2 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold shadow-sm transition-colors">
@@ -349,30 +371,36 @@ export default function ScheduleCanvas({ entityType = 'group', entityId, entityN
         </div>
       )}
 
-      <div className="grid gap-3 mb-2 shrink-0 min-w-[1000px]" style={{ gridTemplateColumns: `6rem repeat(${timeSlots.filter(s => s.type !== 'break').length}, 1fr)` }}>
-        <div />
-        {timeSlots.filter(s => s.type !== 'break').map((s, i) => {
-          const groupPeriods = JSON.parse(localStorage.getItem('sch_group_periods') || '{}')
-          const settings = JSON.parse(localStorage.getItem('sch_settings') || '{}')
-          const maxP = entityType === 'group' ? (groupPeriods[entityId] || parseInt(settings.periodsPerDay || '7', 10)) : parseInt(settings.periodsPerDay || '7', 10)
-          const isBlocked = s.id! > maxP
-          return (
-          <div key={i} className={`flex flex-col items-center rounded-lg py-1 border shadow-sm border-slate-200 ${isBlocked ? 'bg-slate-200/50 dark:bg-slate-800/50 opacity-50' : 'bg-white/50'}`}>
-            <span className="text-xs font-bold">{s.id}ª</span>
-            <span className="text-[9px] text-slate-500">{s.startTime} - {s.endTime}</span>
-          </div>
-        )})}
-      </div>
 
-      <div className="flex-1 overflow-auto custom-scrollbar pr-2 pb-20">
-        <div className="flex flex-col gap-3 min-w-[1000px]">
-          {DAYS.map(day => {
+
+      <div className="flex-1 overflow-auto custom-scrollbar pr-2 pb-20 relative">
+        <div className="flex flex-col min-w-[1000px]">
+          {/* Header de Horas */}
+          <div className="grid gap-3 mb-4 shrink-0 sticky top-0 z-30 bg-white dark:bg-slate-900 pt-2 pb-2" style={{ gridTemplateColumns: `6rem repeat(${timeSlots.filter(s => s.type !== 'break').length}, 1fr)` }}>
+            <div />
+            {timeSlots.filter(s => s.type !== 'break').map((s, i) => {
+              const groupPeriods = JSON.parse(localStorage.getItem('sch_group_periods') || '{}')
+              const settings = JSON.parse(localStorage.getItem('sch_settings') || '{}')
+              const maxP = entityType === 'group' ? (groupPeriods[entityId] || parseInt(settings.periodsPerDay || '7', 10)) : parseInt(settings.periodsPerDay || '7', 10)
+              const isBlocked = s.id! > maxP
+              return (
+              <div key={i} className={`flex flex-col items-center rounded-lg py-1 border shadow-sm border-slate-200 ${isBlocked ? 'bg-slate-200/50 dark:bg-slate-800/50 opacity-50' : 'bg-white/50 dark:bg-slate-800/50'}`}>
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{s.id}ª</span>
+                <span className="text-[9px] text-slate-500 dark:text-slate-400">{s.startTime} - {s.endTime}</span>
+              </div>
+            )})}
+          </div>
+
+          {/* Filas de Días */}
+          <div className="flex flex-col gap-4">
+          {DAYS.map((day, idx) => {
             const groupPeriods = JSON.parse(localStorage.getItem('sch_group_periods') || '{}')
             const settings = JSON.parse(localStorage.getItem('sch_settings') || '{}')
             const maxP = entityType === 'group' ? (groupPeriods[entityId] || parseInt(settings.periodsPerDay || '7', 10)) : parseInt(settings.periodsPerDay || '7', 10)
             const displayTimeSlots = timeSlots.filter(s => s.type !== 'break')
             return (
-              <div key={day} className="grid gap-3 h-24 relative" style={{ gridTemplateColumns: `6rem repeat(${displayTimeSlots.length}, 1fr)` }}>
+              <React.Fragment key={day}>
+                <div className="grid gap-3 h-24 relative" style={{ gridTemplateColumns: `6rem repeat(${displayTimeSlots.length}, 1fr)` }}>
                 <div className="flex items-center justify-end pr-3" style={{ gridRow: 1, gridColumn: 1 }}>
                   <span className="text-xs font-bold text-slate-600">{day}</span>
                 </div>
@@ -387,7 +415,7 @@ export default function ScheduleCanvas({ entityType = 'group', entityId, entityN
                       data-drop-day={day} 
                       data-drop-period={p} 
                       onClick={() => { if(!readOnly && !isOccupied && !isBlocked){ setSelectedDay(day); setSelectedPeriod(p); setIsModalOpen(true) } }} 
-                      className={`h-full rounded-2xl border-2 border-dashed border-slate-200 relative transition-colors ${isBlocked ? 'bg-slate-200/50 dark:bg-slate-800/50 cursor-not-allowed opacity-50' : (isOccupied ? 'bg-white/30' : 'bg-white/30 hover:bg-slate-100 cursor-pointer group')}`}
+                      className={`h-full rounded-2xl relative transition-colors ${!readOnly ? 'border-2 border-dashed border-slate-200' : ''} ${isBlocked ? 'bg-slate-200/50 dark:bg-slate-800/50 cursor-not-allowed opacity-50' : (isOccupied ? 'bg-white/30' : 'bg-white/30 hover:bg-slate-100 cursor-pointer group')}`}
                       style={{ gridRow: 1, gridColumn: i + 2 }}
                     >
                       {!readOnly && !isOccupied && !isBlocked && <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100"><Plus className="h-6 w-6 text-indigo-400" /></div>}
@@ -433,19 +461,24 @@ export default function ScheduleCanvas({ entityType = 'group', entityId, entityN
                         )}
                         <div className="p-2 flex-1 flex flex-col justify-between relative">
                           <div>
-                            <h4 className="text-[13px] leading-tight font-extrabold text-slate-800 pr-4 truncate">{cls.subject}</h4>
-                            <p className="text-[10px] font-medium text-slate-500 flex items-center gap-1 mt-0.5 truncate"><User className="h-2.5 w-2.5" /> {cls.teacher}</p>
+                            <h4 className="text-[13px] leading-tight font-extrabold text-slate-800 pr-2 line-clamp-2" title={cls.subject}>{cls.subject}</h4>
+                            {entityType !== 'teacher' && (
+                              <p className="text-[10px] font-medium text-slate-500 flex items-center gap-1 mt-0.5 truncate" title={cls.teacher}><User className="h-2.5 w-2.5 shrink-0" /> <span className="truncate">{cls.teacher}</span></p>
+                            )}
                           </div>
                           <div className="flex items-center justify-between mt-1 pt-0.5 border-t border-slate-100">
                             <p className="text-[10px] font-bold text-slate-600 flex items-center gap-0.5"><MapPin className="h-2.5 w-2.5 text-slate-400" /> {cls.room}</p>
-                            <span className="text-[9px] px-1 py-[1px] bg-slate-100 rounded text-slate-500 font-bold uppercase tracking-wider">{cls.group}</span>
+                            <span className="text-[11px] px-1 py-[1px] bg-slate-200/60 dark:bg-slate-700/60 rounded text-slate-800 dark:text-slate-100 font-black uppercase tracking-wider shadow-sm">{cls.group}</span>
                           </div>
                         </div>
                   </motion.div>
                 </div>
               )})}
             </div>
+            {idx !== DAYS.length - 1 && <div className="border-b border-slate-200 dark:border-slate-700" />}
+          </React.Fragment>
           )})}
+          </div>
         </div>
       </div>
       
@@ -500,6 +533,7 @@ export default function ScheduleCanvas({ entityType = 'group', entityId, entityN
           groupMax={entityType === 'group' ? (JSON.parse(localStorage.getItem('sch_group_periods') || '{}')[entityId] || parseInt(JSON.parse(localStorage.getItem('sch_settings') || '{}').periodsPerDay || '7', 10)) : parseInt(JSON.parse(localStorage.getItem('sch_settings') || '{}').periodsPerDay || '7', 10)}
         />
       </div>
-    </div>
+      </div>
+    </>
   )
 }

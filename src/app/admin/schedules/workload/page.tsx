@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react'
 import { createClient } from '@/core/config/supabase/client'
 import { getAdminUsers } from '@/modules/admin/application/actions'
-import { Loader2, Briefcase, Mail, Search } from 'lucide-react'
+import { Loader2, Briefcase, Mail, Search, Eye, X } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 
 export default function WorkloadPage() {
   const [loading, setLoading] = useState(true)
@@ -30,7 +31,7 @@ export default function WorkloadPage() {
       }
 
       // 3. Fetch curriculum to count assigned hours and determine level
-      const { data: curriculumRows } = await supabase.from('sch_curriculum').select('teacher_id, hours_per_week, sch_groups(name, level)')
+      const { data: curriculumRows } = await supabase.from('sch_curriculum').select('teacher_id, hours_per_week, sch_groups(name, level), sch_subjects(name)')
       
       const workloadMap = new Map()
       
@@ -38,7 +39,7 @@ export default function WorkloadPage() {
         curriculumRows.forEach((row: any) => {
           if (!row.teacher_id) return
           if (!workloadMap.has(row.teacher_id)) {
-            workloadMap.set(row.teacher_id, { count: 0, groups: new Set(), levelHours: { Primaria: 0, Secundaria: 0, PFC: 0 } })
+            workloadMap.set(row.teacher_id, { count: 0, groups: new Set(), levelHours: { Primaria: 0, Secundaria: 0, PFC: 0 }, details: [] })
           }
           const current = workloadMap.get(row.teacher_id)
           const hours = row.hours_per_week || 0
@@ -48,6 +49,12 @@ export default function WorkloadPage() {
             if (row.sch_groups.level === 'Primaria') current.levelHours.Primaria += hours
             else if (row.sch_groups.level === 'PFC') current.levelHours.PFC += hours
             else current.levelHours.Secundaria += hours // Default a secundaria para media/etc
+            
+            current.details.push({
+              group: row.sch_groups.name,
+              subject: row.sch_subjects?.name || 'Materia desconocida',
+              hours: hours
+            })
           }
         })
       }
@@ -66,7 +73,7 @@ export default function WorkloadPage() {
 
       // 4. Combine data
       const combined = teachers.map(t => {
-        const stats = workloadMap.get(t.id) || { count: 0, groups: new Set(), levelHours: { Primaria: 0, Secundaria: 0, PFC: 0 } }
+        const stats = workloadMap.get(t.id) || { count: 0, groups: new Set(), levelHours: { Primaria: 0, Secundaria: 0, PFC: 0 }, details: [] }
         
         // Determinar el nivel predominante
         let dominantLevel = 'Secundaria' // fallback
@@ -79,7 +86,8 @@ export default function WorkloadPage() {
           ...t,
           assignedHours: stats.count,
           maxHours: settingsMap.get(t.id) || defaultMax,
-          groups: Array.from(stats.groups).join(', ') || 'Ninguno'
+          groups: Array.from(stats.groups).join(', ') || 'Ninguno',
+          details: stats.details
         }
       })
 
@@ -92,6 +100,14 @@ export default function WorkloadPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const [selectedTeacher, setSelectedTeacher] = useState<any>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+
+  const openTeacherDetails = (teacher: any) => {
+    setSelectedTeacher(teacher)
+    setIsModalOpen(true)
   }
 
   return (
@@ -131,6 +147,7 @@ export default function WorkloadPage() {
                 <th className="p-4 font-bold text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700">Grupos Asignados</th>
                 <th className="p-4 font-bold text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700">Intensidad Horaria</th>
                 <th className="p-4 font-bold text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700">Estado de Carga</th>
+                <th className="p-4 font-bold text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700 text-center">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -176,12 +193,21 @@ export default function WorkloadPage() {
                         </span>
                       </div>
                     </td>
+                    <td className="p-4 text-center">
+                      <button
+                        onClick={() => openTeacherDetails(t)}
+                        className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:text-indigo-400 dark:hover:bg-indigo-500/10 rounded-lg transition-colors"
+                        title="Ver Detalles"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </button>
+                    </td>
                   </tr>
                 )
               })}
               {workloads.filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase()) || t.email?.toLowerCase().includes(searchTerm.toLowerCase())).length === 0 && (
                 <tr>
-                  <td colSpan={5} className="p-8 text-center text-slate-500">
+                  <td colSpan={6} className="p-8 text-center text-slate-500">
                     No se encontraron docentes con ese criterio.
                   </td>
                 </tr>
@@ -190,6 +216,106 @@ export default function WorkloadPage() {
           </table>
         )}
       </div>
+
+      <AnimatePresence>
+        {isModalOpen && selectedTeacher && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm"
+              onClick={() => setIsModalOpen(false)}
+            />
+            
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-[90%] max-w-2xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800 z-50 flex flex-col max-h-[85vh]"
+            >
+              <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-800 dark:text-white">
+                    Detalles de Carga Académica
+                  </h2>
+                  <p className="text-xs font-medium text-indigo-600 dark:text-indigo-400 mt-0.5">
+                    {selectedTeacher.name}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsModalOpen(false)}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="p-4 overflow-y-auto custom-scrollbar flex-1">
+                {selectedTeacher.details && selectedTeacher.details.length > 0 ? (
+                  <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead className="bg-slate-50 dark:bg-slate-800/50">
+                        <tr>
+                          <th className="px-3 py-2 font-bold text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700">Materia</th>
+                          <th className="px-3 py-2 font-bold text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700">Grupos Asignados</th>
+                          <th className="px-3 py-2 font-bold text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700 text-center">Horas</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.values(selectedTeacher.details.reduce((acc: any, detail: any) => {
+                          if (!acc[detail.subject]) {
+                            acc[detail.subject] = { subject: detail.subject, groups: [], totalHours: 0 }
+                          }
+                          acc[detail.subject].groups.push({ name: detail.group, hours: detail.hours })
+                          acc[detail.subject].totalHours += detail.hours
+                          return acc
+                        }, {})).map((groupObj: any, idx: number) => (
+                          <tr key={idx} className="border-b border-slate-100 dark:border-slate-800/50 hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
+                            <td className="px-3 py-2 text-slate-700 dark:text-slate-300 font-medium align-middle">
+                              {groupObj.subject}
+                            </td>
+                            <td className="px-3 py-2 text-slate-600 dark:text-slate-400">
+                              <div className="flex flex-wrap gap-1.5">
+                                {groupObj.groups.map((g: any, i: number) => (
+                                  <span key={i} className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-slate-100 border border-slate-200 text-slate-600 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 rounded-md text-[10px]">
+                                    <span className="font-semibold">{g.name}</span>
+                                    <span className="text-slate-400 dark:text-slate-500">({g.hours}h)</span>
+                                  </span>
+                                ))}
+                              </div>
+                            </td>
+                            <td className="px-3 py-2 text-center align-middle">
+                              <span className="inline-flex items-center justify-center px-2 py-0.5 bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400 font-bold rounded-lg">
+                                {groupObj.totalHours}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot className="bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-700">
+                        <tr>
+                          <td colSpan={2} className="px-3 py-2 text-right font-bold text-slate-700 dark:text-slate-300">
+                            Total Asignadas:
+                          </td>
+                          <td className="px-3 py-2 text-center font-black text-indigo-600 dark:text-indigo-400 text-sm">
+                            {selectedTeacher.assignedHours}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center py-6 text-slate-500 dark:text-slate-400">
+                    <Briefcase className="h-8 w-8 mx-auto text-slate-300 dark:text-slate-600 mb-2" />
+                    <p className="text-sm">Sin materias asignadas.</p>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
