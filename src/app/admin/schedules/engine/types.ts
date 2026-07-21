@@ -34,6 +34,7 @@ export interface RuleContext {
     targetEntityId?: string;
     parameters: any;
     weight: 'STRICT' | 'HIGH' | 'MEDIUM' | 'LOW';
+    isActive?: boolean;
   }[];
 }
 

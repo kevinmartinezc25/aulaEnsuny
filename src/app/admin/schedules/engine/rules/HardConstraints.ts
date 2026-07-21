@@ -278,3 +278,96 @@ export class SubjectOncePerDayRule implements IScheduleRule {
     return { isValid: true, scorePenalty: 0 };
   }
 }
+
+export class SubjectRulesRule implements IScheduleRule {
+  readonly code = 'SUBJECT_RULES_VIOLATION';
+  readonly isMandatory = true;
+
+  validate(schedule: ClassSession[], context: RuleContext): RuleResult {
+    const conflicts: string[] = [];
+
+    // Find all active SUBJECT_RULES constraints
+    const subjectRules = context.constraints.filter(c => c.ruleType === 'SUBJECT_RULES' && c.isActive !== false);
+    if (subjectRules.length === 0) {
+      return { isValid: true, scorePenalty: 0 };
+    }
+
+    // Build map of rules per subject
+    const subjectRulesMap = new Map<string, { startPeriod?: number; endPeriod?: number; maxHoursPerDay?: number }>();
+    for (const rule of subjectRules) {
+      if (!rule.targetEntityId) continue;
+      subjectRulesMap.set(rule.targetEntityId, {
+        startPeriod: rule.parameters?.start_period,
+        endPeriod: rule.parameters?.end_period,
+        maxHoursPerDay: rule.parameters?.max_hours_per_day,
+      });
+    }
+
+    // Track daily hours per subject per group
+    const groupSubjectDailyHours = new Map<string, Map<string, Map<string, { hours: number, ids: string[] }>>>();
+
+    for (const session of schedule) {
+      if (!session.subjectId) continue;
+
+      const rule = subjectRulesMap.get(session.subjectId);
+      if (!rule) continue;
+
+      // 1. Validate Time Window
+      const startPeriod = rule.startPeriod;
+      const endPeriod = rule.endPeriod;
+      if (startPeriod !== undefined && endPeriod !== undefined) {
+        const sessionStart = session.periodId;
+        const sessionEnd = session.periodId + session.duration - 1;
+
+        if (sessionStart < startPeriod || sessionEnd > endPeriod) {
+          conflicts.push(session.id || '');
+          return {
+            isValid: false,
+            scorePenalty: 100,
+            message: `Materia fuera del horario establecido (Rango permitido: Periodo ${startPeriod} a ${endPeriod})`,
+            conflictingSessionIds: conflicts
+          };
+        }
+      }
+
+      // 2. Track daily hours for maxHoursPerDay validation
+      if (rule.maxHoursPerDay !== undefined && session.groupId) {
+        if (!groupSubjectDailyHours.has(session.groupId)) {
+          groupSubjectDailyHours.set(session.groupId, new Map());
+        }
+        const dayMap = groupSubjectDailyHours.get(session.groupId)!;
+        if (!dayMap.has(session.dayOfWeek)) {
+          dayMap.set(session.dayOfWeek, new Map());
+        }
+        const subjectMap = dayMap.get(session.dayOfWeek)!;
+        if (!subjectMap.has(session.subjectId)) {
+          subjectMap.set(session.subjectId, { hours: 0, ids: [] });
+        }
+        const stats = subjectMap.get(session.subjectId)!;
+        stats.hours += session.duration;
+        if (session.id) stats.ids.push(session.id);
+      }
+    }
+
+    // Validate Max Hours Per Day
+    for (const [groupId, dayMap] of groupSubjectDailyHours.entries()) {
+      for (const [day, subjectMap] of dayMap.entries()) {
+        for (const [subjectId, stats] of subjectMap.entries()) {
+          const rule = subjectRulesMap.get(subjectId);
+          if (rule && rule.maxHoursPerDay !== undefined && stats.hours > rule.maxHoursPerDay) {
+            conflicts.push(...stats.ids);
+            return {
+              isValid: false,
+              scorePenalty: 100,
+              message: `La materia excede el límite de ${rule.maxHoursPerDay} horas permitidas por día para este grupo`,
+              conflictingSessionIds: conflicts
+            };
+          }
+        }
+      }
+    }
+
+    return { isValid: true, scorePenalty: 0 };
+  }
+}
+

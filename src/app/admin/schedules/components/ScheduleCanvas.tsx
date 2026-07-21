@@ -238,8 +238,25 @@ export default function ScheduleCanvas({ entityType = 'group', entityId, entityN
     const periodsPerDay = groupPeriods[entityId] || parseInt(settings.periodsPerDay || '7', 10)
 
     const context: RuleContext = {
-      constraints: constraintsData || [],
-      timeOff: timeOffData || [],
+      constraints: (constraintsData || []).map((c: any) => ({
+        ruleType: c.rule_type,
+        targetEntityType: c.target_entity_type,
+        targetEntityId: c.target_entity_id,
+        parameters: c.parameters,
+        weight: c.weight,
+        isActive: c.is_active
+      })),
+      timeOff: (timeOffData || []).map((t: any) => ({
+        id: t.id,
+        entityType: t.entity_type,
+        entityId: t.entity_id,
+        teacherId: t.entity_type === 'TEACHER' ? t.entity_id : undefined,
+        groupId: t.entity_type === 'GROUP' ? t.entity_id : undefined,
+        classroomId: t.entity_type === 'CLASSROOM' ? t.entity_id : undefined,
+        dayOfWeek: t.day_of_week,
+        periodId: t.period_id,
+        status: t.status
+      })),
       maxPeriodsPerDay: periodsPerDay,
       breakPeriods
     }
