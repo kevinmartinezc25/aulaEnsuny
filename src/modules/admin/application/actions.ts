@@ -3,29 +3,7 @@
 import { createAdminClient } from '@/core/config/supabase/server'
 import { revalidatePath } from 'next/cache'
 
-// Interface que corresponde a la UI de AdminUsersScreen
-export interface AdminUser {
-  id: string
-  name: string
-  email: string
-  role: 'student' | 'teacher' | 'admin' | 'superadmin'
-  status: 'active' | 'inactive'
-  grade?: string
-  createdAt: string
-}
-
-// Interface que corresponde a la UI de AdminCoursesScreen
-export interface AdminCourse {
-  id: string
-  title: string
-  teacher: string
-  teacherId: string
-  subject: string
-  students: number
-  status: 'active' | 'draft' | 'archived'
-  grade: string
-  createdAt: string
-}
+import { AdminUser, AdminCourse, AcademicLevel, AcademicGroup, AdminTeacher, AdminStudent } from './types'
 
 /**
  * -------------------------------------------------------------
@@ -84,7 +62,9 @@ export async function createAdminUser(data: {
   email: string
   role: 'student' | 'teacher' | 'admin' | 'superadmin'
   status: 'active' | 'inactive'
+  phone?: string
   grade?: string
+  password?: string
 }) {
   try {
     const adminClient = createAdminClient()
@@ -97,11 +77,13 @@ export async function createAdminUser(data: {
     // 1. Crear el usuario en Supabase Auth (confirmado por defecto)
     const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
       email: data.email,
-      password: 'Ensuny2026!',
+      password: data.password && data.password.trim() !== '' ? data.password.trim() : 'Ensuny2026!',
       email_confirm: true,
       user_metadata: {
         first_name: firstName,
         last_name: lastName,
+        full_name: data.name,
+        phone: data.phone || null,
         role_name: data.role,
         grade_level: data.role === 'student' ? data.grade : null,
       }
@@ -144,7 +126,9 @@ export async function updateAdminUser(
     email: string
     role: 'student' | 'teacher' | 'admin' | 'superadmin'
     status: 'active' | 'inactive'
+    phone?: string
     grade?: string
+    password?: string
   }
 ) {
   try {
@@ -182,26 +166,57 @@ export async function updateAdminUser(
       return { error: profileError.message }
     }
 
-    // 3. Actualizar Supabase Auth
-    const { error: authError } = await adminClient.auth.admin.updateUserById(id, {
-      email: data.email,
-      user_metadata: {
+    // 3. Actualizar Supabase Auth (si el usuario existe en Auth)
+    const { data: authUserData, error: getAuthError } = await adminClient.auth.admin.getUserById(id)
+
+    if (authUserData?.user) {
+      const metadataPayload = {
         first_name: firstName,
         last_name: lastName,
+        full_name: data.name,
         role_name: data.role,
         grade_level: data.role === 'student' ? data.grade : null,
-      }
-    })
+      } as any
+      if (data.phone) metadataPayload.phone = data.phone
 
-    if (authError) {
-      return { error: authError.message }
+      // Preparar payload de actualización para Auth
+      const authPayload: any = {
+        user_metadata: metadataPayload
+      }
+
+      // Solo actualizar email si efectivamente cambió
+      if (data.email && authUserData.user.email !== data.email) {
+        authPayload.email = data.email
+        authPayload.email_confirm = true
+      }
+
+      // Solo actualizar contraseña si se envió una nueva
+      if (data.password && data.password.trim() !== '') {
+        authPayload.password = data.password.trim()
+      }
+
+      // 1. Ejecutar una sola actualización en Supabase Auth
+      const { error: authUpdateError } = await adminClient.auth.admin.updateUserById(id, authPayload)
+
+      if (authUpdateError) {
+        console.error('Error al actualizar en Supabase Auth:', authUpdateError)
+        
+        if (authUpdateError.status === 500 && (authUpdateError as any).code === 'unexpected_failure') {
+          return { error: 'El correo electrónico ingresado ya se encuentra en uso por otro usuario. Por favor ingresa uno diferente.' }
+        }
+
+        return { error: `Error al actualizar credenciales: ${authUpdateError.message}` }
+      }
+    } else {
+      console.warn(`Usuario ${id} no encontrado en Supabase Auth. Detalles del error:`, getAuthError)
     }
 
     revalidatePath('/admin/users')
+    revalidatePath('/admin/teachers')
     return { success: true }
   } catch (error: any) {
     console.error('Error en updateAdminUser:', error)
-    return { error: error.message || 'Error interno al actualizar.' }
+    return { error: `[Excepción]: ${error.message || 'Error interno al actualizar.'}` }
   }
 }
 
@@ -415,11 +430,7 @@ export async function deleteAdminCourse(id: string) {
   }
 }
 
-export interface AcademicLevel {
-  id: string
-  name: string
-  createdAt: string
-}
+
 
 /**
  * -------------------------------------------------------------
@@ -502,12 +513,7 @@ export async function deleteAcademicLevel(id: string) {
   }
 }
 
-export interface AcademicGroup {
-  id: string
-  academicLevelId: string
-  name: string
-  createdAt: string
-}
+
 
 /**
  * Obtener los grupos de un grado escolar.
@@ -583,27 +589,7 @@ export async function deleteAcademicGroup(id: string) {
   }
 }
 
-export interface AdminTeacher {
-  id: string
-  name: string
-  email: string
-  phone: string
-  subjects: string[]
-  status: 'active' | 'inactive'
-  joinedDate: string
-}
 
-export interface AdminStudent {
-  id: string
-  name: string
-  firstName: string
-  lastName: string
-  email: string
-  gradeLevel: string
-  groupName?: string
-  status: 'active' | 'inactive'
-  joinedDate: string
-}
 
 /**
  * Obtener todos los docentes en el sistema con sus datos de perfil y auth.
@@ -652,7 +638,7 @@ export async function getAdminTeachers(): Promise<AdminTeacher[]> {
         id: p.id,
         name: `${p.first_name} ${p.last_name}`,
         email: authUser?.email || (p as any).email || 'sin-correo@ensuny.edu.co',
-        phone: (p as any).phone || 'No registrado',
+        phone: authUser?.user_metadata?.phone || authUser?.phone || (p as any).phone || 'No registrado',
         subjects,
         status: (p.status || 'active') as 'active' | 'inactive',
         joinedDate: new Date(p.created_at).toISOString().split('T')[0]
@@ -963,121 +949,10 @@ export async function getAdminEvaluations(): Promise<any[]> {
  * -------------------------------------------------------------
  */
 
-export interface StudentDetails {
-  documentType: string
-  documentNumber: string
-  expeditionDate?: string
-  expeditionPlace?: string
-  firstName: string
-  secondName?: string
-  firstSurname: string
-  secondSurname?: string
-  birthDate: string
-  gender: string
-  bloodType?: string
-  rh?: string
-  nationality: string
-  birthMunicipality?: string
-  birthDepartment?: string
-}
-
-export interface StudentContact {
-  address: string
-  neighborhood?: string
-  municipality: string
-  department: string
-  zone: 'Urbana' | 'Rural'
-  phone?: string
-  studentCellphone?: string
-  studentEmail?: string
-}
-
-export interface StudentGuardians {
-  fatherName?: string
-  fatherDocument?: string
-  fatherPhone?: string
-  fatherEmail?: string
-  fatherOccupation?: string
-  motherName?: string
-  motherDocument?: string
-  motherPhone?: string
-  motherEmail?: string
-  motherOccupation?: string
-  guardianName: string
-  guardianDocument: string
-  guardianRelationship: string
-  guardianPhone: string
-  guardianEmail?: string
-  guardianAddress?: string
-  guardianOccupation?: string
-}
-
-export interface StudentMedicalInfo {
-  eps: string
-  affiliationType?: string
-  ips?: string
-  allergies?: string
-  diseases?: string
-  medicines?: string
-  observations?: string
-}
-
-export interface StudentDocument {
-  id?: string
-  category: 'identificacion' | 'academico' | 'salud' | 'foto' | 'otro'
-  name: string
-  fileUrl: string
-  fileName: string
-}
-
-export interface StudentEnrollment {
-  academicYear: number
-  enrollmentDate: string
-  enrollmentStatus: 'active' | 'pending' | 'withdrawn' | 'cancelled'
-  sede: string
-  jornada: 'Mañana' | 'Tarde' | 'Completa' | 'Única' | 'Nocturna'
-  gradeLevel: string
-  groupName: string
-  enrollmentNumber?: string
-  simatBeneficiary: boolean
-  estrato?: number
-  sisben?: string
-  conflictVictim: boolean
-  specialPopulation?: string
-  previousInstitution?: string
-  previousMunicipality?: string
-  previousDepartment?: string
-  previousGrade?: string
-  previousYear?: number
-  observations?: string
-}
-
-export interface StudentAcademicHistory {
-  id?: string
-  year: number
-  gradeLevel: string
-  groupName: string
-  finalStatus: string
-  finalAverage?: number
-  result?: string
-}
-
-export interface FullStudentData {
-  id: string
-  name: string
-  email: string
-  status: 'active' | 'inactive'
-  joinedDate: string
-  details?: StudentDetails
-  contact?: StudentContact
-  guardians?: StudentGuardians
-  medical?: StudentMedicalInfo
-  documents?: StudentDocument[]
-  enrollment?: StudentEnrollment
-  academicHistory?: StudentAcademicHistory[]
-  courses?: string[]
-  password?: string
-}
+import {
+  StudentDetails, StudentContact, StudentGuardians, StudentMedicalInfo,
+  StudentDocument, StudentEnrollment, StudentAcademicHistory, FullStudentData
+} from './types'
 
 /**
  * Obtener la ficha completa de un estudiante por su ID.

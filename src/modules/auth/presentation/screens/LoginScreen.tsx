@@ -126,7 +126,7 @@ export function LoginScreen() {
       </div>
 
       {/* Scroll container — centres content vertically on tall screens, scrolls on short ones */}
-      <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-4 py-10 sm:py-16 overflow-y-auto">
+      <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-4 py-4 sm:py-8 overflow-y-auto">
         <motion.div
           initial={{ opacity: 0, scale: 0.97 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -138,23 +138,28 @@ export function LoginScreen() {
             initial={{ opacity: 0, y: -16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1, type: 'spring' }}
-            className="mb-6 sm:mb-8 w-full flex justify-center px-6 sm:px-0"
+            className="mb-4 sm:mb-5 w-full flex justify-center px-6 sm:px-0"
           >
-            <div className="relative w-full max-w-[280px] sm:max-w-[360px] aspect-[416/145]">
+            <div className="relative w-full max-w-[200px] sm:max-w-[280px] aspect-[416/145]">
               <img
                 src="/logo.svg?v=2"
                 alt="aulaEnsuny Logo"
-                className="object-contain w-full h-full"
+                className="object-contain w-full h-full dark:hidden"
+              />
+              <img
+                src="/logo_dark.svg?v=2"
+                alt="aulaEnsuny Logo Dark"
+                className="object-contain w-full h-full hidden dark:block"
               />
             </div>
           </motion.div>
 
           {/* Card */}
           <Card className="w-full border-0 bg-white shadow-[0_8px_30px_rgb(0,0,0,0.08)] rounded-2xl dark:bg-slate-900 dark:shadow-none">
-            <CardContent className="p-5 sm:p-8">
+            <CardContent className="p-5 sm:p-6">
 
               {/* Cabecera de la card */}
-              <div className="mb-5 text-center">
+              <div className="mb-4 text-center">
                 <h1 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white tracking-tight">
                   Bienvenido
                 </h1>
@@ -179,7 +184,7 @@ export function LoginScreen() {
                   variants={containerVariants}
                   initial="hidden"
                   animate="show"
-                  className="space-y-4"
+                  className="space-y-3"
                 >
                   {/* Email */}
                   <motion.div variants={itemVariants} className="space-y-1.5">
@@ -190,7 +195,7 @@ export function LoginScreen() {
                       id="email"
                       type="email"
                       placeholder="usuario@ensuny.edu.co"
-                      className={`rounded-xl border-slate-200/80 bg-slate-50/50 h-12 text-sm focus:bg-white focus:ring-[#1F4E31] dark:border-slate-800 dark:bg-slate-950/50 ${errors.email ? 'border-red-500 focus:ring-red-500' : ''
+                      className={`rounded-xl border-slate-200/80 bg-slate-50/50 h-10 text-sm focus:bg-white focus:ring-[#1F4E31] dark:border-slate-800 dark:bg-slate-950/50 ${errors.email ? 'border-red-500 focus:ring-red-500' : ''
                         }`}
                       {...register('email')}
                     />
@@ -209,7 +214,7 @@ export function LoginScreen() {
                         id="password"
                         type={showPassword ? 'text' : 'password'}
                         placeholder="••••••••"
-                        className={`rounded-xl border-slate-200/80 bg-slate-50/50 h-12 pr-11 text-sm focus:bg-white focus:ring-[#1F4E31] dark:border-slate-800 dark:bg-slate-950/50 ${errors.password ? 'border-red-500 focus:ring-red-500' : ''
+                        className={`rounded-xl border-slate-200/80 bg-slate-50/50 h-10 pr-11 text-sm focus:bg-white focus:ring-[#1F4E31] dark:border-slate-800 dark:bg-slate-950/50 ${errors.password ? 'border-red-500 focus:ring-red-500' : ''
                           }`}
                         {...register('password')}
                       />
@@ -240,7 +245,7 @@ export function LoginScreen() {
                     <Button
                       type="submit"
                       disabled={isLoading}
-                      className="w-full rounded-xl bg-[#1F4E31] h-12 text-[15px] text-white font-semibold hover:bg-[#153823] active:scale-[0.99] transition-all duration-200 dark:bg-[#2A6B43] dark:hover:bg-[#1F4E31]"
+                      className="w-full rounded-xl bg-[#1F4E31] h-10 text-[15px] text-white font-semibold hover:bg-[#153823] active:scale-[0.99] transition-all duration-200 dark:bg-[#2A6B43] dark:hover:bg-[#1F4E31]"
                     >
                       {isLoading ? (
                         <>

@@ -5,7 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { GraduationCap, ShieldAlert, Calendar, ClipboardList, Search, Filter, RefreshCw, BarChart2, Check, Download, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { getAcademicPeriods, AcademicPeriod } from '../../application/achievementsActions'
-import { getAcademicLevels, AcademicLevel } from '@/modules/admin/application/actions'
+import { getAcademicLevels } from '@/modules/admin/application/actions'
+import { AcademicLevel } from '@/modules/admin/application/types'
 import { getConsolidatedGroupGrades, getGradeAudits, ConsolidatedGradeRow, GradeAuditRow } from '../../application/gradesActions'
 
 export function AdminAcademicRegistryScreen() {

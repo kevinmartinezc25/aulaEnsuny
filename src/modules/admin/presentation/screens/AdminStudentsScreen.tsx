@@ -7,7 +7,8 @@ import {
   GraduationCap, Search, UserPlus, Trash2, Edit,
   Filter, CheckCircle, Loader2, AlertCircle, BookOpen, Link as LinkIcon
 } from 'lucide-react'
-import { getAcademicLevels, AcademicLevel, getAdminStudents } from '../../application/actions'
+import { getAcademicLevels, getAdminStudents } from '../../application/actions'
+import { AcademicLevel } from '../../application/types'
 
 interface Student {
   id: string

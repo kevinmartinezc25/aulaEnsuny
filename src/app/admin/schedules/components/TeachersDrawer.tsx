@@ -27,9 +27,20 @@ export default function TeachersDrawer({ isOpen }: { isOpen: boolean }) {
   const [activeTeacherTimeOff, setActiveTeacherTimeOff] = useState<Teacher | null>(null)
   
   const [newName, setNewName] = useState('')
-  const [newMaxHours, setNewMaxHours] = useState<number>(40)
+  const [newMaxHours, setNewMaxHours] = useState<number>(22)
 
   const supabase = createClient()
+
+  const getDefaultMaxHours = () => {
+    try {
+      const stored = localStorage.getItem('sch_settings')
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        return parseInt(parsed.maxHoursSecondary || '22', 10)
+      }
+    } catch (e) {}
+    return 22
+  }
 
   useEffect(() => {
     if (isOpen) {
@@ -49,10 +60,12 @@ export default function TeachersDrawer({ isOpen }: { isOpen: boolean }) {
         settings.forEach(s => settingsMap.set(s.teacher_id, s.max_hours))
       }
 
+      const defaultMax = getDefaultMaxHours()
+
       const combined: Teacher[] = globalTeachers.map(t => ({
         id: t.id,
         name: t.name,
-        max_hours: settingsMap.get(t.id) || 40
+        max_hours: settingsMap.get(t.id) || defaultMax
       }))
 
       setTeachers(combined.sort((a, b) => a.name.localeCompare(b.name)))
@@ -88,7 +101,7 @@ export default function TeachersDrawer({ isOpen }: { isOpen: boolean }) {
     setIsAdding(false)
     setEditingId(null)
     setNewName('')
-    setNewMaxHours(40)
+    setNewMaxHours(getDefaultMaxHours())
   }
 
   const handleEditClick = (teacher: Teacher) => {

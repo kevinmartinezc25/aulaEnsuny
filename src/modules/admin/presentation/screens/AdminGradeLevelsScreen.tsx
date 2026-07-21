@@ -8,9 +8,10 @@ import {
 import { createClient } from '@/core/config/supabase/client'
 import { toast } from 'sonner'
 import {
-  getAcademicLevels, createAcademicLevel, deleteAcademicLevel, AcademicLevel,
-  getAcademicGroups, createAcademicGroup, deleteAcademicGroup, AcademicGroup
+  getAcademicLevels, createAcademicLevel, deleteAcademicLevel,
+  getAcademicGroups, createAcademicGroup, deleteAcademicGroup
 } from '../../application/actions'
+import { AcademicLevel, AcademicGroup } from '../../application/types'
 
 export function AdminGradeLevelsScreen() {
   const [levels, setLevels] = useState<AcademicLevel[]>([])

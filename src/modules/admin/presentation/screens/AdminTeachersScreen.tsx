@@ -1,13 +1,15 @@
 'use client'
 
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Users, Search, UserPlus, X, Save, Trash2, Edit, ChevronDown,
-  BookOpen, Filter, CheckCircle, Loader2, AlertCircle, Phone, Mail, Award
+  BookOpen, Filter, CheckCircle, Loader2, AlertCircle, Phone, Mail, Award,
+  Upload, Download, FileSpreadsheet
 } from 'lucide-react'
+import * as XLSX from 'xlsx'
 import { createClient } from '@/core/config/supabase/client'
-import { getAdminTeachers, getAdminCourses, createAdminUser } from '../../application/actions'
+import { getAdminTeachers, getAdminCourses, createAdminUser, updateAdminUser } from '../../application/actions'
 
 interface Teacher {
   id: string
@@ -28,7 +30,7 @@ export function AdminTeachersScreen() {
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null)
-  const [form, setForm] = useState({ name: '', email: '', phone: '', subjects: '', status: 'active' as 'active' | 'inactive' })
+  const [form, setForm] = useState({ name: '', email: '', phone: '', subjects: '', status: 'active' as 'active' | 'inactive', password: '' })
   const [errorMsg, setErrorMsg] = useState('')
   const [successMsg, setSuccessMsg] = useState('')
 
@@ -86,19 +88,26 @@ export function AdminTeachersScreen() {
       const matchSearch = t.name.toLowerCase().includes(search.toLowerCase()) || t.email.toLowerCase().includes(search.toLowerCase())
       const matchStatus = filterStatus === 'all' || t.status === filterStatus
       return matchSearch && matchStatus
-    })
+    }).sort((a, b) => a.name.localeCompare(b.name))
   }, [teachers, search, filterStatus])
 
   const openCreate = () => {
     setEditingTeacher(null)
-    setForm({ name: '', email: '', phone: '', subjects: '', status: 'active' })
+    setForm({ name: '', email: '', phone: '', subjects: '', status: 'active', password: '' })
     setErrorMsg('')
     setIsModalOpen(true)
   }
 
   const openEdit = (t: Teacher) => {
     setEditingTeacher(t)
-    setForm({ name: t.name, email: t.email, phone: t.phone, subjects: t.subjects.join(', '), status: t.status })
+    setForm({ 
+      name: t.name, 
+      email: t.email, 
+      phone: t.phone === 'No registrado' ? '' : t.phone, 
+      subjects: t.subjects.join(', '), 
+      status: t.status,
+      password: ''
+    })
     setErrorMsg('')
     setIsModalOpen(true)
   }
@@ -154,19 +163,19 @@ export function AdminTeachersScreen() {
       const lastName = nameParts.slice(1).join(' ') || 'Nuevo'
 
       if (editingTeacher) {
-        // En modo real, actualizamos perfil
-        const { error } = await supabase
-          .from('profiles')
-          .update({
-            first_name: firstName,
-            last_name: lastName,
-            phone: form.phone,
-            bio: form.subjects, // Usamos campo bio para materias en esta maqueta
-            status: form.status
-          })
-          .eq('id', editingTeacher.id)
+        // Actualizamos usuario (perfil y Supabase Auth) mediante Server Action
+        const res = await updateAdminUser(editingTeacher.id, {
+          name: form.name,
+          email: form.email,
+          phone: form.phone,
+          role: 'teacher',
+          status: form.status,
+          password: form.password || undefined
+        })
 
-        if (error) throw error
+        if (res.error) {
+          throw new Error(res.error)
+        }
 
         // 1. Desasignar todos los cursos previamente asignados a este profesor en la tabla courses
         const { error: unassignError } = await supabase
@@ -191,20 +200,17 @@ export function AdminTeachersScreen() {
           if (assignError) throw assignError
         }
 
-        setTeachers(teachers.map(t => t.id === editingTeacher.id ? {
-          ...t,
-          name: form.name,
-          phone: form.phone,
-          subjects: selectedTitles,
-          status: form.status
-        } : t))
+        const updatedTeachers = await getAdminTeachers()
+        setTeachers(updatedTeachers)
         setSuccessMsg('Docente actualizado con éxito.')
       } else {
         const res = await createAdminUser({
           name: form.name,
           email: form.email,
+          phone: form.phone,
           role: 'teacher',
-          status: form.status
+          status: form.status,
+          password: form.password || undefined
         })
 
         if (res.error) {
@@ -232,6 +238,83 @@ export function AdminTeachersScreen() {
     }
   }
 
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [isImporting, setIsImporting] = useState(false)
+
+  const handleDownloadTemplate = () => {
+    const ws = XLSX.utils.json_to_sheet([
+      { Nombre: 'Juan Perez', Correo: 'juan.perez@ejemplo.com', Telefono: '3001234567' },
+      { Nombre: 'Maria Gomez', Correo: 'maria.gomez@ejemplo.com', Telefono: '3109876543' }
+    ])
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Docentes')
+    XLSX.writeFile(wb, 'Plantilla_Docentes.xlsx')
+  }
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setIsImporting(true)
+    setErrorMsg('')
+    setSuccessMsg('')
+    try {
+      const data = await file.arrayBuffer()
+      const wb = XLSX.read(data)
+      const ws = wb.Sheets[wb.SheetNames[0]]
+      const json = XLSX.utils.sheet_to_json<any>(ws)
+
+      if (json.length === 0) {
+        throw new Error('El archivo está vacío o no tiene el formato correcto.')
+      }
+
+      let successCount = 0
+      let errorCount = 0
+
+      for (const row of json) {
+        const name = row['Nombre'] || row['name'] || row['NOMBRE']
+        const email = row['Correo'] || row['Email'] || row['email'] || row['CORREO']
+        const phone = row['Telefono'] || row['Teléfono'] || row['phone'] || row['TELEFONO']
+
+        if (!name || !email) {
+          errorCount++
+          continue
+        }
+
+        const res = await createAdminUser({
+          name: name.toString().trim(),
+          email: email.toString().trim(),
+          phone: phone ? phone.toString().trim().replace(/[^0-9]/g, '') : '',
+          role: 'teacher',
+          status: 'active'
+        })
+
+        if (res.error) {
+          errorCount++
+        } else {
+          successCount++
+        }
+      }
+
+      const updatedTeachers = await getAdminTeachers()
+      setTeachers(updatedTeachers)
+      
+      if (successCount > 0 && errorCount === 0) {
+        setSuccessMsg(`¡Excelente! Se registraron ${successCount} docentes correctamente.`)
+      } else if (successCount > 0 && errorCount > 0) {
+        setSuccessMsg(`Se registraron ${successCount} docentes, pero fallaron ${errorCount} (posiblemente correos duplicados o datos inválidos).`)
+      } else {
+        setErrorMsg(`No se pudo registrar ningún docente. Fallaron ${errorCount} registros.`)
+      }
+      
+    } catch (err: any) {
+      setErrorMsg('Error al procesar el archivo: ' + err.message)
+    } finally {
+      setIsImporting(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
   return (
     <div className="max-w-7xl mx-auto space-y-8 text-left">
       {/* Header */}
@@ -244,13 +327,37 @@ export function AdminTeachersScreen() {
             Administra el cuerpo docente institucional, asignaturas y estados de contratación.
           </p>
         </div>
-        <button
-          onClick={openCreate}
-          className="flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 text-sm font-semibold active:scale-[0.98] transition-all self-start sm:self-center cursor-pointer"
-        >
-          <UserPlus className="h-4.5 w-4.5" />
-          <span>Registrar Docente</span>
-        </button>
+        <div className="flex items-center gap-2 self-start sm:self-center flex-wrap">
+          <input
+            type="file"
+            accept=".xlsx, .xls, .csv"
+            className="hidden"
+            ref={fileInputRef}
+            onChange={handleFileUpload}
+          />
+          <button
+            onClick={handleDownloadTemplate}
+            className="flex items-center gap-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-3 py-3 text-sm font-semibold transition-all"
+            title="Descargar Plantilla Excel"
+          >
+            <Download className="h-4.5 w-4.5" />
+          </button>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isImporting}
+            className="flex items-center gap-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:hover:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-400 px-4 py-3 text-sm font-semibold active:scale-[0.98] transition-all disabled:opacity-50"
+          >
+            {isImporting ? <Loader2 className="h-4.5 w-4.5 animate-spin" /> : <FileSpreadsheet className="h-4.5 w-4.5" />}
+            <span className="hidden sm:inline">{isImporting ? 'Importando...' : 'Importar Excel'}</span>
+          </button>
+          <button
+            onClick={openCreate}
+            className="flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 text-sm font-semibold active:scale-[0.98] transition-all cursor-pointer"
+          >
+            <UserPlus className="h-4.5 w-4.5" />
+            <span className="hidden sm:inline">Registrar Docente</span>
+          </button>
+        </div>
       </div>
 
       {successMsg && (
@@ -452,12 +559,29 @@ export function AdminTeachersScreen() {
                 <div>
                   <label className="block text-xs font-bold text-slate-450 uppercase mb-1">Teléfono</label>
                   <input
-                    type="text"
+                    type="tel"
                     value={form.phone}
-                    onChange={e => setForm({ ...form, phone: e.target.value })}
-                    placeholder="Ej: 312 456 7890"
+                    onChange={e => {
+                      const onlyNums = e.target.value.replace(/[^0-9]/g, '')
+                      setForm({ ...form, phone: onlyNums })
+                    }}
+                    placeholder="Ej: 3124567890"
                     className="w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:text-white text-sm"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-450 uppercase mb-1">
+                    {editingTeacher ? 'Nueva Contraseña (Opcional)' : 'Contraseña (Opcional)'}
+                  </label>
+                  <input
+                    type="text"
+                    value={form.password}
+                    onChange={e => setForm({ ...form, password: e.target.value })}
+                    placeholder={editingTeacher ? 'Dejar en blanco para mantener actual' : 'Por defecto: Ensuny2026!'}
+                    className="w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:text-white text-sm"
+                  />
+                  {editingTeacher && <p className="text-[10px] text-slate-400 mt-1">Si escribes una contraseña aquí, reemplazarás la contraseña actual del docente.</p>}
                 </div>
 
                 <div>

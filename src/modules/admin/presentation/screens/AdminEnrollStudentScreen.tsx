@@ -9,11 +9,11 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
-  getAcademicLevels, AcademicLevel, getAcademicGroups, AcademicGroup,
-  getAdminCourses, AdminCourse, getAdminStudentById, enrollStudent, updateStudent,
-  FullStudentData, StudentDetails, StudentContact, StudentGuardians, StudentMedicalInfo,
-  StudentEnrollment, StudentAcademicHistory, StudentDocument
+  getAcademicLevels, getAcademicGroups, getAdminCourses, getAdminStudentById, enrollStudent, updateStudent
 } from '../../application/actions'
+import {
+  AcademicLevel, AcademicGroup, AdminCourse, FullStudentData, StudentDetails, StudentContact, StudentGuardians, StudentMedicalInfo, StudentEnrollment, StudentAcademicHistory, StudentDocument
+} from '../../application/types'
 
 interface Props {
   studentId?: string

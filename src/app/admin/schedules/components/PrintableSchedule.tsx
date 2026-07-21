@@ -116,7 +116,7 @@ export default function PrintableSchedule({ groupName, directorName, classes, ti
               </thead>
               <tbody>
                 {DAYS.map((day, dIdx) => (
-                  <tr key={day.id} className="border-b border-slate-200 last:border-b-0 h-[88px]">
+                  <tr key={day.id} className="border-b border-slate-200 last:border-b-0">
                     <td className="border-r border-slate-200 bg-white">
                       <div className="flex items-center justify-center gap-2 w-full h-full">
                         <div className={`p-1.5 rounded-lg ${day.bgColor}`}>
