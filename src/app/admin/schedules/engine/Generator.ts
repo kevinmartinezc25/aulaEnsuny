@@ -3,13 +3,21 @@ import { RuleEngine } from './RuleEngine';
 
 export interface CurriculumBlock {
   subject_id: string;
+  subject_name?: string;
   teacher_id?: string;
+  teacher_name?: string;
   group_id: string;
+  group_name?: string;
   duration: number; // 1 o 2
+  slotIndex?: number;
+  reason?: string;
 }
+
+
 
 export interface GeneratorConfig {
   curriculum: CurriculumBlock[];
+  existingSchedule?: ClassSession[];
   context: RuleContext;
   days: string[];
   periodsPerDay: number; // ej. 7
@@ -38,90 +46,225 @@ export class ScheduleGenerator {
     config: GeneratorConfig,
     onProgress?: (progress: number, message: string) => void
   ): Promise<GeneratorResult> {
-    const { curriculum, context, days, periodsPerDay, breakPeriods } = config;
+    const { curriculum, existingSchedule = [], context, days, periodsPerDay, breakPeriods } = config;
     
-    let currentSchedule: ClassSession[] = [];
+    let currentSchedule: ClassSession[] = [...existingSchedule];
     let unassigned: CurriculumBlock[] = [];
 
-    // 1. Ordenar bloques heurísticamente
-    // Prioridad: bloques de 2 horas primero. (Otras heurísticas pueden sumarse aquí).
-    const sortedBlocks = [...curriculum].sort((a, b) => b.duration - a.duration);
-    
-    const totalBlocks = sortedBlocks.length;
+    // Identificar materias con múltiples docentes (locales y globales)
+    const subjectTeacherMap = new Map<string, Set<string>>();
+    for (const b of curriculum) {
+      if (!subjectTeacherMap.has(b.subject_id)) {
+        subjectTeacherMap.set(b.subject_id, new Set());
+      }
+      if (b.teacher_id) {
+        subjectTeacherMap.get(b.subject_id)!.add(b.teacher_id);
+      }
+    }
+    const multiTeacherSubjectIds = new Set<string>(context.multiTeacherSubjectIds || []);
+    for (const [subjId, teachers] of subjectTeacherMap.entries()) {
+      if (teachers.size > 1) {
+        multiTeacherSubjectIds.add(subjId);
+      }
+    }
+
+    // 1. Agrupar bloques por (group_id, subject_id, duration) para Co-Docencia Sincronizada
+    interface CoGroup {
+      key: string;
+      groupId: string;
+      subjectId: string;
+      duration: number;
+      blocks: CurriculumBlock[];
+    }
+
+    const coGroupMap = new Map<string, CoGroup>();
+    for (const b of curriculum) {
+      const slotKey = b.slotIndex !== undefined ? `slot${b.slotIndex}` : `rnd${Math.random()}`;
+      const key = `${b.group_id}-${b.subject_id}-${slotKey}-${b.duration}`;
+      if (!coGroupMap.has(key)) {
+        coGroupMap.set(key, {
+          key,
+          groupId: b.group_id,
+          subjectId: b.subject_id,
+          duration: b.duration,
+          blocks: []
+        });
+      }
+      coGroupMap.get(key)!.blocks.push(b);
+    }
+
+
+    const coGroups = Array.from(coGroupMap.values());
+
+    // Prioridad de ordenamiento:
+    // 1° Materias Multi-Docente (Núcleo/Comité)
+    // 2° Mayor duración (2 horas)
+    coGroups.sort((a, b) => {
+      const aIsMulti = multiTeacherSubjectIds.has(a.subjectId) || a.blocks.length > 1 ? 1 : 0;
+      const bIsMulti = multiTeacherSubjectIds.has(b.subjectId) || b.blocks.length > 1 ? 1 : 0;
+      if (aIsMulti !== bIsMulti) return bIsMulti - aIsMulti;
+      return b.duration - a.duration;
+    });
+
+    const totalCoGroups = coGroups.length;
     let processed = 0;
 
-    for (const block of sortedBlocks) {
-      // Ceder control al event loop cada N bloques para actualizar UI
+    for (const coGroup of coGroups) {
       if (processed % 5 === 0) {
         await new Promise(resolve => setTimeout(resolve, 0));
       }
-      
+
       processed++;
       if (onProgress) {
-        const percent = Math.round((processed / totalBlocks) * 100);
-        onProgress(percent, `Evaluando clase ${processed} de ${totalBlocks}...`);
+        const percent = Math.round((processed / totalCoGroups) * 90);
+        onProgress(percent, `Evaluando bloque co-docente ${processed} de ${totalCoGroups}...`);
       }
 
       let bestSlot: { day: string, periodId: number } | null = null;
       let bestScore = -1;
 
-      // Buscar todos los posibles slots (Día y Hora)
+      // Probar todos los slots posibles para TODOS los profesores del grupo simultáneamente
       for (const day of days) {
         for (let p = 1; p <= periodsPerDay; p++) {
-          // Ignorar si el bloque cae en un recreo
           if (breakPeriods.includes(p)) continue;
-          
-          // Si dura 2 horas, asegurar que el siguiente periodo no es recreo ni excede el día
-          if (block.duration === 2) {
-            if (p + 1 > periodsPerDay) continue;
-            if (breakPeriods.includes(p + 1)) continue;
+          if (coGroup.duration === 2) {
+            if (p + 1 > periodsPerDay || breakPeriods.includes(p + 1)) continue;
           }
 
-          // Crear sesión candidata
-          const candidateSession: ClassSession = {
-            id: `temp-${processed}`,
-            groupId: block.group_id || '',
-            teacherId: block.teacher_id || '',
-            subjectId: block.subject_id || '',
+          // Crear sesiones candidatas para TODOS los profesores asignados al grupo
+          const candidateSessions: ClassSession[] = coGroup.blocks.map((b, idx) => ({
+            id: `temp-${processed}-${idx}`,
+            groupId: b.group_id || '',
+            teacherId: b.teacher_id || '',
+            subjectId: b.subject_id || '',
             dayOfWeek: day,
             periodId: p,
-            duration: block.duration
-          };
+            duration: b.duration
+          }));
 
-          // Evaluar añadiendo el candidato al horario actual
-          currentSchedule.push(candidateSession);
-          
+          currentSchedule.push(...candidateSessions);
           const report = this.engine.evaluate(currentSchedule, context);
-          
+
           if (report.isValid) {
-            // Es un slot legal. Verificamos si es el que mejor puntaje de reglas suaves tiene
             if (report.score > bestScore) {
               bestScore = report.score;
               bestSlot = { day, periodId: p };
             }
           }
 
-          // Retirar candidato para probar el siguiente
-          currentSchedule.pop();
+          // Retirar candidatos
+          currentSchedule.splice(-candidateSessions.length);
         }
       }
 
-      // Si encontramos un slot válido, lo asignamos definitivamente
       if (bestSlot) {
-        currentSchedule.push({
-          id: `assigned-${processed}`,
-          groupId: block.group_id || '',
-          teacherId: block.teacher_id || '',
-          subjectId: block.subject_id || '',
-          dayOfWeek: bestSlot.day,
-          periodId: bestSlot.periodId,
-          duration: block.duration
-        });
+        // Asignar a TODOS los docentes juntos en el mismo día y periodo
+        for (const b of coGroup.blocks) {
+          currentSchedule.push({
+            id: `assigned-${Date.now()}-${Math.random()}`,
+            groupId: b.group_id || '',
+            teacherId: b.teacher_id || '',
+            subjectId: b.subject_id || '',
+            dayOfWeek: bestSlot.day,
+            periodId: bestSlot.periodId,
+            duration: b.duration
+          });
+        }
       } else {
-        // No hay hueco legal para esta clase. (Puede requerir revisión manual).
-        unassigned.push(block);
+        // Ningún slot estricto funcionó para todos los docentes juntos
+        unassigned.push(...coGroup.blocks);
       }
     }
+
+    // PASE 2: Rescate Garantizado manteniendo la Sincronización de Co-Docentes
+    if (unassigned.length > 0) {
+      if (onProgress) {
+        onProgress(95, `Ejecutando pase de rescate para ${unassigned.length} bloques...`);
+      }
+
+      const relaxedContext: RuleContext = {
+        ...context,
+        constraints: context.constraints.filter(c => 
+          c.ruleType === 'TEACHER_OVERLAP' || 
+          c.ruleType === 'GROUP_OVERLAP' || 
+          c.ruleType === 'CLASSROOM_OVERLAP' ||
+          c.ruleType === 'MULTI_TEACHER_SAME_SLOT'
+        )
+      };
+
+      // Re-agrupar unassigned por coGroup
+      const rescueCoGroupMap = new Map<string, CoGroup>();
+      for (const b of unassigned) {
+        const slotKey = b.slotIndex !== undefined ? `slot${b.slotIndex}` : `rnd${Math.random()}`;
+        const key = `${b.group_id}-${b.subject_id}-${slotKey}-${b.duration}`;
+        if (!rescueCoGroupMap.has(key)) {
+          rescueCoGroupMap.set(key, {
+            key,
+            groupId: b.group_id,
+            subjectId: b.subject_id,
+            duration: b.duration,
+            blocks: []
+          });
+        }
+        rescueCoGroupMap.get(key)!.blocks.push(b);
+      }
+
+
+      const stillUnassigned: CurriculumBlock[] = [];
+
+      for (const coGroup of rescueCoGroupMap.values()) {
+        let placed = false;
+
+        for (const day of days) {
+          if (placed) break;
+          for (let p = 1; p <= periodsPerDay; p++) {
+            if (breakPeriods.includes(p)) continue;
+            if (coGroup.duration === 2) {
+              if (p + 1 > periodsPerDay || breakPeriods.includes(p + 1)) continue;
+            }
+
+            const candidateSessions: ClassSession[] = coGroup.blocks.map((b, idx) => ({
+              id: `rescued-${Date.now()}-${idx}-${Math.random()}`,
+              groupId: b.group_id || '',
+              teacherId: b.teacher_id || '',
+              subjectId: b.subject_id || '',
+              dayOfWeek: day,
+              periodId: p,
+              duration: b.duration
+            }));
+
+            currentSchedule.push(...candidateSessions);
+            const report = this.engine.evaluate(currentSchedule, relaxedContext);
+
+            if (report.isValid) {
+              placed = true;
+              break;
+            }
+
+            currentSchedule.splice(-candidateSessions.length);
+          }
+        }
+
+        if (!placed) {
+          for (const block of coGroup.blocks) {
+            let reason = "El docente asignado se encuentra en clase con otro grupo en todos los periodos libres de este grupo.";
+            if (block.teacher_id && context.timeOff?.some(t => t.teacherId === block.teacher_id && t.status === 'FORBIDDEN')) {
+              reason = "El horario disponible del docente coincide con restricciones de disponibilidad (Time-Off / Permiso).";
+            } else if (!block.teacher_id) {
+              reason = "No se ha asignado un docente para esta materia en la malla curricular.";
+            }
+
+            stillUnassigned.push({
+              ...block,
+              reason
+            });
+          }
+        }
+      }
+
+      unassigned = stillUnassigned;
+    }
+
 
     // Evaluación Final
     const finalReport = this.engine.evaluate(currentSchedule, context);
@@ -130,10 +273,12 @@ export class ScheduleGenerator {
       onProgress(100, `¡Generación completada! Score final: ${Math.round(finalReport.score)}/100`);
     }
 
+
     return {
-      schedule: currentSchedule,
+      schedule: currentSchedule.filter(s => !s.id?.startsWith('existing-')),
       unassigned,
       score: finalReport.score
     };
+
   }
 }

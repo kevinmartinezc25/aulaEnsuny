@@ -36,27 +36,38 @@ export class GroupOverlapRule implements IScheduleRule {
 
   validate(schedule: ClassSession[], context: RuleContext): RuleResult {
     const conflicts: string[] = [];
-    const map = new Map<string, string[]>();
+    const map = new Map<string, ClassSession[]>();
 
     for (const session of schedule) {
       if (!session.groupId) continue;
       
       for (let i = 0; i < session.duration; i++) {
         const key = `${session.groupId}-${session.dayOfWeek}-${session.periodId + i}`;
-        if (map.has(key)) {
-          conflicts.push(session.id || '');
-        } else {
-          map.set(key, [session.id || '']);
+        if (!map.has(key)) {
+          map.set(key, []);
+        }
+        map.get(key)!.push(session);
+      }
+    }
+
+    for (const [_, sessions] of map.entries()) {
+      if (sessions.length > 1) {
+        // Permitir múltiples docentes en el mismo grupo y periodo SOLO SI es la misma materia (co-teaching / multi-docente)
+        const firstSubj = sessions[0].subjectId;
+        const hasDifferentSubject = sessions.some(s => s.subjectId !== firstSubj);
+        if (hasDifferentSubject) {
+          conflicts.push(...sessions.map(s => s.id || '').filter(Boolean));
         }
       }
     }
 
     if (conflicts.length > 0) {
-      return { isValid: false, scorePenalty: 100, message: 'Superposición de grupo detectada', conflictingSessionIds: conflicts };
+      return { isValid: false, scorePenalty: 100, message: 'Superposición de grupo detectada con materias diferentes', conflictingSessionIds: conflicts };
     }
     return { isValid: true, scorePenalty: 0 };
   }
 }
+
 
 export class TimeOffRule implements IScheduleRule {
   readonly code = 'TIME_OFF_VIOLATION';
@@ -98,7 +109,7 @@ export class GroupNoGapsRule implements IScheduleRule {
 
   validate(schedule: ClassSession[], context: RuleContext): RuleResult {
     const conflicts: string[] = [];
-    const groupSchedules = new Map<string, Map<string, { min: number, max: number, count: number, ids: string[] }>>();
+    const groupSchedules = new Map<string, Map<string, { min: number, max: number, periods: Set<number>, ids: string[] }>>();
 
     for (const session of schedule) {
       if (!session.groupId) continue;
@@ -109,7 +120,7 @@ export class GroupNoGapsRule implements IScheduleRule {
 
       const dayMap = groupSchedules.get(session.groupId)!;
       if (!dayMap.has(session.dayOfWeek)) {
-        dayMap.set(session.dayOfWeek, { min: 999, max: -1, count: 0, ids: [] });
+        dayMap.set(session.dayOfWeek, { min: 999, max: -1, periods: new Set(), ids: [] });
       }
 
       const stats = dayMap.get(session.dayOfWeek)!;
@@ -120,13 +131,15 @@ export class GroupNoGapsRule implements IScheduleRule {
       if (sessionMin < stats.min) stats.min = sessionMin;
       if (sessionMax > stats.max) stats.max = sessionMax;
       
-      stats.count += session.duration;
+      for (let i = 0; i < session.duration; i++) {
+        stats.periods.add(session.periodId + i);
+      }
       if (session.id) stats.ids.push(session.id);
     }
 
     for (const [groupId, dayMap] of groupSchedules.entries()) {
       for (const [day, stats] of dayMap.entries()) {
-        if (stats.count === 0) continue;
+        if (stats.periods.size === 0) continue;
         
         const span = stats.max - stats.min + 1;
         
@@ -140,7 +153,7 @@ export class GroupNoGapsRule implements IScheduleRule {
         }
         
         // Si el lapso (descontando los recreos) es mayor a las horas de clase impartidas, hay un hueco.
-        if ((span - breaksInSpan) > stats.count) {
+        if ((span - breaksInSpan) > stats.periods.size) {
           conflicts.push(...stats.ids);
           return { 
             isValid: false, 
@@ -162,7 +175,7 @@ export class SubjectMaxHoursPerDayRule implements IScheduleRule {
 
   validate(schedule: ClassSession[], context: RuleContext): RuleResult {
     const conflicts: string[] = [];
-    const subjectDailyHours = new Map<string, Map<string, Map<string, { hours: number, ids: string[] }>>>();
+    const subjectDailyHours = new Map<string, Map<string, Map<string, { periods: Set<number>, ids: string[] }>>>();
 
     for (const session of schedule) {
       if (!session.groupId || !session.subjectId) continue;
@@ -178,18 +191,20 @@ export class SubjectMaxHoursPerDayRule implements IScheduleRule {
 
       const subjectMap = dayMap.get(session.dayOfWeek)!;
       if (!subjectMap.has(session.subjectId)) {
-        subjectMap.set(session.subjectId, { hours: 0, ids: [] });
+        subjectMap.set(session.subjectId, { periods: new Set(), ids: [] });
       }
 
       const stats = subjectMap.get(session.subjectId)!;
-      stats.hours += session.duration;
+      for (let i = 0; i < session.duration; i++) {
+        stats.periods.add(session.periodId + i);
+      }
       if (session.id) stats.ids.push(session.id);
     }
 
     for (const [groupId, dayMap] of subjectDailyHours.entries()) {
       for (const [day, subjectMap] of dayMap.entries()) {
         for (const [subjectId, stats] of subjectMap.entries()) {
-          if (stats.hours > 2) {
+          if (stats.periods.size > 2) {
             conflicts.push(...stats.ids);
             return {
               isValid: false,
@@ -205,6 +220,7 @@ export class SubjectMaxHoursPerDayRule implements IScheduleRule {
     return { isValid: true, scorePenalty: 0 };
   }
 }
+
 
 export class TeacherRequiredRule implements IScheduleRule {
   readonly code = 'TEACHER_REQUIRED';
@@ -235,39 +251,48 @@ export class SubjectOncePerDayRule implements IScheduleRule {
 
   validate(schedule: ClassSession[], context: RuleContext): RuleResult {
     const conflicts: string[] = [];
-    const subjectDailySessions = new Map<string, Map<string, Map<string, string[]>>>();
+    const subjectDailyPeriods = new Map<string, Map<string, Map<string, Set<number>>>>();
 
     for (const session of schedule) {
       if (!session.groupId || !session.subjectId) continue;
 
-      if (!subjectDailySessions.has(session.groupId)) {
-        subjectDailySessions.set(session.groupId, new Map());
+      if (!subjectDailyPeriods.has(session.groupId)) {
+        subjectDailyPeriods.set(session.groupId, new Map());
       }
       
-      const dayMap = subjectDailySessions.get(session.groupId)!;
+      const dayMap = subjectDailyPeriods.get(session.groupId)!;
       if (!dayMap.has(session.dayOfWeek)) {
         dayMap.set(session.dayOfWeek, new Map());
       }
 
       const subjectMap = dayMap.get(session.dayOfWeek)!;
       if (!subjectMap.has(session.subjectId)) {
-        subjectMap.set(session.subjectId, []);
+        subjectMap.set(session.subjectId, new Set());
       }
 
-      const ids = subjectMap.get(session.subjectId)!;
-      if (session.id) ids.push(session.id);
+      const periodsSet = subjectMap.get(session.subjectId)!;
+      for (let i = 0; i < session.duration; i++) {
+        periodsSet.add(session.periodId + i);
+      }
     }
 
-    for (const [groupId, dayMap] of subjectDailySessions.entries()) {
+    for (const [groupId, dayMap] of subjectDailyPeriods.entries()) {
       for (const [day, subjectMap] of dayMap.entries()) {
-        for (const [subjectId, ids] of subjectMap.entries()) {
-          // Si una materia tiene más de 1 bloque/sesión en un solo día, es inválido
-          if (ids.length > 1) {
-            conflicts.push(...ids);
+        for (const [subjectId, periodsSet] of subjectMap.entries()) {
+          const periods = Array.from(periodsSet).sort((a, b) => a - b);
+          // Si los periodos ocupados son más de 2 o si no son consecutivos (ej. periodos 1 y 4)
+          if (periods.length > 2) {
             return {
               isValid: false,
               scorePenalty: 100,
-              message: 'Una materia está siendo asignada en múltiples bloques separados en el mismo día.',
+              message: 'Una materia excede el límite de bloques diarios.',
+              conflictingSessionIds: conflicts
+            };
+          } else if (periods.length === 2 && periods[1] - periods[0] !== 1) {
+            return {
+              isValid: false,
+              scorePenalty: 100,
+              message: 'Una materia está siendo asignada en bloques separados el mismo día.',
               conflictingSessionIds: conflicts
             };
           }
@@ -278,6 +303,7 @@ export class SubjectOncePerDayRule implements IScheduleRule {
     return { isValid: true, scorePenalty: 0 };
   }
 }
+
 
 export class SubjectRulesRule implements IScheduleRule {
   readonly code = 'SUBJECT_RULES_VIOLATION';
@@ -370,4 +396,96 @@ export class SubjectRulesRule implements IScheduleRule {
     return { isValid: true, scorePenalty: 0 };
   }
 }
+
+export class MultiTeacherSameSlotRule implements IScheduleRule {
+  readonly code = 'MULTI_TEACHER_SAME_SLOT';
+  readonly isMandatory = true;
+
+  validate(schedule: ClassSession[], context: RuleContext): RuleResult {
+    const conflicts: string[] = [];
+
+    // Buscar la restricción activa MULTI_TEACHER_SAME_SLOT
+    const rule = context.constraints.find(
+      c => c.ruleType === 'MULTI_TEACHER_SAME_SLOT' && c.isActive !== false
+    );
+    if (!rule) {
+      return { isValid: true, scorePenalty: 0 };
+    }
+
+    // Extraer lista de reglas (soporta múltiples reglas o regla única legacy)
+    const ruleEntries: Array<{ subject_id?: string; fixed_day?: string; fixed_period?: number }> = 
+      Array.isArray(rule.parameters?.rules) && rule.parameters.rules.length > 0
+        ? rule.parameters.rules
+        : [{
+            subject_id: rule.parameters?.subject_id || rule.targetEntityId,
+            fixed_day: rule.parameters?.fixed_day,
+            fixed_period: rule.parameters?.fixed_period ? Number(rule.parameters.fixed_period) : undefined
+          }];
+
+    const multiTeacherSubjectIdsSet = new Set<string>(context.multiTeacherSubjectIds || []);
+
+    for (const entry of ruleEntries) {
+      const fixedDay = entry.fixed_day;
+      const fixedPeriod = entry.fixed_period ? Number(entry.fixed_period) : undefined;
+      const selectedSubjectId = entry.subject_id;
+
+      // Agrupar sesiones por materia
+      const subjectSessionsMap = new Map<string, ClassSession[]>();
+      for (const session of schedule) {
+        if (!session.subjectId) continue;
+        // Si se especificó una materia o grupo específico (no 'ALL'), ignorar otras materias
+        if (selectedSubjectId && selectedSubjectId !== 'ALL' && session.subjectId !== selectedSubjectId) {
+          continue;
+        }
+        if (!subjectSessionsMap.has(session.subjectId)) {
+          subjectSessionsMap.set(session.subjectId, []);
+        }
+        subjectSessionsMap.get(session.subjectId)!.push(session);
+      }
+
+      for (const [subjectId, sessions] of subjectSessionsMap.entries()) {
+        if (sessions.length === 0) continue;
+
+        const uniqueTeachers = new Set(sessions.map(s => s.teacherId).filter(Boolean));
+        const isExplicitTarget = selectedSubjectId && selectedSubjectId !== 'ALL' && selectedSubjectId === subjectId;
+        const isMultiTeacherSubject = multiTeacherSubjectIdsSet.has(subjectId);
+
+        // Aplica si hay más de 1 docente asignado, o si la materia es multi-docente globalmente, o si fue seleccionada explícitamente
+        if (uniqueTeachers.size > 1 || isExplicitTarget || isMultiTeacherSubject || sessions.length > 1) {
+          const firstSession = sessions[0];
+
+          for (const session of sessions) {
+            const isSlotMismatch = session.dayOfWeek !== firstSession.dayOfWeek || session.periodId !== firstSession.periodId;
+            const isDayMismatch = fixedDay && fixedDay !== 'ANY' && session.dayOfWeek !== fixedDay;
+            const isPeriodMismatch = fixedPeriod && fixedPeriod > 0 && session.periodId !== fixedPeriod;
+
+            if (isSlotMismatch || isDayMismatch || isPeriodMismatch) {
+              if (session.id && !session.id.startsWith('existing-')) conflicts.push(session.id);
+
+              let msg = `La materia / grupo tiene varias clases o docentes y debe programarse en la misma hora y día para todos (Núcleo / Comité / Taller).`;
+              if (isDayMismatch) {
+                msg = `La materia o grupo (Núcleo / Comité / Proyecto) debe programarse el día ${fixedDay}.`;
+              } else if (isPeriodMismatch) {
+                const hourLabel = fixedPeriod === 1 ? '1era Hora' : fixedPeriod === 2 ? '2da Hora' : fixedPeriod === 3 ? '3ra Hora' : fixedPeriod === 4 ? '4ta Hora' : fixedPeriod === 5 ? '5ta Hora' : fixedPeriod === 6 ? '6ta Hora' : fixedPeriod === 7 ? '7ma Hora' : `${fixedPeriod}ª Hora`;
+                msg = `La materia o grupo (Núcleo / Comité / Proyecto) debe programarse en la ${hourLabel}.`;
+              }
+
+              return {
+                isValid: false,
+                scorePenalty: 100,
+                message: msg,
+                conflictingSessionIds: conflicts
+              };
+            }
+          }
+        }
+      }
+    }
+
+    return { isValid: true, scorePenalty: 0 };
+  }
+}
+
+
+
 

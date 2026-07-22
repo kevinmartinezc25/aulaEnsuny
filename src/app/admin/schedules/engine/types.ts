@@ -20,7 +20,10 @@ export interface RuleContext {
   // Configuración cargada desde la BD
   maxPeriodsPerDay: number;
   breakPeriods?: number[];
+  multiTeacherSubjectIds?: string[];
+  normalWorkloadSubjectIds?: string[];
   timeOff: {
+
     teacherId?: string;
     groupId?: string;
     classroomId?: string;
