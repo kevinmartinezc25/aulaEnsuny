@@ -9,9 +9,11 @@ import { generateTimeSlots, TimeSlot } from '../utils/timeCalculator'
 import MobileTeacherSchedule from '@/app/(dashboard)/teacher/schedule/components/MobileTeacherSchedule'
 import { toast } from 'sonner'
 import { ScheduleGenerator, GeneratorConfig } from '../engine/Generator'
-import { RuleContext } from '../engine/types'
+import { RuleContext, ClassSession } from '../engine/types'
+
 import SlotEditorModal from './SlotEditorModal'
 import PrintableSchedule from './PrintableSchedule'
+import UnassignedBlocksModal from './UnassignedBlocksModal'
 
 const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes']
 
@@ -23,7 +25,16 @@ interface ScheduleCanvasProps {
   readOnly?: boolean
 }
 
-export default function ScheduleCanvas({ entityType = 'group', entityId, entityName, directorName, readOnly = false }: ScheduleCanvasProps) {
+export default function ScheduleCanvas({
+  entityType = 'group',
+  entityId,
+  entityName = '',
+  directorName = '',
+  readOnly = false
+}: ScheduleCanvasProps) {
+  const [showUnassignedModal, setShowUnassignedModal] = useState(false)
+  const [unassignedBlocks, setUnassignedBlocks] = useState<any[]>([])
+
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
   const [classes, setClasses] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
@@ -203,10 +214,20 @@ export default function ScheduleCanvas({ entityType = 'group', entityId, entityN
   }
 
   const analyzeConflicts = () => {
+    if (unassignedBlocks.length > 0) {
+      setShowUnassignedModal(true)
+      return
+    }
     toast.info('Análisis heurístico ejecutado: No se encontraron choques duros en el grupo actual.')
   }
 
+
   const executeAutoGenerate = async () => {
+    if (entityType === 'teacher') {
+      toast.info('La autogeneración de horarios se realiza por Grupo o desde la vista de Autogeneración Global.')
+      return
+    }
+
     setGenerating(true)
     setProgress(0)
     setProgressMsg('Preparando motor de reglas...')
@@ -215,6 +236,7 @@ export default function ScheduleCanvas({ entityType = 'group', entityId, entityN
     await supabase.from('sch_schedule_slots').delete().eq('group_id', entityId)
 
     const { data: currData } = await supabase.from('sch_curriculum').select('*').eq('group_id', entityId)
+
     if (!currData || currData.length === 0) {
       toast.error('Malla Curricular no configurada.')
       setGenerating(false)
@@ -224,7 +246,56 @@ export default function ScheduleCanvas({ entityType = 'group', entityId, entityN
     // 2. Obtener contexto (Reglas y Disponibilidad)
     const { data: constraintsData } = await supabase.from('sch_constraints').select('*')
     const { data: timeOffData } = await supabase.from('sch_time_off').select('*')
-    
+
+    // Identificar materias multi-docente por grupo o por regla explícita
+    const { data: allCurriculumData } = await supabase.from('sch_curriculum').select('group_id, subject_id, teacher_id')
+    const groupSubjectTeachers = new Map<string, Set<string>>()
+    const multiTeacherSubjSet = new Set<string>()
+
+    if (allCurriculumData) {
+      allCurriculumData.forEach((row: any) => {
+        if (!row.group_id || !row.subject_id || !row.teacher_id) return
+        const key = `${row.group_id}-${row.subject_id}`
+        if (!groupSubjectTeachers.has(key)) groupSubjectTeachers.set(key, new Set())
+        groupSubjectTeachers.get(key)!.add(row.teacher_id)
+      })
+      for (const [key, tSet] of groupSubjectTeachers.entries()) {
+        if (tSet.size > 1) {
+          const subjectId = key.split('-')[1]
+          if (subjectId) multiTeacherSubjSet.add(subjectId)
+        }
+      }
+    }
+
+    // Agregar materias explícitamente configuradas en la regla MULTI_TEACHER_SAME_SLOT
+    const explicitRules = (constraintsData || []).find((c: any) => c.rule_type === 'MULTI_TEACHER_SAME_SLOT' && c.is_active !== false)
+    if (explicitRules?.parameters?.rules && Array.isArray(explicitRules.parameters.rules)) {
+      explicitRules.parameters.rules.forEach((r: any) => {
+        if (r.subject_id && r.subject_id !== 'ALL') multiTeacherSubjSet.add(r.subject_id)
+      })
+    } else if (explicitRules?.parameters?.subject_id && explicitRules.parameters.subject_id !== 'ALL') {
+      multiTeacherSubjSet.add(explicitRules.parameters.subject_id)
+    }
+
+    const multiTeacherSubjectIds = Array.from(multiTeacherSubjSet)
+
+    // Obtener los slots agendados de otros grupos para evitar cruces de docentes
+    const { data: existingSlotsData } = await supabase
+      .from('sch_schedule_slots')
+      .select('*')
+      .neq('group_id', entityId)
+
+    const existingSchedule: ClassSession[] = (existingSlotsData || []).map((slot: any) => ({
+      id: `existing-${slot.id}`,
+      groupId: slot.group_id,
+      subjectId: slot.subject_id,
+      teacherId: slot.teacher_id,
+      classroomId: slot.classroom_id,
+      dayOfWeek: slot.day_of_week,
+      periodId: slot.period_id,
+      duration: slot.duration || 1
+    }))
+
     const settings = JSON.parse(localStorage.getItem('sch_settings') || '{}')
     let breaks = settings.breaks
     if (!breaks && settings.breakPeriod) {
@@ -237,8 +308,14 @@ export default function ScheduleCanvas({ entityType = 'group', entityId, entityN
     const groupPeriods = JSON.parse(localStorage.getItem('sch_group_periods') || '{}')
     const periodsPerDay = groupPeriods[entityId] || parseInt(settings.periodsPerDay || '7', 10)
 
+    const workloadConfig = (constraintsData || []).find((c: any) => c.rule_type === 'MULTI_TEACHER_WORKLOAD_CONFIG' && c.is_active !== false)
+    const normalWorkloadSubjectIds = workloadConfig?.parameters?.normal_workload_subject_ids || []
+
     const context: RuleContext = {
+      multiTeacherSubjectIds,
+      normalWorkloadSubjectIds,
       constraints: (constraintsData || []).map((c: any) => ({
+
         ruleType: c.rule_type,
         targetEntityType: c.target_entity_type,
         targetEntityId: c.target_entity_id,
@@ -267,20 +344,24 @@ export default function ScheduleCanvas({ entityType = 'group', entityId, entityN
     currData.forEach(c => {
       let hoursLeft = c.hours_per_week
       const isBlockSubject = blockSubjects.includes(c.subject_id)
+      let slotIdx = 0
       while (hoursLeft >= (isBlockSubject ? 2 : 1)) {
-        blocksToAssign.push({ subject_id: c.subject_id, teacher_id: c.teacher_id, group_id: c.group_id, duration: isBlockSubject ? 2 : 1 })
+        blocksToAssign.push({ subject_id: c.subject_id, teacher_id: c.teacher_id, group_id: c.group_id, duration: isBlockSubject ? 2 : 1, slotIndex: slotIdx++ })
         hoursLeft -= (isBlockSubject ? 2 : 1)
       }
-      if (hoursLeft > 0) blocksToAssign.push({ subject_id: c.subject_id, teacher_id: c.teacher_id, group_id: c.group_id, duration: 1 })
+      if (hoursLeft > 0) blocksToAssign.push({ subject_id: c.subject_id, teacher_id: c.teacher_id, group_id: c.group_id, duration: 1, slotIndex: slotIdx++ })
     })
+
 
     const config: GeneratorConfig = {
       curriculum: blocksToAssign,
+      existingSchedule,
       context,
       days: DAYS,
       periodsPerDay,
       breakPeriods
     }
+
 
     // 5. Ejecutar Motor (con updates a la UI)
     const generator = new ScheduleGenerator()
@@ -297,19 +378,34 @@ export default function ScheduleCanvas({ entityType = 'group', entityId, entityN
         period_id: s.periodId,
         group_id: s.groupId,
         subject_id: s.subjectId,
-        teacher_id: s.teacherId,
-        duration: s.duration
+        teacher_id: s.teacherId && s.teacherId.trim() !== '' ? s.teacherId : null,
+        duration: s.duration || 1
       }))
       
       const { error } = await supabase.from('sch_schedule_slots').insert(toInsert)
       if (error) {
-        toast.error('Error al guardar el horario.')
+        console.error('Error insertando slots de horario:', error)
+        toast.error(`Error al guardar el horario: ${error.message || 'Error de base de datos'}`)
       } else {
-        toast.success(`Horario autogenerado con éxito. Score de calidad: ${Math.round(result.score)}/100`)
-        if (result.unassigned.length > 0) {
-          toast.warning(`${result.unassigned.length} bloques no pudieron asignarse. Revise conflictos de profesores.`)
+        const { data: subjsData } = await supabase.from('sch_subjects').select('id, name')
+        const { data: profsData } = await supabase.from('profiles').select('id, first_name, last_name')
+        const subMap = new Map((subjsData || []).map((s: any) => [s.id, s.name]))
+        const profMap = new Map((profsData || []).map((p: any) => [p.id, `${p.first_name || ''} ${p.last_name || ''}`.trim()]))
+
+        const enrichedUnassigned = (result.unassigned || []).map(b => ({
+          ...b,
+          group_name: entityName || b.group_id,
+          subject_name: subMap.get(b.subject_id) || b.subject_id,
+          teacher_name: profMap.get(b.teacher_id || '') || 'Sin asignar'
+        }))
+        setUnassignedBlocks(enrichedUnassigned)
+        if (enrichedUnassigned.length > 0) {
+          setShowUnassignedModal(true)
+          toast.warning(`${enrichedUnassigned.length} bloques no pudieron asignarse. Revisa el desglose en el modal.`)
         }
+
       }
+
     } else {
       toast.error('No se pudo asignar ninguna clase.')
     }
@@ -317,6 +413,7 @@ export default function ScheduleCanvas({ entityType = 'group', entityId, entityN
     setGenerating(false)
     fetchSchedule()
   }
+
 
   const autoGenerateSchedule = () => {
     toast('¿Deseas autogenerar el horario basado en la Malla Curricular? Esto reemplazará el horario actual.', {
@@ -333,6 +430,12 @@ export default function ScheduleCanvas({ entityType = 'group', entityId, entityN
 
   return (
     <>
+      <UnassignedBlocksModal
+        isOpen={showUnassignedModal}
+        onClose={() => setShowUnassignedModal(false)}
+        unassignedBlocks={unassignedBlocks}
+      />
+
       <div className="block lg:hidden print:hidden h-full">
         <MobileTeacherSchedule 
           classes={classes} 

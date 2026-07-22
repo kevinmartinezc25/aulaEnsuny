@@ -78,11 +78,23 @@ export class TeacherMaxHoursRule implements IScheduleRule {
     const ruleConfig = context.constraints.find(c => c.ruleType === 'MAX_HOURS_DAY');
     const maxAllowedHours = ruleConfig?.parameters?.max_hours ?? 6; // default 6 hrs
     const weightMultiplier = ruleConfig?.weight === 'STRICT' ? 50 : ruleConfig?.weight === 'HIGH' ? 30 : 10;
+    const multiTeacherSubjectIdsSet = new Set<string>(context.multiTeacherSubjectIds || []);
+    const normalWorkloadSubjectIdsSet = new Set<string>(context.normalWorkloadSubjectIds || []);
 
     const teacherSchedules = new Map<string, Map<string, number>>();
 
     for (const session of schedule) {
       if (!session.teacherId) continue;
+      
+      // Eximir materias multi-docente del conteo de horas docentes A MENOS que se hayan configurado como "Carga Normal"
+      if (
+        session.subjectId &&
+        multiTeacherSubjectIdsSet.has(session.subjectId) &&
+        !normalWorkloadSubjectIdsSet.has(session.subjectId)
+      ) {
+        continue;
+      }
+
       
       if (!teacherSchedules.has(session.teacherId)) {
         teacherSchedules.set(session.teacherId, new Map());
@@ -104,3 +116,4 @@ export class TeacherMaxHoursRule implements IScheduleRule {
     return { isValid: true, scorePenalty: totalPenalty };
   }
 }
+

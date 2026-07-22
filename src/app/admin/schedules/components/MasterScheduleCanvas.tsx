@@ -9,6 +9,7 @@ import { Loader2, Download, Printer, Sparkles, Trash2, AlertTriangle, Coffee } f
 import { toast } from 'sonner'
 import { ScheduleGenerator, GeneratorConfig } from '../engine/Generator'
 import { RuleContext } from '../engine/types'
+import UnassignedBlocksModal from './UnassignedBlocksModal'
 
 const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes']
 
@@ -18,6 +19,8 @@ interface MasterScheduleCanvasProps {
 
 export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterScheduleCanvasProps) {
   const [loading, setLoading] = useState(true)
+  const [showUnassignedModal, setShowUnassignedModal] = useState(false)
+
   const [groups, setGroups] = useState<any[]>([])
   const [slots, setSlots] = useState<any[]>([])
   const [subjects, setSubjects] = useState<Record<string, any>>({})
@@ -176,9 +179,39 @@ export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterSched
     })
   }
 
-  const analyzeConflicts = () => {
-    toast.info('Análisis global ejecutado: No se detectaron cruces de docentes.')
+  const [unassignedBlocks, setUnassignedBlocks] = useState<any[]>([])
+
+  const analyzeConflicts = async () => {
+    if (unassignedBlocks.length > 0) {
+      setShowUnassignedModal(true)
+      return
+    }
+
+    const { data: currentSlots } = await supabase
+      .from('sch_schedule_slots')
+      .select('*, group:sch_groups(name), teacher:profiles(first_name, last_name), subject:sch_subjects(name)')
+
+    if (currentSlots && currentSlots.length > 0) {
+      const teacherSlotsMap = new Map<string, any[]>()
+      currentSlots.forEach((s: any) => {
+        if (!s.teacher_id) return
+        const key = `${s.teacher_id}-${s.day_of_week}-${s.period_id}`
+        if (!teacherSlotsMap.has(key)) teacherSlotsMap.set(key, [])
+        teacherSlotsMap.get(key)!.push(s)
+      })
+
+      const conflicts = Array.from(teacherSlotsMap.entries()).filter(([_, list]) => list.length > 1)
+
+      if (conflicts.length > 0) {
+        toast.error(`Se detectaron ${conflicts.length} cruces de docente en los horarios guardados.`)
+        return
+      }
+    }
+
+    toast.success('Análisis global completado: Todos los bloques agendados están libres de cruces.')
   }
+
+
 
   const executeAutoGenerateGlobal = async () => {
     setGenerating(true)
@@ -210,8 +243,45 @@ export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterSched
     const maxPeriodsPerDay = parseInt(settings.periodsPerDay || '7', 10)
     const blockSubjects = JSON.parse(localStorage.getItem('sch_block_subjects') || '[]')
     
+    // Identificar materias multi-docente por grupo o por regla explícita
+    const groupSubjectTeachers = new Map<string, Set<string>>()
+    const multiTeacherSubjSet = new Set<string>()
+
+    if (currData) {
+      currData.forEach((row: any) => {
+        if (!row.group_id || !row.subject_id || !row.teacher_id) return
+        const key = `${row.group_id}-${row.subject_id}`
+        if (!groupSubjectTeachers.has(key)) groupSubjectTeachers.set(key, new Set())
+        groupSubjectTeachers.get(key)!.add(row.teacher_id)
+      })
+      for (const [key, tSet] of groupSubjectTeachers.entries()) {
+        if (tSet.size > 1) {
+          const subjectId = key.split('-')[1]
+          if (subjectId) multiTeacherSubjSet.add(subjectId)
+        }
+      }
+    }
+
+    // Agregar materias explícitamente configuradas en la regla MULTI_TEACHER_SAME_SLOT
+    const explicitRules = (constraintsData || []).find((c: any) => c.rule_type === 'MULTI_TEACHER_SAME_SLOT' && c.is_active !== false)
+    if (explicitRules?.parameters?.rules && Array.isArray(explicitRules.parameters.rules)) {
+      explicitRules.parameters.rules.forEach((r: any) => {
+        if (r.subject_id && r.subject_id !== 'ALL') multiTeacherSubjSet.add(r.subject_id)
+      })
+    } else if (explicitRules?.parameters?.subject_id && explicitRules.parameters.subject_id !== 'ALL') {
+      multiTeacherSubjSet.add(explicitRules.parameters.subject_id)
+    }
+
+    const multiTeacherSubjectIds = Array.from(multiTeacherSubjSet)
+    const workloadConfig = (constraintsData || []).find((c: any) => c.rule_type === 'MULTI_TEACHER_WORKLOAD_CONFIG' && c.is_active !== false)
+    const normalWorkloadSubjectIds = workloadConfig?.parameters?.normal_workload_subject_ids || []
+
     const context: RuleContext = {
+      multiTeacherSubjectIds,
+      normalWorkloadSubjectIds,
+
       constraints: (constraintsData || []).map((c: any) => ({
+
         ruleType: c.rule_type,
         targetEntityType: c.target_entity_type,
         targetEntityId: c.target_entity_id,
@@ -234,6 +304,7 @@ export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterSched
       breakPeriods
     }
 
+
     // 3. Obtener configuraciones globales
     const globalSettingsData = JSON.parse(localStorage.getItem('sch_settings') || '{}')
     let breaksGS = globalSettingsData.breaks
@@ -250,18 +321,20 @@ export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterSched
     currData.forEach(c => {
       let hoursLeft = c.hours_per_week
       const isBlockSubject = blockSubjects.includes(c.subject_id)
+      let slotIdx = 0
 
       if (isBlockSubject) {
         while (hoursLeft >= 2) {
-          blocksToAssign.push({ subject_id: c.subject_id, teacher_id: c.teacher_id, group_id: c.group_id, duration: 2 })
+          blocksToAssign.push({ subject_id: c.subject_id, teacher_id: c.teacher_id, group_id: c.group_id, duration: 2, slotIndex: slotIdx++ })
           hoursLeft -= 2
         }
       }
       while (hoursLeft > 0) {
-        blocksToAssign.push({ subject_id: c.subject_id, teacher_id: c.teacher_id, group_id: c.group_id, duration: 1 })
+        blocksToAssign.push({ subject_id: c.subject_id, teacher_id: c.teacher_id, group_id: c.group_id, duration: 1, slotIndex: slotIdx++ })
         hoursLeft -= 1
       }
     })
+
 
     const config: GeneratorConfig = {
       curriculum: blocksToAssign,
@@ -288,17 +361,25 @@ export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterSched
         period_id: s.periodId,
         group_id: s.groupId,
         subject_id: s.subjectId,
-        teacher_id: s.teacherId,
-        duration: s.duration
+        teacher_id: s.teacherId && s.teacherId.trim() !== '' ? s.teacherId : null,
+        duration: s.duration || 1
       }))
       
       const { error } = await supabase.from('sch_schedule_slots').insert(toInsert)
       if (error) {
-        toast.error('Error al guardar el horario.')
+        console.error('Error insertando slots de horario global:', error)
+        toast.error(`Error al guardar el horario: ${error.message || 'Error de base de datos'}`)
       } else {
-        toast.success(`Horario generado. Score: ${Math.round(result.score)}/100`)
-        if (result.unassigned.length > 0) {
-          toast.warning(`${result.unassigned.length} bloques no pudieron ser asignados (conflictos).`)
+        const enrichedUnassigned = (result.unassigned || []).map(b => ({
+          ...b,
+          subject_name: subjects[b.subject_id]?.name || b.subject_id,
+          group_name: groups.find(g => g.id === b.group_id)?.name || b.group_id,
+          teacher_name: teachers[b.teacher_id || '']?.name || 'Sin asignar'
+        }))
+        setUnassignedBlocks(enrichedUnassigned)
+        if (enrichedUnassigned.length > 0) {
+          setShowUnassignedModal(true)
+          toast.warning(`Se encontraron ${enrichedUnassigned.length} bloques no asignados. Revisa los detalles en el modal.`)
         }
       }
     } else {
@@ -320,6 +401,14 @@ export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterSched
 
   return (
     <div className="w-full h-full flex flex-col relative bg-slate-50 dark:bg-slate-900 rounded-xl overflow-hidden">
+      
+      {/* Modal de Diagnóstico de Bloques No Asignados */}
+      <UnassignedBlocksModal
+        isOpen={showUnassignedModal}
+        onClose={() => setShowUnassignedModal(false)}
+        unassignedBlocks={unassignedBlocks}
+      />
+
       
       {/* Botones Flotantes movidos arriba mediante Portal */}
       {portalNode && createPortal(

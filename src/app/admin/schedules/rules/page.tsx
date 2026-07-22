@@ -1,7 +1,8 @@
 'use client'
 
 import React, { useState, useEffect, useCallback } from 'react'
-import { ShieldCheck, ToggleLeft, ToggleRight, Save, Info, Loader2, Clock, ChevronDown, ChevronUp, Users, BookOpen } from 'lucide-react'
+import { ShieldCheck, ToggleLeft, ToggleRight, Save, Info, Loader2, Clock, ChevronDown, ChevronUp, Users, BookOpen, Plus, Trash2 } from 'lucide-react'
+
 import { toast } from 'sonner'
 import { createClient } from '@/core/config/supabase/client'
 import { getAdminUsers } from '@/modules/admin/application/actions'
@@ -20,7 +21,8 @@ const RULE_MAP: Record<string, string> = {
   evenDistribution: 'EVEN_DISTRIBUTION',
   labRoomPriority: 'LAB_ROOM_PRIORITY',
   groupMovementMinimization: 'HOME_ROOM_PRIORITY',
-  lunchBreakEnforcement: 'LUNCH_BREAK_ENFORCEMENT'
+  lunchBreakEnforcement: 'LUNCH_BREAK_ENFORCEMENT',
+  syncMultiTeacherSubjects: 'MULTI_TEACHER_SAME_SLOT'
 }
 
 interface TeacherSubject {
@@ -52,6 +54,13 @@ interface SubjectRule {
   expanded: boolean
 }
 
+interface MultiTeacherRuleEntry {
+  id: string
+  subjectId: string
+  day: string
+  period: number
+}
+
 export default function RulesPage() {
   const [rules, setRules] = useState<Record<string, boolean>>({
     preventTeacherConflict: true,
@@ -67,7 +76,15 @@ export default function RulesPage() {
     lunchBreakEnforcement: true,
     groupMovementMinimization: false,
     evenDistribution: true,
+    syncMultiTeacherSubjects: true,
   })
+  const [multiTeacherRules, setMultiTeacherRules] = useState<MultiTeacherRuleEntry[]>([
+    { id: '1', subjectId: 'ALL', day: 'ANY', period: 0 }
+  ])
+  const [allSubjectsList, setAllSubjectsList] = useState<{ id: string; name: string }[]>([])
+  const [normalWorkloadSubjectIds, setNormalWorkloadSubjectIds] = useState<string[]>([])
+  const [multiTeacherSubjectsOptions, setMultiTeacherSubjectsOptions] = useState<{ id: string; name: string }[]>([])
+
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -89,18 +106,86 @@ export default function RulesPage() {
 
   const fetchRules = async () => {
     setLoading(true)
-    const { data, error } = await supabase.from('sch_constraints').select('rule_type, is_active')
+    const { data, error } = await supabase.from('sch_constraints').select('rule_type, is_active, parameters, target_entity_id')
     if (data && !error) {
       const newRules = { ...rules }
       for (const row of data) {
         const uiKey = Object.keys(RULE_MAP).find(k => RULE_MAP[k] === row.rule_type)
         if (uiKey) {
           newRules[uiKey] = row.is_active
+          if (row.rule_type === 'MULTI_TEACHER_SAME_SLOT' && row.parameters) {
+            if (Array.isArray(row.parameters.rules) && row.parameters.rules.length > 0) {
+              setMultiTeacherRules(
+                row.parameters.rules.map((r: any, idx: number) => ({
+                  id: String(idx + 1),
+                  subjectId: r.subject_id || 'ALL',
+                  day: r.fixed_day || 'ANY',
+                  period: Number(r.fixed_period || 0)
+                }))
+              )
+            } else if (row.parameters.fixed_day || row.parameters.subject_id) {
+              setMultiTeacherRules([
+                {
+                  id: '1',
+                  subjectId: row.parameters.subject_id || row.target_entity_id || 'ALL',
+                  day: row.parameters.fixed_day || 'ANY',
+                  period: Number(row.parameters.fixed_period || 0)
+                }
+              ])
+            }
+          }
         }
       }
       setRules(newRules)
     }
+
+    // Cargar catálogo de materias directamente de la base de datos
+    const { data: subjectsCatalog } = await supabase.from('sch_subjects').select('id, name').order('name')
+    if (subjectsCatalog && subjectsCatalog.length > 0) {
+      setAllSubjectsList(subjectsCatalog)
+      setMultiTeacherSubjectsOptions(subjectsCatalog)
+    } else {
+      // Fallback a sch_curriculum si sch_subjects está vacío
+      const { data: currData } = await supabase.from('sch_curriculum').select('subject_id, sch_subjects(id, name)')
+      const optionsMap = new Map<string, string>()
+      if (currData) {
+        currData.forEach((row: any) => {
+          if (row.subject_id && row.sch_subjects?.name) {
+            optionsMap.set(row.subject_id, row.sch_subjects.name)
+          }
+        })
+      }
+      const options = Array.from(optionsMap.entries()).map(([id, name]) => ({ id, name }))
+      setAllSubjectsList(options)
+      setMultiTeacherSubjectsOptions(options)
+    }
+
+    const { data: workloadConfig } = await supabase.from('sch_constraints').select('*').eq('rule_type', 'MULTI_TEACHER_WORKLOAD_CONFIG').maybeSingle()
+    if (workloadConfig?.parameters?.normal_workload_subject_ids) {
+      setNormalWorkloadSubjectIds(workloadConfig.parameters.normal_workload_subject_ids)
+    }
+
     setLoading(false)
+
+  }
+
+
+  const addMultiTeacherRule = () => {
+    setMultiTeacherRules(prev => [
+      ...prev,
+      { id: Date.now().toString(), subjectId: 'ALL', day: 'ANY', period: 0 }
+    ])
+  }
+
+  const removeMultiTeacherRule = (id: string) => {
+    if (multiTeacherRules.length <= 1) return
+    setMultiTeacherRules(prev => prev.filter(r => r.id !== id))
+  }
+
+  const updateMultiTeacherRule = (id: string, field: 'subjectId' | 'day' | 'period', value: any) => {
+    setMultiTeacherRules(prev =>
+      prev.map(r => r.id === id ? { ...r, [field]: value } : r)
+    )
   }
 
   const fetchTeacherAvailabilities = async () => {
@@ -179,25 +264,49 @@ export default function RulesPage() {
     try {
       await supabase.from('sch_constraints').delete().is('target_entity_id', null).neq('rule_type', 'TEACHER_TIME_WINDOW')
 
-      const toInsert = Object.entries(rules).map(([uiKey, isActive]) => ({
-        rule_type: RULE_MAP[uiKey],
-        target_entity_type: 'GLOBAL',
-        target_entity_id: null,
-        parameters: {},
-        weight: 'HIGH',
-        is_active: isActive
-      }))
+      const toInsert = Object.entries(rules).map(([uiKey, isActive]) => {
+        const isMultiTeacher = uiKey === 'syncMultiTeacherSubjects'
+        return {
+          rule_type: RULE_MAP[uiKey],
+          target_entity_type: 'GLOBAL',
+          target_entity_id: null,
+          parameters: isMultiTeacher ? {
+            rules: multiTeacherRules.map(r => ({
+              subject_id: r.subjectId,
+              fixed_day: r.day,
+              fixed_period: r.period
+            }))
+          } : {},
+          weight: 'HIGH',
+          is_active: isActive
+        }
+      })
 
       const { error } = await supabase.from('sch_constraints').insert(toInsert)
       if (error) throw error
 
+      // Guardar la regla MULTI_TEACHER_WORKLOAD_CONFIG
+      await supabase.from('sch_constraints').delete().eq('rule_type', 'MULTI_TEACHER_WORKLOAD_CONFIG')
+      await supabase.from('sch_constraints').insert({
+        rule_type: 'MULTI_TEACHER_WORKLOAD_CONFIG',
+        target_entity_type: 'GLOBAL',
+        target_entity_id: null,
+        parameters: {
+          normal_workload_subject_ids: normalWorkloadSubjectIds
+        },
+        weight: 'HIGH',
+        is_active: true
+      })
+
       toast.success('Reglas de negocio guardadas correctamente en la base de datos.')
+
     } catch (e) {
       console.error(e)
       toast.error('Error al guardar las reglas.')
     }
     setSaving(false)
   }
+
 
   const toggleRule = (key: string) => {
     setRules(prev => ({ ...prev, [key]: !prev[key] }))
@@ -258,6 +367,36 @@ export default function RulesPage() {
         .select('id, name, color')
         .order('name')
       if (subjErr) throw subjErr
+
+      // Obtener la carga académica para identificar materias con más de un docente
+      const { data: curriculumRows } = await supabase
+        .from('sch_curriculum')
+        .select('subject_id, teacher_id')
+
+      const subjectTeachersMap = new Map<string, Set<string>>()
+      if (curriculumRows) {
+        curriculumRows.forEach((row: any) => {
+          if (!row.subject_id || !row.teacher_id) return
+          if (!subjectTeachersMap.has(row.subject_id)) {
+            subjectTeachersMap.set(row.subject_id, new Set())
+          }
+          subjectTeachersMap.get(row.subject_id)!.add(row.teacher_id)
+        })
+      }
+
+      // Filtrar sólo materias con más de 1 docente asignado
+      const multiTeacherSubjects = (subjectsData || []).filter((s: any) => {
+        const teachers = subjectTeachersMap.get(s.id)
+        return teachers && teachers.size > 1
+      })
+
+      const filteredList = multiTeacherSubjects.length > 0 
+        ? multiTeacherSubjects.map((s: any) => ({ id: s.id, name: s.name }))
+        : (subjectsData || []).map((s: any) => ({ id: s.id, name: s.name }))
+
+      setAllSubjectsList(filteredList)
+
+
 
       const { data: constraints, error: constErr } = await supabase
         .from('sch_constraints')
@@ -464,6 +603,155 @@ export default function RulesPage() {
                 <button onClick={() => toggleRule('earlyHardSubjects')} className={`transition-colors ${rules.earlyHardSubjects ? 'text-indigo-600' : 'text-slate-300 dark:text-slate-600'}`}>
                   {rules.earlyHardSubjects ? <ToggleRight className="h-10 w-10" /> : <ToggleLeft className="h-10 w-10" />}
                 </button>
+              </div>
+
+              {/* Regla de Sincronización Multi-Docente (Núcleo / Comité) */}
+              <div className="p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm space-y-3 transition-all hover:border-indigo-200 dark:hover:border-indigo-800">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                      <Users className="h-4 w-4 text-indigo-500" />
+                      Sincronización Materias Multi-Docente (Núcleo / Comité)
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Si una materia tiene asignados varios docentes, los agenda a todos en el mismo día y periodo de la jornada escolar.
+                    </p>
+                  </div>
+                  <button onClick={() => toggleRule('syncMultiTeacherSubjects')} className={`transition-colors ${rules.syncMultiTeacherSubjects ? 'text-indigo-600' : 'text-slate-300 dark:text-slate-600'}`}>
+                    {rules.syncMultiTeacherSubjects ? <ToggleRight className="h-10 w-10" /> : <ToggleLeft className="h-10 w-10" />}
+                  </button>
+                </div>
+
+                {rules.syncMultiTeacherSubjects && (
+                  <div className="pt-3 border-t border-slate-100 dark:border-slate-700/60 space-y-3">
+                    {multiTeacherRules.map((ruleItem, index) => (
+                      <div key={ruleItem.id} className="grid grid-cols-1 sm:grid-cols-12 gap-3 bg-slate-50 dark:bg-slate-900/40 p-3 rounded-lg items-end">
+                        <div className="sm:col-span-5">
+                          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                            Materia / Grupo Vinculado #{index + 1}:
+                          </label>
+                          <select
+                            value={ruleItem.subjectId}
+                            onChange={(e) => updateMultiTeacherRule(ruleItem.id, 'subjectId', e.target.value)}
+                            className="w-full text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg px-2.5 py-1.5 font-medium text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                          >
+                            <option value="ALL">Todas las materias multi-docente</option>
+                            {allSubjectsList.map(s => (
+                              <option key={s.id} value={s.id}>{s.name}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="sm:col-span-3">
+                          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                            Día de la Reunión / Clase:
+                          </label>
+                          <select
+                            value={ruleItem.day}
+                            onChange={(e) => updateMultiTeacherRule(ruleItem.id, 'day', e.target.value)}
+                            className="w-full text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg px-2.5 py-1.5 font-medium text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                          >
+                            <option value="ANY">Cualquier día coincidente</option>
+                            <option value="Lunes">Lunes</option>
+                            <option value="Martes">Martes</option>
+                            <option value="Miércoles">Miércoles</option>
+                            <option value="Jueves">Jueves</option>
+                            <option value="Viernes">Viernes</option>
+                          </select>
+                        </div>
+
+                        <div className="sm:col-span-3">
+                          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                            Hora de la jornada:
+                          </label>
+                          <select
+                            value={ruleItem.period}
+                            onChange={(e) => updateMultiTeacherRule(ruleItem.id, 'period', Number(e.target.value))}
+                            className="w-full text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg px-2.5 py-1.5 font-medium text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                          >
+                            <option value={0}>Cualquier hora coincidente</option>
+                            <option value={1}>1era Hora</option>
+                            <option value={2}>2da Hora</option>
+                            <option value={3}>3ra Hora</option>
+                            <option value={4}>4ta Hora</option>
+                            <option value={5}>5ta Hora</option>
+                            <option value={6}>6ta Hora</option>
+                            <option value={7}>7ma Hora</option>
+                            <option value={8}>8va Hora</option>
+                          </select>
+                        </div>
+
+                        <div className="sm:col-span-1 flex justify-end pb-1">
+                          {multiTeacherRules.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeMultiTeacherRule(ruleItem.id)}
+                              className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors"
+                              title="Eliminar esta regla"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+
+                    <button
+                      type="button"
+                      onClick={addMultiTeacherRule}
+                      className="flex items-center gap-1.5 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 pt-1 transition-colors"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Agregar otra materia / grupo multi-docente
+                    </button>
+                  </div>
+                )}
+
+
+
+              </div>
+
+              {/* Clasificación de Carga Horaria para Materias Multi-Docente */}
+              <div className="p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm space-y-3 transition-all hover:border-indigo-200 dark:hover:border-indigo-800">
+                <div>
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-indigo-500" />
+                    Contabilizar Materias Multi-Docente en Carga Académica Normal
+                  </p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Selecciona las materias multi-docente que deben sumar al tope máximo de horas del docente (ej. 22 hrs). Las materias desmarcadas se mantendrán como horas especiales exentas.
+                  </p>
+                </div>
+
+                <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {multiTeacherSubjectsOptions.map((subj) => {
+                    const isChecked = normalWorkloadSubjectIds.includes(subj.id)
+                    return (
+                      <label key={subj.id} className="flex items-center gap-2.5 p-2 bg-slate-50 dark:bg-slate-800/60 rounded-lg border border-slate-200/80 dark:border-slate-700 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setNormalWorkloadSubjectIds(prev => [...prev, subj.id])
+                            } else {
+                              setNormalWorkloadSubjectIds(prev => prev.filter(id => id !== subj.id))
+                            }
+                          }}
+                          className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4"
+                        />
+                        <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                          {subj.name}
+                        </span>
+                      </label>
+                    )
+                  })}
+                  {multiTeacherSubjectsOptions.length === 0 && (
+                    <p className="text-xs text-slate-400 col-span-2 italic">
+                      No hay materias multi-docente registradas en la malla curricular.
+                    </p>
+                  )}
+                </div>
               </div>
 
               <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-xl flex gap-3 items-start">
@@ -717,7 +1005,7 @@ export default function RulesPage() {
               Restricciones y Horarios de Materias
             </h2>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Define los periodos específicos de la jornada en los que debe dictarse cada materia (ej. para comisiones/comités) y sus límites de horas diarias.
+              Define las horas específicas de la jornada en las que debe dictarse cada materia (ej. para comisiones/comités) y sus límites de horas diarias.
             </p>
           </div>
 
@@ -732,128 +1020,138 @@ export default function RulesPage() {
                 <p className="text-sm">No hay materias registradas aún.</p>
               </div>
             ) : (
-              subjectRules.map(subj => (
-                <div
-                  key={subj.subjectId}
-                  className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden transition-all"
-                >
-                  {/* Row Header — always visible */}
+              subjectRules.map(subj => {
+                const getHourLabel = (p: number) => {
+                  const map: Record<number, string> = {
+                    1: '1era Hora', 2: '2da Hora', 3: '3ra Hora', 4: '4ta Hora', 5: '5ta Hora',
+                    6: '6ta Hora', 7: '7ma Hora', 8: '8va Hora', 9: '9na Hora', 10: '10ma Hora'
+                  }
+                  return map[p] || `${p}ª Hora`
+                }
+                return (
                   <div
-                    className="flex items-center justify-between p-4 bg-slate-50/60 dark:bg-slate-800/60 cursor-pointer hover:bg-slate-100/80 dark:hover:bg-slate-800 transition-colors"
-                    onClick={() => toggleSubjectExpanded(subj.subjectId)}
+                    key={subj.subjectId}
+                    className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden transition-all"
                   >
-                    <div className="flex items-center gap-3 min-w-0">
-                      {/* Color Dot/Avatar */}
-                      <div
-                        className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0"
-                        style={{ backgroundColor: subj.color }}
-                      >
-                        {subj.subjectName.charAt(0).toUpperCase()}
+                    {/* Row Header — always visible */}
+                    <div
+                      className="flex items-center justify-between p-4 bg-slate-50/60 dark:bg-slate-800/60 cursor-pointer hover:bg-slate-100/80 dark:hover:bg-slate-800 transition-colors"
+                      onClick={() => toggleSubjectExpanded(subj.subjectId)}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        {/* Color Dot/Avatar */}
+                        <div
+                          className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0"
+                          style={{ backgroundColor: subj.color }}
+                        >
+                          {subj.subjectName.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">{subj.subjectName}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${subj.isActive ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>
+                              {subj.isActive ? 'Restricción Activa' : 'Sin Restricción'}
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">{subj.subjectName}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${subj.isActive ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>
-                            {subj.isActive ? 'Restricción Activa' : 'Sin Restricción'}
+
+                      <div className="flex items-center gap-3 shrink-0 ml-4">
+                        {/* Preview when collapsed */}
+                        {!subj.expanded && subj.isActive && (
+                          <div className="hidden sm:flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-700 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600">
+                            <span>{getHourLabel(subj.startPeriod)} – {getHourLabel(subj.endPeriod)}</span>
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-600" />
+                            <span>Máx: {subj.maxHoursPerDay}h/día</span>
+                          </div>
+                        )}
+                        {subj.expanded
+                          ? <ChevronUp className="h-4 w-4 text-slate-400" />
+                          : <ChevronDown className="h-4 w-4 text-slate-400" />
+                        }
+                      </div>
+                    </div>
+
+                    {/* Expanded Panel */}
+                    {subj.expanded && (
+                      <div className="p-5 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                            Configuración de Restricciones
                           </span>
+                          <button
+                            onClick={() => toggleSubjectActive(subj.subjectId)}
+                            className={`flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all ${subj.isActive ? 'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-950/20 dark:border-indigo-850 dark:text-indigo-400' : 'bg-slate-50 border-slate-200 text-slate-600 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400'}`}
+                          >
+                            {subj.isActive ? <ToggleRight className="h-5 w-5 text-indigo-600 dark:text-indigo-400" /> : <ToggleLeft className="h-5 w-5 text-slate-400" />}
+                            {subj.isActive ? 'Habilitado' : 'Deshabilitado'}
+                          </button>
+                        </div>
+
+                        {subj.isActive && (
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div>
+                              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
+                                Hora Inicial Permitida
+                              </label>
+                              <select
+                                value={subj.startPeriod}
+                                onChange={e => updateSubjectRuleField(subj.subjectId, 'startPeriod', parseInt(e.target.value))}
+                                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors"
+                              >
+                                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(p => (
+                                  <option key={p} value={p}>{getHourLabel(p)}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
+                                Hora Final Permitida
+                              </label>
+                              <select
+                                value={subj.endPeriod}
+                                onChange={e => updateSubjectRuleField(subj.subjectId, 'endPeriod', parseInt(e.target.value))}
+                                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors"
+                              >
+                                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(p => (
+                                  <option key={p} value={p}>{getHourLabel(p)}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
+                                Horas Límites por Día
+                              </label>
+                              <select
+                                value={subj.maxHoursPerDay}
+                                onChange={e => updateSubjectRuleField(subj.subjectId, 'maxHoursPerDay', parseInt(e.target.value))}
+                                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors"
+                              >
+                                {[1, 2, 3, 4, 5, 6].map(h => (
+                                  <option key={h} value={h}>{h} {h === 1 ? 'hora' : 'horas'}</option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex justify-end pt-2 border-t border-slate-100 dark:border-slate-800">
+                          <button
+                            onClick={() => handleSaveSubjectRule(subj)}
+                            disabled={subj.saving}
+                            className="flex items-center gap-2 px-5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-bold rounded-lg transition-colors shadow-sm shadow-indigo-500/20 whitespace-nowrap"
+                          >
+                            {subj.saving ? <Loader2 className="animate-spin h-4 w-4" /> : <Save className="h-4 w-4" />}
+                            Guardar Reglas
+                          </button>
                         </div>
                       </div>
-                    </div>
-
-                    <div className="flex items-center gap-3 shrink-0 ml-4">
-                      {/* Preview when collapsed */}
-                      {!subj.expanded && subj.isActive && (
-                        <div className="hidden sm:flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-700 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600">
-                          <span>P{subj.startPeriod} – P{subj.endPeriod}</span>
-                          <span className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-600" />
-                          <span>Máx: {subj.maxHoursPerDay}h/día</span>
-                        </div>
-                      )}
-                      {subj.expanded
-                        ? <ChevronUp className="h-4 w-4 text-slate-400" />
-                        : <ChevronDown className="h-4 w-4 text-slate-400" />
-                      }
-                    </div>
+                    )}
                   </div>
-
-                  {/* Expanded Panel */}
-                  {subj.expanded && (
-                    <div className="p-5 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 space-y-4">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                          Configuración de Restricciones
-                        </span>
-                        <button
-                          onClick={() => toggleSubjectActive(subj.subjectId)}
-                          className={`flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all ${subj.isActive ? 'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-950/20 dark:border-indigo-850 dark:text-indigo-400' : 'bg-slate-50 border-slate-200 text-slate-600 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400'}`}
-                        >
-                          {subj.isActive ? <ToggleRight className="h-5 w-5 text-indigo-600 dark:text-indigo-400" /> : <ToggleLeft className="h-5 w-5 text-slate-400" />}
-                          {subj.isActive ? 'Habilitado' : 'Deshabilitado'}
-                        </button>
-                      </div>
-
-                      {subj.isActive && (
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
-                              Periodo Inicial Permitido
-                            </label>
-                            <select
-                              value={subj.startPeriod}
-                              onChange={e => updateSubjectRuleField(subj.subjectId, 'startPeriod', parseInt(e.target.value))}
-                              className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors"
-                            >
-                              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(p => (
-                                <option key={p} value={p}>Periodo {p}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
-                              Periodo Final Permitido
-                            </label>
-                            <select
-                              value={subj.endPeriod}
-                              onChange={e => updateSubjectRuleField(subj.subjectId, 'endPeriod', parseInt(e.target.value))}
-                              className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors"
-                            >
-                              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(p => (
-                                <option key={p} value={p}>Periodo {p}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
-                              Horas Límites por Día
-                            </label>
-                            <select
-                              value={subj.maxHoursPerDay}
-                              onChange={e => updateSubjectRuleField(subj.subjectId, 'maxHoursPerDay', parseInt(e.target.value))}
-                              className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors"
-                            >
-                              {[1, 2, 3, 4, 5, 6].map(h => (
-                                <option key={h} value={h}>{h} {h === 1 ? 'hora' : 'horas'}</option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="flex justify-end pt-2 border-t border-slate-100 dark:border-slate-800">
-                        <button
-                          onClick={() => handleSaveSubjectRule(subj)}
-                          disabled={subj.saving}
-                          className="flex items-center gap-2 px-5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-bold rounded-lg transition-colors shadow-sm shadow-indigo-500/20 whitespace-nowrap"
-                        >
-                          {subj.saving ? <Loader2 className="animate-spin h-4 w-4" /> : <Save className="h-4 w-4" />}
-                          Guardar Reglas
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))
+                )
+              })
             )}
+
           </div>
         </div>
 
