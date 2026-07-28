@@ -85,6 +85,9 @@ export default function RulesPage() {
   const [normalWorkloadSubjectIds, setNormalWorkloadSubjectIds] = useState<string[]>([])
   const [multiTeacherSubjectsOptions, setMultiTeacherSubjectsOptions] = useState<{ id: string; name: string }[]>([])
 
+  const [minGaps, setMinGaps] = useState<number>(1)
+  const [maxGaps, setMaxGaps] = useState<number>(4)
+
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -113,6 +116,10 @@ export default function RulesPage() {
         const uiKey = Object.keys(RULE_MAP).find(k => RULE_MAP[k] === row.rule_type)
         if (uiKey) {
           newRules[uiKey] = row.is_active
+          if (row.rule_type === 'MAX_GAPS_DAY' && row.parameters) {
+            if (typeof row.parameters.min_gaps === 'number') setMinGaps(row.parameters.min_gaps)
+            if (typeof row.parameters.max_gaps === 'number') setMaxGaps(row.parameters.max_gaps)
+          }
           if (row.rule_type === 'MULTI_TEACHER_SAME_SLOT' && row.parameters) {
             if (Array.isArray(row.parameters.rules) && row.parameters.rules.length > 0) {
               setMultiTeacherRules(
@@ -266,6 +273,7 @@ export default function RulesPage() {
 
       const toInsert = Object.entries(rules).map(([uiKey, isActive]) => {
         const isMultiTeacher = uiKey === 'syncMultiTeacherSubjects'
+        const isMinimizeGaps = uiKey === 'minimizeGaps'
         return {
           rule_type: RULE_MAP[uiKey],
           target_entity_type: 'GLOBAL',
@@ -276,6 +284,9 @@ export default function RulesPage() {
               fixed_day: r.day,
               fixed_period: r.period
             }))
+          } : isMinimizeGaps ? {
+            min_gaps: minGaps,
+            max_gaps: maxGaps
           } : {},
           weight: 'HIGH',
           is_active: isActive
@@ -765,14 +776,66 @@ export default function RulesPage() {
             <section className="space-y-4">
               <h3 className="text-base font-bold text-slate-700 dark:text-slate-300">Calidad del Horario (Soft Rules)</h3>
 
-              <div className="flex items-center justify-between p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm transition-all hover:border-indigo-200 dark:hover:border-indigo-800">
-                <div>
-                  <p className="text-sm font-bold text-slate-800 dark:text-slate-200">Minimizar Ventanas (Huecos)</p>
-                  <p className="text-xs text-slate-500 mt-1">Evita que los docentes tengan bloques libres improductivos entre clases.</p>
+              <div className="p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm space-y-3 transition-all hover:border-indigo-200 dark:hover:border-indigo-800">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                      Huecos (Ventanas) en Horario Personal Docente
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Los docentes en sus horarios personales deben tener huecos mínimos de 1 hora dentro de la jornada hasta un máximo de 4 horas.
+                    </p>
+                  </div>
+                  <button onClick={() => toggleRule('minimizeGaps')} className={`transition-colors ${rules.minimizeGaps ? 'text-indigo-600' : 'text-slate-300 dark:text-slate-600'}`}>
+                    {rules.minimizeGaps ? <ToggleRight className="h-10 w-10" /> : <ToggleLeft className="h-10 w-10" />}
+                  </button>
                 </div>
-                <button onClick={() => toggleRule('minimizeGaps')} className={`transition-colors ${rules.minimizeGaps ? 'text-indigo-600' : 'text-slate-300 dark:text-slate-600'}`}>
-                  {rules.minimizeGaps ? <ToggleRight className="h-10 w-10" /> : <ToggleLeft className="h-10 w-10" />}
-                </button>
+
+                {rules.minimizeGaps && (
+                  <div className="pt-3 border-t border-slate-100 dark:border-slate-700/60 space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-900/40 p-3 rounded-lg">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                          Hueco Mínimo por Jornada:
+                        </label>
+                        <select
+                          value={minGaps}
+                          onChange={(e) => setMinGaps(Number(e.target.value))}
+                          className="w-full text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg px-2.5 py-1.5 font-medium text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                        >
+                          <option value={1}>1 hora (Mínimo recomendado)</option>
+                          <option value={2}>2 horas</option>
+                          <option value={3}>3 horas</option>
+                          <option value={4}>4 horas</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                          Hueco Máximo por Jornada:
+                        </label>
+                        <select
+                          value={maxGaps}
+                          onChange={(e) => setMaxGaps(Number(e.target.value))}
+                          className="w-full text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg px-2.5 py-1.5 font-medium text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                        >
+                          <option value={1}>1 hora</option>
+                          <option value={2}>2 horas</option>
+                          <option value={3}>3 horas</option>
+                          <option value={4}>4 horas (Máximo recomendado)</option>
+                          <option value={5}>5 horas</option>
+                          <option value={6}>6 horas</option>
+                        </select>
+                      </div>
+
+                      {minGaps > maxGaps && (
+                        <p className="text-xs text-red-500 font-semibold col-span-1 sm:col-span-2">
+                          ⚠️ El hueco mínimo no puede ser mayor que el hueco máximo.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center justify-between p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm transition-all hover:border-indigo-200 dark:hover:border-indigo-800">
@@ -797,8 +860,8 @@ export default function RulesPage() {
 
               <div className="flex items-center justify-between p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm transition-all hover:border-indigo-200 dark:hover:border-indigo-800">
                 <div>
-                  <p className="text-sm font-bold text-slate-800 dark:text-slate-200">Distribución Equitativa</p>
-                  <p className="text-xs text-slate-500 mt-1">Distribuye las horas de una materia a lo largo de la semana en lugar de agruparlas.</p>
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-200">Distribución en 5 Días de la Semana (Lunes a Viernes)</p>
+                  <p className="text-xs text-slate-500 mt-1">Garantiza que las materias y clases asignadas a cada docente se distribuyan equitativamente en los 5 días de la semana (Lunes a Viernes), evitando la concentración de carga en pocos días.</p>
                 </div>
                 <button onClick={() => toggleRule('evenDistribution')} className={`transition-colors ${rules.evenDistribution ? 'text-indigo-600' : 'text-slate-300 dark:text-slate-600'}`}>
                   {rules.evenDistribution ? <ToggleRight className="h-10 w-10" /> : <ToggleLeft className="h-10 w-10" />}

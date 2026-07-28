@@ -249,7 +249,7 @@ export default function MobileTeacherSchedule({
 
               const periodId = slot.id!
               const dayClasses = classes.filter(c => c.day === selectedDay)
-              const cls = dayClasses.find(c => c.period === periodId)
+              const cls = dayClasses.find(c => c.period <= periodId && (c.period + (c.duration || 1) - 1) >= periodId)
               const covering = coveringSubstitutions.find(s => s.period_id === periodId)
 
               // Determine status and details

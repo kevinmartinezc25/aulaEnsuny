@@ -35,6 +35,20 @@ export default function ScheduleCanvas({
   const [showUnassignedModal, setShowUnassignedModal] = useState(false)
   const [unassignedBlocks, setUnassignedBlocks] = useState<any[]>([])
 
+  useEffect(() => {
+    if (!entityId) return
+    try {
+      const stored = localStorage.getItem(`sch_local_unassigned_${entityId}`)
+      if (stored) {
+        setUnassignedBlocks(JSON.parse(stored))
+      } else {
+        setUnassignedBlocks([])
+      }
+    } catch (e) {
+      console.error(e)
+    }
+  }, [entityId])
+
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
   const [classes, setClasses] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
@@ -221,6 +235,30 @@ export default function ScheduleCanvas({
     toast.info('Análisis heurístico ejecutado: No se encontraron choques duros en el grupo actual.')
   }
 
+  const handleManualAssign = async (block: any, day: string, period: number) => {
+    const { error } = await supabase.from('sch_schedule_slots').insert({
+      day_of_week: day,
+      period_id: period,
+      group_id: block.group_id,
+      subject_id: block.subject_id,
+      teacher_id: block.teacher_id && block.teacher_id.trim() !== '' ? block.teacher_id : null,
+      duration: block.duration || 1
+    })
+
+    if (error) {
+      console.error(error)
+      toast.error(`Error al asignar el bloque: ${error.message || 'Error desconocido'}`)
+      throw error
+    }
+
+    toast.success('Bloque asignado manualmente.')
+    
+    const newUnassigned = unassignedBlocks.filter(b => b !== block)
+    setUnassignedBlocks(newUnassigned)
+    localStorage.setItem(`sch_local_unassigned_${entityId}`, JSON.stringify(newUnassigned))
+    fetchSchedule()
+  }
+
 
   const executeAutoGenerate = async () => {
     if (entityType === 'teacher') {
@@ -353,13 +391,17 @@ export default function ScheduleCanvas({
     })
 
 
+    const groupPeriodsRaw = localStorage.getItem('sch_group_periods')
+    const groupPeriodsCfg = groupPeriodsRaw ? JSON.parse(groupPeriodsRaw) : {}
+
     const config: GeneratorConfig = {
       curriculum: blocksToAssign,
       existingSchedule,
       context,
       days: DAYS,
       periodsPerDay,
-      breakPeriods
+      breakPeriods,
+      groupPeriods: groupPeriodsCfg
     }
 
 
@@ -399,6 +441,7 @@ export default function ScheduleCanvas({
           teacher_name: profMap.get(b.teacher_id || '') || 'Sin asignar'
         }))
         setUnassignedBlocks(enrichedUnassigned)
+        localStorage.setItem(`sch_local_unassigned_${entityId}`, JSON.stringify(enrichedUnassigned))
         if (enrichedUnassigned.length > 0) {
           setShowUnassignedModal(true)
           toast.warning(`${enrichedUnassigned.length} bloques no pudieron asignarse. Revisa el desglose en el modal.`)
@@ -434,6 +477,8 @@ export default function ScheduleCanvas({
         isOpen={showUnassignedModal}
         onClose={() => setShowUnassignedModal(false)}
         unassignedBlocks={unassignedBlocks}
+        timeSlots={timeSlots}
+        onAssign={handleManualAssign}
       />
 
       <div className="block lg:hidden print:hidden h-full">
@@ -457,8 +502,13 @@ export default function ScheduleCanvas({
 
             <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1" />
 
-            <button onClick={analyzeConflicts} className="flex flex-col items-center gap-1 px-3 py-1 hover:bg-amber-50 dark:hover:bg-amber-500/10 rounded-lg text-amber-600 dark:text-amber-500 transition-colors group" title="Analizar Conflictos">
+            <button onClick={analyzeConflicts} className="flex flex-col items-center gap-1 px-3 py-1 hover:bg-amber-50 dark:hover:bg-amber-500/10 rounded-lg text-amber-600 dark:text-amber-500 transition-colors group relative" title="Analizar Conflictos">
               <AlertTriangle className="h-4 w-4 group-hover:-translate-y-0.5 transition-transform" />
+              {unassignedBlocks.length > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full shadow-sm animate-pulse">
+                  {unassignedBlocks.length}
+                </span>
+              )}
             </button>
             
             <button onClick={exportPDF} className="flex flex-col items-center gap-1 px-3 py-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-600 dark:text-slate-300 transition-colors group" title="Exportar PDF">

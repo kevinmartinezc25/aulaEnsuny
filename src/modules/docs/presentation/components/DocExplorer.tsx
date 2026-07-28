@@ -1,10 +1,11 @@
 'use client'
 
 import React, { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ChevronRight, ChevronDown, ChevronUp, Folder, FolderOpen, FileText,
-  Plus, MoreHorizontal, Pencil, Trash2, FolderPlus, FilePlus, Palette, X
+  Plus, MoreHorizontal, Pencil, Trash2, FolderPlus, FilePlus, Palette, X, Lock
 } from 'lucide-react'
 import type { Document, DocFolder } from '@/modules/docs/domain/entities/Document'
 import { DocStatusBadge } from './DocStatusBadge'
@@ -20,7 +21,8 @@ interface DocExplorerProps {
   documents: Document[]
   selectedDocId?: string | null
   selectedFolderId?: string | null
-  userRole: 'admin' | 'teacher' | 'student' | 'guest'
+  userRole: 'admin' | 'superadmin' | 'teacher' | 'student' | 'guest'
+  currentUserId?: string | null
   onSelectDoc: (doc: Document) => void
   onSelectFolder: (folderId: string | null) => void
   onNewDocument: (folderId?: string | null) => void
@@ -86,7 +88,7 @@ function buildTree(folders: DocFolder[], documents: Document[]): TreeFolder[] {
 
 // ─── Single folder node ────────────────────────────────────────────────────────
 function FolderNode({
-  folder, depth, selectedDocId, selectedFolderId, userRole,
+  folder, depth, selectedDocId, selectedFolderId, userRole, currentUserId,
   onSelectDoc, onSelectFolder, onNewDocument, onNewFolder, onRenameFolder, onDeleteFolder, onDeleteDoc,
   onReorderFolder, onColorFolder
 }: {
@@ -94,7 +96,8 @@ function FolderNode({
   depth: number
   selectedDocId?: string | null
   selectedFolderId?: string | null
-  userRole: 'admin' | 'teacher' | 'student' | 'guest'
+  userRole: 'admin' | 'superadmin' | 'teacher' | 'student' | 'guest'
+  currentUserId?: string | null
   onSelectDoc: (doc: Document) => void
   onSelectFolder: (folderId: string | null) => void
   onNewDocument: (folderId?: string | null) => void
@@ -110,21 +113,49 @@ function FolderNode({
   const [colorPickerOpen, setColorPickerOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const hasContent = folder.children.length > 0 || folder.documents.length > 0
-  const canEdit = userRole !== 'student' && userRole !== 'guest'
+  const canAddContent = userRole !== 'student' && userRole !== 'guest'
+  const isAuthor = currentUserId ? folder.createdBy === currentUserId : false
+  const isAdmin = userRole === 'admin' || userRole === 'superadmin'
+  const canModifyFolder = isAuthor || isAdmin
+  const isReadOnlyFolder = !canModifyFolder && userRole === 'teacher'
   const isSelected = selectedFolderId === folder.id
   const docCount = getRecursiveDocCount(folder)
   const folderColor = folder.color ?? '#94a3b8' // default slate-400
 
+  const [mounted, setMounted] = useState(false)
+  const [menuCoords, setMenuCoords] = useState<{ top: number; right: number } | null>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Close dropdown when scrolling or resizing
+  useEffect(() => {
+    if (!menuOpen) return
+    const handleScrollOrResize = () => setMenuOpen(false)
+    window.addEventListener('scroll', handleScrollOrResize, true)
+    window.addEventListener('resize', handleScrollOrResize)
+    return () => {
+      window.removeEventListener('scroll', handleScrollOrResize, true)
+      window.removeEventListener('resize', handleScrollOrResize)
+    }
+  }, [menuOpen])
+
   // Close dropdown when clicking outside
   useEffect(() => {
     if (!menuOpen) return
-    function handleClickOutside(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+    function handleClickOutside(e: MouseEvent | TouchEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node) && buttonRef.current && !buttonRef.current.contains(e.target as Node)) {
         setMenuOpen(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
+    document.addEventListener('touchstart', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('touchstart', handleClickOutside)
+    }
   }, [menuOpen])
 
   return (
@@ -166,6 +197,11 @@ function FolderNode({
             <Folder className="h-4 w-4 shrink-0" style={{ color: folderColor }} />
           )}
           <span className="truncate">{folder.name}</span>
+          {isReadOnlyFolder && (
+            <span title="Solo lectura (creada por otro docente)">
+              <Lock className="h-3 w-3 text-amber-500 shrink-0" />
+            </span>
+          )}
         </div>
 
         {/* Badges / Actions */}
@@ -178,123 +214,158 @@ function FolderNode({
             </span>
           )}
 
-          {canEdit && (
-            <div ref={menuRef} className="relative opacity-0 group-hover:opacity-100 transition-opacity">
+          {canAddContent && (
+            <div className="relative">
               <button
+                ref={buttonRef}
                 type="button"
-                onClick={e => { e.stopPropagation(); setMenuOpen(m => !m) }}
-                className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700"
+                onClick={e => {
+                  e.stopPropagation()
+                  if (!menuOpen && buttonRef.current) {
+                    const rect = buttonRef.current.getBoundingClientRect()
+                    const right = Math.max(10, window.innerWidth - rect.right)
+                    let top = rect.bottom + 4
+                    if (window.innerHeight - rect.bottom < 260) {
+                      top = rect.top - 240
+                    }
+                    setMenuCoords({ top: Math.max(10, top), right })
+                  }
+                  setMenuOpen(m => !m)
+                }}
+                className={`p-1.5 rounded-lg transition-colors ${
+                  menuOpen
+                    ? 'bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-white'
+                    : 'hover:bg-slate-200/80 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-900 dark:hover:text-white opacity-100 sm:opacity-0 sm:group-hover:opacity-100'
+                }`}
+                title="Opciones de carpeta"
               >
-                <MoreHorizontal className="h-3 w-3 text-slate-400" />
+                <MoreHorizontal className="h-3.5 w-3.5" />
               </button>
-              <AnimatePresence>
-                {menuOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    transition={{ duration: 0.1 }}
-                    className="absolute right-0 top-full mt-1 z-[999] bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl shadow-xl py-1 min-w-[185px]"
-                  >
-                    {userRole === 'admin' && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => { onReorderFolder?.(folder.id, 'up'); setMenuOpen(false) }}
-                          className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-600 dark:text-slate-350 hover:bg-slate-50 dark:hover:bg-slate-800"
-                        >
-                          <ChevronUp className="h-3.5 w-3.5" /> Mover arriba
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => { onReorderFolder?.(folder.id, 'down'); setMenuOpen(false) }}
-                          className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-600 dark:text-slate-350 hover:bg-slate-50 dark:hover:bg-slate-800"
-                        >
-                          <ChevronDown className="h-3.5 w-3.5" /> Mover abajo
-                        </button>
-                        <div className="my-1 border-t border-slate-100 dark:border-slate-800" />
-                      </>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => { onNewDocument(folder.id); setMenuOpen(false) }}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-600 dark:text-slate-350 hover:bg-slate-50 dark:hover:bg-slate-800"
-                    >
-                      <FilePlus className="h-3.5 w-3.5" /> Nuevo documento
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { onNewFolder(folder.id); setMenuOpen(false) }}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-600 dark:text-slate-350 hover:bg-slate-50 dark:hover:bg-slate-800"
-                    >
-                      <FolderPlus className="h-3.5 w-3.5" /> Nueva subcarpeta
-                    </button>
-
-                    {/* ── Color Picker ── */}
-                    <div className="my-1 border-t border-slate-100 dark:border-slate-800" />
-                    <button
-                      type="button"
-                      onClick={() => setColorPickerOpen(v => !v)}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-600 dark:text-slate-350 hover:bg-slate-50 dark:hover:bg-slate-800"
-                    >
-                      <Palette className="h-3.5 w-3.5" />
-                      <span>Color de carpeta</span>
-                      <span
-                        className="ml-auto h-3 w-3 rounded-full border border-slate-300 dark:border-slate-600 shrink-0"
-                        style={{ backgroundColor: folder.color ?? '#94a3b8' }}
-                      />
-                    </button>
-
-                    {colorPickerOpen && (
-                      <div className="px-3 pb-2">
-                        <div className="grid grid-cols-6 gap-1.5 mt-1">
-                          {FOLDER_COLORS.map(c => (
-                            <button
-                              key={c.label}
-                              type="button"
-                              title={c.label}
-                              onClick={() => {
-                                onColorFolder?.(folder.id, c.value)
-                                setColorPickerOpen(false)
-                                setMenuOpen(false)
-                              }}
-                              className={`h-5 w-5 rounded-full border-2 transition-transform hover:scale-110 ${
-                                folder.color === c.value
-                                  ? 'border-slate-900 dark:border-white scale-110'
-                                  : 'border-transparent'
-                              }`}
-                              style={{
-                                backgroundColor: c.value ?? '#e2e8f0',
-                                outline: c.value === null ? '1.5px dashed #94a3b8' : 'none'
-                              }}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="my-1 border-t border-slate-100 dark:border-slate-800" />
-                    <button
-                      type="button"
-                      onClick={() => { onRenameFolder(folder); setMenuOpen(false) }}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-600 dark:text-slate-350 hover:bg-slate-50 dark:hover:bg-slate-800"
-                    >
-                      <Pencil className="h-3.5 w-3.5" /> Renombrar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { onDeleteFolder(folder); setMenuOpen(false) }}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-xs text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" /> Eliminar
-                    </button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
             </div>
           )}
         </div>
       </div>
+
+      {/* Portal Dropdown Menu rendered at document.body */}
+      {canAddContent && menuOpen && menuCoords && mounted && createPortal(
+        <div
+          ref={menuRef}
+          style={{
+            position: 'fixed',
+            top: `${menuCoords.top}px`,
+            right: `${menuCoords.right}px`,
+            zIndex: 999999,
+          }}
+          onClick={e => e.stopPropagation()}
+        >
+          <AnimatePresence>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: -4 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: -4 }}
+              transition={{ duration: 0.12 }}
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl py-1.5 min-w-[190px] text-slate-800 dark:text-slate-100"
+            >
+              {isAdmin && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => { onReorderFolder?.(folder.id, 'up'); setMenuOpen(false) }}
+                    className="flex w-full items-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                  >
+                    <ChevronUp className="h-3.5 w-3.5 text-slate-400" /> Mover arriba
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { onReorderFolder?.(folder.id, 'down'); setMenuOpen(false) }}
+                    className="flex w-full items-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                  >
+                    <ChevronDown className="h-3.5 w-3.5 text-slate-400" /> Mover abajo
+                  </button>
+                  <div className="my-1 border-t border-slate-100 dark:border-slate-800" />
+                </>
+              )}
+              <button
+                type="button"
+                onClick={() => { onNewDocument(folder.id); setMenuOpen(false) }}
+                className="flex w-full items-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                <FilePlus className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> Nuevo documento
+              </button>
+              <button
+                type="button"
+                onClick={() => { onNewFolder(folder.id); setMenuOpen(false) }}
+                className="flex w-full items-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                <FolderPlus className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" /> Nueva subcarpeta
+              </button>
+
+              {canModifyFolder && (
+                <>
+                  <div className="my-1 border-t border-slate-100 dark:border-slate-800" />
+                  <button
+                    type="button"
+                    onClick={() => setColorPickerOpen(v => !v)}
+                    className="flex w-full items-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                  >
+                    <Palette className="h-3.5 w-3.5 text-purple-500" />
+                    <span>Color de carpeta</span>
+                    <span
+                      className="ml-auto h-3 w-3 rounded-full border border-slate-300 dark:border-slate-600 shrink-0"
+                      style={{ backgroundColor: folder.color ?? '#94a3b8' }}
+                    />
+                  </button>
+
+                  {colorPickerOpen && (
+                    <div className="px-3.5 pb-2">
+                      <div className="grid grid-cols-6 gap-1.5 mt-1">
+                        {FOLDER_COLORS.map(c => (
+                          <button
+                            key={c.label}
+                            type="button"
+                            title={c.label}
+                            onClick={() => {
+                              onColorFolder?.(folder.id, c.value)
+                              setColorPickerOpen(false)
+                              setMenuOpen(false)
+                            }}
+                            className={`h-5 w-5 rounded-full border-2 transition-transform hover:scale-110 ${
+                              folder.color === c.value
+                                ? 'border-slate-900 dark:border-white scale-110'
+                                : 'border-transparent'
+                            }`}
+                            style={{
+                              backgroundColor: c.value ?? '#e2e8f0',
+                              outline: c.value === null ? '1.5px dashed #94a3b8' : 'none'
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="my-1 border-t border-slate-100 dark:border-slate-800" />
+                  <button
+                    type="button"
+                    onClick={() => { onRenameFolder(folder); setMenuOpen(false) }}
+                    className="flex w-full items-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                  >
+                    <Pencil className="h-3.5 w-3.5 text-slate-400" /> Renombrar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { onDeleteFolder(folder); setMenuOpen(false) }}
+                    className="flex w-full items-center gap-2 px-3.5 py-2 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+                  >
+                    <Trash2 className="h-3.5 w-3.5 text-red-500" /> Eliminar
+                  </button>
+                </>
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </div>,
+        document.body
+      )}
 
       {/* Folder Contents */}
       <AnimatePresence initial={false}>
@@ -314,6 +385,7 @@ function FolderNode({
                 selectedDocId={selectedDocId}
                 selectedFolderId={selectedFolderId}
                 userRole={userRole}
+                currentUserId={currentUserId}
                 onSelectDoc={onSelectDoc}
                 onSelectFolder={onSelectFolder}
                 onNewDocument={onNewDocument}
@@ -333,6 +405,7 @@ function FolderNode({
                 depth={depth + 1}
                 isSelected={selectedDocId === doc.id}
                 userRole={userRole}
+                currentUserId={currentUserId}
                 onSelect={() => onSelectDoc(doc)}
                 onDelete={() => onDeleteDoc(doc)}
               />
@@ -345,16 +418,55 @@ function FolderNode({
 }
 
 // ─── Document node ─────────────────────────────────────────────────────────────
-function DocNode({ doc, depth, isSelected, userRole, onSelect, onDelete }: {
+function DocNode({ doc, depth, isSelected, userRole, currentUserId, onSelect, onDelete }: {
   doc: Document
   depth: number
   isSelected: boolean
-  userRole: 'admin' | 'teacher' | 'student' | 'guest'
+  userRole: 'admin' | 'superadmin' | 'teacher' | 'student' | 'guest'
+  currentUserId?: string | null
   onSelect: () => void
   onDelete: () => void
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
-  const canEdit = userRole !== 'student' && userRole !== 'guest'
+  const [mounted, setMounted] = useState(false)
+  const [menuCoords, setMenuCoords] = useState<{ top: number; right: number } | null>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  const isDocAuthor = currentUserId ? doc.createdBy === currentUserId : false
+  const isAdmin = userRole === 'admin' || userRole === 'superadmin'
+  const canModifyDoc = isDocAuthor || isAdmin
+  const isReadOnlyDoc = !canModifyDoc && userRole === 'teacher'
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const handleScrollOrResize = () => setMenuOpen(false)
+    window.addEventListener('scroll', handleScrollOrResize, true)
+    window.addEventListener('resize', handleScrollOrResize)
+    return () => {
+      window.removeEventListener('scroll', handleScrollOrResize, true)
+      window.removeEventListener('resize', handleScrollOrResize)
+    }
+  }, [menuOpen])
+
+  useEffect(() => {
+    if (!menuOpen) return
+    function handleClickOutside(e: MouseEvent | TouchEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node) && buttonRef.current && !buttonRef.current.contains(e.target as Node)) {
+        setMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('touchstart', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('touchstart', handleClickOutside)
+    }
+  }, [menuOpen])
 
   return (
     <div
@@ -368,58 +480,96 @@ function DocNode({ doc, depth, isSelected, userRole, onSelect, onDelete }: {
     >
       <FileText className={`h-3.5 w-3.5 shrink-0 ${isSelected ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`} />
       <span className="flex-1 truncate">{doc.title}</span>
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
+      {isReadOnlyDoc && (
+        <span title="Solo lectura (creado por otro docente)">
+          <Lock className="h-3 w-3 text-slate-400 shrink-0" />
+        </span>
+      )}
+      <div
+        className={`flex items-center gap-1 transition-opacity ${
+          menuOpen
+            ? 'opacity-100 z-50'
+            : 'opacity-100 sm:opacity-0 sm:group-hover:opacity-100'
+        }`}
+        onClick={e => e.stopPropagation()}
+      >
         <DocStatusBadge status={doc.status} size="sm" />
-        {canEdit && (
+        {canModifyDoc && (
           <div className="relative">
             <button
+              ref={buttonRef}
               type="button"
-              onClick={e => { e.stopPropagation(); setMenuOpen(m => !m) }}
-              className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700"
+              onClick={e => {
+                e.stopPropagation()
+                if (!menuOpen && buttonRef.current) {
+                  const rect = buttonRef.current.getBoundingClientRect()
+                  const right = Math.max(10, window.innerWidth - rect.right)
+                  let top = rect.bottom + 4
+                  if (window.innerHeight - rect.bottom < 150) {
+                    top = rect.top - 60
+                  }
+                  setMenuCoords({ top: Math.max(10, top), right })
+                }
+                setMenuOpen(m => !m)
+              }}
+              className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-700 dark:hover:text-white"
             >
-              <MoreHorizontal className="h-3 w-3 text-slate-400" />
+              <MoreHorizontal className="h-3.5 w-3.5" />
             </button>
-            <AnimatePresence>
-              {menuOpen && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  className="absolute right-0 top-full mt-1 z-55 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl shadow-xl py-1 min-w-[130px]"
-                >
-                  <button
-                    type="button"
-                    onClick={() => { onDelete(); setMenuOpen(false) }}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-xs text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" /> Eliminar
-                  </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
           </div>
         )}
       </div>
+
+      {canModifyDoc && menuOpen && menuCoords && mounted && createPortal(
+        <div
+          ref={menuRef}
+          style={{
+            position: 'fixed',
+            top: `${menuCoords.top}px`,
+            right: `${menuCoords.right}px`,
+            zIndex: 999999,
+          }}
+          onClick={e => e.stopPropagation()}
+        >
+          <AnimatePresence>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl py-1 min-w-[130px]"
+            >
+              <button
+                type="button"
+                onClick={() => { onDelete(); setMenuOpen(false) }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-xs text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors font-semibold"
+              >
+                <Trash2 className="h-3.5 w-3.5" /> Eliminar
+              </button>
+            </motion.div>
+          </AnimatePresence>
+        </div>,
+        document.body
+      )}
     </div>
   )
 }
 
 // ─── Main Explorer ─────────────────────────────────────────────────────────────
 export function DocExplorer({
-  folders, documents, selectedDocId, selectedFolderId, userRole,
+  folders, documents, selectedDocId, selectedFolderId, userRole, currentUserId,
   onSelectDoc, onSelectFolder, onNewDocument, onNewFolder, onRenameFolder, onDeleteFolder, onDeleteDoc,
   onReorderFolder, onColorFolder
 }: DocExplorerProps) {
   const tree = buildTree(folders, documents)
   const rootDocuments = documents.filter(d => !d.folderId)
-  const canEdit = userRole !== 'student' && userRole !== 'guest'
+  const canAddContent = userRole !== 'student' && userRole !== 'guest'
 
   return (
     <div className="flex flex-col h-full bg-white dark:bg-slate-900/40">
       {/* Explorer Header */}
       <div className="flex items-center justify-between px-4 py-3.5 border-b border-slate-100 dark:border-slate-800/60">
         <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Categorías</span>
-        {canEdit && (
+        {canAddContent && (
           <div className="flex items-center gap-1">
             <button
               type="button"
@@ -470,6 +620,7 @@ export function DocExplorer({
             selectedDocId={selectedDocId}
             selectedFolderId={selectedFolderId}
             userRole={userRole}
+            currentUserId={currentUserId}
             onSelectDoc={onSelectDoc}
             onSelectFolder={onSelectFolder}
             onNewDocument={onNewDocument}
@@ -493,6 +644,7 @@ export function DocExplorer({
                 depth={0}
                 isSelected={selectedDocId === doc.id}
                 userRole={userRole}
+                currentUserId={currentUserId}
                 onSelect={() => onSelectDoc(doc)}
                 onDelete={() => onDeleteDoc(doc)}
               />
@@ -505,7 +657,7 @@ export function DocExplorer({
           <div className="py-8 text-center">
             <FileText className="h-8 w-8 text-slate-200 dark:text-slate-700 mx-auto mb-2" />
             <p className="text-xs text-slate-400">Sin carpetas aún</p>
-            {canEdit && (
+            {canAddContent && (
               <button
                 type="button"
                 onClick={() => onNewFolder(null)}

@@ -22,6 +22,7 @@ export interface GeneratorConfig {
   days: string[];
   periodsPerDay: number; // ej. 7
   breakPeriods: number[]; // id de periodos que son recreo
+  groupPeriods?: Record<string, number>;
 }
 
 export interface GeneratorResult {
@@ -46,7 +47,7 @@ export class ScheduleGenerator {
     config: GeneratorConfig,
     onProgress?: (progress: number, message: string) => void
   ): Promise<GeneratorResult> {
-    const { curriculum, existingSchedule = [], context, days, periodsPerDay, breakPeriods } = config;
+    const { curriculum, existingSchedule = [], context, days, periodsPerDay, breakPeriods, groupPeriods = {} } = config;
     
     let currentSchedule: ClassSession[] = [...existingSchedule];
     let unassigned: CurriculumBlock[] = [];
@@ -68,7 +69,7 @@ export class ScheduleGenerator {
       }
     }
 
-    // 1. Agrupar bloques por (group_id, subject_id, duration) para Co-Docencia Sincronizada
+    // 1. Agrupar bloques por (group_id, subject_id, slotIndex) para Co-Docencia Sincronizada
     interface CoGroup {
       key: string;
       groupId: string;
@@ -78,9 +79,19 @@ export class ScheduleGenerator {
     }
 
     const coGroupMap = new Map<string, CoGroup>();
+    const fallbackSlotCounters = new Map<string, number>();
+
     for (const b of curriculum) {
-      const slotKey = b.slotIndex !== undefined ? `slot${b.slotIndex}` : `rnd${Math.random()}`;
-      const key = `${b.group_id}-${b.subject_id}-${slotKey}-${b.duration}`;
+      let sIdx = b.slotIndex;
+      if (sIdx === undefined) {
+        // Asignar slotIndex basado en el docente. Así, el 1er bloque de Kevin, el 1er de Gloria y el 1er de Ana 
+        // compartirán el mismo slotIndex (0) y se agruparán en el mismo CoGroup.
+        const teacherKey = `${b.group_id}-${b.subject_id}-${b.teacher_id || 'unassigned'}`;
+        sIdx = fallbackSlotCounters.get(teacherKey) || 0;
+        fallbackSlotCounters.set(teacherKey, sIdx + 1);
+      }
+
+      const key = `${b.group_id}-${b.subject_id}-slot${sIdx}`;
       if (!coGroupMap.has(key)) {
         coGroupMap.set(key, {
           key,
@@ -90,9 +101,12 @@ export class ScheduleGenerator {
           blocks: []
         });
       }
-      coGroupMap.get(key)!.blocks.push(b);
+      const cg = coGroupMap.get(key)!;
+      if (b.duration > cg.duration) {
+        cg.duration = b.duration;
+      }
+      cg.blocks.push(b);
     }
-
 
     const coGroups = Array.from(coGroupMap.values());
 
@@ -100,8 +114,8 @@ export class ScheduleGenerator {
     // 1° Materias Multi-Docente (Núcleo/Comité)
     // 2° Mayor duración (2 horas)
     coGroups.sort((a, b) => {
-      const aIsMulti = multiTeacherSubjectIds.has(a.subjectId) || a.blocks.length > 1 ? 1 : 0;
-      const bIsMulti = multiTeacherSubjectIds.has(b.subjectId) || b.blocks.length > 1 ? 1 : 0;
+      const aIsMulti = a.blocks.length > 1 ? 1 : 0;
+      const bIsMulti = b.blocks.length > 1 ? 1 : 0;
       if (aIsMulti !== bIsMulti) return bIsMulti - aIsMulti;
       return b.duration - a.duration;
     });
@@ -123,12 +137,14 @@ export class ScheduleGenerator {
       let bestSlot: { day: string, periodId: number } | null = null;
       let bestScore = -1;
 
+      const maxP = groupPeriods[coGroup.groupId] || periodsPerDay;
+
       // Probar todos los slots posibles para TODOS los profesores del grupo simultáneamente
       for (const day of days) {
-        for (let p = 1; p <= periodsPerDay; p++) {
+        for (let p = 1; p <= maxP; p++) {
           if (breakPeriods.includes(p)) continue;
           if (coGroup.duration === 2) {
-            if (p + 1 > periodsPerDay || breakPeriods.includes(p + 1)) continue;
+            if (p + 1 > maxP || breakPeriods.includes(p + 1)) continue;
           }
 
           // Crear sesiones candidatas para TODOS los profesores asignados al grupo
@@ -139,7 +155,7 @@ export class ScheduleGenerator {
             subjectId: b.subject_id || '',
             dayOfWeek: day,
             periodId: p,
-            duration: b.duration
+            duration: coGroup.duration
           }));
 
           currentSchedule.push(...candidateSessions);
@@ -167,7 +183,7 @@ export class ScheduleGenerator {
             subjectId: b.subject_id || '',
             dayOfWeek: bestSlot.day,
             periodId: bestSlot.periodId,
-            duration: b.duration
+            duration: coGroup.duration
           });
         }
       } else {
@@ -192,11 +208,19 @@ export class ScheduleGenerator {
         )
       };
 
-      // Re-agrupar unassigned por coGroup
+      // Re-agrupar unassigned por coGroup unificado
       const rescueCoGroupMap = new Map<string, CoGroup>();
+      const rescueSlotCounters = new Map<string, number>();
+
       for (const b of unassigned) {
-        const slotKey = b.slotIndex !== undefined ? `slot${b.slotIndex}` : `rnd${Math.random()}`;
-        const key = `${b.group_id}-${b.subject_id}-${slotKey}-${b.duration}`;
+        let sIdx = b.slotIndex;
+        if (sIdx === undefined) {
+          const teacherKey = `${b.group_id}-${b.subject_id}-${b.teacher_id || 'unassigned'}`;
+          sIdx = rescueSlotCounters.get(teacherKey) || 0;
+          rescueSlotCounters.set(teacherKey, sIdx + 1);
+        }
+
+        const key = `${b.group_id}-${b.subject_id}-slot${sIdx}`;
         if (!rescueCoGroupMap.has(key)) {
           rescueCoGroupMap.set(key, {
             key,
@@ -206,7 +230,11 @@ export class ScheduleGenerator {
             blocks: []
           });
         }
-        rescueCoGroupMap.get(key)!.blocks.push(b);
+        const cg = rescueCoGroupMap.get(key)!;
+        if (b.duration > cg.duration) {
+          cg.duration = b.duration;
+        }
+        cg.blocks.push(b);
       }
 
 
@@ -214,13 +242,16 @@ export class ScheduleGenerator {
 
       for (const coGroup of rescueCoGroupMap.values()) {
         let placed = false;
+        
+        const maxP = groupPeriods[coGroup.groupId] || periodsPerDay;
+        const failureReasons = new Set<string>();
 
         for (const day of days) {
           if (placed) break;
-          for (let p = 1; p <= periodsPerDay; p++) {
+          for (let p = 1; p <= maxP; p++) {
             if (breakPeriods.includes(p)) continue;
             if (coGroup.duration === 2) {
-              if (p + 1 > periodsPerDay || breakPeriods.includes(p + 1)) continue;
+              if (p + 1 > maxP || breakPeriods.includes(p + 1)) continue;
             }
 
             const candidateSessions: ClassSession[] = coGroup.blocks.map((b, idx) => ({
@@ -230,7 +261,7 @@ export class ScheduleGenerator {
               subjectId: b.subject_id || '',
               dayOfWeek: day,
               periodId: p,
-              duration: b.duration
+              duration: coGroup.duration
             }));
 
             currentSchedule.push(...candidateSessions);
@@ -242,16 +273,31 @@ export class ScheduleGenerator {
             }
 
             currentSchedule.splice(-candidateSessions.length);
+            if (!report.isValid && report.violations && report.violations.length > 0) {
+              report.violations.forEach(v => {
+                if (v.message) failureReasons.add(v.message);
+              });
+            }
           }
         }
 
         if (!placed) {
+          let customReason = Array.from(failureReasons).join(" | ");
+          
           for (const block of coGroup.blocks) {
-            let reason = "El docente asignado se encuentra en clase con otro grupo en todos los periodos libres de este grupo.";
-            if (block.teacher_id && context.timeOff?.some(t => t.teacherId === block.teacher_id && t.status === 'FORBIDDEN')) {
-              reason = "El horario disponible del docente coincide con restricciones de disponibilidad (Time-Off / Permiso).";
-            } else if (!block.teacher_id) {
-              reason = "No se ha asignado un docente para esta materia en la malla curricular.";
+            let reason = customReason;
+            
+            // Si no hay razón específica del motor, caemos a las heurísticas según la realidad del bloque
+            if (!reason) {
+              if (coGroup.blocks.length > 1) {
+                reason = "Uno o más docentes de la materia multi-docente coinciden con cruces de horario con otros grupos en los periodos disponibles.";
+              } else if (block.teacher_id && context.timeOff?.some(t => t.teacherId === block.teacher_id && t.status === 'FORBIDDEN')) {
+                reason = "El horario disponible del docente coincide con restricciones de disponibilidad (Time-Off / Permiso).";
+              } else if (!block.teacher_id) {
+                reason = "No se ha asignado un docente para esta materia en la malla curricular.";
+              } else {
+                reason = "El docente asignado se encuentra en clase con otro grupo en los periodos disponibles de este grupo.";
+              }
             }
 
             stillUnassigned.push({

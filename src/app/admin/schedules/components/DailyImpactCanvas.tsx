@@ -138,7 +138,7 @@ export default function DailyImpactCanvas({ selectedDate }: DailyImpactCanvasPro
   }
 
   const getSlot = (groupId: string, periodId: number) => {
-    return slots.find(s => s.group_id === groupId && s.period_id === periodId)
+    return slots.find(s => s.group_id === groupId && s.period_id <= periodId && (s.period_id + (s.duration || 1) - 1) >= periodId)
   }
 
   const handlePrint = () => {

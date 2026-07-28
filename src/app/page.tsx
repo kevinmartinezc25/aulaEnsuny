@@ -94,12 +94,12 @@ export default function LandingPage() {
             </span>
           </Link>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-6">
             <Link
               href="/docs"
-              className="hidden sm:inline-flex items-center text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-[#1F4E31] dark:hover:text-[#4AB874] transition-colors"
+              className="hidden sm:inline-flex items-center text-sm font-semibold text-slate-600 dark:text-slate-300 hover:text-[#1F4E31] dark:hover:text-[#4AB874] transition-colors"
             >
-              Documentación pública
+              Documentación institucional
             </Link>
 
             {/* Theme Toggle */}

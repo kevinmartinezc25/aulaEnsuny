@@ -282,6 +282,8 @@ function SidebarContent({ onClose, isCollapsed = false, user }: SidebarProps) {
   const router = useRouter()
   const [isProfileOpen, setIsProfileOpen] = useState(false)
 
+  const isTeacher = user?.role === 'teacher' || pathname.startsWith('/teacher')
+
   let menuItems = [
     { name: 'Mis cursos', href: '/student/dashboard', icon: BookOpen },
     { name: 'Mis solicitudes', href: '/student/requests', icon: ClipboardList },
@@ -291,7 +293,7 @@ function SidebarContent({ onClose, isCollapsed = false, user }: SidebarProps) {
     { name: 'Configuración', href: '/student/settings', icon: Settings },
   ]
 
-  if (pathname.startsWith('/teacher')) {
+  if (isTeacher) {
     menuItems = [
       { name: 'Panel Docente', href: '/teacher/dashboard', icon: BookOpen },
       { name: 'Horario (Docente)', href: '/teacher/schedule', icon: CalendarDays },
@@ -373,7 +375,7 @@ function SidebarContent({ onClose, isCollapsed = false, user }: SidebarProps) {
                   {user?.email || 'estudiante@ensuny.edu.co'}
                 </p>
               </div>
-              <Link href={pathname.startsWith('/teacher') ? '/teacher/settings' : '/student/settings'} onClick={onClose} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors">
+              <Link href={isTeacher ? '/teacher/settings' : '/student/settings'} onClick={onClose} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors">
                 <Settings className="h-4 w-4" /> Ajustes
               </Link>
             </motion.div>
