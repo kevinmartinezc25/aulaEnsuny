@@ -68,6 +68,46 @@ export class GroupOverlapRule implements IScheduleRule {
   }
 }
 
+export class ClassroomOverlapRule implements IScheduleRule {
+  readonly code = 'CLASSROOM_OVERLAP';
+  readonly isMandatory = true;
+
+  validate(schedule: ClassSession[], context: RuleContext): RuleResult {
+    const conflicts: string[] = [];
+    const map = new Map<string, ClassSession[]>();
+
+    for (const session of schedule) {
+      if (!session.classroomId) continue;
+
+      for (let i = 0; i < session.duration; i++) {
+        const key = `${session.classroomId}-${session.dayOfWeek}-${session.periodId + i}`;
+        if (!map.has(key)) {
+          map.set(key, []);
+        }
+        map.get(key)!.push(session);
+      }
+    }
+
+    for (const [_, sessions] of map.entries()) {
+      if (sessions.length > 1) {
+        // Las materias multi-docente / co-docencia comparten la misma aula de forma válida
+        const firstSubj = sessions[0].subjectId;
+        const firstGroup = sessions[0].groupId;
+        const hasDifferentSubjectOrGroup = sessions.some(s => s.subjectId !== firstSubj && s.groupId !== firstGroup);
+
+        if (hasDifferentSubjectOrGroup) {
+          conflicts.push(...sessions.map(s => s.id || '').filter(Boolean));
+        }
+      }
+    }
+
+    if (conflicts.length > 0) {
+      return { isValid: false, scorePenalty: 100, message: 'Superposición de aula detectada entre materias o grupos diferentes', conflictingSessionIds: conflicts };
+    }
+    return { isValid: true, scorePenalty: 0 };
+  }
+}
+
 
 export class TimeOffRule implements IScheduleRule {
   readonly code = 'TIME_OFF_VIOLATION';
@@ -329,8 +369,8 @@ export class SubjectRulesRule implements IScheduleRule {
       });
     }
 
-    // Track daily hours per subject per group
-    const groupSubjectDailyHours = new Map<string, Map<string, Map<string, { hours: number, ids: string[] }>>>();
+    // Track daily hours per subject per group using a Set of unique periods to avoid double counting co-teachers
+    const groupSubjectDailyHours = new Map<string, Map<string, Map<string, { periods: Set<number>, ids: string[] }>>>();
 
     for (const session of schedule) {
       if (!session.subjectId) continue;
@@ -367,10 +407,14 @@ export class SubjectRulesRule implements IScheduleRule {
         }
         const subjectMap = dayMap.get(session.dayOfWeek)!;
         if (!subjectMap.has(session.subjectId)) {
-          subjectMap.set(session.subjectId, { hours: 0, ids: [] });
+          subjectMap.set(session.subjectId, { periods: new Set<number>(), ids: [] });
         }
         const stats = subjectMap.get(session.subjectId)!;
-        stats.hours += session.duration;
+        
+        for (let i = 0; i < session.duration; i++) {
+          stats.periods.add(session.periodId + i);
+        }
+        
         if (session.id) stats.ids.push(session.id);
       }
     }
@@ -380,7 +424,7 @@ export class SubjectRulesRule implements IScheduleRule {
       for (const [day, subjectMap] of dayMap.entries()) {
         for (const [subjectId, stats] of subjectMap.entries()) {
           const rule = subjectRulesMap.get(subjectId);
-          if (rule && rule.maxHoursPerDay !== undefined && stats.hours > rule.maxHoursPerDay) {
+          if (rule && rule.maxHoursPerDay !== undefined && stats.periods.size > rule.maxHoursPerDay) {
             conflicts.push(...stats.ids);
             return {
               isValid: false,
@@ -429,47 +473,83 @@ export class MultiTeacherSameSlotRule implements IScheduleRule {
       const fixedPeriod = entry.fixed_period ? Number(entry.fixed_period) : undefined;
       const selectedSubjectId = entry.subject_id;
 
-      // Agrupar sesiones por materia
-      const subjectSessionsMap = new Map<string, ClassSession[]>();
+      // Agrupar sesiones por (groupId, subjectId)
+      const groupSubjectMap = new Map<string, ClassSession[]>();
       for (const session of schedule) {
-        if (!session.subjectId) continue;
-        // Si se especificó una materia o grupo específico (no 'ALL'), ignorar otras materias
+        if (!session.subjectId || !session.groupId) continue;
         if (selectedSubjectId && selectedSubjectId !== 'ALL' && session.subjectId !== selectedSubjectId) {
           continue;
         }
-        if (!subjectSessionsMap.has(session.subjectId)) {
-          subjectSessionsMap.set(session.subjectId, []);
+        const key = `${session.groupId}-${session.subjectId}`;
+        if (!groupSubjectMap.has(key)) {
+          groupSubjectMap.set(key, []);
         }
-        subjectSessionsMap.get(session.subjectId)!.push(session);
+        groupSubjectMap.get(key)!.push(session);
       }
 
-      for (const [subjectId, sessions] of subjectSessionsMap.entries()) {
+      for (const [_, sessions] of groupSubjectMap.entries()) {
         if (sessions.length === 0) continue;
 
-        const uniqueTeachers = new Set(sessions.map(s => s.teacherId).filter(Boolean));
-        const isExplicitTarget = selectedSubjectId && selectedSubjectId !== 'ALL' && selectedSubjectId === subjectId;
-        const isMultiTeacherSubject = multiTeacherSubjectIdsSet.has(subjectId);
+        const allTeachers = Array.from(new Set(sessions.map(s => s.teacherId).filter(Boolean)));
+        const subjectId = sessions[0].subjectId;
+        const isMultiTeacher = allTeachers.length > 1 || multiTeacherSubjectIdsSet.has(subjectId);
 
-        // Aplica si hay más de 1 docente asignado, o si la materia es multi-docente globalmente, o si fue seleccionada explícitamente
-        if (uniqueTeachers.size > 1 || isExplicitTarget || isMultiTeacherSubject || sessions.length > 1) {
-          const firstSession = sessions[0];
-
+        if (isMultiTeacher && allTeachers.length > 1) {
+          // Agrupar las sesiones por slot (dayOfWeek - periodId)
+          const slotMap = new Map<string, Set<string>>();
           for (const session of sessions) {
-            const isSlotMismatch = session.dayOfWeek !== firstSession.dayOfWeek || session.periodId !== firstSession.periodId;
+            const slotKey = `${session.dayOfWeek}-${session.periodId}`;
+            if (!slotMap.has(slotKey)) {
+              slotMap.set(slotKey, new Set());
+            }
+            if (session.teacherId) {
+              slotMap.get(slotKey)!.add(session.teacherId);
+            }
+          }
+
+          // Relaxed: Instead of forcing ALL teachers to be present in EVERY slot (which breaks if hours are mismatched 
+          // or if the user made a manual partial assignment), we only penalize or reject if there is a CLEAR split
+          // where teachers are scheduled at DIFFERENT times without overlapping.
+          // Since the Generator already synchronizes CoGroups, we can safely skip the rigid size check.
+          // A conflict is when we have multiple distinct slots where a subset of teachers is present, but they don't align.
+          
+          let maxTeachersInASlot = 0;
+          for (const teachersInSlot of slotMap.values()) {
+            if (teachersInSlot.size > maxTeachersInASlot) {
+              maxTeachersInASlot = teachersInSlot.size;
+            }
+          }
+
+          for (const [slotKey, teachersInSlot] of slotMap.entries()) {
+            // Si el slot actual tiene menos docentes que el máximo encontrado, y además NO contiene docentes nuevos
+            // (es decir, están divididos), podríamos marcarlo. Pero para ser seguros y evitar falsos positivos
+            // con horas dispares, dejaremos que la heurística de CoGroup haga el trabajo duro.
+            if (teachersInSlot.size < maxTeachersInASlot && maxTeachersInASlot > 1) {
+               // En lugar de retornar false y abortar la generación, agregamos una penalidad para disuadirlo.
+               return {
+                 isValid: true,
+                 scorePenalty: 50, // Penalización fuerte pero no bloqueante
+                 message: 'Advertencia: Horas desiguales o asíncronas en materia multi-docente.'
+               };
+            }
+          }
+        }
+
+        // Validar fixedDay y fixedPeriod si están definidos en los parámetros de la regla
+        if (fixedDay || fixedPeriod) {
+          for (const session of sessions) {
             const isDayMismatch = fixedDay && fixedDay !== 'ANY' && session.dayOfWeek !== fixedDay;
             const isPeriodMismatch = fixedPeriod && fixedPeriod > 0 && session.periodId !== fixedPeriod;
 
-            if (isSlotMismatch || isDayMismatch || isPeriodMismatch) {
+            if (isDayMismatch || isPeriodMismatch) {
               if (session.id && !session.id.startsWith('existing-')) conflicts.push(session.id);
-
-              let msg = `La materia / grupo tiene varias clases o docentes y debe programarse en la misma hora y día para todos (Núcleo / Comité / Taller).`;
+              let msg = `La materia / comité multi-docente debe programarse en el día o periodo configurado.`;
               if (isDayMismatch) {
-                msg = `La materia o grupo (Núcleo / Comité / Proyecto) debe programarse el día ${fixedDay}.`;
+                msg = `La materia / comité debe programarse el día ${fixedDay}.`;
               } else if (isPeriodMismatch) {
-                const hourLabel = fixedPeriod === 1 ? '1era Hora' : fixedPeriod === 2 ? '2da Hora' : fixedPeriod === 3 ? '3ra Hora' : fixedPeriod === 4 ? '4ta Hora' : fixedPeriod === 5 ? '5ta Hora' : fixedPeriod === 6 ? '6ta Hora' : fixedPeriod === 7 ? '7ma Hora' : `${fixedPeriod}ª Hora`;
-                msg = `La materia o grupo (Núcleo / Comité / Proyecto) debe programarse en la ${hourLabel}.`;
+                const hourLabel = `${fixedPeriod}ª Hora`;
+                msg = `La materia / comité debe programarse en la ${hourLabel}.`;
               }
-
               return {
                 isValid: false,
                 scorePenalty: 100,

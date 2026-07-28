@@ -3,13 +3,23 @@
 import React, { useState, useEffect } from 'react'
 import { createClient } from '@/core/config/supabase/client'
 import { getAdminUsers } from '@/modules/admin/application/actions'
-import { Loader2, Briefcase, Mail, Search, Eye, X } from 'lucide-react'
+import { Loader2, Briefcase, Mail, Search, Eye, X, FileSpreadsheet, LayoutGrid, List } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import WorkloadMatrixView from './components/WorkloadMatrixView'
 
 export default function WorkloadPage() {
   const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState<'matrix' | 'cards'>('matrix')
   const [workloads, setWorkloads] = useState<any[]>([])
   const [searchTerm, setSearchTerm] = useState('')
+
+  // Raw data for Matrix View
+  const [teachersData, setTeachersData] = useState<any[]>([])
+  const [groupsData, setGroupsData] = useState<any[]>([])
+  const [rawCurriculum, setRawCurriculum] = useState<any[]>([])
+  const [rawSettingsMap, setRawSettingsMap] = useState<Map<string, number>>(new Map())
+  const [normalWorkloadIds, setNormalWorkloadIds] = useState<Set<string>>(new Set())
+
   const supabase = createClient()
 
   useEffect(() => {
@@ -22,20 +32,35 @@ export default function WorkloadPage() {
       // 1. Fetch all teachers from superadmin
       const users = await getAdminUsers()
       const teachers = (users || []).filter(u => u.role === 'teacher')
+      setTeachersData(teachers)
 
-      // 2. Fetch max hours settings
+      // 2. Fetch all groups with directors
+      const { data: groupsFetched } = await supabase
+        .from('sch_groups')
+        .select('id, name, level, director_id, director:profiles(first_name, last_name)')
+        .order('name')
+      setGroupsData(groupsFetched || [])
+
+      // 3. Fetch max hours settings
       const { data: settingsData } = await supabase.from('sch_teacher_settings').select('*')
-      const settingsMap = new Map()
+      const settingsMap = new Map<string, number>()
       if (settingsData) {
         settingsData.forEach(s => settingsMap.set(s.teacher_id, s.max_hours))
       }
+      setRawSettingsMap(settingsMap)
 
-      // 3. Fetch curriculum and constraints to identify multi-teacher subjects accurately
-      const { data: curriculumRows } = await supabase.from('sch_curriculum').select('group_id, subject_id, teacher_id, hours_per_week, sch_groups(name, level), sch_subjects(name)')
+      // 4. Fetch curriculum and constraints to identify multi-teacher subjects accurately
+      const { data: curriculumRows } = await supabase
+        .from('sch_curriculum')
+        .select('group_id, subject_id, teacher_id, hours_per_week, sch_groups(id, name, level), sch_subjects(id, name)')
+      
+      setRawCurriculum(curriculumRows || [])
+
       const { data: constraintsData } = await supabase.from('sch_constraints').select('*').eq('rule_type', 'MULTI_TEACHER_SAME_SLOT').eq('is_active', true)
       const { data: workloadConfigData } = await supabase.from('sch_constraints').select('*').eq('rule_type', 'MULTI_TEACHER_WORKLOAD_CONFIG').eq('is_active', true).maybeSingle()
 
       const normalWorkloadSubjectIds = new Set<string>(workloadConfigData?.parameters?.normal_workload_subject_ids || [])
+      setNormalWorkloadIds(normalWorkloadSubjectIds)
 
       const explicitMultiTeacherSubjIds = new Set<string>()
       if (constraintsData) {
@@ -88,8 +113,6 @@ export default function WorkloadPage() {
             current.regularCount += hours
           }
 
-
-
           if (row.sch_groups) {
             current.groups.add(row.sch_groups.name)
             if (row.sch_groups.level === 'Primaria') current.levelHours.Primaria += hours
@@ -118,7 +141,7 @@ export default function WorkloadPage() {
         }
       } catch(e) {}
 
-      // 4. Combine data
+      // Combine data for card/list view
       const combined = teachers.map(t => {
         const stats = workloadMap.get(t.id) || { count: 0, regularCount: 0, specialCount: 0, groups: new Set(), levelHours: { Primaria: 0, Secundaria: 0, PFC: 0 }, details: [] }
         
@@ -130,7 +153,7 @@ export default function WorkloadPage() {
 
         return {
           ...t,
-          assignedHours: stats.regularCount, // Solo horas regulares cuentan para la comparación con maxHours
+          assignedHours: stats.regularCount,
           totalHours: stats.count,
           specialHours: stats.specialCount,
           maxHours: settingsMap.get(t.id) || defaultMax,
@@ -138,7 +161,6 @@ export default function WorkloadPage() {
           details: stats.details
         }
       })
-
 
       // Sort by assigned hours descending
       combined.sort((a, b) => b.assignedHours - a.assignedHours)
@@ -161,116 +183,160 @@ export default function WorkloadPage() {
 
   return (
     <div className="p-8 h-full flex flex-col">
-      <div className="mb-6">
-        <h1 className="text-2xl font-black text-slate-800 dark:text-slate-100 flex items-center gap-2">
-          <Briefcase className="h-6 w-6 text-indigo-500" />
-          Carga Académica de Docentes
-        </h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-          Visualiza y gestiona la intensidad horaria asignada a cada docente.
-        </p>
+      {/* Header & Tab Switcher */}
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6 print:hidden">
+        <div>
+          <h1 className="text-2xl font-black text-slate-800 dark:text-slate-100 flex items-center gap-2">
+            <Briefcase className="h-6 w-6 text-indigo-500" />
+            Carga Académica de Docentes
+          </h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+            Visualiza y gestiona la intensidad horaria asignada a cada docente en la institución.
+          </p>
+        </div>
+
+        {/* Tabs navigation */}
+        <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+          <button
+            onClick={() => setActiveTab('matrix')}
+            className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg transition-all ${
+              activeTab === 'matrix'
+                ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+            }`}
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+            Consolidado Institucional (Matriz)
+          </button>
+          <button
+            onClick={() => setActiveTab('cards')}
+            className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg transition-all ${
+              activeTab === 'cards'
+                ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+            }`}
+          >
+            <List className="h-4 w-4" />
+            Resumen por Docente (Tarjetas)
+          </button>
+        </div>
       </div>
 
-      <div className="mb-4 relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
-        <input 
-          type="text"
-          placeholder="Buscar docente por nombre o correo..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-10 pr-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-sm focus:outline-none focus:border-indigo-500 transition-colors"
-        />
-      </div>
-
-      <div className="flex-1 overflow-auto custom-scrollbar bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-        {loading ? (
-          <div className="h-full flex items-center justify-center">
-            <Loader2 className="h-8 w-8 text-indigo-500 animate-spin" />
+      {loading ? (
+        <div className="h-full flex items-center justify-center">
+          <Loader2 className="h-8 w-8 text-indigo-500 animate-spin" />
+        </div>
+      ) : activeTab === 'matrix' ? (
+        /* TAB 1: Consolidado Institucional en Matriz */
+        <div className="flex-1 overflow-hidden">
+          <WorkloadMatrixView
+            teachers={teachersData}
+            groups={groupsData}
+            curriculumRows={rawCurriculum}
+            settingsMap={rawSettingsMap}
+            normalWorkloadSubjectIds={normalWorkloadIds}
+          />
+        </div>
+      ) : (
+        /* TAB 2: Resumen por Docente (Vista Lista / Tarjetas) */
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="mb-4 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+            <input 
+              type="text"
+              placeholder="Buscar docente por nombre o correo..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-sm focus:outline-none focus:border-indigo-500 transition-colors"
+            />
           </div>
-        ) : (
-          <table className="w-full text-left border-collapse text-sm">
-            <thead className="bg-slate-50 dark:bg-slate-800/50 sticky top-0 z-10 shadow-sm">
-              <tr>
-                <th className="p-4 font-bold text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700">Docente</th>
-                <th className="p-4 font-bold text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700">Correo</th>
-                <th className="p-4 font-bold text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700">Grupos Asignados</th>
-                <th className="p-4 font-bold text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700">Intensidad Horaria</th>
-                <th className="p-4 font-bold text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700">Estado de Carga</th>
-                <th className="p-4 font-bold text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700 text-center">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {workloads
-                .filter(t => 
-                  t.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                  t.email?.toLowerCase().includes(searchTerm.toLowerCase())
-                )
-                .map(t => {
-                const percentage = Math.min(100, Math.round((t.assignedHours / t.maxHours) * 100))
-                let barColor = "bg-indigo-500"
-                if (percentage > 90) barColor = "bg-rose-500"
-                else if (percentage > 70) barColor = "bg-amber-500"
-                else if (percentage < 30) barColor = "bg-emerald-500"
 
-                return (
-                  <tr key={t.id} className="border-b border-slate-100 dark:border-slate-800/50 hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
-                    <td className="p-4 text-slate-800 dark:text-slate-200 font-medium">
-                      {t.name}
-                    </td>
-                    <td className="p-4 text-slate-500 text-xs">
-                      <div className="flex items-center gap-1">
-                        <Mail className="h-3 w-3" />
-                        {t.email}
-                      </div>
-                    </td>
-                    <td className="p-4 text-slate-600 dark:text-slate-400 text-xs max-w-xs truncate">
-                      {t.groups}
-                    </td>
-                    <td className="p-4">
-                      <div className="flex items-baseline gap-1 flex-wrap">
-                        <span className="text-lg font-black text-slate-800 dark:text-slate-200">{t.assignedHours}</span>
-                        <span className="text-xs font-bold text-slate-400">/ {t.maxHours}h</span>
-                        {t.specialHours > 0 && (
-                          <span className="ml-1 px-1.5 py-0.5 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded text-[10px] font-bold" title="Horas especiales exentas del límite contractual">
-                            +{t.specialHours}h especiales
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <div className="flex items-center gap-3">
-                        <div className="flex-1 h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                          <div className={`h-full ${barColor} rounded-full transition-all duration-500`} style={{ width: `${percentage}%` }} />
+          <div className="flex-1 overflow-auto custom-scrollbar bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+            <table className="w-full text-left border-collapse text-sm">
+              <thead className="bg-slate-50 dark:bg-slate-800/50 sticky top-0 z-10 shadow-sm">
+                <tr>
+                  <th className="p-4 font-bold text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700">Docente</th>
+                  <th className="p-4 font-bold text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700">Correo</th>
+                  <th className="p-4 font-bold text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700">Grupos Asignados</th>
+                  <th className="p-4 font-bold text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700">Intensidad Horaria</th>
+                  <th className="p-4 font-bold text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700">Estado de Carga</th>
+                  <th className="p-4 font-bold text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700 text-center">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {workloads
+                  .filter(t => 
+                    t.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                    t.email?.toLowerCase().includes(searchTerm.toLowerCase())
+                  )
+                  .map(t => {
+                  const percentage = Math.min(100, Math.round((t.assignedHours / t.maxHours) * 100))
+                  let barColor = "bg-indigo-500"
+                  if (percentage > 90) barColor = "bg-rose-500"
+                  else if (percentage > 70) barColor = "bg-amber-500"
+                  else if (percentage < 30) barColor = "bg-emerald-500"
+
+                  return (
+                    <tr key={t.id} className="border-b border-slate-100 dark:border-slate-800/50 hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
+                      <td className="p-4 text-slate-800 dark:text-slate-200 font-medium">
+                        {t.name}
+                      </td>
+                      <td className="p-4 text-slate-500 text-xs">
+                        <div className="flex items-center gap-1">
+                          <Mail className="h-3 w-3" />
+                          {t.email}
                         </div>
-                        <span className={`text-xs font-bold w-12 text-right ${percentage > 90 ? 'text-rose-500' : 'text-slate-500'}`}>
-                          {percentage}%
-                        </span>
-                      </div>
-                    </td>
-                    <td className="p-4 text-center">
-                      <button
-                        onClick={() => openTeacherDetails(t)}
-                        className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:text-indigo-400 dark:hover:bg-indigo-500/10 rounded-lg transition-colors"
-                        title="Ver Detalles"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </button>
+                      </td>
+                      <td className="p-4 text-slate-600 dark:text-slate-400 text-xs max-w-xs truncate">
+                        {t.groups}
+                      </td>
+                      <td className="p-4">
+                        <div className="flex items-baseline gap-1 flex-wrap">
+                          <span className="text-lg font-black text-slate-800 dark:text-slate-200">{t.assignedHours}</span>
+                          <span className="text-xs font-bold text-slate-400">/ {t.maxHours}h</span>
+                          {t.specialHours > 0 && (
+                            <span className="ml-1 px-1.5 py-0.5 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded text-[10px] font-bold" title="Horas especiales exentas del límite contractual">
+                              +{t.specialHours}h especiales
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1 h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                            <div className={`h-full ${barColor} rounded-full transition-all duration-500`} style={{ width: `${percentage}%` }} />
+                          </div>
+                          <span className={`text-xs font-bold w-12 text-right ${percentage > 90 ? 'text-rose-500' : 'text-slate-500'}`}>
+                            {percentage}%
+                          </span>
+                        </div>
+                      </td>
+                      <td className="p-4 text-center">
+                        <button
+                          onClick={() => openTeacherDetails(t)}
+                          className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:text-indigo-400 dark:hover:bg-indigo-500/10 rounded-lg transition-colors"
+                          title="Ver Detalles"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
+                {workloads.filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase()) || t.email?.toLowerCase().includes(searchTerm.toLowerCase())).length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="p-8 text-center text-slate-500">
+                      No se encontraron docentes con ese criterio.
                     </td>
                   </tr>
-                )
-              })}
-              {workloads.filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase()) || t.email?.toLowerCase().includes(searchTerm.toLowerCase())).length === 0 && (
-                <tr>
-                  <td colSpan={6} className="p-8 text-center text-slate-500">
-                    No se encontraron docentes con ese criterio.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        )}
-      </div>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
+      {/* Details Modal for Card View */}
       <AnimatePresence>
         {isModalOpen && selectedTeacher && (
           <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -371,7 +437,6 @@ export default function WorkloadPage() {
                           </td>
                         </tr>
                       </tfoot>
-
                     </table>
                   </div>
                 ) : (

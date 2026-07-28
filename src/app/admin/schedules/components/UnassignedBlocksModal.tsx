@@ -4,18 +4,58 @@ import React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, AlertTriangle, Briefcase, BookOpen, Users, Clock, HelpCircle } from 'lucide-react'
 import { CurriculumBlock } from '../engine/Generator'
+import { TimeSlot } from '../utils/timeCalculator'
 
 interface UnassignedBlocksModalProps {
   isOpen: boolean
   onClose: () => void
   unassignedBlocks: CurriculumBlock[]
+  timeSlots?: TimeSlot[]
+  currentSlots?: any[]
+  onAssign?: (block: CurriculumBlock, day: string, period: number) => Promise<void>
 }
 
 export default function UnassignedBlocksModal({
   isOpen,
   onClose,
-  unassignedBlocks
+  unassignedBlocks,
+  timeSlots,
+  currentSlots,
+  onAssign
 }: UnassignedBlocksModalProps) {
+  const [assigningIdx, setAssigningIdx] = React.useState<number | null>(null)
+  const [selectedDay, setSelectedDay] = React.useState<string>('Lunes')
+  const [selectedPeriod, setSelectedPeriod] = React.useState<number>(1)
+  const [isSaving, setIsSaving] = React.useState(false)
+
+  const handleAssign = async (block: CurriculumBlock) => {
+    if (!onAssign) return
+    setIsSaving(true)
+    try {
+      await onAssign(block, selectedDay, selectedPeriod)
+      setAssigningIdx(null)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const getSuggestionText = (day: string, period: number, block: CurriculumBlock) => {
+    if (!currentSlots) return ''
+    const groupSlots = currentSlots.filter(s => s.group_id === block.group_id && s.day_of_week === day && s.period_id === period)
+    const teacherBusy = block.teacher_id ? currentSlots.some(s => s.teacher_id === block.teacher_id && s.day_of_week === day && s.period_id === period) : false
+    
+    const isGroupBusyWithOtherSubject = groupSlots.length > 0 && groupSlots.some(s => s.subject_id !== block.subject_id)
+    const isGroupBusyWithSameSubject = groupSlots.length > 0 && groupSlots.every(s => s.subject_id === block.subject_id)
+
+    if (isGroupBusyWithOtherSubject && teacherBusy) return '❌ Grupo y Docente ocupados'
+    if (isGroupBusyWithOtherSubject) return '⚠️ Grupo ocupado'
+    if (teacherBusy) return '⚠️ Docente ocupado'
+    if (isGroupBusyWithSameSubject) return '👥 Unirse a Co-docencia'
+    return '✅ Libre'
+  }
+
+  const days = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes']
+
   if (!isOpen) return null
 
   return (
@@ -73,6 +113,9 @@ export default function UnassignedBlocksModal({
                       <th className="px-3.5 py-3 font-bold text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700">Docente</th>
                       <th className="px-3.5 py-3 font-bold text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700 text-center">Duración</th>
                       <th className="px-3.5 py-3 font-bold text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700">Causa / Conflicto Detectado</th>
+                      {onAssign && (
+                        <th className="px-3.5 py-3 font-bold text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700 text-center">Acción</th>
+                      )}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
@@ -110,6 +153,62 @@ export default function UnassignedBlocksModal({
                             </span>
                           </div>
                         </td>
+                        {onAssign && (
+                          <td className="px-3.5 py-3 align-middle text-center">
+                            {assigningIdx === idx ? (
+                              <div className="flex flex-col gap-1.5 items-center">
+                                <select 
+                                  value={selectedDay}
+                                  onChange={(e) => setSelectedDay(e.target.value)}
+                                  className="w-full text-xs p-1 border rounded bg-white dark:bg-slate-800 dark:border-slate-700"
+                                >
+                                  {days.map(d => <option key={d} value={d}>{d}</option>)}
+                                </select>
+                                <select
+                                  value={selectedPeriod}
+                                  onChange={(e) => setSelectedPeriod(Number(e.target.value))}
+                                  className="w-full text-xs p-1 border rounded bg-white dark:bg-slate-800 dark:border-slate-700"
+                                >
+                                  {timeSlots?.filter(s => s.type === 'period').map(s => {
+                                    const suggestion = getSuggestionText(selectedDay, Number(s.id), block)
+                                    return (
+                                      <option key={s.id} value={s.id}>
+                                        {s.id}ª {suggestion ? `- ${suggestion}` : ''}
+                                      </option>
+                                    )
+                                  })}
+                                </select>
+                                <div className="flex gap-1 w-full mt-1">
+                                  <button
+                                    onClick={() => handleAssign(block)}
+                                    disabled={isSaving}
+                                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold py-1 rounded disabled:opacity-50"
+                                  >
+                                    Guardar
+                                  </button>
+                                  <button
+                                    onClick={() => setAssigningIdx(null)}
+                                    disabled={isSaving}
+                                    className="flex-1 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-[10px] font-bold py-1 rounded"
+                                  >
+                                    X
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  setAssigningIdx(idx)
+                                  setSelectedDay('Lunes')
+                                  setSelectedPeriod(1)
+                                }}
+                                className="bg-indigo-50 dark:bg-indigo-500/10 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 font-bold text-[11px] px-3 py-1.5 rounded-lg border border-indigo-200 dark:border-indigo-500/30 transition-colors"
+                              >
+                                Forzar
+                              </button>
+                            )}
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>

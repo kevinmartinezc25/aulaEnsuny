@@ -9,7 +9,10 @@ import { Loader2, Download, Printer, Sparkles, Trash2, AlertTriangle, Coffee } f
 import { toast } from 'sonner'
 import { ScheduleGenerator, GeneratorConfig } from '../engine/Generator'
 import { RuleContext } from '../engine/types'
+import SlotEditorModal from './SlotEditorModal'
+import PrintableSchedule from './PrintableSchedule'
 import UnassignedBlocksModal from './UnassignedBlocksModal'
+import SavedConflictsModal from './SavedConflictsModal'
 
 const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes']
 
@@ -20,7 +23,12 @@ interface MasterScheduleCanvasProps {
 export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterScheduleCanvasProps) {
   const [loading, setLoading] = useState(true)
   const [showUnassignedModal, setShowUnassignedModal] = useState(false)
+  const [unassignedBlocks, setUnassignedBlocks] = useState<any[]>([])
+  
+  const [showSavedConflictsModal, setShowSavedConflictsModal] = useState(false)
+  const [savedConflicts, setSavedConflicts] = useState<any[][]>([])
 
+  const [activeDragId, setActiveDragId] = useState<string | null>(null)
   const [groups, setGroups] = useState<any[]>([])
   const [slots, setSlots] = useState<any[]>([])
   const [subjects, setSubjects] = useState<Record<string, any>>({})
@@ -163,6 +171,8 @@ export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterSched
     const { error } = await supabase.from('sch_schedule_slots').delete().neq('id', '00000000-0000-0000-0000-000000000000') 
     if (!error) {
       toast.success('El horario global ha sido vaciado.')
+      setUnassignedBlocks([])
+      localStorage.removeItem('sch_global_unassigned')
       fetchGlobalData()
     } else {
       toast.error('Error al limpiar el horario global.')
@@ -179,7 +189,16 @@ export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterSched
     })
   }
 
-  const [unassignedBlocks, setUnassignedBlocks] = useState<any[]>([])
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('sch_global_unassigned')
+      if (stored) {
+        setUnassignedBlocks(JSON.parse(stored))
+      }
+    } catch (e) {
+      console.error(e)
+    }
+  }, [])
 
   const analyzeConflicts = async () => {
     if (unassignedBlocks.length > 0) {
@@ -200,9 +219,11 @@ export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterSched
         teacherSlotsMap.get(key)!.push(s)
       })
 
-      const conflicts = Array.from(teacherSlotsMap.entries()).filter(([_, list]) => list.length > 1)
+      const conflicts = Array.from(teacherSlotsMap.entries()).filter(([_, list]) => list.length > 1).map(([_, list]) => list)
 
       if (conflicts.length > 0) {
+        setSavedConflicts(conflicts)
+        setShowSavedConflictsModal(true)
         toast.error(`Se detectaron ${conflicts.length} cruces de docente en los horarios guardados.`)
         return
       }
@@ -211,7 +232,29 @@ export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterSched
     toast.success('Análisis global completado: Todos los bloques agendados están libres de cruces.')
   }
 
+  const handleManualAssign = async (block: any, day: string, period: number) => {
+    const { error } = await supabase.from('sch_schedule_slots').insert({
+      day_of_week: day,
+      period_id: period,
+      group_id: block.group_id,
+      subject_id: block.subject_id,
+      teacher_id: block.teacher_id && block.teacher_id.trim() !== '' ? block.teacher_id : null,
+      duration: block.duration || 1
+    })
 
+    if (error) {
+      console.error(error)
+      toast.error(`Error al asignar el bloque: ${error.message || 'Error desconocido'}`)
+      throw error
+    }
+
+    toast.success('Bloque asignado manualmente.')
+    
+    const newUnassigned = unassignedBlocks.filter(b => b !== block)
+    setUnassignedBlocks(newUnassigned)
+    localStorage.setItem('sch_global_unassigned', JSON.stringify(newUnassigned))
+    fetchGlobalData()
+  }
 
   const executeAutoGenerateGlobal = async () => {
     setGenerating(true)
@@ -318,10 +361,14 @@ export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterSched
     
     // 4. Preparar CurriculumBlocks para el Generador
     const blocksToAssign: any[] = []
+    const slotCounters = new Map<string, number>()
+
     currData.forEach(c => {
       let hoursLeft = c.hours_per_week
       const isBlockSubject = blockSubjects.includes(c.subject_id)
-      let slotIdx = 0
+      
+      const counterKey = `${c.group_id}-${c.subject_id}-${c.teacher_id}`
+      let slotIdx = slotCounters.get(counterKey) || 0
 
       if (isBlockSubject) {
         while (hoursLeft >= 2) {
@@ -333,16 +380,21 @@ export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterSched
         blocksToAssign.push({ subject_id: c.subject_id, teacher_id: c.teacher_id, group_id: c.group_id, duration: 1, slotIndex: slotIdx++ })
         hoursLeft -= 1
       }
+      
+      slotCounters.set(counterKey, slotIdx)
     })
 
+      const groupPeriodsRaw = localStorage.getItem('sch_group_periods')
+      const groupPeriods = groupPeriodsRaw ? JSON.parse(groupPeriodsRaw) : {}
 
-    const config: GeneratorConfig = {
-      curriculum: blocksToAssign,
-      context,
-      days: DAYS,
-      periodsPerDay,
-      breakPeriods
-    }
+      const config: GeneratorConfig = {
+        curriculum: blocksToAssign,
+        context,
+        days: DAYS,
+        periodsPerDay,
+        breakPeriods,
+        groupPeriods
+      }
 
     // 5. Ejecutar Motor (con updates a la UI)
     const generator = new ScheduleGenerator()
@@ -377,6 +429,7 @@ export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterSched
           teacher_name: teachers[b.teacher_id || '']?.name || 'Sin asignar'
         }))
         setUnassignedBlocks(enrichedUnassigned)
+        localStorage.setItem('sch_global_unassigned', JSON.stringify(enrichedUnassigned))
         if (enrichedUnassigned.length > 0) {
           setShowUnassignedModal(true)
           toast.warning(`Se encontraron ${enrichedUnassigned.length} bloques no asignados. Revisa los detalles en el modal.`)
@@ -407,6 +460,16 @@ export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterSched
         isOpen={showUnassignedModal}
         onClose={() => setShowUnassignedModal(false)}
         unassignedBlocks={unassignedBlocks}
+        timeSlots={timeSlots}
+        currentSlots={slots}
+        onAssign={handleManualAssign}
+      />
+
+      {/* Modal de Cruces Guardados */}
+      <SavedConflictsModal
+        isOpen={showSavedConflictsModal}
+        onClose={() => setShowSavedConflictsModal(false)}
+        conflicts={savedConflicts}
       />
 
       
@@ -427,10 +490,15 @@ export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterSched
 
           <button 
             onClick={analyzeConflicts}
-            className="flex flex-col items-center gap-1 px-3 py-1 hover:bg-amber-50 dark:hover:bg-amber-500/10 rounded-lg text-amber-600 dark:text-amber-500 transition-colors group"
+            className="flex flex-col items-center gap-1 px-3 py-1 hover:bg-amber-50 dark:hover:bg-amber-500/10 rounded-lg text-amber-600 dark:text-amber-500 transition-colors group relative"
             title="Analizar Conflictos"
           >
             <AlertTriangle className="h-4 w-4 group-hover:-translate-y-0.5 transition-transform" />
+            {unassignedBlocks.length > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full shadow-sm animate-pulse">
+                {unassignedBlocks.length}
+              </span>
+            )}
           </button>
 
           <button 

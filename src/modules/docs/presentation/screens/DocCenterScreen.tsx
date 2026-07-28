@@ -8,11 +8,12 @@ import {
   PanelLeftClose, PanelLeftOpen, Sparkles, FolderPlus, ArrowLeft, Star,
   SlidersHorizontal, Download, User, Calendar, Shield, FileSpreadsheet,
   FileImage, FileArchive, ExternalLink, TrendingUp, Users, Eye, History, Trash2, Edit,
-  Sun, Moon, LogOut
+  Sun, Moon, LogOut, Lock
 } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { createClient } from '@/core/config/supabase/client'
 
 import type { Document, DocFolder, DocTag } from '@/modules/docs/domain/entities/Document'
 import type { DocumentStatus } from '@/modules/docs/domain/value-objects/DocumentStatus'
@@ -30,7 +31,7 @@ import {
 import { logout } from '@/modules/auth/application/actions'
 
 interface DocCenterScreenProps {
-  userRole: 'admin' | 'teacher' | 'student' | 'guest'
+  userRole: 'admin' | 'superadmin' | 'teacher' | 'student' | 'guest'
 }
 
 function getFolderPath(folderId: string | null | undefined, allFolders: DocFolder[]): string {
@@ -92,14 +93,37 @@ export function DocCenterScreen({ userRole }: DocCenterScreenProps) {
   }
 
   // Data State
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [folders, setFolders] = useState<DocFolder[]>([])
   const [documents, setDocuments] = useState<Document[]>([])
   const [tags, setTags] = useState<DocTag[]>([])
   const [recentActivity, setRecentActivity] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data }) => {
+      if (data?.user) setCurrentUserId(data.user.id)
+    })
+  }, [])
+
+  const canModifyResource = useCallback((createdBy: string) => {
+    if (userRole === 'admin' || userRole === 'superadmin') return true
+    if (currentUserId && createdBy === currentUserId) return true
+    return false
+  }, [userRole, currentUserId])
+
   // Navigation / Selection State
+  const [isMobile, setIsMobile] = useState(false)
+  const [isMobileExplorerOpen, setIsMobileExplorerOpen] = useState(false)
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null)
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768)
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null)
   const [activeTab, setActiveTab] = useState<'all' | 'recent' | 'mine' | 'favorites'>('all')
 
@@ -208,9 +232,9 @@ export function DocCenterScreen({ userRole }: DocCenterScreenProps) {
   }
 
   const handleDeleteDoc = (doc: Document) => {
-    // Check teacher permission (can only delete their own docs)
-    if (userRole === 'teacher' && doc.createdBy !== doc.createdByProfile?.firstName) {
-      // Normally RLS enforces this, but let's check
+    if (!canModifyResource(doc.createdBy)) {
+      toast.error('No tienes permisos para eliminar este documento. Solo el autor o un administrador pueden eliminarlo.')
+      return
     }
 
     toast.warning(`¿Eliminar "${doc.title}"?`, {
@@ -273,6 +297,11 @@ export function DocCenterScreen({ userRole }: DocCenterScreenProps) {
 
   const handleRenameFolder = async (name: string) => {
     if (!renameFolderTarget) return
+    if (!canModifyResource(renameFolderTarget.createdBy)) {
+      toast.error('No tienes permisos para renombrar esta carpeta. Solo el autor o un administrador pueden hacerlo.')
+      setRenameFolderTarget(null)
+      return
+    }
     const { data, error } = await updateFolder(renameFolderTarget.id, name)
     setRenameFolderTarget(null)
     if (error) {
@@ -286,6 +315,10 @@ export function DocCenterScreen({ userRole }: DocCenterScreenProps) {
   }
 
   const handleDeleteFolder = (folder: DocFolder) => {
+    if (!canModifyResource(folder.createdBy)) {
+      toast.error('No tienes permisos para eliminar esta carpeta. Solo el autor o un administrador pueden eliminarla.')
+      return
+    }
     toast.warning(`¿Eliminar categoría "${folder.name}"?`, {
       description: 'Se eliminará la categoría de la navegación. Los documentos contenidos quedarán sin categoría.',
       action: {
@@ -525,96 +558,198 @@ export function DocCenterScreen({ userRole }: DocCenterScreenProps) {
     <div className="flex flex-col h-screen w-full overflow-hidden bg-slate-50/30 dark:bg-slate-950/20">
 
       {/* ── Top Filter Bar (Merged Header) ── */}
-      <div className="flex items-center gap-3 px-6 py-3.5 border-b border-slate-200/40 dark:border-slate-800/40 bg-white dark:bg-slate-900/60 backdrop-blur-md shrink-0 justify-between">
-        <div className="flex items-center gap-2">
-          <Link
-            href={
-              userRole === 'admin'
-                ? '/admin/dashboard'
-                : userRole === 'teacher'
-                  ? '/teacher/dashboard'
-                  : userRole === 'student'
-                    ? '/student/dashboard'
-                    : '/'
-            }
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-850 bg-slate-50 hover:bg-slate-100 text-slate-750 hover:text-slate-900 dark:bg-slate-950 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-slate-200 text-xs font-bold transition-all cursor-pointer mr-1"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            <span className="hidden sm:inline">Volver</span>
-          </Link>
+      <div className={`flex-col md:flex-row items-stretch md:items-center gap-2.5 px-3 sm:px-6 py-2.5 sm:py-3.5 border-b border-slate-200/40 dark:border-slate-800/40 bg-white dark:bg-slate-900/60 backdrop-blur-md shrink-0 justify-between ${selectedDoc ? 'hidden md:flex' : 'flex'}`}>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+            <Link
+              href={
+                userRole === 'admin'
+                  ? '/admin/dashboard'
+                  : userRole === 'teacher'
+                    ? '/teacher/dashboard'
+                    : userRole === 'student'
+                      ? '/student/dashboard'
+                      : '/'
+              }
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-850 bg-slate-50 hover:bg-slate-100 text-slate-750 hover:text-slate-900 dark:bg-slate-950 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-slate-200 text-xs font-bold transition-all cursor-pointer"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Volver</span>
+            </Link>
 
-          <button
-            onClick={() => setExplorerVisible(v => !v)}
-            className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-colors"
-            title={explorerVisible ? 'Ocultar panel' : 'Mostrar panel'}
-          >
-            {explorerVisible ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
-          </button>
+            {/* Mobile Explorer Drawer Toggle Button */}
+            <button
+              onClick={() => setIsMobileExplorerOpen(true)}
+              className="md:hidden flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/50 text-xs font-bold transition-colors"
+              title="Explorar Carpetas"
+            >
+              <FolderPlus className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+              <span>Carpetas</span>
+            </button>
 
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-emerald-500 to-[#1F4E31] flex items-center justify-center">
-              <BookOpen className="h-4 w-4 text-white" />
+            {/* Desktop Explorer Panel Toggle Button */}
+            <button
+              onClick={() => setExplorerVisible(v => !v)}
+              className="hidden md:block p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-colors"
+              title={explorerVisible ? 'Ocultar panel' : 'Mostrar panel'}
+            >
+              {explorerVisible ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
+            </button>
+
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-xl bg-gradient-to-br from-emerald-500 to-[#1F4E31] flex items-center justify-center shrink-0">
+                <BookOpen className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
+              </div>
+              <span className="text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate">
+                Centro de Conocimiento<span className="hidden sm:inline"> Institucional</span>
+              </span>
             </div>
-            <div>
-              <span className="text-sm font-black text-slate-900 dark:text-white">Centro de Conocimiento Institucional</span>
-            </div>
+          </div>
+
+          {/* Quick Actions (Upload & Theme) on Mobile */}
+          <div className="flex items-center gap-1.5 md:hidden">
+            {canEdit && (
+              <button
+                onClick={() => setNewDocModal({ folderId: selectedFolderId })}
+                className="flex items-center justify-center p-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white transition-all shadow-sm"
+                title="Subir Documento"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="rounded-xl p-2 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+              title="Cambiar tema"
+            >
+              {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </button>
           </div>
         </div>
 
-        {/* Search bar in the center */}
-        <div className="relative w-full max-w-xs sm:max-w-md mx-2">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Buscar documentos, temas..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-8 py-2 text-xs rounded-xl bg-slate-50 hover:bg-slate-100/50 dark:bg-slate-950 dark:hover:bg-slate-900 border border-slate-200/50 dark:border-slate-800/80 outline-none focus:ring-2 focus:ring-emerald-500/20 focus:bg-white dark:focus:bg-slate-950 transition-all text-slate-900 dark:text-white"
-          />
-          {searchQuery && (
-            <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-              <X className="h-3 w-3" />
-            </button>
-          )}
-        </div>
+        {/* Search & Desktop Actions Row */}
+        <div className="flex items-center gap-2 w-full md:w-auto">
+          <div className="relative flex-1 md:w-64 lg:w-80">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Buscar documentos, temas..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-8 py-1.5 sm:py-2 text-xs rounded-xl bg-slate-50 hover:bg-slate-100/50 dark:bg-slate-950 dark:hover:bg-slate-900 border border-slate-200/50 dark:border-slate-800/80 outline-none focus:ring-2 focus:ring-emerald-500/20 focus:bg-white dark:focus:bg-slate-950 transition-all text-slate-900 dark:text-white"
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
 
-        {/* Actions on the right */}
-        <div className="flex items-center gap-2">
-          {canEdit && (
+          <div className="hidden md:flex items-center gap-2">
+            {canEdit && (
+              <button
+                onClick={() => setNewDocModal({ folderId: selectedFolderId })}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-md shadow-emerald-100 dark:shadow-none cursor-pointer"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Subir Documento</span>
+              </button>
+            )}
+
             <button
-              onClick={() => setNewDocModal({ folderId: selectedFolderId })}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-md shadow-emerald-100 dark:shadow-none cursor-pointer"
+              type="button"
+              onClick={toggleTheme}
+              className="rounded-xl p-2.5 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors"
+              title="Cambiar tema"
             >
-              <Plus className="h-4 w-4" />
-              <span className="hidden sm:inline">Subir Documento</span>
+              {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
-          )}
 
-          <button
-            type="button"
-            onClick={toggleTheme}
-            className="rounded-xl p-2.5 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors"
-            title="Cambiar tema"
-          >
-            {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </button>
-
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:text-red-650 hover:border-red-200 active:scale-[0.98] transition-all dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 dark:hover:text-red-400 cursor-pointer"
-          >
-            <LogOut className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Cerrar Sesión</span>
-          </button>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:text-red-650 hover:border-red-200 active:scale-[0.98] transition-all dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 dark:hover:text-red-400 cursor-pointer"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              <span>Cerrar Sesión</span>
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* ── Mobile Folder Explorer Drawer Sheet ── */}
+      <AnimatePresence>
+        {isMobileExplorerOpen && (
+          <div className="fixed inset-0 z-50 md:hidden flex">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsMobileExplorerOpen(false)}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ x: '-100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '-100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+              className="relative w-[85%] max-w-xs h-full bg-white dark:bg-slate-900 shadow-2xl flex flex-col z-10"
+            >
+              <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-800">
+                <div className="flex items-center gap-2">
+                  <BookOpen className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                  <span className="font-bold text-sm text-slate-900 dark:text-white">Explorador de Carpetas</span>
+                </div>
+                <button
+                  onClick={() => setIsMobileExplorerOpen(false)}
+                  className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-2">
+                <DocExplorer
+                  folders={folders}
+                  documents={documents}
+                  selectedDocId={selectedDoc?.id}
+                  selectedFolderId={selectedFolderId}
+                  userRole={userRole}
+                  currentUserId={currentUserId}
+                  onSelectDoc={doc => {
+                    setSelectedDoc(doc)
+                    setIsMobileExplorerOpen(false)
+                  }}
+                  onSelectFolder={folderId => {
+                    setSelectedFolderId(folderId)
+                    setSelectedDoc(null)
+                    setIsMobileExplorerOpen(false)
+                  }}
+                  onNewDocument={fId => {
+                    setNewDocModal({ folderId: fId ?? null })
+                    setIsMobileExplorerOpen(false)
+                  }}
+                  onNewFolder={parentId => {
+                    setNewFolderModal({ parentId: parentId ?? null })
+                    setIsMobileExplorerOpen(false)
+                  }}
+                  onRenameFolder={setRenameFolderTarget}
+                  onDeleteFolder={handleDeleteFolder}
+                  onDeleteDoc={handleDeleteDoc}
+                  onReorderFolder={handleReorderFolder}
+                  onColorFolder={handleColorFolder}
+                />
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* ── Main Layout ── */}
       <div className="flex-1 overflow-hidden">
         <PanelGroup orientation="horizontal" className="h-full">
-          {/* Explorer Left Panel */}
-          {explorerVisible && (
+          {/* Explorer Left Panel (Desktop only) */}
+          {!isMobile && explorerVisible && (
             <>
               <Panel defaultSize="22%" minSize="18%" maxSize="30%" className="border-r border-slate-200/40 dark:border-slate-800/40 bg-white/70 dark:bg-slate-950/40 flex flex-col justify-between h-full">
                 <div className="flex-1 overflow-y-auto">
@@ -653,27 +788,27 @@ export function DocCenterScreen({ userRole }: DocCenterScreenProps) {
               // ─── Visualizer Pane ───
               <div className="flex flex-col h-full overflow-hidden bg-slate-50/40 dark:bg-slate-950/20">
                 {/* Document Sub-Header */}
-                <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-slate-200/40 dark:border-slate-850/60 bg-white dark:bg-slate-900 shrink-0">
-                  <div className="flex items-center gap-3">
+                <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 sm:gap-3 px-3 sm:px-6 py-2.5 sm:py-4 border-b border-slate-200/40 dark:border-slate-850/60 bg-white dark:bg-slate-900 shrink-0">
+                  <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                     <button
                       onClick={() => setSelectedDoc(null)}
-                      className="p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-500 transition-colors"
+                      className="p-1.5 sm:p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-500 transition-colors shrink-0"
                       title="Volver al listado"
                     >
                       <ArrowLeft className="h-4 w-4" />
                     </button>
-                    <div>
-                      <h4 className="text-sm font-bold text-slate-900 dark:text-white">{selectedDoc.title}</h4>
+                    <div className="min-w-0">
+                      <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">{selectedDoc.title}</h4>
                       <p className="text-[10px] text-slate-400 font-medium">
-                        Versión {selectedDoc.versionLabel} • {formatBytes(selectedDoc.fileSize)}
+                        v{selectedDoc.versionLabel} • {formatBytes(selectedDoc.fileSize)}
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 sm:gap-2">
                     <button
                       onClick={e => handleToggleStar(selectedDoc, e)}
-                      className={`p-2 rounded-xl border transition-colors ${selectedDoc.isStarred
+                      className={`p-1.5 sm:p-2 rounded-xl border transition-colors ${selectedDoc.isStarred
                         ? 'border-amber-200 bg-amber-50 text-amber-500'
                         : 'border-slate-200 dark:border-slate-800 text-slate-400 hover:text-amber-500'
                         }`}
@@ -687,33 +822,40 @@ export function DocCenterScreen({ userRole }: DocCenterScreenProps) {
                       href={selectedDoc.driveUrl || '#'}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-850 dark:hover:bg-slate-800 dark:text-slate-200 text-xs font-bold transition-colors cursor-pointer"
+                      className="flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-850 dark:hover:bg-slate-800 dark:text-slate-200 text-xs font-bold transition-colors cursor-pointer"
+                      title="Abrir en Google Drive"
                     >
                       <ExternalLink className="h-3.5 w-3.5" />
-                      <span>Abrir en Google Drive</span>
+                      <span className="hidden sm:inline">Abrir en Google Drive</span>
                     </a>
 
-                    {canEdit && (
+                    {canModifyResource(selectedDoc.createdBy) ? (
                       <>
                         <button
                           onClick={() => setEditDocModal(selectedDoc)}
-                          className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+                          className="p-1.5 sm:p-2 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+                          title="Editar metadatos"
                         >
                           <Edit className="h-3.5 w-3.5" />
                         </button>
                         <button
                           onClick={() => handleDeleteDoc(selectedDoc)}
-                          className="p-2 rounded-xl border border-red-200 text-red-500 hover:bg-red-50 dark:border-red-900/40 dark:hover:bg-red-950/20"
+                          className="p-1.5 sm:p-2 rounded-xl border border-red-200 text-red-500 hover:bg-red-50 dark:border-red-900/40 dark:hover:bg-red-950/20"
+                          title="Eliminar documento"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       </>
-                    )}
+                    ) : userRole === 'teacher' ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 bg-amber-50 dark:bg-amber-950/40 dark:text-amber-300 font-bold px-2.5 py-1.5 rounded-xl border border-amber-200 dark:border-amber-800">
+                        <Lock className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Solo lectura</span>
+                      </span>
+                    ) : null}
                   </div>
                 </div>
 
                 {/* Visualizer Frame */}
-                <div className="flex-1 p-6 flex flex-col min-h-0">
+                <div className="flex-1 p-1 sm:p-6 flex flex-col min-h-0">
                   <div className="bg-white dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800/80 rounded-2xl flex-1 overflow-hidden flex flex-col relative">
                     {selectedDoc.driveUrl ? (
                       <iframe
@@ -843,110 +985,200 @@ export function DocCenterScreen({ userRole }: DocCenterScreenProps) {
                   </div>
                 </div>
 
-                {/* Table modern */}
+                {/* Document List Container: Responsive Mobile Cards + Desktop Table */}
                 <div className="flex-1 overflow-y-auto">
                   {filteredDocuments.length > 0 ? (
-                    <table className="w-full text-left border-collapse">
-                      <thead>
-                        <tr className="border-b border-slate-100 dark:border-slate-850/60 text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-slate-50/50 dark:bg-slate-950/20">
-                          <th className="px-6 py-3.5">Documento</th>
-                          <th className="px-6 py-3.5">Categoría</th>
-                          <th className="px-6 py-3.5">Última actualización</th>
-                          <th className="px-6 py-3.5 text-center">Versión</th>
-                          <th className="px-6 py-3.5 text-center">Estado</th>
-                          <th className="px-6 py-3.5 text-right">Acciones</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 dark:divide-slate-850/40">
+                    <>
+                      {/* Mobile Cards (Visible on mobile, hidden on md+) */}
+                      <div className="block md:hidden p-3 space-y-3">
                         {filteredDocuments.map(doc => (
-                          <tr
+                          <div
                             key={doc.id}
                             onClick={() => setSelectedDoc(doc)}
-                            className="hover:bg-slate-50/60 dark:hover:bg-slate-800/10 transition-colors cursor-pointer group"
+                            className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all space-y-3 cursor-pointer"
                           >
-                            <td className="px-6 py-4">
-                              <div className="flex items-center gap-3">
-                                {getFileIcon(doc.mimeType)}
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800 shrink-0">
+                                  {getFileIcon(doc.mimeType)}
+                                </div>
                                 <div className="min-w-0">
-                                  <p className="font-semibold text-slate-900 dark:text-slate-250 truncate text-xs group-hover:text-emerald-600 transition-colors">
-                                    {doc.title}
+                                  <h4 className="text-xs font-bold text-slate-900 dark:text-white truncate">{doc.title}</h4>
+                                  <p className="text-[10px] text-slate-400 font-medium">
+                                    {getFolderPath(doc.folder?.id, folders)} • v{doc.versionLabel}
                                   </p>
-                                  <div className="flex flex-wrap gap-1 mt-1">
-                                    {doc.tags?.map(t => (
-                                      <span
-                                        key={t.id}
-                                        className="text-[9px] font-bold px-1.5 py-0.5 rounded-md"
-                                        style={{ backgroundColor: `${t.color}15`, color: t.color }}
-                                      >
-                                        #{t.name}
-                                      </span>
-                                    ))}
-                                  </div>
                                 </div>
                               </div>
-                            </td>
-                            <td className="px-6 py-4 text-xs text-slate-500 dark:text-slate-400 font-medium">
-                              {getFolderPath(doc.folder?.id, folders)}
-                            </td>
-                            <td className="px-6 py-4">
-                              <div>
-                                <p className="text-xs font-semibold text-slate-700 dark:text-slate-350">
-                                  {formatTimeAgo(doc.updatedAt)}
-                                </p>
-                                <p className="text-[10px] text-slate-400 font-medium">
-                                  Por {doc.createdByProfile ? `${doc.createdByProfile.firstName} ${doc.createdByProfile.lastName}` : 'Docente'}
-                                </p>
+                              <button
+                                onClick={e => handleToggleStar(doc, e)}
+                                className="p-1 rounded text-slate-400 hover:text-amber-500 transition-colors shrink-0"
+                              >
+                                <Star className={`h-4 w-4 ${doc.isStarred ? 'text-amber-500 fill-current' : ''}`} />
+                              </button>
+                            </div>
+
+                            {doc.tags && doc.tags.length > 0 && (
+                              <div className="flex flex-wrap gap-1">
+                                {doc.tags.map(t => (
+                                  <span
+                                    key={t.id}
+                                    className="text-[9px] font-bold px-1.5 py-0.5 rounded-md"
+                                    style={{ backgroundColor: `${t.color}15`, color: t.color }}
+                                  >
+                                    #{t.name}
+                                  </span>
+                                ))}
                               </div>
-                            </td>
-                            <td className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 text-center">
-                              {doc.versionLabel}
-                            </td>
-                            <td className="px-6 py-4 text-center">
-                              <DocStatusBadge status={doc.status} size="sm" />
-                            </td>
-                            <td className="px-6 py-4 text-right" onClick={e => e.stopPropagation()}>
-                              <div className="flex items-center justify-end gap-2.5">
-                                <button
-                                  onClick={e => handleToggleStar(doc, e)}
-                                  className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-amber-500 transition-colors"
-                                >
-                                  <Star className={`h-4.5 w-4.5 ${doc.isStarred ? 'text-amber-500 fill-current' : ''}`} />
-                                </button>
+                            )}
 
-                                <a
-                                  href={doc.driveUrl || '#'}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
-                                  title="Ver original"
-                                >
-                                  <ExternalLink className="h-4 w-4" />
-                                </a>
+                            <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-850/60 text-xs">
+                              <span className="text-[10px] text-slate-400 font-medium truncate">
+                                Por {doc.createdByProfile && (doc.createdByProfile.firstName || doc.createdByProfile.lastName)
+                                  ? `${doc.createdByProfile.firstName} ${doc.createdByProfile.lastName}`.trim()
+                                  : 'Docente'}
+                              </span>
 
-                                {canEdit && (
-                                  <>
+                              <div className="flex items-center gap-2 shrink-0" onClick={e => e.stopPropagation()}>
+                                <DocStatusBadge status={doc.status} size="sm" />
+                                {canModifyResource(doc.createdBy) ? (
+                                  <div className="flex items-center gap-1">
                                     <button
                                       onClick={() => setEditDocModal(doc)}
-                                      className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-emerald-600 transition-colors"
-                                      title="Editar metadatos"
+                                      className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-emerald-600"
+                                      title="Editar"
                                     >
-                                      <Edit className="h-4 w-4" />
+                                      <Edit className="h-3.5 w-3.5" />
                                     </button>
                                     <button
                                       onClick={() => handleDeleteDoc(doc)}
-                                      className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-red-500 transition-colors"
+                                      className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-red-500"
                                       title="Eliminar"
                                     >
-                                      <Trash2 className="h-4 w-4" />
+                                      <Trash2 className="h-3.5 w-3.5" />
                                     </button>
-                                  </>
-                                )}
+                                  </div>
+                                ) : userRole === 'teacher' ? (
+                                  <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 bg-amber-50 dark:bg-amber-950/40 dark:text-amber-300 font-medium px-1.5 py-0.5 rounded-md border border-amber-200 dark:border-amber-800">
+                                    <Lock className="h-3 w-3" /> Solo lectura
+                                  </span>
+                                ) : null}
                               </div>
-                            </td>
-                          </tr>
+                            </div>
+                          </div>
                         ))}
-                      </tbody>
-                    </table>
+                      </div>
+
+                      {/* Desktop Table (Hidden on mobile, visible on md+) */}
+                      <div className="hidden md:block">
+                        <table className="w-full text-left border-collapse">
+                          <thead>
+                            <tr className="border-b border-slate-100 dark:border-slate-850/60 text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-slate-50/50 dark:bg-slate-950/20">
+                              <th className="px-6 py-3.5">Documento</th>
+                              <th className="px-6 py-3.5">Categoría</th>
+                              <th className="px-6 py-3.5">Última actualización</th>
+                              <th className="px-6 py-3.5 text-center">Versión</th>
+                              <th className="px-6 py-3.5 text-center">Estado</th>
+                              <th className="px-6 py-3.5 text-right">Acciones</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 dark:divide-slate-850/40">
+                            {filteredDocuments.map(doc => (
+                              <tr
+                                key={doc.id}
+                                onClick={() => setSelectedDoc(doc)}
+                                className="hover:bg-slate-50/60 dark:hover:bg-slate-800/10 transition-colors cursor-pointer group"
+                              >
+                                <td className="px-6 py-4">
+                                  <div className="flex items-center gap-3">
+                                    {getFileIcon(doc.mimeType)}
+                                    <div className="min-w-0">
+                                      <p className="font-semibold text-slate-900 dark:text-slate-250 truncate text-xs group-hover:text-emerald-600 transition-colors">
+                                        {doc.title}
+                                      </p>
+                                      <div className="flex flex-wrap gap-1 mt-1">
+                                        {doc.tags?.map(t => (
+                                          <span
+                                            key={t.id}
+                                            className="text-[9px] font-bold px-1.5 py-0.5 rounded-md"
+                                            style={{ backgroundColor: `${t.color}15`, color: t.color }}
+                                          >
+                                            #{t.name}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 text-xs text-slate-500 dark:text-slate-400 font-medium">
+                                  {getFolderPath(doc.folder?.id, folders)}
+                                </td>
+                                <td className="px-6 py-4">
+                                  <div>
+                                    <p className="text-xs font-semibold text-slate-700 dark:text-slate-350">
+                                      {formatTimeAgo(doc.updatedAt)}
+                                    </p>
+                                    <p className="text-[10px] text-slate-400 font-medium">
+                                      Por {doc.createdByProfile && (doc.createdByProfile.firstName || doc.createdByProfile.lastName)
+                                        ? `${doc.createdByProfile.firstName} ${doc.createdByProfile.lastName}`.trim()
+                                        : 'Docente'}
+                                    </p>
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 text-center">
+                                  {doc.versionLabel}
+                                </td>
+                                <td className="px-6 py-4 text-center">
+                                  <DocStatusBadge status={doc.status} size="sm" />
+                                </td>
+                                <td className="px-6 py-4 text-right" onClick={e => e.stopPropagation()}>
+                                  <div className="flex items-center justify-end gap-2.5">
+                                    <button
+                                      onClick={e => handleToggleStar(doc, e)}
+                                      className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-amber-500 transition-colors"
+                                    >
+                                      <Star className={`h-4.5 w-4.5 ${doc.isStarred ? 'text-amber-500 fill-current' : ''}`} />
+                                    </button>
+
+                                    <a
+                                      href={doc.driveUrl || '#'}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                                      title="Ver original"
+                                    >
+                                      <ExternalLink className="h-4 w-4" />
+                                    </a>
+
+                                    {canModifyResource(doc.createdBy) ? (
+                                      <>
+                                        <button
+                                          onClick={() => setEditDocModal(doc)}
+                                          className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-emerald-600 transition-colors"
+                                          title="Editar metadatos"
+                                        >
+                                          <Edit className="h-4 w-4" />
+                                        </button>
+                                        <button
+                                          onClick={() => handleDeleteDoc(doc)}
+                                          className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-red-500 transition-colors"
+                                          title="Eliminar"
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </button>
+                                      </>
+                                    ) : userRole === 'teacher' ? (
+                                      <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 bg-amber-50 dark:bg-amber-950/40 dark:text-amber-300 font-medium px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800" title="Solo lectura: Creado por otro docente">
+                                        <Lock className="h-3 w-3" /> Solo lectura
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
                   ) : (
                     <div className="py-20 text-center">
                       <FileText className="h-12 w-12 text-slate-200 dark:text-slate-700 mx-auto mb-4" />

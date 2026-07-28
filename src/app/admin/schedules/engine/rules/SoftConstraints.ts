@@ -7,9 +7,14 @@ export class TeacherMaxGapsRule implements IScheduleRule {
   validate(schedule: ClassSession[], context: RuleContext): RuleResult {
     let totalPenalty = 0;
     
-    // Config: Obtener el límite de huecos (gaps) desde el contexto. Si no hay, por defecto 2.
+    // Config: Obtener el límite de huecos (gaps) desde el contexto. Si no hay, por defecto min 1, max 4.
     const ruleConfig = context.constraints.find(c => c.ruleType === 'MAX_GAPS_DAY');
-    const maxAllowedGaps = ruleConfig?.parameters?.max_gaps ?? 2;
+    if (ruleConfig && ruleConfig.isActive === false) {
+      return { isValid: true, scorePenalty: 0 };
+    }
+
+    const minAllowedGaps = ruleConfig?.parameters?.min_gaps ?? 1;
+    const maxAllowedGaps = ruleConfig?.parameters?.max_gaps ?? 4;
     const weightMultiplier = ruleConfig?.weight === 'STRICT' ? 50 : ruleConfig?.weight === 'HIGH' ? 30 : 10;
 
     // Agrupar clases por profesor y luego por día
@@ -44,7 +49,6 @@ export class TeacherMaxGapsRule implements IScheduleRule {
         
         // Número total de slots desde la primera clase hasta la última = max - min + 1
         // Número de gaps = total slots - clases reales impartidas
-        // Nota: esto asume que no hay solapamientos (ya validados por HardConstraints)
         const totalSpan = maxPeriod - minPeriod + 1;
         
         let breaksInSpan = 0;
@@ -58,8 +62,12 @@ export class TeacherMaxGapsRule implements IScheduleRule {
         
         const gaps = totalSpan - breaksInSpan - periods.length;
 
-        if (gaps > maxAllowedGaps) {
-          totalPenalty += (gaps - maxAllowedGaps) * weightMultiplier;
+        if (gaps > 0) {
+          if (gaps < minAllowedGaps) {
+            totalPenalty += (minAllowedGaps - gaps) * weightMultiplier;
+          } else if (gaps > maxAllowedGaps) {
+            totalPenalty += (gaps - maxAllowedGaps) * weightMultiplier;
+          }
         }
       }
     }
@@ -116,4 +124,52 @@ export class TeacherMaxHoursRule implements IScheduleRule {
     return { isValid: true, scorePenalty: totalPenalty };
   }
 }
+
+export class TeacherFiveDaysDistributionRule implements IScheduleRule {
+  readonly code = 'EVEN_DISTRIBUTION';
+  readonly isMandatory = false;
+
+  validate(schedule: ClassSession[], context: RuleContext): RuleResult {
+    let totalPenalty = 0;
+
+    const ruleConfig = context.constraints.find(c => c.ruleType === 'EVEN_DISTRIBUTION');
+    if (ruleConfig && ruleConfig.isActive === false) {
+      return { isValid: true, scorePenalty: 0 };
+    }
+
+    const weightMultiplier = ruleConfig?.weight === 'STRICT' ? 50 : ruleConfig?.weight === 'HIGH' ? 30 : 15;
+    const workDays = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
+
+    const teacherDayCounts = new Map<string, Map<string, number>>();
+
+    for (const session of schedule) {
+      if (!session.teacherId) continue;
+      if (!workDays.includes(session.dayOfWeek)) continue;
+
+      if (!teacherDayCounts.has(session.teacherId)) {
+        teacherDayCounts.set(session.teacherId, new Map());
+      }
+      const dayMap = teacherDayCounts.get(session.teacherId)!;
+      dayMap.set(session.dayOfWeek, (dayMap.get(session.dayOfWeek) || 0) + 1);
+    }
+
+    for (const [teacherId, dayMap] of teacherDayCounts.entries()) {
+      const activeDaysCount = dayMap.size;
+      const totalSessions = Array.from(dayMap.values()).reduce((a, b) => a + b, 0);
+
+      // Si el docente tiene días sin clases pero agrupa múltiples sesiones en un mismo día,
+      // penalizamos la concentración desigual en ese día.
+      if (activeDaysCount < 5 && totalSessions >= 2) {
+        for (const [day, count] of dayMap.entries()) {
+          if (count > 1) {
+            totalPenalty += (count - 1) * (5 - activeDaysCount) * weightMultiplier;
+          }
+        }
+      }
+    }
+
+    return { isValid: true, scorePenalty: totalPenalty };
+  }
+}
+
 

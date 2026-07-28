@@ -8,6 +8,21 @@ import { GoogleDriveGasService } from '@/modules/resources/infrastructure/drive/
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function mapDocument(row: Record<string, unknown>): Document {
+  const profileRow = (row.profiles as any) || (row.createdByProfile as any)
+  let createdByProfile: Document['createdByProfile'] = undefined
+
+  if (profileRow) {
+    const fn = profileRow.firstName ?? profileRow.first_name ?? ''
+    const ln = profileRow.lastName ?? profileRow.last_name ?? ''
+    if (fn || ln) {
+      createdByProfile = {
+        firstName: fn,
+        lastName: ln,
+        avatarUrl: profileRow.avatarUrl ?? profileRow.avatar_url ?? null,
+      }
+    }
+  }
+
   return {
     id: row.id as string,
     title: row.title as string,
@@ -35,7 +50,7 @@ function mapDocument(row: Record<string, unknown>): Document {
       ?.map((r: any) => r.doc_tags)
       .filter(Boolean) ?? [],
     folder: row.doc_folders as DocFolder | null ?? null,
-    createdByProfile: row.profiles as any ?? undefined,
+    createdByProfile,
   }
 }
 
@@ -89,6 +104,28 @@ async function logDocActivityInternal(
   } catch (e) {
     console.error('Error al registrar actividad:', e)
   }
+}
+
+// ─── Permission Helper ────────────────────────────────────────────────────────
+async function checkCanEditResource(
+  supabase: any,
+  user: any,
+  resourceCreatedBy: string | null | undefined
+): Promise<boolean> {
+  if (!user || !resourceCreatedBy) return false
+  if (user.id === resourceCreatedBy) return true
+
+  const userRole = user.user_metadata?.role_name
+  if (userRole === 'admin' || userRole === 'superadmin') return true
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role_id, roles(name)')
+    .eq('id', user.id)
+    .single()
+
+  const roleName = (profile?.roles as any)?.name
+  return roleName === 'admin' || roleName === 'superadmin'
 }
 
 // ─── Get Recent Activity ──────────────────────────────────────────────────────
@@ -157,7 +194,13 @@ export async function updateFolder(
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { data: null, error: 'No autenticado' }
 
-    const { data: oldFolder } = await supabase.from('doc_folders').select('name').eq('id', id).single()
+    const { data: oldFolder } = await supabase.from('doc_folders').select('name, created_by').eq('id', id).single()
+    if (!oldFolder) return { data: null, error: 'Carpeta no encontrada' }
+
+    const canEdit = await checkCanEditResource(supabase, user, oldFolder.created_by)
+    if (!canEdit) {
+      return { data: null, error: 'No tienes permisos para modificar esta carpeta. Solo el autor, un Administrador o SuperAdmin pueden modificarla.' }
+    }
 
     const { data, error } = await supabase
       .from('doc_folders')
@@ -197,6 +240,14 @@ export async function updateFolderColor(
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'No autenticado' }
 
+    const { data: folder } = await supabase.from('doc_folders').select('created_by').eq('id', id).single()
+    if (!folder) return { error: 'Carpeta no encontrada' }
+
+    const canEdit = await checkCanEditResource(supabase, user, folder.created_by)
+    if (!canEdit) {
+      return { error: 'No tienes permisos para cambiar el color de esta carpeta. Solo el autor, un Administrador o SuperAdmin pueden modificarla.' }
+    }
+
     const { error } = await supabase
       .from('doc_folders')
       .update({ color, updated_at: new Date().toISOString() })
@@ -221,7 +272,13 @@ export async function deleteFolder(id: string): Promise<{ error: string | null }
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'No autenticado' }
 
-    const { data: folder } = await supabase.from('doc_folders').select('name').eq('id', id).single()
+    const { data: folder } = await supabase.from('doc_folders').select('name, created_by').eq('id', id).single()
+    if (!folder) return { error: 'Carpeta no encontrada' }
+
+    const canEdit = await checkCanEditResource(supabase, user, folder.created_by)
+    if (!canEdit) {
+      return { error: 'No tienes permisos para eliminar esta carpeta. Solo el autor, un Administrador o SuperAdmin pueden eliminarla.' }
+    }
 
     const { error } = await supabase.from('doc_folders').delete().eq('id', id)
     if (error) return { error: error.message }
@@ -409,11 +466,27 @@ export async function updateDocument(
 
     const { data: oldDoc, error: getErr } = await supabase
       .from('documents')
-      .select('drive_file_id, version_label, title, folder_id')
+      .select('drive_file_id, version_label, title, folder_id, created_by')
       .eq('id', id)
       .single()
 
     if (getErr || !oldDoc) return { data: null, error: 'Documento no encontrado' }
+
+    // Permitir toggle de favorito (isStarred) si solo se modifica eso; de lo contrario validar autoría
+    const isOnlyStarToggle = input.isStarred !== undefined &&
+      input.title === undefined &&
+      input.description === undefined &&
+      input.folderId === undefined &&
+      input.status === undefined &&
+      input.isPublic === undefined &&
+      !input.base64File
+
+    if (!isOnlyStarToggle) {
+      const canEdit = await checkCanEditResource(supabase, user, oldDoc.created_by)
+      if (!canEdit) {
+        return { data: null, error: 'No tienes permisos para modificar este documento. Solo el autor, un Administrador o SuperAdmin pueden modificarlo.' }
+      }
+    }
 
     const updatePayload: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
@@ -525,11 +598,16 @@ export async function deleteDocument(id: string): Promise<{ error: string | null
 
     const { data: doc, error: getErr } = await supabase
       .from('documents')
-      .select('title, drive_file_id')
+      .select('title, drive_file_id, created_by')
       .eq('id', id)
       .single()
 
     if (getErr || !doc) return { error: 'Documento no encontrado' }
+
+    const canEdit = await checkCanEditResource(supabase, user, doc.created_by)
+    if (!canEdit) {
+      return { error: 'No tienes permisos para eliminar este documento. Solo el autor, un Administrador o SuperAdmin pueden eliminarlo.' }
+    }
 
     const { error } = await supabase.from('documents').delete().eq('id', id)
     if (error) return { error: error.message }
@@ -764,11 +842,16 @@ export async function reorderFolder(
     // 1. Get the details of the folder we want to move
     const { data: folder, error: getErr } = await supabase
       .from('doc_folders')
-      .select('parent_id, sort_order')
+      .select('parent_id, sort_order, created_by')
       .eq('id', folderId)
       .single()
 
     if (getErr || !folder) return { success: false, error: 'Carpeta no encontrada' }
+
+    const canEdit = await checkCanEditResource(supabase, user, folder.created_by)
+    if (!canEdit) {
+      return { success: false, error: 'No tienes permisos para reordenar esta carpeta. Solo el autor, Administrador o SuperAdmin pueden reordenarla.' }
+    }
 
     const parentId = folder.parent_id
     const currentOrder = folder.sort_order ?? 0
