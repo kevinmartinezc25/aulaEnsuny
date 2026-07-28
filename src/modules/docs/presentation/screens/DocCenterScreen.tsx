@@ -8,7 +8,7 @@ import {
   PanelLeftClose, PanelLeftOpen, Sparkles, FolderPlus, ArrowLeft, Star,
   SlidersHorizontal, Download, User, Calendar, Shield, FileSpreadsheet,
   FileImage, FileArchive, ExternalLink, TrendingUp, Users, Eye, History, Trash2, Edit,
-  Sun, Moon, LogOut, Lock
+  Sun, Moon, LogOut, LogIn, Lock
 } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
@@ -555,7 +555,7 @@ export function DocCenterScreen({ userRole }: DocCenterScreenProps) {
   }
 
   return (
-    <div className="flex flex-col h-screen w-full overflow-hidden bg-slate-50/30 dark:bg-slate-950/20">
+    <div className="flex flex-col h-screen w-full min-w-0 overflow-hidden bg-slate-50/30 dark:bg-slate-950/20">
 
       {/* ── Top Filter Bar (Merged Header) ── */}
       <div className={`flex-col md:flex-row items-stretch md:items-center gap-2.5 px-3 sm:px-6 py-2.5 sm:py-3.5 border-b border-slate-200/40 dark:border-slate-800/40 bg-white dark:bg-slate-900/60 backdrop-blur-md shrink-0 justify-between ${selectedDoc ? 'hidden md:flex' : 'flex'}`}>
@@ -625,6 +625,25 @@ export function DocCenterScreen({ userRole }: DocCenterScreenProps) {
             >
               {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
+
+            {isGuest ? (
+              <Link
+                href="/login"
+                className="flex items-center justify-center p-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white transition-all shadow-sm"
+                title="Iniciar Sesión"
+              >
+                <LogIn className="h-4 w-4" />
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="p-2 rounded-xl text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors"
+                title="Cerrar Sesión"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            )}
           </div>
         </div>
 
@@ -666,14 +685,24 @@ export function DocCenterScreen({ userRole }: DocCenterScreenProps) {
               {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
 
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:text-red-650 hover:border-red-200 active:scale-[0.98] transition-all dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 dark:hover:text-red-400 cursor-pointer"
-            >
-              <LogOut className="h-3.5 w-3.5" />
-              <span>Cerrar Sesión</span>
-            </button>
+            {!isGuest ? (
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:text-red-650 hover:border-red-200 active:scale-[0.98] transition-all dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 dark:hover:text-red-400 cursor-pointer"
+              >
+                <LogOut className="h-3.5 w-3.5" />
+                <span>Cerrar Sesión</span>
+              </button>
+            ) : (
+              <Link
+                href="/login"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-sm cursor-pointer"
+              >
+                <LogIn className="h-3.5 w-3.5" />
+                <span>Iniciar Sesión</span>
+              </Link>
+            )}
           </div>
         </div>
       </div>
@@ -746,13 +775,13 @@ export function DocCenterScreen({ userRole }: DocCenterScreenProps) {
       </AnimatePresence>
 
       {/* ── Main Layout ── */}
-      <div className="flex-1 overflow-hidden">
-        <PanelGroup orientation="horizontal" className="h-full">
+      <div className="flex-1 overflow-hidden min-w-0 w-full">
+        <PanelGroup orientation="horizontal" className="h-full min-w-0 w-full">
           {/* Explorer Left Panel (Desktop only) */}
           {!isMobile && explorerVisible && (
             <>
-              <Panel defaultSize="22%" minSize="18%" maxSize="30%" className="border-r border-slate-200/40 dark:border-slate-800/40 bg-white/70 dark:bg-slate-950/40 flex flex-col justify-between h-full">
-                <div className="flex-1 overflow-y-auto">
+              <Panel defaultSize="22%" minSize="18%" maxSize="30%" className="border-r border-slate-200/40 dark:border-slate-800/40 bg-white/70 dark:bg-slate-950/40 flex flex-col justify-between h-full min-w-0 overflow-hidden">
+                <div className="flex-1 overflow-y-auto overflow-x-hidden min-w-0 w-full">
                   <DocExplorer
                     folders={folders}
                     documents={documents}
@@ -783,7 +812,7 @@ export function DocCenterScreen({ userRole }: DocCenterScreenProps) {
           )}
 
           {/* Central Panel */}
-          <Panel className="flex flex-col bg-white dark:bg-slate-900 overflow-hidden h-full">
+          <Panel className="flex flex-col bg-white dark:bg-slate-900 overflow-hidden h-full min-w-0">
             {selectedDoc ? (
               // ─── Visualizer Pane ───
               <div className="flex flex-col h-full overflow-hidden bg-slate-50/40 dark:bg-slate-950/20">
@@ -798,7 +827,7 @@ export function DocCenterScreen({ userRole }: DocCenterScreenProps) {
                       <ArrowLeft className="h-4 w-4" />
                     </button>
                     <div className="min-w-0">
-                      <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">{selectedDoc.title}</h4>
+                      <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white break-words line-clamp-2" title={selectedDoc.title}>{selectedDoc.title}</h4>
                       <p className="text-[10px] text-slate-400 font-medium">
                         v{selectedDoc.versionLabel} • {formatBytes(selectedDoc.fileSize)}
                       </p>
@@ -886,7 +915,7 @@ export function DocCenterScreen({ userRole }: DocCenterScreenProps) {
               <div className="flex flex-col h-full">
 
                 {/* Stats Row Minimal */}
-                <div className="flex items-center gap-4 px-6 py-2.5 border-b border-slate-100 dark:border-slate-850/60 bg-slate-50/10 dark:bg-slate-950/5 text-xs font-semibold text-slate-500">
+                <div className="flex items-center gap-4 px-6 py-2.5 border-b border-slate-100 dark:border-slate-850/60 bg-slate-50/10 dark:bg-slate-950/5 text-xs font-semibold text-slate-500 min-w-0 max-w-full overflow-x-auto">
                   <div className="flex items-center gap-1.5">
                     <FileText className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                     <span>Documentos:</span>
@@ -907,7 +936,7 @@ export function DocCenterScreen({ userRole }: DocCenterScreenProps) {
                 </div>
 
                 {/* List Filter Toolbar */}
-                <div className="px-6 py-3 border-b border-slate-100 dark:border-slate-850/60 bg-white dark:bg-slate-900 flex flex-wrap justify-between items-center gap-3 shrink-0">
+                <div className="px-6 py-3 border-b border-slate-100 dark:border-slate-850/60 bg-white dark:bg-slate-900 flex flex-wrap justify-between items-center gap-3 shrink-0 min-w-0 max-w-full overflow-hidden">
                   {/* Left Tabs */}
                   <div className="flex gap-1 bg-slate-100 dark:bg-slate-950 p-1 rounded-xl">
                     <button
@@ -986,7 +1015,7 @@ export function DocCenterScreen({ userRole }: DocCenterScreenProps) {
                 </div>
 
                 {/* Document List Container: Responsive Mobile Cards + Desktop Table */}
-                <div className="flex-1 overflow-y-auto">
+                <div className="flex-1 overflow-y-auto overflow-x-hidden min-w-0 max-w-full">
                   {filteredDocuments.length > 0 ? (
                     <>
                       {/* Mobile Cards (Visible on mobile, hidden on md+) */}
@@ -1003,7 +1032,7 @@ export function DocCenterScreen({ userRole }: DocCenterScreenProps) {
                                   {getFileIcon(doc.mimeType)}
                                 </div>
                                 <div className="min-w-0">
-                                  <h4 className="text-xs font-bold text-slate-900 dark:text-white truncate">{doc.title}</h4>
+                                  <h4 className="text-xs font-bold text-slate-900 dark:text-white break-words line-clamp-2" title={doc.title}>{doc.title}</h4>
                                   <p className="text-[10px] text-slate-400 font-medium">
                                     {getFolderPath(doc.folder?.id, folders)} • v{doc.versionLabel}
                                   </p>
@@ -1069,8 +1098,8 @@ export function DocCenterScreen({ userRole }: DocCenterScreenProps) {
                       </div>
 
                       {/* Desktop Table (Hidden on mobile, visible on md+) */}
-                      <div className="hidden md:block">
-                        <table className="w-full text-left border-collapse">
+                      <div className="hidden md:block w-full overflow-x-auto min-w-0 max-w-full">
+                        <table className="w-full text-left border-collapse min-w-[650px]">
                           <thead>
                             <tr className="border-b border-slate-100 dark:border-slate-850/60 text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-slate-50/50 dark:bg-slate-950/20">
                               <th className="px-6 py-3.5">Documento</th>
@@ -1092,9 +1121,9 @@ export function DocCenterScreen({ userRole }: DocCenterScreenProps) {
                                   <div className="flex items-center gap-3">
                                     {getFileIcon(doc.mimeType)}
                                     <div className="min-w-0">
-                                      <p className="font-semibold text-slate-900 dark:text-slate-250 truncate text-xs group-hover:text-emerald-600 transition-colors">
-                                        {doc.title}
-                                      </p>
+                                       <p className="font-semibold text-slate-900 dark:text-slate-250 break-words line-clamp-2 text-xs group-hover:text-emerald-600 transition-colors" title={doc.title}>
+                                         {doc.title}
+                                       </p>
                                       <div className="flex flex-wrap gap-1 mt-1">
                                         {doc.tags?.map(t => (
                                           <span
@@ -1109,9 +1138,9 @@ export function DocCenterScreen({ userRole }: DocCenterScreenProps) {
                                     </div>
                                   </div>
                                 </td>
-                                <td className="px-6 py-4 text-xs text-slate-500 dark:text-slate-400 font-medium">
-                                  {getFolderPath(doc.folder?.id, folders)}
-                                </td>
+                                 <td className="px-6 py-4 text-xs text-slate-500 dark:text-slate-400 font-medium max-w-[220px] break-words line-clamp-2" title={getFolderPath(doc.folder?.id, folders)}>
+                                   {getFolderPath(doc.folder?.id, folders)}
+                                 </td>
                                 <td className="px-6 py-4">
                                   <div>
                                     <p className="text-xs font-semibold text-slate-700 dark:text-slate-350">

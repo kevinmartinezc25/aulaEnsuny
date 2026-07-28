@@ -697,7 +697,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
   if (isAdmin) {
     return (
-      <div className="flex min-h-screen bg-slate-50 dark:bg-slate-950">
+      <div className="flex min-h-screen max-w-full overflow-x-hidden min-w-0 bg-slate-50 dark:bg-slate-950">
         {/* Admin Sidebar Desktop */}
         {!isDocsPage && (
           <aside className={`fixed inset-y-0 left-0 z-20 hidden md:flex flex-col transition-all duration-300 ${isAdminSidebarVisible ? 'w-60' : 'w-20'}`}>
@@ -706,7 +706,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         )}
 
         {/* Admin Main */}
-        <div className={`flex flex-1 flex-col transition-all duration-300 ${!isDocsPage ? (isAdminSidebarVisible ? 'md:pl-60' : 'md:pl-20') : 'md:pl-0'}`}>
+        <div className={`flex flex-1 flex-col transition-all duration-300 min-w-0 max-w-full overflow-hidden ${!isDocsPage ? (isAdminSidebarVisible ? 'md:pl-60' : 'md:pl-20') : 'md:pl-0'}`}>
           {/* Admin Header */}
           {!isDocsPage && (
             <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b border-slate-100 bg-white px-6 dark:border-slate-800/60 dark:bg-slate-900">
@@ -771,7 +771,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </header>
           )}
 
-          <main className={`flex-1 ${isDocsPage ? 'p-0' : 'p-6 md:p-8'}`}>{children}</main>
+          <main className={`flex-1 min-w-0 max-w-full overflow-hidden ${isDocsPage ? 'p-0 h-full' : 'p-6 md:p-8'}`}>{children}</main>
         </div>
 
         {/* Mobile Drawer for Admin */}
@@ -811,7 +811,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       )}
 
       {/* Main Container */}
-      <div className={`flex flex-1 flex-col transition-all duration-300 ${(isCourseSection || isDocsPage) ? 'pl-0' : (isSidebarCollapsed ? 'md:pl-20' : 'md:pl-64')}`}>
+      <div className={`flex flex-1 flex-col transition-all duration-300 min-w-0 overflow-hidden ${(isCourseSection || isDocsPage) ? 'pl-0' : (isSidebarCollapsed ? 'md:pl-20' : 'md:pl-64')}`}>
         {/* Header */}
         {!isDocsPage && (
           <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-slate-100 bg-white px-6 dark:border-slate-800/60 dark:bg-slate-950 print:hidden">
@@ -876,7 +876,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </header>
         )}
 
-        <main className={`flex-1 ${isDocsPage ? 'p-0' : 'p-6 md:p-8'}`}>{children}</main>
+        <main className={`flex-1 min-w-0 overflow-hidden ${isDocsPage ? 'p-0' : 'p-6 md:p-8'}`}>{children}</main>
         {!isDocsPage && (
           <footer className="border-t border-slate-100 py-6 text-center text-xs text-slate-400 dark:border-slate-800/60 dark:text-slate-500">
             <p>© {new Date().getFullYear()} aulaEnsuny. Todos los derechos reservados.</p>
