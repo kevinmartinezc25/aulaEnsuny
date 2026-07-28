@@ -197,7 +197,7 @@ export function NewDocModal({
       }
 
       await onConfirm({
-        title: title.trim(),
+        title: title.trim().replace(/[\r\n]+/g, ' '),
         description: description.trim(),
         folderId: selectedFolder,
         base64File,
@@ -306,12 +306,17 @@ export function NewDocModal({
                 <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                   Título del Documento *
                 </label>
-                <input
-                  type="text"
+                <textarea
                   value={title}
                   onChange={e => setTitle(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-4 py-2.5 text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/20 focus:bg-white dark:focus:bg-slate-950 transition-all font-medium"
+                  rows={2}
+                  className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-4 py-2.5 text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/20 focus:bg-white dark:focus:bg-slate-950 transition-all font-medium resize-none break-words min-w-0 max-w-full"
                   placeholder="Ej. PEI - Proyecto Educativo Institucional"
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                    }
+                  }}
                   required
                 />
               </div>

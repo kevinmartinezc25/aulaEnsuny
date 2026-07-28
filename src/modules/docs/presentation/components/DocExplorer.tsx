@@ -162,12 +162,12 @@ function FolderNode({
     <div>
       {/* Folder Header */}
       <div
-        className={`group flex items-center rounded-xl px-2 py-1.5 transition-all duration-200 cursor-pointer text-xs
+        className={`group flex items-center rounded-xl px-2 py-1.5 transition-all duration-200 cursor-pointer text-xs min-w-0 max-w-full overflow-hidden
           ${isSelected 
             ? 'bg-[#1F4E31]/10 text-[#1F4E31] dark:bg-emerald-500/10 dark:text-[#4AB874] font-semibold' 
             : 'hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-350'
           }`}
-        style={{ paddingLeft: `${4 + depth * 12}px` }}
+        style={{ paddingLeft: `${Math.min(depth * 8 + 4, 36)}px` }}
         onClick={() => {
           onSelectFolder(folder.id)
           setIsOpen(o => !o)
@@ -190,15 +190,15 @@ function FolderNode({
         </button>
 
         {/* Icon & Name */}
-        <div className="flex items-center gap-2 flex-1 min-w-0">
+        <div className="flex items-center gap-1.5 flex-1 min-w-0 overflow-hidden">
           {isOpen ? (
             <FolderOpen className="h-4 w-4 shrink-0" style={{ color: folderColor }} />
           ) : (
             <Folder className="h-4 w-4 shrink-0" style={{ color: folderColor }} />
           )}
-          <span className="truncate">{folder.name}</span>
+          <span className="truncate min-w-0">{folder.name}</span>
           {isReadOnlyFolder && (
-            <span title="Solo lectura (creada por otro docente)">
+            <span title="Solo lectura (creada por otro docente)" className="shrink-0">
               <Lock className="h-3 w-3 text-amber-500 shrink-0" />
             </span>
           )}
@@ -470,30 +470,32 @@ function DocNode({ doc, depth, isSelected, userRole, currentUserId, onSelect, on
 
   return (
     <div
-      className={`group flex items-center gap-2 rounded-xl transition-all duration-200 cursor-pointer text-xs py-1.5
+      className={`group flex items-center gap-1.5 rounded-xl transition-all duration-200 cursor-pointer text-xs py-1.5 min-w-0 max-w-full overflow-hidden
         ${isSelected
           ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-[#4AB874] font-semibold'
           : 'hover:bg-slate-50 dark:hover:bg-slate-800/40 text-slate-500 dark:text-slate-400'
         }`}
-      style={{ paddingLeft: `${24 + depth * 12}px`, paddingRight: '8px' }}
+      style={{ paddingLeft: `${Math.min(depth * 8 + 16, 44)}px`, paddingRight: '4px' }}
       onClick={onSelect}
     >
       <FileText className={`h-3.5 w-3.5 shrink-0 ${isSelected ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`} />
-      <span className="flex-1 truncate">{doc.title}</span>
+      <span className="flex-1 min-w-0 truncate">{doc.title}</span>
       {isReadOnlyDoc && (
-        <span title="Solo lectura (creado por otro docente)">
+        <span title="Solo lectura (creado por otro docente)" className="shrink-0">
           <Lock className="h-3 w-3 text-slate-400 shrink-0" />
         </span>
       )}
       <div
-        className={`flex items-center gap-1 transition-opacity ${
+        className={`flex items-center gap-1 shrink-0 transition-opacity ${
           menuOpen
             ? 'opacity-100 z-50'
             : 'opacity-100 sm:opacity-0 sm:group-hover:opacity-100'
         }`}
         onClick={e => e.stopPropagation()}
       >
-        <DocStatusBadge status={doc.status} size="sm" />
+        <span className="hidden xl:inline-block">
+          <DocStatusBadge status={doc.status} size="sm" />
+        </span>
         {canModifyDoc && (
           <div className="relative">
             <button
@@ -565,9 +567,9 @@ export function DocExplorer({
   const canAddContent = userRole !== 'student' && userRole !== 'guest'
 
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-slate-900/40">
+    <div className="flex flex-col h-full w-full min-w-0 overflow-hidden bg-white dark:bg-slate-900/40">
       {/* Explorer Header */}
-      <div className="flex items-center justify-between px-4 py-3.5 border-b border-slate-100 dark:border-slate-800/60">
+      <div className="flex items-center justify-between px-4 py-3.5 border-b border-slate-100 dark:border-slate-800/60 shrink-0">
         <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Categorías</span>
         {canAddContent && (
           <div className="flex items-center gap-1">
@@ -592,7 +594,7 @@ export function DocExplorer({
       </div>
 
       {/* Tree */}
-      <div className="flex-1 overflow-y-auto py-3 px-2 space-y-1">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden py-3 px-2 space-y-1 min-w-0 w-full">
         {/* Root Selector (All documents) */}
         <div
           onClick={() => onSelectFolder(null)}
