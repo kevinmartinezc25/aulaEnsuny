@@ -7,6 +7,7 @@ export interface ClassSession {
   dayOfWeek: string;
   periodId: number;
   duration: number; // En periodos (ej. 1 o 2)
+  slotIndex?: number;
 }
 
 export interface RuleResult {

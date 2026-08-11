@@ -19,6 +19,7 @@ export default function WorkloadPage() {
   const [rawCurriculum, setRawCurriculum] = useState<any[]>([])
   const [rawSettingsMap, setRawSettingsMap] = useState<Map<string, number>>(new Map())
   const [normalWorkloadIds, setNormalWorkloadIds] = useState<Set<string>>(new Set())
+  const [explicitMultiTeacherIds, setExplicitMultiTeacherIds] = useState<Set<string>>(new Set())
 
   const supabase = createClient()
 
@@ -75,6 +76,7 @@ export default function WorkloadPage() {
           }
         })
       }
+      setExplicitMultiTeacherIds(explicitMultiTeacherSubjIds)
 
       // Group-level check: A (group_id, subject_id) pair is multi-teacher IF it has > 1 teacher assigned in the SAME group
       const groupSubjectTeachers = new Map<string, Set<string>>()
@@ -235,6 +237,7 @@ export default function WorkloadPage() {
             curriculumRows={rawCurriculum}
             settingsMap={rawSettingsMap}
             normalWorkloadSubjectIds={normalWorkloadIds}
+            explicitMultiTeacherSubjIds={explicitMultiTeacherIds}
           />
         </div>
       ) : (

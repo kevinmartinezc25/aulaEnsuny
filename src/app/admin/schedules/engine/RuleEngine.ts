@@ -1,5 +1,5 @@
 import { ClassSession, IScheduleRule, RuleContext, RuleResult } from './types';
-import { GroupOverlapRule, TeacherOverlapRule, ClassroomOverlapRule, TimeOffRule, GroupNoGapsRule, SubjectMaxHoursPerDayRule, TeacherRequiredRule, SubjectOncePerDayRule, SubjectRulesRule, MultiTeacherSameSlotRule } from './rules/HardConstraints';
+import { GroupOverlapRule, TeacherOverlapRule, ClassroomOverlapRule, TimeOffRule, GroupNoGapsRule, SubjectMaxHoursPerDayRule, TeacherRequiredRule, SubjectOncePerDayRule, BlockSubjectSeparateDaysRule, SubjectRulesRule, MultiTeacherSameSlotRule, MultiTeacherAtLeastOneSharedHourRule } from './rules/HardConstraints';
 import { TeacherMaxGapsRule, TeacherMaxHoursRule, TeacherFiveDaysDistributionRule } from './rules/SoftConstraints';
 
 export interface EvaluationReport {
@@ -26,8 +26,10 @@ export class RuleEngine {
     this.rules.push(new SubjectMaxHoursPerDayRule());
     this.rules.push(new TeacherRequiredRule());
     this.rules.push(new SubjectOncePerDayRule());
+    this.rules.push(new BlockSubjectSeparateDaysRule());
     this.rules.push(new SubjectRulesRule());
     this.rules.push(new MultiTeacherSameSlotRule());
+    this.rules.push(new MultiTeacherAtLeastOneSharedHourRule());
     
     // Reglas suaves
     this.rules.push(new TeacherMaxGapsRule());

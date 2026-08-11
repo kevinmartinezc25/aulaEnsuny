@@ -6,6 +6,8 @@ import { getTeachersList } from '@/modules/admin/application/actions'
 import { generateTimeSlots, TimeSlot } from '../utils/timeCalculator'
 import { Loader2, Calendar, Printer, AlertTriangle } from 'lucide-react'
 
+import { isOfficialGradeGroup } from '../utils/groupFilters'
+
 interface DailyImpactCanvasProps {
   selectedDate: string // YYYY-MM-DD
 }
@@ -68,7 +70,8 @@ export default function DailyImpactCanvas({ selectedDate }: DailyImpactCanvasPro
       ])
 
       if (gData.data) {
-        setGroups(gData.data.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true })))
+        const officialGroups = gData.data.filter((g: any) => isOfficialGradeGroup(g.name))
+        setGroups(officialGroups.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true })))
       }
       
       const subMap: Record<string, any> = {}

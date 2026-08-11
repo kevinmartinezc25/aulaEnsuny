@@ -227,14 +227,27 @@ export async function deleteAdminUser(id: string) {
   try {
     const adminClient = createAdminClient()
 
-    // Eliminar el usuario en auth.users (la cascada borrará automáticamente su registro en profiles)
-    const { error } = await adminClient.auth.admin.deleteUser(id)
+    // 1. Desvincular referencias de este usuario en la base de datos
+    await adminClient.from('sch_curriculum').update({ teacher_id: null }).eq('teacher_id', id)
+    await adminClient.from('courses').update({ teacher_id: null }).eq('teacher_id', id)
 
-    if (error) {
-      return { error: error.message }
+    // 2. Intentar borrar en auth.users (si existe en Supabase Auth)
+    const { error: authError } = await adminClient.auth.admin.deleteUser(id)
+
+    // 3. Garantizar la eliminación en la tabla profiles
+    const { error: profileError } = await adminClient.from('profiles').delete().eq('id', id)
+
+    if (authError && profileError) {
+      return { error: authError.message || profileError.message }
     }
 
-    revalidatePath('/admin/users')
+    try {
+      revalidatePath('/admin/users')
+      revalidatePath('/admin/teachers')
+      revalidatePath('/admin/students')
+    } catch {
+      // Ignorar errores de contexto de revalidatePath
+    }
     return { success: true }
   } catch (error: any) {
     console.error('Error en deleteAdminUser:', error)
@@ -1614,6 +1627,109 @@ export async function saveAdminModulePermissions(permissions: { module_key: stri
     return { error: err.message || 'Error al guardar los permisos' }
   }
 }
+
+export async function getScheduleSlotsAction(entityType?: 'group' | 'teacher', entityId?: string) {
+  try {
+    const adminClient = createAdminClient()
+    let query = adminClient
+      .from('sch_schedule_slots')
+      .select(`
+        id,
+        day_of_week,
+        period_id,
+        duration,
+        group_id,
+        subject_id,
+        teacher_id,
+        group:sch_groups(id, name),
+        teacher:profiles(id, first_name, last_name),
+        subject:sch_subjects(id, name, color, room_type),
+        classroom:sch_classrooms(id, name)
+      `)
+
+    if (entityType === 'teacher' && entityId) {
+      query = query.eq('teacher_id', entityId)
+    } else if (entityType === 'group' && entityId) {
+      query = query.eq('group_id', entityId)
+    }
+
+    const { data, error } = await query
+    if (error) {
+      console.error('Error fetching schedule slots:', error)
+      return []
+    }
+    return data || []
+  } catch (err) {
+    console.error('Error in getScheduleSlotsAction:', err)
+    return []
+  }
+}
+
+/**
+ * Borra TODOS los slots del horario. Usa el admin client (service role) para evitar
+ * restricciones de RLS que impiden borrar registros de otros usuarios desde el browser.
+ */
+export async function clearAllScheduleSlotsAction(): Promise<{ success: boolean; error?: string }> {
+  try {
+    const adminClient = createAdminClient()
+    const { error } = await adminClient
+      .from('sch_schedule_slots')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000')
+    if (error) {
+      console.error('Error clearing schedule slots:', error)
+      return { success: false, error: error.message }
+    }
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Error desconocido' }
+  }
+}
+
+/**
+ * Borra los slots de un grupo específico. Usa el admin client para evitar RLS.
+ */
+export async function clearGroupScheduleSlotsAction(groupId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const adminClient = createAdminClient()
+    const { error } = await adminClient
+      .from('sch_schedule_slots')
+      .delete()
+      .eq('group_id', groupId)
+    if (error) {
+      console.error('Error clearing group schedule slots:', error)
+      return { success: false, error: error.message }
+    }
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Error desconocido' }
+  }
+}
+
+/**
+ * Inserta un lote de slots en el horario. Usa el admin client para evitar RLS.
+ */
+export async function saveScheduleSlotsAction(slots: {
+  day_of_week: string
+  period_id: number
+  group_id: string
+  subject_id: string
+  teacher_id: string | null
+  duration: number
+}[]): Promise<{ success: boolean; error?: string }> {
+  try {
+    const adminClient = createAdminClient()
+    const { error } = await adminClient.from('sch_schedule_slots').insert(slots)
+    if (error) {
+      console.error('Error saving schedule slots:', error)
+      return { success: false, error: error.message }
+    }
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Error desconocido' }
+  }
+}
+
 
 
 

@@ -8,6 +8,7 @@ import { getAdminUsers } from '@/modules/admin/application/actions'
 import { useRouter, usePathname } from 'next/navigation'
 import { toast } from 'sonner'
 
+
 interface Group {
   id: string
   name: string
@@ -71,7 +72,10 @@ export default function GroupsDrawer({ isOpen }: { isOpen: boolean }) {
   }
 
   const handleSave = async () => {
-    if (!newName.trim()) return
+    if (!newName.trim()) {
+      toast.error('El nombre del grupo es obligatorio.')
+      return
+    }
     
     if (editingId) {
       const { data, error } = await supabase
@@ -80,12 +84,14 @@ export default function GroupsDrawer({ isOpen }: { isOpen: boolean }) {
         .eq('id', editingId)
         .select('*, director:profiles(id, first_name, last_name)')
 
-      if (!error && data) {
-        const mappedData = {
-          ...data[0],
-          director: data[0].director ? { name: `${data[0].director.first_name} ${data[0].director.last_name}`.trim() } : null
-        }
-        setGroups(groups.map(g => g.id === editingId ? mappedData : g).sort((a, b) => a.name.localeCompare(b.name)))
+      if (error) {
+        toast.error(`Error al actualizar grupo: ${error.message}`)
+        return
+      }
+
+      if (data) {
+        toast.success(`Grupo "${newName}" actualizado con éxito.`)
+        await fetchGroups()
         resetForm()
       }
     } else {
@@ -94,12 +100,14 @@ export default function GroupsDrawer({ isOpen }: { isOpen: boolean }) {
         .insert([{ name: newName, level: newLevel, director_id: newDirectorId || null }])
         .select('*, director:profiles(id, first_name, last_name)')
 
-      if (!error && data) {
-        const mappedData = {
-          ...data[0],
-          director: data[0].director ? { name: `${data[0].director.first_name} ${data[0].director.last_name}`.trim() } : null
-        }
-        setGroups([...groups, mappedData].sort((a, b) => a.name.localeCompare(b.name)))
+      if (error) {
+        toast.error(`Error al registrar grupo: ${error.message}`)
+        return
+      }
+
+      if (data) {
+        toast.success(`Grupo "${newName}" registrado con éxito.`)
+        await fetchGroups()
         resetForm()
       }
     }

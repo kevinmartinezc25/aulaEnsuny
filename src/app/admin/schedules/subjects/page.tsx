@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   BookOpen, Plus, Trash2, Edit2, Loader2, Search, Save,
@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/core/config/supabase/client'
 import { getAdminUsers } from '@/modules/admin/application/actions'
+import { isOfficialGradeGroup } from '../utils/groupFilters'
 import { toast } from 'sonner'
 
 const COLORS = ['#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#f97316', '#14b8a6', '#ec4899', '#0ea5e9', '#6366f1']
@@ -54,6 +55,16 @@ export default function SubjectsPage() {
   const [selectedTeacherIds, setSelectedTeacherIds] = useState<string[]>([])
   const [hoursPerWeek, setHoursPerWeek] = useState(1)
   const [teacherDropdownOpen, setTeacherDropdownOpen] = useState(false)
+  const [teacherSearchTerm, setTeacherSearchTerm] = useState('')
+
+  const filteredTeachers = useMemo(() => {
+    if (!teacherSearchTerm.trim()) return teachers
+    const term = teacherSearchTerm.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    return teachers.filter((t: any) => {
+      const name = (t.name || `${t.first_name || ''} ${t.last_name || ''}`).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      return name.includes(term)
+    })
+  }, [teachers, teacherSearchTerm])
 
   useEffect(() => {
     fetchSubjects()
@@ -142,7 +153,8 @@ export default function SubjectsPage() {
       getAdminUsers()
     ])
     if (g.data) {
-      const sortedGroups = g.data.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
+      const officialGroups = g.data.filter((group: any) => isOfficialGradeGroup(group.name))
+      const sortedGroups = officialGroups.sort((a: any, b: any) => a.name.localeCompare(b.name, undefined, { numeric: true }))
       setGroups(sortedGroups)
       if (sortedGroups.length > 0) setSelectedGroupId(sortedGroups[0].id)
     }
@@ -235,6 +247,7 @@ export default function SubjectsPage() {
     setSelectedTeacherIds([])
     setHoursPerWeek(1)
     setTeacherDropdownOpen(false)
+    setTeacherSearchTerm('')
   }
 
   const handleEditCurriculum = (group: CurriculumGroup) => {
@@ -499,18 +512,45 @@ export default function SubjectsPage() {
                           onClick={e => e.stopPropagation()}
                           className="absolute z-50 bottom-full mb-1 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl overflow-hidden"
                         >
+                          {/* Search Input Box */}
+                          <div className="p-2 border-b border-slate-100 dark:border-slate-700 relative bg-slate-50 dark:bg-slate-900/50">
+                            <div className="relative">
+                              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                              <input
+                                type="text"
+                                placeholder="Buscar docente por nombre..."
+                                value={teacherSearchTerm}
+                                onChange={e => setTeacherSearchTerm(e.target.value)}
+                                onClick={e => e.stopPropagation()}
+                                autoFocus
+                                className="w-full pl-8 pr-7 py-1.5 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-800 dark:text-slate-200 placeholder:text-slate-400"
+                              />
+                              {teacherSearchTerm && (
+                                <button
+                                  type="button"
+                                  onClick={() => setTeacherSearchTerm('')}
+                                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
                           <div className="max-h-48 overflow-y-auto">
-                            {teachers.length === 0 ? (
-                              <div className="p-3 text-sm text-slate-400 text-center">No hay docentes</div>
+                            {filteredTeachers.length === 0 ? (
+                              <div className="p-3 text-xs text-slate-400 text-center">
+                                {teachers.length === 0 ? 'No hay docentes registrados' : 'No se encontraron docentes'}
+                              </div>
                             ) : (
-                              teachers.map((t: any) => {
+                              filteredTeachers.map((t: any) => {
                                 const isSelected = selectedTeacherIds.includes(t.id)
                                 return (
                                   <button
                                     key={t.id}
                                     type="button"
                                     onClick={() => toggleTeacherSelection(t.id)}
-                                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors ${isSelected ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-300' : 'hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'}`}
+                                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors ${isSelected ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 font-medium' : 'hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'}`}
                                   >
                                     <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${isSelected ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300 dark:border-slate-600'}`}>
                                       {isSelected && <div className="w-2 h-2 bg-white rounded-sm" />}
@@ -525,13 +565,13 @@ export default function SubjectsPage() {
                             )}
                           </div>
                           {selectedTeacherIds.length > 0 && (
-                            <div className="p-2 border-t border-slate-100 dark:border-slate-700">
+                            <div className="p-2 border-t border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
                               <button
                                 type="button"
                                 onClick={() => setSelectedTeacherIds([])}
-                                className="w-full text-xs text-red-500 hover:text-red-600 py-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+                                className="w-full text-xs text-red-500 hover:text-red-600 py-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors font-medium"
                               >
-                                Quitar todos
+                                Quitar todos ({selectedTeacherIds.length})
                               </button>
                             </div>
                           )}
