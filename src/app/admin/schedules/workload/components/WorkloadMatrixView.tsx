@@ -9,6 +9,7 @@ interface WorkloadMatrixViewProps {
   curriculumRows: any[]
   settingsMap: Map<string, number>
   normalWorkloadSubjectIds?: Set<string>
+  explicitMultiTeacherSubjIds?: Set<string>
 }
 
 // Function to map subjects to Core Areas (Núcleo)
@@ -27,6 +28,25 @@ function getNucleoForSubject(subjectName: string): string {
     return 'Lúdico artístico'
   }
   return 'Ciencia y tecnología'
+}
+
+// Helper to identify meeting / committee / non-academic groups
+function isMeetingOrNonAcademicGroup(groupName: string): boolean {
+  if (!groupName) return false
+  const name = groupName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
+  
+  return (
+    /^com\b/i.test(name) ||
+    /^nucle/i.test(name) ||
+    name.includes('comite') ||
+    name.includes('nucleo') ||
+    name.includes('nucle') ||
+    name.includes('reunion') ||
+    name.includes('co-docencia') ||
+    name.includes('codocencia') ||
+    name.includes('docentes') ||
+    name.includes('institucional')
+  )
 }
 
 // Parse grade and short subgroup name from group name
@@ -77,7 +97,8 @@ export default function WorkloadMatrixView({
   groups,
   curriculumRows,
   settingsMap,
-  normalWorkloadSubjectIds
+  normalWorkloadSubjectIds,
+  explicitMultiTeacherSubjIds
 }: WorkloadMatrixViewProps) {
   const [searchTerm, setSearchTerm] = useState('')
 
@@ -99,12 +120,11 @@ export default function WorkloadMatrixView({
     return set
   }, [curriculumRows])
 
-  // Filter groups to exclude pseudo-groups created specifically for multi-teacher subjects
+  // Filter groups to exclude pseudo-groups created specifically for multi-teacher subjects (COM, NUCLEO, REUNION, etc.)
   const filteredGroups = useMemo(() => {
     return groups.filter(g => {
-      const gName = g.name.toLowerCase()
-      // Filter out groups named like multi-teacher subjects (e.g. "Núcleo", "Comité")
-      if (gName.includes('núcleo') || gName.includes('comité') || gName.includes('co-docencia')) return false
+      if (!g || !g.name) return false
+      if (isMeetingOrNonAcademicGroup(g.name)) return false
       return true
     })
   }, [groups])
@@ -178,6 +198,17 @@ export default function WorkloadMatrixView({
     if (curriculumRows) {
       curriculumRows.forEach(row => {
         if (!row.teacher_id) return
+
+        const key = `${row.group_id}-${row.subject_id}`
+        const isMultiTeacherGroup = multiTeacherKeys.has(key) || (row.subject_id && explicitMultiTeacherSubjIds?.has(row.subject_id))
+        
+        // Excluir ÚNICAMENTE las materias que tienen la leyenda "Multi-docente / Exenta" (isSpecial === true)
+        const isSpecial = isMultiTeacherGroup && (!row.subject_id || !normalWorkloadSubjectIds?.has(row.subject_id))
+
+        if (isSpecial) {
+          return
+        }
+
         let tData = map.get(row.teacher_id)
         if (!tData) {
           tData = {
@@ -197,29 +228,19 @@ export default function WorkloadMatrixView({
         const subjName = row.sch_subjects?.name || 'Materia'
         const hours = row.hours_per_week || 0
 
-        const pairKey = `${row.group_id}-${row.subject_id}`
-        const isMultiTeacher = multiTeacherKeys.has(pairKey) || 
-          subjName.toLowerCase().includes('núcleo') || 
-          subjName.toLowerCase().includes('comité') || 
-          subjName.toLowerCase().includes('co-docencia')
-
         if (!tData.subjects.has(subjId)) {
           tData.subjects.set(subjId, {
             subjectId: subjId,
             subjectName: subjName,
             hoursByGroup: new Map<string, number>(),
             subtotal: 0,
-            isMultiTeacher
+            isMultiTeacher: false
           })
         }
 
         const sData = tData.subjects.get(subjId)!
-        if (isMultiTeacher) {
-          sData.isMultiTeacher = true
-        }
 
-        // Las materias multi-docente NO colocan números en las columnas de grupo
-        if (!isMultiTeacher && row.group_id) {
+        if (row.group_id) {
           const currentGrpHours = sData.hoursByGroup.get(row.group_id) || 0
           sData.hoursByGroup.set(row.group_id, currentGrpHours + hours)
         }

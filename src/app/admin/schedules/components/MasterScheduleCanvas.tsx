@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { createClient } from '@/core/config/supabase/client'
-import { getAdminUsers } from '@/modules/admin/application/actions'
+import { getAdminUsers, getScheduleSlotsAction, clearAllScheduleSlotsAction, saveScheduleSlotsAction } from '@/modules/admin/application/actions'
 import { generateTimeSlots, TimeSlot } from '../utils/timeCalculator'
 import { Loader2, Download, Printer, Sparkles, Trash2, AlertTriangle, Coffee } from 'lucide-react'
 import { toast } from 'sonner'
@@ -13,6 +13,8 @@ import SlotEditorModal from './SlotEditorModal'
 import PrintableSchedule from './PrintableSchedule'
 import UnassignedBlocksModal from './UnassignedBlocksModal'
 import SavedConflictsModal from './SavedConflictsModal'
+
+import { isOfficialGradeGroup } from '../utils/groupFilters'
 
 const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes']
 
@@ -75,16 +77,17 @@ export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterSched
     try {
       const [gData, slData, subData, oldTData, adminUsers] = await Promise.all([
         supabase.from('sch_groups').select('id, name'),
-        supabase.from('sch_schedule_slots').select('*'),
+        getScheduleSlotsAction(),
         supabase.from('sch_subjects').select('id, name, color'),
         supabase.from('sch_teachers').select('id, name, alias'),
         getAdminUsers()
       ])
 
       if (gData.data) {
-        setGroups(gData.data.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true })))
+        const officialGroups = gData.data.filter((g: any) => isOfficialGradeGroup(g.name))
+        setGroups(officialGroups.sort((a: any, b: any) => a.name.localeCompare(b.name, undefined, { numeric: true })))
       }
-      if (slData.data) setSlots(slData.data)
+      if (slData) setSlots(slData)
       
       const subMap: Record<string, any> = {}
       subData.data?.forEach(s => { subMap[s.id] = s })
@@ -168,14 +171,14 @@ export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterSched
 
   const executeClearGlobalSchedule = async () => {
     setLoading(true)
-    const { error } = await supabase.from('sch_schedule_slots').delete().neq('id', '00000000-0000-0000-0000-000000000000') 
-    if (!error) {
+    const result = await clearAllScheduleSlotsAction()
+    if (result.success) {
       toast.success('El horario global ha sido vaciado.')
       setUnassignedBlocks([])
       localStorage.removeItem('sch_global_unassigned')
       fetchGlobalData()
     } else {
-      toast.error('Error al limpiar el horario global.')
+      toast.error(`Error al limpiar el horario global: ${result.error || ''}`)
     }
     setLoading(false)
   }
@@ -201,6 +204,58 @@ export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterSched
   }, [])
 
   const analyzeConflicts = async () => {
+    // Siempre re-computar desde la BD: comparar carga académica vs slots asignados
+    const { data: currData } = await supabase.from('sch_curriculum').select('subject_id, teacher_id, group_id, hours_per_week')
+    const { data: slotsData } = await supabase.from('sch_schedule_slots').select('subject_id, teacher_id, group_id, duration')
+
+    const scheduledHours = new Map<string, number>()
+    ;(slotsData || []).forEach((s: any) => {
+      const key = `${s.group_id}-${s.subject_id}-${s.teacher_id}`
+      scheduledHours.set(key, (scheduledHours.get(key) || 0) + (s.duration || 1))
+    })
+
+    const unassigned: any[] = []
+    ;(currData || []).forEach((c: any) => {
+      if (!c.group_id || !c.teacher_id || !c.hours_per_week) return
+      const key = `${c.group_id}-${c.subject_id}-${c.teacher_id}`
+      const assigned = scheduledHours.get(key) || 0
+      const missing = c.hours_per_week - assigned
+      if (missing > 0) {
+        for (let i = 0; i < missing; i++) {
+          unassigned.push({
+            subject_id: c.subject_id,
+            teacher_id: c.teacher_id,
+            group_id: c.group_id,
+            duration: 1,
+            subject_name: c.subject_id,
+            group_name: c.group_id,
+            teacher_name: c.teacher_id
+          })
+        }
+      }
+    })
+
+    if (unassigned.length > 0) {
+      // Enriquecer con nombres reales
+      const { data: subjsData } = await supabase.from('sch_subjects').select('id, name')
+      const { data: profsData } = await supabase.from('profiles').select('id, first_name, last_name')
+      const { data: groupsData } = await supabase.from('sch_groups').select('id, name')
+      const subMap = new Map((subjsData || []).map((s: any) => [s.id, s.name]))
+      const profMap = new Map((profsData || []).map((p: any) => [p.id, `${p.first_name || ''} ${p.last_name || ''}`.trim()]))
+      const grpMap = new Map((groupsData || []).map((g: any) => [g.id, g.name]))
+
+      const enriched = unassigned.map(b => ({
+        ...b,
+        subject_name: subMap.get(b.subject_id) || b.subject_id,
+        group_name: grpMap.get(b.group_id) || b.group_id,
+        teacher_name: profMap.get(b.teacher_id || '') || 'Sin asignar'
+      }))
+      setUnassignedBlocks(enriched)
+      localStorage.setItem('sch_global_unassigned', JSON.stringify(enriched))
+      setShowUnassignedModal(true)
+      return
+    }
+
     if (unassignedBlocks.length > 0) {
       setShowUnassignedModal(true)
       return
@@ -260,9 +315,12 @@ export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterSched
     setGenerating(true)
     setProgress(0)
     setProgressMsg('Preparando motor de reglas...')
+    // Limpiar caché de bloques no asignados antes de cada nueva generación
+    setUnassignedBlocks([])
+    localStorage.removeItem('sch_global_unassigned')
     
-    // 1. Obtener mallas de todos los grupos
-    const { data: currData } = await supabase.from('sch_curriculum').select('*')
+    // 1. Obtener mallas de todos los grupos con su grupo asignado
+    const { data: currData } = await supabase.from('sch_curriculum').select('*, group:sch_groups(name)')
     if (!currData || currData.length === 0) {
       toast.error('No hay mallas curriculares configuradas.')
       setGenerating(false)
@@ -280,11 +338,14 @@ export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterSched
     } else if (!breaks) {
       breaks = []
     }
-    const breakPeriods = breaks.map((b: any) => b.afterPeriod)
+    const breakPeriods: number[] = []
     
     // Asumimos un máximo de 10 periodos si no se puede determinar
     const maxPeriodsPerDay = parseInt(settings.periodsPerDay || '7', 10)
-    const blockSubjects = JSON.parse(localStorage.getItem('sch_block_subjects') || '[]')
+    const dbBlockConstraint = (constraintsData || []).find((c: any) => c.rule_type === 'BLOCK_SUBJECTS_CONFIG' && c.is_active !== false)
+    const blockSubjects = dbBlockConstraint?.parameters?.subject_ids && Array.isArray(dbBlockConstraint.parameters.subject_ids)
+      ? dbBlockConstraint.parameters.subject_ids
+      : JSON.parse(localStorage.getItem('sch_block_subjects') || '[]')
     
     // Identificar materias multi-docente por grupo o por regla explícita
     const groupSubjectTeachers = new Map<string, Set<string>>()
@@ -356,26 +417,28 @@ export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterSched
     } else if (!breaksGS) {
       breaksGS = []
     }
-    const breakPeriodsGS = breaksGS.map((b: any) => b.afterPeriod)
+    const breakPeriodsGS: number[] = []
     const periodsPerDay = parseInt(globalSettingsData.periodsPerDay || '7', 10)
     
     // 4. Preparar CurriculumBlocks para el Generador
     const blocksToAssign: any[] = []
     const slotCounters = new Map<string, number>()
+    currData.forEach((c: any) => {
+      if (!c.group_id || !c.teacher_id) return
 
-    currData.forEach(c => {
       let hoursLeft = c.hours_per_week
       const isBlockSubject = blockSubjects.includes(c.subject_id)
-      
       const counterKey = `${c.group_id}-${c.subject_id}-${c.teacher_id}`
       let slotIdx = slotCounters.get(counterKey) || 0
 
       if (isBlockSubject) {
+        // Materias en bloque: agrupar de a 2 horas continuas
         while (hoursLeft >= 2) {
           blocksToAssign.push({ subject_id: c.subject_id, teacher_id: c.teacher_id, group_id: c.group_id, duration: 2, slotIndex: slotIdx++ })
           hoursLeft -= 2
         }
       }
+      // Hora restante o materias sin bloque: agregar de 1 en 1
       while (hoursLeft > 0) {
         blocksToAssign.push({ subject_id: c.subject_id, teacher_id: c.teacher_id, group_id: c.group_id, duration: 1, slotIndex: slotIdx++ })
         hoursLeft -= 1
@@ -404,8 +467,13 @@ export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterSched
     })
 
     setProgressMsg('Guardando en base de datos...')
-    // 6. Limpiar DB e Insertar
-    await supabase.from('sch_schedule_slots').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+    // 6. Limpiar DB e Insertar usando Server Actions (bypass RLS)
+    const clearResult = await clearAllScheduleSlotsAction()
+    if (!clearResult.success) {
+      toast.error(`Error al limpiar horario previo: ${clearResult.error || ''}`)
+      setGenerating(false)
+      return
+    }
     
     if (result.schedule.length > 0) {
       const toInsert = result.schedule.map(s => ({
@@ -417,11 +485,23 @@ export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterSched
         duration: s.duration || 1
       }))
       
-      const { error } = await supabase.from('sch_schedule_slots').insert(toInsert)
-      if (error) {
-        console.error('Error insertando slots de horario global:', error)
-        toast.error(`Error al guardar el horario: ${error.message || 'Error de base de datos'}`)
+      // Insertar en lotes de 200 para no superar límites de Supabase
+      const BATCH_SIZE = 200
+      let insertError: string | undefined
+      for (let i = 0; i < toInsert.length; i += BATCH_SIZE) {
+        const batch = toInsert.slice(i, i + BATCH_SIZE)
+        const saveResult = await saveScheduleSlotsAction(batch)
+        if (!saveResult.success) {
+          insertError = saveResult.error
+          break
+        }
+      }
+
+      if (insertError) {
+        console.error('Error insertando slots de horario global:', insertError)
+        toast.error(`Error al guardar el horario: ${insertError}`)
       } else {
+        toast.success(`✅ Horario generado: ${result.schedule.length} sesiones asignadas.`)
         const enrichedUnassigned = (result.unassigned || []).map(b => ({
           ...b,
           subject_name: subjects[b.subject_id]?.name || b.subject_id,
@@ -433,6 +513,8 @@ export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterSched
         if (enrichedUnassigned.length > 0) {
           setShowUnassignedModal(true)
           toast.warning(`Se encontraron ${enrichedUnassigned.length} bloques no asignados. Revisa los detalles en el modal.`)
+        } else {
+          toast.success('🎉 ¡Carga académica 100% asignada!')
         }
       }
     } else {
@@ -599,9 +681,9 @@ export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterSched
                             )
                           }
                           
-                          const slot = getSlot(entity.id, day, p)
+                          const matchingSlots = slots.filter(s => (viewMode === 'group' ? s.group_id === entity.id : s.teacher_id === entity.id) && s.day_of_week === day && s.period_id === p)
+                          const slot = matchingSlots[0]
                           const subject = slot ? subjects[slot.subject_id] : null
-                          const teacher = slot ? teachers[slot.teacher_id] : null
                           const duration = slot?.duration || 1
                           
                           if (duration > 1) {
@@ -610,13 +692,19 @@ export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterSched
 
                           // Calculate colSpan accounting for breaks
                           let finalColSpan = duration
-                          if (duration > 1) {
-                            finalColSpan = duration
-                          }
 
-                          const secondaryText = viewMode === 'group' 
-                            ? (teacher?.alias || teacher?.name.split(' ')[0])
-                            : groups.find(g => g.id === slot?.group_id)?.name
+                          let secondaryText = ''
+                          if (viewMode === 'group') {
+                            const tNames = matchingSlots
+                              .map(s => teachers[s.teacher_id]?.name ? (teachers[s.teacher_id]?.alias || teachers[s.teacher_id]?.name.split(' ')[0]) : null)
+                              .filter(Boolean)
+                            secondaryText = Array.from(new Set(tNames)).join(', ')
+                          } else {
+                            const gNames = matchingSlots
+                              .map(s => groups.find(g => g.id === s.group_id)?.name)
+                              .filter(Boolean)
+                            secondaryText = Array.from(new Set(gNames)).join(', ')
+                          }
 
                           return (
                             <td key={`${entity.id}-${day}-${p}`} colSpan={finalColSpan} className={`border-b border-slate-200 dark:border-slate-700 p-1 h-[50px] relative hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors ${borderClasses}`}>

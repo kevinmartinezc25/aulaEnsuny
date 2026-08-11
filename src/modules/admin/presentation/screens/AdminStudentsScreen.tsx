@@ -7,7 +7,7 @@ import {
   GraduationCap, Search, UserPlus, Trash2, Edit,
   Filter, CheckCircle, Loader2, AlertCircle, BookOpen, Link as LinkIcon
 } from 'lucide-react'
-import { getAcademicLevels, getAdminStudents } from '../../application/actions'
+import { getAcademicLevels, getAdminStudents, deleteAdminUser } from '../../application/actions'
 import { AcademicLevel } from '../../application/types'
 
 interface Student {
@@ -122,11 +122,21 @@ export function AdminStudentsScreen() {
     setIsDeleteModalOpen(true)
   }
 
-  const performDelete = () => {
+  const performDelete = async () => {
     if (deleteTargetId) {
-      setStudents(students.filter(s => s.id !== deleteTargetId))
-      setSuccessMsg('Estudiante retirado con éxito.')
-      setTimeout(() => setSuccessMsg(''), 3000)
+      try {
+        const res = await deleteAdminUser(deleteTargetId)
+        if (res.error) {
+          console.error('Error al retirar estudiante:', res.error)
+        } else {
+          setSuccessMsg('Estudiante retirado con éxito.')
+          const updated = await getAdminStudents()
+          setStudents(updated)
+          setTimeout(() => setSuccessMsg(''), 3000)
+        }
+      } catch (err: any) {
+        console.error('Error al eliminar el estudiante:', err)
+      }
     }
     setIsDeleteModalOpen(false)
     setDeleteTargetId(null)

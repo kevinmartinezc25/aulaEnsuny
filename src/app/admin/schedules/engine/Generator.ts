@@ -155,7 +155,8 @@ export class ScheduleGenerator {
             subjectId: b.subject_id || '',
             dayOfWeek: day,
             periodId: p,
-            duration: coGroup.duration
+            duration: coGroup.duration,
+            slotIndex: b.slotIndex
           }));
 
           currentSchedule.push(...candidateSessions);

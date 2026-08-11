@@ -8,8 +8,9 @@ import {
   Upload, Download, FileSpreadsheet
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
+import { toast } from 'sonner'
 import { createClient } from '@/core/config/supabase/client'
-import { getAdminTeachers, getAdminCourses, createAdminUser, updateAdminUser } from '../../application/actions'
+import { getAdminTeachers, getAdminCourses, createAdminUser, updateAdminUser, deleteAdminUser } from '../../application/actions'
 
 interface Teacher {
   id: string
@@ -33,6 +34,8 @@ export function AdminTeachersScreen() {
   const [form, setForm] = useState({ name: '', email: '', phone: '', subjects: '', status: 'active' as 'active' | 'inactive', password: '' })
   const [errorMsg, setErrorMsg] = useState('')
   const [successMsg, setSuccessMsg] = useState('')
+  const [teacherToDelete, setTeacherToDelete] = useState<Teacher | null>(null)
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
 
   const mockTeachers: Teacher[] = [
     { id: 't-1', name: 'Alejandro Giraldo', email: 'a.giraldo@ensuny.edu.co', phone: '312 456 7890', subjects: ['Física I', 'Física II'], status: 'active', joinedDate: '2024-01-15' },
@@ -203,6 +206,7 @@ export function AdminTeachersScreen() {
         const updatedTeachers = await getAdminTeachers()
         setTeachers(updatedTeachers)
         setSuccessMsg('Docente actualizado con éxito.')
+        toast.success('Docente actualizado con éxito')
       } else {
         const res = await createAdminUser({
           name: form.name,
@@ -220,21 +224,47 @@ export function AdminTeachersScreen() {
         const updatedTeachers = await getAdminTeachers()
         setTeachers(updatedTeachers)
         setSuccessMsg('Docente creado con éxito.')
+        toast.success('Docente creado con éxito')
       }
       setIsModalOpen(false)
       setTimeout(() => setSuccessMsg(''), 3000)
     } catch (err: any) {
       setErrorMsg(err.message || 'Error al guardar docente.')
+      toast.error(err.message || 'Error al guardar el docente')
     } finally {
       setIsSaving(false)
     }
   }
 
-  const handleDelete = (id: string) => {
-    if (confirm('¿Está seguro de que desea eliminar este docente del sistema?')) {
-      setTeachers(teachers.filter(t => t.id !== id))
-      setSuccessMsg('Docente eliminado con éxito.')
-      setTimeout(() => setSuccessMsg(''), 3000)
+  const handleDelete = (t: Teacher) => {
+    setTeacherToDelete(t)
+    setIsDeleteModalOpen(true)
+  }
+
+  const confirmDeleteTeacher = async () => {
+    if (!teacherToDelete) return
+
+    const targetId = teacherToDelete.id
+    const targetName = teacherToDelete.name
+
+    setIsDeleteModalOpen(false)
+    setTeacherToDelete(null)
+
+    // Actualización optimista inmediata de la UI
+    setTeachers(prev => prev.filter(t => t.id !== targetId))
+    toast.success(`Docente "${targetName}" eliminado con éxito`)
+
+    try {
+      const res = await deleteAdminUser(targetId)
+      if (res.error) {
+        toast.error(`Error al eliminar en el servidor: ${res.error}`)
+        const reloaded = await getAdminTeachers()
+        setTeachers(reloaded)
+      }
+    } catch (err: any) {
+      toast.error('Error al conectar con el servidor')
+      const reloaded = await getAdminTeachers()
+      setTeachers(reloaded)
     }
   }
 
@@ -249,6 +279,7 @@ export function AdminTeachersScreen() {
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Docentes')
     XLSX.writeFile(wb, 'Plantilla_Docentes.xlsx')
+    toast.info('Plantilla Excel descargada correctamente')
   }
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -258,6 +289,8 @@ export function AdminTeachersScreen() {
     setIsImporting(true)
     setErrorMsg('')
     setSuccessMsg('')
+    const toastId = toast.loading('Procesando archivo Excel e importando docentes...')
+
     try {
       const data = await file.arrayBuffer()
       const wb = XLSX.read(data)
@@ -300,15 +333,23 @@ export function AdminTeachersScreen() {
       setTeachers(updatedTeachers)
       
       if (successCount > 0 && errorCount === 0) {
-        setSuccessMsg(`¡Excelente! Se registraron ${successCount} docentes correctamente.`)
+        const msg = `¡Excelente! Se registraron ${successCount} docentes correctamente.`
+        setSuccessMsg(msg)
+        toast.success(msg, { id: toastId })
       } else if (successCount > 0 && errorCount > 0) {
-        setSuccessMsg(`Se registraron ${successCount} docentes, pero fallaron ${errorCount} (posiblemente correos duplicados o datos inválidos).`)
+        const msg = `Se registraron ${successCount} docentes, pero fallaron ${errorCount} registros.`
+        setSuccessMsg(msg)
+        toast.warning(msg, { id: toastId })
       } else {
-        setErrorMsg(`No se pudo registrar ningún docente. Fallaron ${errorCount} registros.`)
+        const msg = `No se pudo registrar ningún docente. Fallaron ${errorCount} registros.`
+        setErrorMsg(msg)
+        toast.error(msg, { id: toastId })
       }
       
     } catch (err: any) {
-      setErrorMsg('Error al procesar el archivo: ' + err.message)
+      const msg = 'Error al procesar el archivo: ' + err.message
+      setErrorMsg(msg)
+      toast.error(msg, { id: toastId })
     } finally {
       setIsImporting(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
@@ -447,8 +488,8 @@ export function AdminTeachersScreen() {
                   <td className="px-6 py-4">
                     <div className="flex flex-wrap gap-1">
                       {t.subjects.length > 0 ? (
-                        t.subjects.map(sub => (
-                          <span key={sub} className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 border border-blue-100/30">
+                        t.subjects.map((sub, idx) => (
+                          <span key={`${sub}-${idx}`} className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 border border-blue-100/30">
                             {sub}
                           </span>
                         ))
@@ -484,7 +525,7 @@ export function AdminTeachersScreen() {
                         <Edit className="h-4 w-4" />
                       </button>
                       <button
-                        onClick={() => handleDelete(t.id)}
+                        onClick={() => handleDelete(t)}
                         className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/20 text-red-500 hover:text-red-700 transition-colors"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -647,6 +688,57 @@ export function AdminTeachersScreen() {
                 >
                   {isSaving ? <Loader2 className="h-4.5 w-4.5 animate-spin" /> : <Save className="h-4.5 w-4.5" />}
                   <span>{editingTeacher ? 'Actualizar Ficha' : 'Guardar Ficha'}</span>
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Modal Confirmar Eliminar Docente */}
+      <AnimatePresence>
+        {isDeleteModalOpen && teacherToDelete && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.4 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsDeleteModalOpen(false)}
+              className="fixed inset-0 bg-black z-50"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="fixed inset-x-4 bottom-4 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-[440px] bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl p-6 shadow-2xl z-50 text-left"
+            >
+              <div className="flex items-center gap-3.5 mb-4">
+                <div className="p-3 bg-red-50 dark:bg-red-950/30 text-red-600 rounded-2xl">
+                  <Trash2 className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 dark:text-white text-lg">¿Eliminar docente?</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Esta acción no se puede deshacer.</p>
+                </div>
+              </div>
+
+              <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed mb-6">
+                ¿Está seguro de que desea eliminar a <strong className="text-slate-900 dark:text-white font-semibold">{teacherToDelete.name}</strong> del sistema institucional? Se desvincularán sus cargas académicas de forma permanente.
+              </p>
+
+              <div className="flex justify-end gap-3 border-t border-slate-100 dark:border-slate-800/60 pt-4">
+                <button
+                  onClick={() => setIsDeleteModalOpen(false)}
+                  className="px-4 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 font-semibold text-xs transition-all cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmDeleteTeacher}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-semibold text-xs transition-all cursor-pointer shadow-lg shadow-red-600/20"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>Sí, eliminar docente</span>
                 </button>
               </div>
             </motion.div>

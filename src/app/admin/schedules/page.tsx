@@ -20,6 +20,7 @@ import GroupsDrawer from './components/GroupsDrawer'
 import ScheduleCanvas from './components/ScheduleCanvas'
 import MasterScheduleCanvas from './components/MasterScheduleCanvas'
 import { getAdminUsers } from '@/modules/admin/application/actions'
+import { isOfficialGradeGroup } from './utils/groupFilters'
 
 export default function SchedulesMainPage() {
   const [view, setView] = useState<'grid'|'list'>('grid')
@@ -51,11 +52,13 @@ export default function SchedulesMainPage() {
     ])
     
     if (gData.data) {
-      // Map the director name correctly from profiles
-      const mappedGroups = gData.data.map((g: any) => ({
-        ...g,
-        director: g.director ? { name: `${g.director.first_name} ${g.director.last_name}`.trim() } : null
-      }))
+      // Map the director name correctly from profiles and filter only official 6° to 13° and Nivelatorio groups
+      const mappedGroups = gData.data
+        .filter((g: any) => isOfficialGradeGroup(g.name))
+        .map((g: any) => ({
+          ...g,
+          director: g.director ? { name: `${g.director.first_name} ${g.director.last_name}`.trim() } : null
+        }))
       const sortedGroups = mappedGroups.sort((a: any, b: any) => a.name.localeCompare(b.name, undefined, { numeric: true }))
       const groupsWithGeneral = [{ id: 'general-all', name: 'GENERAL' }, ...sortedGroups]
       setGroups(groupsWithGeneral)

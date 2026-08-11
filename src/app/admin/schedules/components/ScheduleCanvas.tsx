@@ -8,12 +8,14 @@ import { createClient } from '@/core/config/supabase/client'
 import { generateTimeSlots, TimeSlot } from '../utils/timeCalculator'
 import MobileTeacherSchedule from '@/app/(dashboard)/teacher/schedule/components/MobileTeacherSchedule'
 import { toast } from 'sonner'
+import { getScheduleSlotsAction, clearGroupScheduleSlotsAction, saveScheduleSlotsAction } from '@/modules/admin/application/actions'
 import { ScheduleGenerator, GeneratorConfig } from '../engine/Generator'
 import { RuleContext, ClassSession } from '../engine/types'
 
 import SlotEditorModal from './SlotEditorModal'
 import PrintableSchedule from './PrintableSchedule'
 import UnassignedBlocksModal from './UnassignedBlocksModal'
+import { isOfficialGradeGroup } from '../utils/groupFilters'
 
 const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes']
 
@@ -110,39 +112,85 @@ export default function ScheduleCanvas({
 
   const fetchSchedule = async () => {
     setLoading(true)
-    const query = supabase
-      .from('sch_schedule_slots')
-      .select(`
-        id,
-        day_of_week,
-        period_id,
-        duration,
-        group:sch_groups(name),
-        teacher:profiles(first_name, last_name),
-        subject:sch_subjects(name, color, room_type),
-        classroom:sch_classrooms(name)
-      `)
-      
-    if (entityType === 'teacher') {
-      query.eq('teacher_id', entityId)
-    } else {
-      query.eq('group_id', entityId)
+    let data: any[] = []
+    try {
+      data = await getScheduleSlotsAction(entityType, entityId)
+    } catch (e) {
+      console.error('Error fetching slots with action:', e)
     }
 
-    const { data, error } = await query
+    if (!data || data.length === 0) {
+      const query = supabase
+        .from('sch_schedule_slots')
+        .select(`
+          id,
+          day_of_week,
+          period_id,
+          duration,
+          group:sch_groups(name),
+          teacher:profiles(first_name, last_name),
+          subject:sch_subjects(name, color, room_type),
+          classroom:sch_classrooms(name)
+        `)
+        
+      if (entityType === 'teacher') {
+        query.eq('teacher_id', entityId)
+      } else {
+        query.eq('group_id', entityId)
+      }
 
-    if (!error && data) {
-      const formattedClasses = data.map((d: any) => ({
-        id: d.id,
-        day: d.day_of_week,
-        period: d.period_id,
-        duration: d.duration,
-        subject: d.subject?.name || 'Libre',
-        teacher: entityType === 'teacher' ? (d.group?.name || 'Sin grupo') : (d.teacher ? `${d.teacher.first_name} ${d.teacher.last_name}`.trim() : 'Sin asignar'),
-        room: d.classroom?.name || '',
-        color: d.subject?.color || '#ffffff',
-        group: d.group?.name || ''
-      }))
+      const { data: resData } = await query
+      if (resData) data = resData
+    }
+
+    if (data) {
+      const groupedSlots = new Map<string, any>()
+      
+      data.forEach((d: any) => {
+        const slotKey = `${d.day_of_week}-${d.period_id}-${entityType === 'group' ? d.subject_id : (d.subject_id || d.group_id)}`
+        if (!groupedSlots.has(slotKey)) {
+          groupedSlots.set(slotKey, {
+            id: d.id,
+            day: d.day_of_week,
+            period: d.period_id,
+            duration: d.duration || 1,
+            subject: d.subject?.name || 'Libre',
+            teachers: [],
+            groups: [],
+            color: d.subject?.color || '#ffffff',
+            room: d.classroom?.name || ''
+          })
+        }
+        const item = groupedSlots.get(slotKey)!
+        if (d.teacher) {
+          const tName = `${d.teacher.first_name || ''} ${d.teacher.last_name || ''}`.trim()
+          if (tName && !item.teachers.includes(tName)) item.teachers.push(tName)
+        }
+        if (d.group?.name && !item.groups.includes(d.group.name)) {
+          item.groups.push(d.group.name)
+        }
+      })
+
+      const formattedClasses = Array.from(groupedSlots.values()).map((item: any) => {
+        const officialGroupNames = item.groups.filter((gName: string) => isOfficialGradeGroup(gName))
+        const displayGroup = officialGroupNames.length > 0 
+          ? officialGroupNames.join(', ') 
+          : (item.groups.length > 0 ? 'Comité / Reunión Docente' : 'Docentes')
+
+        return {
+          id: item.id,
+          day: item.day,
+          period: item.period,
+          duration: item.duration,
+          subject: item.subject,
+          teacher: entityType === 'teacher' 
+            ? displayGroup 
+            : (item.teachers.join(', ') || 'Sin asignar'),
+          room: item.room,
+          color: item.color,
+          group: displayGroup
+        }
+      })
       setClasses(formattedClasses)
     }
     setLoading(false)
@@ -270,8 +318,13 @@ export default function ScheduleCanvas({
     setProgress(0)
     setProgressMsg('Preparando motor de reglas...')
     
-    // 1. Limpiar horario actual del grupo
-    await supabase.from('sch_schedule_slots').delete().eq('group_id', entityId)
+    // 1. Limpiar horario actual del grupo usando Server Action (bypass RLS)
+    const clearResult = await clearGroupScheduleSlotsAction(entityId)
+    if (!clearResult.success) {
+      toast.error(`Error al limpiar el horario: ${clearResult.error || ''}`)
+      setGenerating(false)
+      return
+    }
 
     const { data: currData } = await supabase.from('sch_curriculum').select('*').eq('group_id', entityId)
 
@@ -341,7 +394,7 @@ export default function ScheduleCanvas({
     } else if (!breaks) {
       breaks = []
     }
-    const breakPeriods = breaks.map((b: any) => b.afterPeriod)
+    const breakPeriods: number[] = []
     
     const groupPeriods = JSON.parse(localStorage.getItem('sch_group_periods') || '{}')
     const periodsPerDay = groupPeriods[entityId] || parseInt(settings.periodsPerDay || '7', 10)
@@ -376,18 +429,29 @@ export default function ScheduleCanvas({
       breakPeriods
     }
 
-    const blockSubjects = JSON.parse(localStorage.getItem('sch_block_subjects') || '[]')
+    const dbBlockConstraint = (constraintsData || []).find((c: any) => c.rule_type === 'BLOCK_SUBJECTS_CONFIG' && c.is_active !== false)
+    const blockSubjects: string[] = dbBlockConstraint?.parameters?.subject_ids && Array.isArray(dbBlockConstraint.parameters.subject_ids)
+      ? dbBlockConstraint.parameters.subject_ids
+      : JSON.parse(localStorage.getItem('sch_block_subjects') || '[]')
 
     const blocksToAssign: any[] = []
+    const slotCounters = new Map<string, number>()
     currData.forEach(c => {
       let hoursLeft = c.hours_per_week
       const isBlockSubject = blockSubjects.includes(c.subject_id)
-      let slotIdx = 0
-      while (hoursLeft >= (isBlockSubject ? 2 : 1)) {
-        blocksToAssign.push({ subject_id: c.subject_id, teacher_id: c.teacher_id, group_id: c.group_id, duration: isBlockSubject ? 2 : 1, slotIndex: slotIdx++ })
-        hoursLeft -= (isBlockSubject ? 2 : 1)
+      const counterKey = `${c.group_id}-${c.subject_id}-${c.teacher_id}`
+      let slotIdx = slotCounters.get(counterKey) || 0
+      if (isBlockSubject) {
+        while (hoursLeft >= 2) {
+          blocksToAssign.push({ subject_id: c.subject_id, teacher_id: c.teacher_id, group_id: c.group_id, duration: 2, slotIndex: slotIdx++ })
+          hoursLeft -= 2
+        }
       }
-      if (hoursLeft > 0) blocksToAssign.push({ subject_id: c.subject_id, teacher_id: c.teacher_id, group_id: c.group_id, duration: 1, slotIndex: slotIdx++ })
+      while (hoursLeft > 0) {
+        blocksToAssign.push({ subject_id: c.subject_id, teacher_id: c.teacher_id, group_id: c.group_id, duration: 1, slotIndex: slotIdx++ })
+        hoursLeft -= 1
+      }
+      slotCounters.set(counterKey, slotIdx)
     })
 
 
@@ -424,10 +488,10 @@ export default function ScheduleCanvas({
         duration: s.duration || 1
       }))
       
-      const { error } = await supabase.from('sch_schedule_slots').insert(toInsert)
-      if (error) {
-        console.error('Error insertando slots de horario:', error)
-        toast.error(`Error al guardar el horario: ${error.message || 'Error de base de datos'}`)
+      const saveResult = await saveScheduleSlotsAction(toInsert)
+      if (!saveResult.success) {
+        console.error('Error insertando slots de horario:', saveResult.error)
+        toast.error(`Error al guardar el horario: ${saveResult.error || 'Error de base de datos'}`)
       } else {
         const { data: subjsData } = await supabase.from('sch_subjects').select('id, name')
         const { data: profsData } = await supabase.from('profiles').select('id, first_name, last_name')
@@ -445,8 +509,9 @@ export default function ScheduleCanvas({
         if (enrichedUnassigned.length > 0) {
           setShowUnassignedModal(true)
           toast.warning(`${enrichedUnassigned.length} bloques no pudieron asignarse. Revisa el desglose en el modal.`)
+        } else {
+          toast.success(`✅ Horario del grupo generado: ${result.schedule.length} sesiones asignadas.`)
         }
-
       }
 
     } else {

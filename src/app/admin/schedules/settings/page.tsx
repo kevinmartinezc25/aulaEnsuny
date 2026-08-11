@@ -5,6 +5,7 @@ import { Settings2, Save, Clock, CalendarDays, AlignLeft, Eye, Sun, LayoutGrid, 
 import { toast } from 'sonner'
 import { createClient } from '@/core/config/supabase/client'
 import { Break, generateTimeSlots, TimeSlot } from '../utils/timeCalculator'
+import { isOfficialGradeGroup } from '../utils/groupFilters'
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState({
@@ -63,19 +64,33 @@ export default function SettingsPage() {
       }
     }
     
-    const savedBlocks = localStorage.getItem('sch_block_subjects')
-    if (savedBlocks) {
-      try { setBlockSubjects(JSON.parse(savedBlocks)) } catch(e) {}
-    }
-
-    const savedGroupPeriods = localStorage.getItem('sch_group_periods')
-    if (savedGroupPeriods) {
-      try { setGroupPeriods(JSON.parse(savedGroupPeriods)) } catch(e) {}
-    }
-
+    fetchBlockSubjects()
     fetchSubjects()
     fetchGroups()
   }, [])
+
+  const fetchBlockSubjects = async () => {
+    const { data: constraint } = await supabase
+      .from('sch_constraints')
+      .select('parameters')
+      .eq('rule_type', 'BLOCK_SUBJECTS_CONFIG')
+      .maybeSingle()
+
+    if (constraint?.parameters?.subject_ids && Array.isArray(constraint.parameters.subject_ids) && constraint.parameters.subject_ids.length > 0) {
+      setBlockSubjects(constraint.parameters.subject_ids)
+      localStorage.setItem('sch_block_subjects', JSON.stringify(constraint.parameters.subject_ids))
+    } else {
+      // Fallback: materias con 2+ horas en la malla curricular
+      const { data: curr } = await supabase.from('sch_curriculum').select('subject_id, hours_per_week')
+      const multiHourIds = new Set<string>()
+      curr?.forEach((c: any) => {
+        if (c.hours_per_week >= 2 && c.subject_id) multiHourIds.add(c.subject_id)
+      })
+      const idsArray = Array.from(multiHourIds)
+      setBlockSubjects(idsArray)
+      localStorage.setItem('sch_block_subjects', JSON.stringify(idsArray))
+    }
+  }
 
   const fetchSubjects = async () => {
     const { data } = await supabase.from('sch_subjects').select('id, name, color').order('name')
@@ -85,18 +100,42 @@ export default function SettingsPage() {
   const fetchGroups = async () => {
     const { data } = await supabase.from('sch_groups').select('id, name').order('name')
     if (data) {
-      // Sort groups logically (e.g. 10°-1, 10°-2)
-      const sortedGroups = data.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
+      const officialGroups = data.filter((g: any) => isOfficialGradeGroup(g.name))
+      const sortedGroups = officialGroups.sort((a: any, b: any) => a.name.localeCompare(b.name, undefined, { numeric: true }))
       setGroups(sortedGroups)
     }
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const settingsToSave = { ...settings, breaks }
     localStorage.setItem('sch_settings', JSON.stringify(settingsToSave))
     localStorage.setItem('sch_active_period', settings.academicYear)
     localStorage.setItem('sch_block_subjects', JSON.stringify(blockSubjects))
     localStorage.setItem('sch_group_periods', JSON.stringify(groupPeriods))
+
+    // Guardar también en BD sch_constraints para persistencia entre dispositivos/recargas
+    const { data: existing } = await supabase
+      .from('sch_constraints')
+      .select('id')
+      .eq('rule_type', 'BLOCK_SUBJECTS_CONFIG')
+      .maybeSingle()
+
+    if (existing) {
+      await supabase
+        .from('sch_constraints')
+        .update({ parameters: { subject_ids: blockSubjects }, is_active: true })
+        .eq('id', existing.id)
+    } else {
+      await supabase.from('sch_constraints').insert({
+        rule_type: 'BLOCK_SUBJECTS_CONFIG',
+        target_entity_type: 'GLOBAL',
+        target_entity_id: null,
+        parameters: { subject_ids: blockSubjects },
+        weight: 100,
+        is_active: true
+      })
+    }
+
     toast.success('Ajustes guardados. Los cambios en la cuadrícula de horarios requerirán recargar la vista del lienzo.')
   }
 
@@ -406,7 +445,7 @@ export default function SettingsPage() {
             <div className="mt-6 bg-indigo-50/50 dark:bg-indigo-900/10 border border-indigo-100 dark:border-indigo-800/30 rounded-xl p-4">
               <h4 className="text-xs font-bold text-indigo-800 dark:text-indigo-300 uppercase tracking-wider mb-3">Previsualización de Tiempos</h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                {timePreview.map((slot, i) => (
+                {timePreview.map((slot: any, i: number) => (
                   <div key={i} className={`px-3 py-2 rounded-lg text-xs flex justify-between items-center ${slot.type === 'break' ? 'bg-amber-100/50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 font-bold border border-amber-200/50 dark:border-amber-700/50' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700'}`}>
                     <span className={slot.type === 'period' ? 'font-bold text-slate-700 dark:text-slate-300' : ''}>
                       {slot.type === 'period' ? `${slot.id}ª Hora` : slot.name}
