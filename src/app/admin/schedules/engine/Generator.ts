@@ -1,5 +1,6 @@
 import { ClassSession, RuleContext } from './types';
 import { RuleEngine } from './RuleEngine';
+import { isOfficialGradeGroup } from '../utils/groupFilters';
 
 export interface CurriculumBlock {
   subject_id: string;
@@ -84,14 +85,20 @@ export class ScheduleGenerator {
     for (const b of curriculum) {
       let sIdx = b.slotIndex;
       if (sIdx === undefined) {
-        // Asignar slotIndex basado en el docente. Así, el 1er bloque de Kevin, el 1er de Gloria y el 1er de Ana 
-        // compartirán el mismo slotIndex (0) y se agruparán en el mismo CoGroup.
         const teacherKey = `${b.group_id}-${b.subject_id}-${b.teacher_id || 'unassigned'}`;
         sIdx = fallbackSlotCounters.get(teacherKey) || 0;
         fallbackSlotCounters.set(teacherKey, sIdx + 1);
+        b.slotIndex = sIdx;
       }
 
-      const key = `${b.group_id}-${b.subject_id}-slot${sIdx}`;
+      const isMultiTeacherSubj = multiTeacherSubjectIds.has(b.subject_id) || !b.group_id || !isOfficialGradeGroup(b.group_id);
+
+      // slotIndex === 0 es la hora de reunión/encuentro compartida por todos los docentes.
+      // slotIndex > 0 son horas individuales de cada docente que se agendan independientemente en su horario.
+      const key = (sIdx === 0 || !isMultiTeacherSubj)
+        ? `${b.group_id}-${b.subject_id}-slot${sIdx}`
+        : `${b.group_id}-${b.subject_id}-${b.teacher_id || 'unassigned'}-slot${sIdx}`;
+
       if (!coGroupMap.has(key)) {
         coGroupMap.set(key, {
           key,
@@ -219,9 +226,15 @@ export class ScheduleGenerator {
           const teacherKey = `${b.group_id}-${b.subject_id}-${b.teacher_id || 'unassigned'}`;
           sIdx = rescueSlotCounters.get(teacherKey) || 0;
           rescueSlotCounters.set(teacherKey, sIdx + 1);
+          b.slotIndex = sIdx;
         }
 
-        const key = `${b.group_id}-${b.subject_id}-slot${sIdx}`;
+        const isMultiTeacherSubj = multiTeacherSubjectIds.has(b.subject_id) || !b.group_id || !isOfficialGradeGroup(b.group_id);
+
+        const key = (sIdx === 0 || !isMultiTeacherSubj)
+          ? `${b.group_id}-${b.subject_id}-slot${sIdx}`
+          : `${b.group_id}-${b.subject_id}-${b.teacher_id || 'unassigned'}-slot${sIdx}`;
+
         if (!rescueCoGroupMap.has(key)) {
           rescueCoGroupMap.set(key, {
             key,

@@ -34,22 +34,21 @@ export default function SettingsPage() {
   const supabase = createClient()
 
   useEffect(() => {
+    fetchGlobalSettings()
+    fetchBlockSubjects()
+    fetchGroupPeriods()
+    fetchSubjects()
+    fetchGroups()
+  }, [])
+
+  const fetchGlobalSettings = async () => {
     const savedSettings = localStorage.getItem('sch_settings')
     if (savedSettings) {
       try {
         const parsed = JSON.parse(savedSettings)
-        
-        // Remove breakPeriod and handle breaks array
         const { breakPeriod, breaks: savedBreaksArray, ...restParsed } = parsed
         setSettings(s => ({ ...s, ...restParsed }))
-        
-        if (savedBreaksArray) {
-          setBreaks(savedBreaksArray)
-        } else if (breakPeriod) {
-          // Backward compatibility
-          setBreaks([{ id: '1', name: 'Recreo', afterPeriod: parseInt(breakPeriod, 10), durationMinutes: 30 }])
-        }
-
+        if (savedBreaksArray) setBreaks(savedBreaksArray)
         if (parsed.academicYear && !periods.includes(parsed.academicYear)) {
           setPeriods(prev => [...prev, parsed.academicYear])
         }
@@ -63,11 +62,43 @@ export default function SettingsPage() {
         setSettings(s => ({ ...s, academicYear: savedPeriod }))
       }
     }
-    
-    fetchBlockSubjects()
-    fetchSubjects()
-    fetchGroups()
-  }, [])
+
+    // Always check DB sch_constraints for GLOBAL_SETTINGS_CONFIG
+    const { data: constraint } = await supabase
+      .from('sch_constraints')
+      .select('parameters')
+      .eq('rule_type', 'GLOBAL_SETTINGS_CONFIG')
+      .maybeSingle()
+
+    if (constraint?.parameters?.settings) {
+      const dbSettings = constraint.parameters.settings
+      const { breaks: dbBreaks, ...restDbSettings } = dbSettings
+      setSettings(s => ({ ...s, ...restDbSettings }))
+      if (dbBreaks && Array.isArray(dbBreaks)) setBreaks(dbBreaks)
+      localStorage.setItem('sch_settings', JSON.stringify(dbSettings))
+      if (dbSettings.academicYear) localStorage.setItem('sch_active_period', dbSettings.academicYear)
+    }
+  }
+
+  const fetchGroupPeriods = async () => {
+    const saved = localStorage.getItem('sch_group_periods')
+    if (saved) {
+      try {
+        setGroupPeriods(JSON.parse(saved))
+      } catch (e) {}
+    }
+
+    const { data: constraint } = await supabase
+      .from('sch_constraints')
+      .select('parameters')
+      .eq('rule_type', 'GROUP_PERIODS_CONFIG')
+      .maybeSingle()
+
+    if (constraint?.parameters?.group_periods) {
+      setGroupPeriods(constraint.parameters.group_periods)
+      localStorage.setItem('sch_group_periods', JSON.stringify(constraint.parameters.group_periods))
+    }
+  }
 
   const fetchBlockSubjects = async () => {
     const { data: constraint } = await supabase
@@ -113,30 +144,76 @@ export default function SettingsPage() {
     localStorage.setItem('sch_block_subjects', JSON.stringify(blockSubjects))
     localStorage.setItem('sch_group_periods', JSON.stringify(groupPeriods))
 
-    // Guardar también en BD sch_constraints para persistencia entre dispositivos/recargas
-    const { data: existing } = await supabase
+    // Guardar en BD sch_constraints (GLOBAL_SETTINGS_CONFIG)
+    const { data: existingGlobal } = await supabase
+      .from('sch_constraints')
+      .select('id')
+      .eq('rule_type', 'GLOBAL_SETTINGS_CONFIG')
+      .maybeSingle()
+
+    if (existingGlobal) {
+      await supabase
+        .from('sch_constraints')
+        .update({ parameters: { settings: settingsToSave }, is_active: true })
+        .eq('id', existingGlobal.id)
+    } else {
+      await supabase.from('sch_constraints').insert({
+        rule_type: 'GLOBAL_SETTINGS_CONFIG',
+        target_entity_type: 'GLOBAL',
+        target_entity_id: null,
+        parameters: { settings: settingsToSave },
+        weight: 'STRICT',
+        is_active: true
+      })
+    }
+
+    // Guardar en BD sch_constraints (BLOCK_SUBJECTS_CONFIG)
+    const { data: existingBlock } = await supabase
       .from('sch_constraints')
       .select('id')
       .eq('rule_type', 'BLOCK_SUBJECTS_CONFIG')
       .maybeSingle()
 
-    if (existing) {
+    if (existingBlock) {
       await supabase
         .from('sch_constraints')
         .update({ parameters: { subject_ids: blockSubjects }, is_active: true })
-        .eq('id', existing.id)
+        .eq('id', existingBlock.id)
     } else {
       await supabase.from('sch_constraints').insert({
         rule_type: 'BLOCK_SUBJECTS_CONFIG',
         target_entity_type: 'GLOBAL',
         target_entity_id: null,
         parameters: { subject_ids: blockSubjects },
-        weight: 100,
+        weight: 'STRICT',
         is_active: true
       })
     }
 
-    toast.success('Ajustes guardados. Los cambios en la cuadrícula de horarios requerirán recargar la vista del lienzo.')
+    // Guardar en BD sch_constraints (GROUP_PERIODS_CONFIG)
+    const { data: existingGroupPeriods } = await supabase
+      .from('sch_constraints')
+      .select('id')
+      .eq('rule_type', 'GROUP_PERIODS_CONFIG')
+      .maybeSingle()
+
+    if (existingGroupPeriods) {
+      await supabase
+        .from('sch_constraints')
+        .update({ parameters: { group_periods: groupPeriods }, is_active: true })
+        .eq('id', existingGroupPeriods.id)
+    } else {
+      await supabase.from('sch_constraints').insert({
+        rule_type: 'GROUP_PERIODS_CONFIG',
+        target_entity_type: 'GLOBAL',
+        target_entity_id: null,
+        parameters: { group_periods: groupPeriods },
+        weight: 'STRICT',
+        is_active: true
+      })
+    }
+
+    toast.success('Ajustes guardados correctamente en la base de datos.')
   }
 
   const handleAddPeriod = () => {

@@ -1,6 +1,7 @@
 import React from 'react'
 import { TimeSlot } from '../utils/timeCalculator'
 import { Calendar, Clock, GraduationCap, Quote, School, Users, User, CalendarDays } from 'lucide-react'
+import { isOfficialGradeGroup } from '../utils/groupFilters'
 
 interface PrintableScheduleProps {
   groupName: string
@@ -22,12 +23,22 @@ const DAYS = [
 export default function PrintableSchedule({ groupName, directorName, classes, timeSlots, groupMax, isTeacherView = false }: PrintableScheduleProps) {
   const allSlots = timeSlots.filter(s => s.type !== 'break' && s.id! <= groupMax)
 
+  // Filter classes for student group view so non-academic / multi-teacher meetings do not appear
+  const filteredClasses = isTeacherView
+    ? classes
+    : classes.filter(c => {
+        if (!c.group) return true
+        const gStr = String(c.group)
+        if (gStr.includes('Comité') || gStr.includes('Reunión') || gStr.includes('DOCENTES')) return false
+        return isOfficialGradeGroup(gStr)
+      })
+
   const isCoveredByPreviousBlock = (day: string, period: number) => {
-    return classes.some(c => c.day === day && period > c.period && period < c.period + (c.duration || 1))
+    return filteredClasses.some(c => c.day === day && period > c.period && period < c.period + (c.duration || 1))
   }
 
   const getStartingClass = (day: string, period: number) => {
-    return classes.find(c => c.day === day && c.period === period)
+    return filteredClasses.find(c => c.day === day && c.period === period)
   }
 
   return (

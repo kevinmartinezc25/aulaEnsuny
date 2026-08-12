@@ -565,32 +565,9 @@ export class MultiTeacherSameSlotRule implements IScheduleRule {
             }
           }
 
-          // Relaxed: Instead of forcing ALL teachers to be present in EVERY slot (which breaks if hours are mismatched 
-          // or if the user made a manual partial assignment), we only penalize or reject if there is a CLEAR split
-          // where teachers are scheduled at DIFFERENT times without overlapping.
-          // Since the Generator already synchronizes CoGroups, we can safely skip the rigid size check.
-          // A conflict is when we have multiple distinct slots where a subset of teachers is present, but they don't align.
-          
-          let maxTeachersInASlot = 0;
-          for (const teachersInSlot of slotMap.values()) {
-            if (teachersInSlot.size > maxTeachersInASlot) {
-              maxTeachersInASlot = teachersInSlot.size;
-            }
-          }
-
-          for (const [slotKey, teachersInSlot] of slotMap.entries()) {
-            // Si el slot actual tiene menos docentes que el máximo encontrado, y además NO contiene docentes nuevos
-            // (es decir, están divididos), podríamos marcarlo. Pero para ser seguros y evitar falsos positivos
-            // con horas dispares, dejaremos que la heurística de CoGroup haga el trabajo duro.
-            if (teachersInSlot.size < maxTeachersInASlot && maxTeachersInASlot > 1) {
-               // En lugar de retornar false y abortar la generación, agregamos una penalidad para disuadirlo.
-               return {
-                 isValid: true,
-                 scorePenalty: 50, // Penalización fuerte pero no bloqueante
-                 message: 'Advertencia: Horas desiguales o asíncronas en materia multi-docente.'
-               };
-            }
-          }
+          // CoGroup handles synchronizing the 1st shared meeting hour (slot0)
+          // Individual slots (slotIndex > 0) are scheduled independently per teacher
+          // without incurring penalties for asynchronous teacher presence.
         }
 
         // Validar fixedDay y fixedPeriod si están definidos en los parámetros de la regla
@@ -684,6 +661,97 @@ export class MultiTeacherAtLeastOneSharedHourRule implements IScheduleRule {
     }
 
     return { isValid: true, scorePenalty: 0 };
+  }
+}
+
+export class TeacherMaxFullDaysRule implements IScheduleRule {
+  readonly code = 'TEACHER_MAX_FULL_DAYS';
+  readonly isMandatory = true;
+
+  validate(schedule: ClassSession[], context: RuleContext): RuleResult {
+    const ruleConfig = context.constraints.find(c => c.ruleType === 'TEACHER_MAX_FULL_DAYS');
+    if (ruleConfig && ruleConfig.isActive === false) {
+      return { isValid: true, scorePenalty: 0 };
+    }
+
+    const targetFullDays = ruleConfig?.parameters?.max_full_days ?? 2; // Exactamente 2 días objetivo
+    const fullDayThreshold = ruleConfig?.parameters?.full_day_hours ?? 6; // Jornada completa de 6 horas
+    const weightMultiplier = ruleConfig?.weight === 'STRICT' ? 100 : ruleConfig?.weight === 'HIGH' ? 50 : 25;
+
+    const multiTeacherSubjectIdsSet = new Set<string>(context.multiTeacherSubjectIds || []);
+    const normalWorkloadSubjectIdsSet = new Set<string>(context.normalWorkloadSubjectIds || []);
+
+    const teacherDailyHours = new Map<string, Map<string, { totalHours: number; sessionIds: string[] }>>();
+
+    for (const session of schedule) {
+      if (!session.teacherId) continue;
+
+      if (
+        session.subjectId &&
+        multiTeacherSubjectIdsSet.has(session.subjectId) &&
+        !normalWorkloadSubjectIdsSet.has(session.subjectId)
+      ) {
+        continue;
+      }
+
+      if (!teacherDailyHours.has(session.teacherId)) {
+        teacherDailyHours.set(session.teacherId, new Map());
+      }
+
+      const dayMap = teacherDailyHours.get(session.teacherId)!;
+      if (!dayMap.has(session.dayOfWeek)) {
+        dayMap.set(session.dayOfWeek, { totalHours: 0, sessionIds: [] });
+      }
+
+      const dayInfo = dayMap.get(session.dayOfWeek)!;
+      dayInfo.totalHours += session.duration || 1;
+      if (session.id) dayInfo.sessionIds.push(session.id);
+    }
+
+    const conflictingSessionIds: string[] = [];
+    let totalPenalty = 0;
+    let hasFailure = false;
+    let failureMsg = '';
+
+    for (const [teacherId, dayMap] of teacherDailyHours.entries()) {
+      let fullDaysCount = 0;
+      let totalWeeklyHours = 0;
+      const allTeacherSessions: string[] = [];
+
+      for (const [day, dayInfo] of dayMap.entries()) {
+        totalWeeklyHours += dayInfo.totalHours;
+        allTeacherSessions.push(...dayInfo.sessionIds);
+        if (dayInfo.totalHours >= fullDayThreshold) {
+          fullDaysCount++;
+        }
+      }
+
+      // Si sobrepasa el máximo permitido de 2 días con 6 horas
+      if (fullDaysCount > targetFullDays) {
+        hasFailure = true;
+        totalPenalty += (fullDaysCount - targetFullDays) * weightMultiplier * 2;
+        conflictingSessionIds.push(...allTeacherSessions);
+        if (!failureMsg) {
+          failureMsg = `Un docente supera el límite máximo de ${targetFullDays} días con 6 horas completas (encontrados: ${fullDaysCount} días).`;
+        }
+      }
+      // Si tiene suficiente carga lectiva (>= 12h) pero no completa los 2 días de 6 horas
+      else if (totalWeeklyHours >= targetFullDays * fullDayThreshold && fullDaysCount < targetFullDays) {
+        totalPenalty += (targetFullDays - fullDaysCount) * weightMultiplier;
+      }
+    }
+
+    if (hasFailure) {
+      const isStrict = !ruleConfig || ruleConfig.weight === 'STRICT';
+      return {
+        isValid: !isStrict,
+        scorePenalty: totalPenalty > 0 ? totalPenalty : 100,
+        message: failureMsg,
+        conflictingSessionIds
+      };
+    }
+
+    return { isValid: true, scorePenalty: totalPenalty };
   }
 }
 

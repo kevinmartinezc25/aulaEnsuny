@@ -7,7 +7,7 @@ export const isOfficialGradeGroup = (groupName: string): boolean => {
   const trimmed = groupName.trim()
   const upper = trimmed.toUpperCase()
 
-  // Exclude non-academic / meeting / committee pseudo-groups (e.g. Com Inv, Comité de Investigación, Nucleo Ciencias)
+  // Exclude non-academic / meeting / committee pseudo-groups (e.g. DOCENTES_INSTITUCIONAL, Com Inv, Comité, Nucleo)
   if (
     upper.startsWith('COM') ||
     upper.includes('COMITE') ||
@@ -16,7 +16,9 @@ export const isOfficialGradeGroup = (groupName: string): boolean => {
     upper.includes('NUCLEO') ||
     upper.includes('NÚCLEO') ||
     upper.includes('REUNION') ||
-    upper.includes('REUNIÓN')
+    upper.includes('REUNIÓN') ||
+    upper.includes('DOCENTE') ||
+    upper.includes('INSTITUCIONAL')
   ) {
     return false
   }

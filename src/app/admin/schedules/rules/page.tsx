@@ -12,6 +12,7 @@ const RULE_MAP: Record<string, string> = {
   preventTeacherConflict: 'TEACHER_OVERLAP',
   preventClassroomConflict: 'CLASSROOM_OVERLAP',
   enforceMaxHours: 'MAX_HOURS_DAY',
+  teacherMaxFullDays: 'TEACHER_MAX_FULL_DAYS',
   minimizeGaps: 'MAX_GAPS_DAY',
   limitConsecutiveClasses: 'MAX_CONSECUTIVE_CLASSES',
   maxClassesPerDay: 'MAX_SUBJECT_CLASSES_DAY',
@@ -66,6 +67,7 @@ export default function RulesPage() {
     preventTeacherConflict: true,
     preventClassroomConflict: true,
     enforceMaxHours: true,
+    teacherMaxFullDays: true,
     minimizeGaps: true,
     maxClassesPerDay: true,
     preferredDays: false,
@@ -573,6 +575,16 @@ export default function RulesPage() {
                 </div>
                 <button onClick={() => toggleRule('enforceMaxHours')} className={`transition-colors ${rules.enforceMaxHours ? 'text-indigo-600' : 'text-slate-300 dark:text-slate-600'}`}>
                   {rules.enforceMaxHours ? <ToggleRight className="h-10 w-10" /> : <ToggleLeft className="h-10 w-10" />}
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm transition-all hover:border-indigo-200 dark:hover:border-indigo-800">
+                <div>
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-200">2 Días de Jornada Completa (6 Horas)</p>
+                  <p className="text-xs text-slate-500 mt-1">Garantiza que un docente con carga suficiente tenga exactamente 2 días de 6 horas completas (mínimo 2 y máximo 2 días). Los demás días tendrán menor intensidad.</p>
+                </div>
+                <button onClick={() => toggleRule('teacherMaxFullDays')} className={`transition-colors ${rules.teacherMaxFullDays ? 'text-indigo-600' : 'text-slate-300 dark:text-slate-600'}`}>
+                  {rules.teacherMaxFullDays ? <ToggleRight className="h-10 w-10" /> : <ToggleLeft className="h-10 w-10" />}
                 </button>
               </div>
 

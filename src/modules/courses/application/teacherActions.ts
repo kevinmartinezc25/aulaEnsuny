@@ -559,6 +559,8 @@ export async function getCourseGradebook(courseId: string, categories: CourseGra
 export interface CourseStudent {
   id: string
   name: string
+  firstName?: string
+  lastName?: string
   email: string
   status: 'active' | 'at_risk'
   attendance: string
@@ -702,7 +704,9 @@ export async function getCourseStudents(courseId: string): Promise<CourseStudent
 
     return {
       id: student.id,
-      name: `${student.first_name} ${student.last_name}`,
+      name: `${student.first_name || ''} ${student.last_name || ''}`.trim(),
+      firstName: student.first_name || '',
+      lastName: student.last_name || '',
       email,
       status,
       attendance: '95%',
