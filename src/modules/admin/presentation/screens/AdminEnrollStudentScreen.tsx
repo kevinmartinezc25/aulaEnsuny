@@ -201,8 +201,8 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
         setAcademicLevels(levels)
         setAllCourses(courses.filter(c => c.status === 'active'))
         
-        // Seleccionar primer nivel si está vacío
-        if (levels.length > 0 && !enrollment.gradeLevel) {
+        // Seleccionar primer nivel si está vacío y no estamos en modo edición
+        if (!isEditMode && levels.length > 0 && !enrollment.gradeLevel) {
           setEnrollment(prev => ({ ...prev, gradeLevel: levels[0].name }))
         }
       } catch (err) {
@@ -213,7 +213,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
       }
     }
     loadAuxData()
-  }, [])
+  }, [isEditMode])
 
   // --- Cargar grupos al cambiar nivel ---
   useEffect(() => {
@@ -224,7 +224,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
         try {
           const grps = await getAcademicGroups(matchedLevel.id)
           setAcademicGroups(grps)
-          if (grps.length > 0 && !enrollment.groupName) {
+          if (grps.length > 0 && !enrollment.groupName && !isEditMode) {
             setEnrollment(prev => ({ ...prev, groupName: grps[0].name }))
           }
         } catch (err) {
@@ -233,7 +233,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
       }
     }
     loadGroups()
-  }, [enrollment.gradeLevel, academicLevels])
+  }, [enrollment.gradeLevel, academicLevels, isEditMode])
 
 
 

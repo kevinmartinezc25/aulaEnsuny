@@ -1099,13 +1099,13 @@ export async function getAdminStudentById(id: string): Promise<FullStudentData |
     if (enrollments && enrollments.length > 0) {
       const activeEnroll = enrollments[0]
       mappedEnrollment = {
-        academicYear: activeEnroll.academic_year,
-        enrollmentDate: activeEnroll.enrollment_date,
-        enrollmentStatus: activeEnroll.enrollment_status as any,
-        sede: activeEnroll.sede,
-        jornada: activeEnroll.jornada as any,
-        gradeLevel: activeEnroll.grade_level,
-        groupName: activeEnroll.group_name,
+        academicYear: activeEnroll.academic_year || new Date().getFullYear(),
+        enrollmentDate: activeEnroll.enrollment_date || new Date().toISOString().split('T')[0],
+        enrollmentStatus: (activeEnroll.enrollment_status || profile.status || 'active') as any,
+        sede: activeEnroll.sede || 'Principal',
+        jornada: (activeEnroll.jornada || 'Única') as any,
+        gradeLevel: activeEnroll.grade_level || profile.grade_level || '',
+        groupName: activeEnroll.group_name || profile.group_name || '',
         enrollmentNumber: activeEnroll.enrollment_number || undefined,
         simatBeneficiary: activeEnroll.simat_beneficiary || false,
         estrato: activeEnroll.estrato || undefined,
@@ -1118,6 +1118,18 @@ export async function getAdminStudentById(id: string): Promise<FullStudentData |
         previousGrade: activeEnroll.previous_grade || undefined,
         previousYear: activeEnroll.previous_year || undefined,
         observations: activeEnroll.observations || undefined
+      }
+    } else {
+      mappedEnrollment = {
+        academicYear: new Date().getFullYear(),
+        enrollmentDate: new Date().toISOString().split('T')[0],
+        enrollmentStatus: (profile.status || 'active') as any,
+        sede: 'Principal',
+        jornada: 'Única',
+        gradeLevel: profile.grade_level || '',
+        groupName: profile.group_name || '',
+        simatBeneficiary: false,
+        conflictVictim: false
       }
     }
 
@@ -1719,10 +1731,40 @@ export async function saveScheduleSlotsAction(slots: {
 }[]): Promise<{ success: boolean; error?: string }> {
   try {
     const adminClient = createAdminClient()
-    const { error } = await adminClient.from('sch_schedule_slots').insert(slots)
+
+    // 1. Deduplicate slots in memory by (group_id, subject_id, teacher_id, day_of_week, period_id)
+    const uniqueMap = new Map<string, typeof slots[0]>()
+    for (const slot of slots) {
+      const teacherKey = slot.teacher_id || 'null'
+      const key = `${slot.group_id}-${slot.subject_id}-${teacherKey}-${slot.day_of_week}-${slot.period_id}`
+      if (!uniqueMap.has(key)) {
+        uniqueMap.set(key, slot)
+      }
+    }
+    const uniqueSlots = Array.from(uniqueMap.values())
+
+    if (uniqueSlots.length === 0) {
+      return { success: true }
+    }
+
+    // 2. Use upsert with onConflict on unique group_subject_teacher_slot constraint
+    const { error } = await adminClient
+      .from('sch_schedule_slots')
+      .upsert(uniqueSlots, {
+        onConflict: 'group_id,subject_id,teacher_id,day_of_week,period_id',
+        ignoreDuplicates: false
+      })
+
     if (error) {
-      console.error('Error saving schedule slots:', error)
-      return { success: false, error: error.message }
+      console.error('Error saving schedule slots with upsert, falling back to insert:', error)
+      const { error: insertErr } = await adminClient
+        .from('sch_schedule_slots')
+        .insert(uniqueSlots)
+
+      if (insertErr) {
+        console.error('Error in fallback insert:', insertErr)
+        return { success: false, error: insertErr.message }
+      }
     }
     return { success: true }
   } catch (err: any) {

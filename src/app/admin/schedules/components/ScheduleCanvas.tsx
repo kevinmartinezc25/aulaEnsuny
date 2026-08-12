@@ -147,6 +147,13 @@ export default function ScheduleCanvas({
       const groupedSlots = new Map<string, any>()
       
       data.forEach((d: any) => {
+        // If viewing Student Group Schedule (entityType === 'group'), omit non-academic / multi-teacher meeting slots
+        if (entityType === 'group') {
+          if (d.group?.name && !isOfficialGradeGroup(d.group.name)) {
+            return
+          }
+        }
+
         const slotKey = `${d.day_of_week}-${d.period_id}-${entityType === 'group' ? d.subject_id : (d.subject_id || d.group_id)}`
         if (!groupedSlots.has(slotKey)) {
           groupedSlots.set(slotKey, {
@@ -479,6 +486,10 @@ export default function ScheduleCanvas({
     setProgressMsg('Guardando en base de datos...')
     
     if (result.schedule.length > 0) {
+      if (entityType === 'group' && entityId) {
+        await clearGroupScheduleSlotsAction(entityId)
+      }
+
       const toInsert = result.schedule.map(s => ({
         day_of_week: s.dayOfWeek,
         period_id: s.periodId,

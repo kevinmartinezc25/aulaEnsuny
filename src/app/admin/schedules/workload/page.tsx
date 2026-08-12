@@ -6,6 +6,7 @@ import { getAdminUsers } from '@/modules/admin/application/actions'
 import { Loader2, Briefcase, Mail, Search, Eye, X, FileSpreadsheet, LayoutGrid, List } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import WorkloadMatrixView from './components/WorkloadMatrixView'
+import { isOfficialGradeGroup } from '../utils/groupFilters'
 
 export default function WorkloadPage() {
   const [loading, setLoading] = useState(true)
@@ -104,8 +105,9 @@ export default function WorkloadPage() {
           const current = workloadMap.get(row.teacher_id)
           const hours = row.hours_per_week || 0
           const key = `${row.group_id}-${row.subject_id}`
-          const isMultiTeacherGroup = multiTeacherGroupSubjectKeys.has(key) || (row.subject_id && explicitMultiTeacherSubjIds.has(row.subject_id))
-          // Una materia multi-docente es exenta/especial SOLO SI NO está marcada en Reglas como Carga Académica Normal
+          const isNonGroupOrSpecialGroup = !row.group_id || (row.sch_groups && !isOfficialGradeGroup(row.sch_groups.name))
+          const isMultiTeacherGroup = isNonGroupOrSpecialGroup || multiTeacherGroupSubjectKeys.has(key) || (row.subject_id && explicitMultiTeacherSubjIds.has(row.subject_id))
+          // Una materia multi-docente es exenta/especial SOLO SI NO está marcada en Reglas/Configuración como Carga Académica Normal
           const isSpecial = isMultiTeacherGroup && (!row.subject_id || !normalWorkloadSubjectIds.has(row.subject_id))
 
           current.count += hours
@@ -115,19 +117,20 @@ export default function WorkloadPage() {
             current.regularCount += hours
           }
 
+          const groupName = row.sch_groups?.name || 'Institucional (Sin Grupo)'
+          current.groups.add(groupName)
           if (row.sch_groups) {
-            current.groups.add(row.sch_groups.name)
             if (row.sch_groups.level === 'Primaria') current.levelHours.Primaria += hours
             else if (row.sch_groups.level === 'PFC') current.levelHours.PFC += hours
             else current.levelHours.Secundaria += hours
-            
-            current.details.push({
-              group: row.sch_groups.name,
-              subject: row.sch_subjects?.name || 'Materia desconocida',
-              hours: hours,
-              isSpecial
-            })
           }
+
+          current.details.push({
+            group: groupName,
+            subject: row.sch_subjects?.name || 'Materia / Actividad',
+            hours: hours,
+            isSpecial
+          })
         })
       }
 
@@ -188,9 +191,13 @@ export default function WorkloadPage() {
       {/* Header & Tab Switcher */}
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6 print:hidden">
         <div>
-          <h1 className="text-2xl font-black text-slate-800 dark:text-slate-100 flex items-center gap-2">
+          <h1 className="text-2xl font-black text-slate-800 dark:text-slate-100 flex items-center flex-wrap gap-2.5">
             <Briefcase className="h-6 w-6 text-indigo-500" />
-            Carga Académica de Docentes
+            <span>Carga Académica de Docentes</span>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700 border border-indigo-200/60 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800/60 shadow-sm">
+              <span className="h-2 w-2 rounded-full bg-indigo-500 animate-pulse" />
+              {teachersData.length} {teachersData.length === 1 ? 'docente' : 'docentes'}
+            </span>
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
             Visualiza y gestiona la intensidad horaria asignada a cada docente en la institución.

@@ -9,6 +9,8 @@ import { useRouter, usePathname } from 'next/navigation'
 import { toast } from 'sonner'
 
 
+import { isOfficialGradeGroup } from '../utils/groupFilters'
+
 interface Group {
   id: string
   name: string
@@ -58,10 +60,12 @@ export default function GroupsDrawer({ isOpen }: { isOpen: boolean }) {
       .order('name')
     
     if (!error && data) {
-      const mappedData = data.map((d: any) => ({
-        ...d,
-        director: d.director ? { name: `${d.director.first_name} ${d.director.last_name}`.trim() } : null
-      }))
+      const mappedData = data
+        .filter((d: any) => isOfficialGradeGroup(d.name))
+        .map((d: any) => ({
+          ...d,
+          director: d.director ? { name: `${d.director.first_name} ${d.director.last_name}`.trim() } : null
+        }))
       setGroups(mappedData)
     }
     setLoading(false)
