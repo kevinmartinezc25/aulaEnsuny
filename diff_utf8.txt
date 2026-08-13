@@ -1,0 +1,1163 @@
+﻿diff --git a/src/app/(dashboard)/layout.tsx b/src/app/(dashboard)/layout.tsx
+index 817514d..b62c93f 100644
+--- a/src/app/(dashboard)/layout.tsx
++++ b/src/app/(dashboard)/layout.tsx
+@@ -811,7 +811,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
+       )}
+ 
+       {/* Main Container */}
+-      <div className={`flex flex-1 flex-col transition-all duration-300 min-w-0 overflow-hidden ${(isCourseSection || isDocsPage) ? 'pl-0' : (isSidebarCollapsed ? 'md:pl-20' : 'md:pl-64')}`}>
++      <div className={`flex flex-1 flex-col transition-all duration-300 min-w-0 ${(isCourseSection || isDocsPage) ? 'pl-0' : (isSidebarCollapsed ? 'md:pl-20' : 'md:pl-64')}`}>
+         {/* Header */}
+         {!isDocsPage && (
+           <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-slate-100 bg-white px-6 dark:border-slate-800/60 dark:bg-slate-950 print:hidden">
+@@ -876,8 +876,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
+         </header>
+         )}
+ 
+-        <main className={`flex-1 min-w-0 overflow-hidden ${isDocsPage ? 'p-0' : 'p-6 md:p-8'}`}>{children}</main>
+-        {!isDocsPage && (
++        <main className={`flex-1 min-w-0 ${
++          isDocsPage ? 'overflow-hidden p-0'
++          : isCourseSection ? 'overflow-y-auto p-0 h-[calc(100vh-4rem)]'
++          : 'overflow-hidden p-6 md:p-8'
++        }`}>{children}</main>
++        {!isDocsPage && !isCourseSection && (
+           <footer className="border-t border-slate-100 py-6 text-center text-xs text-slate-400 dark:border-slate-800/60 dark:text-slate-500">
+             <p>┬® {new Date().getFullYear()} aulaEnsuny. Todos los derechos reservados.</p>
+           </footer>
+diff --git a/src/app/(dashboard)/teacher/courses/[id]/layout.tsx b/src/app/(dashboard)/teacher/courses/[id]/layout.tsx
+index d12645b..cbfc16e 100644
+--- a/src/app/(dashboard)/teacher/courses/[id]/layout.tsx
++++ b/src/app/(dashboard)/teacher/courses/[id]/layout.tsx
+@@ -71,7 +71,7 @@ export default function TeacherCourseLayout({
+   ]
+ 
+   return (
+-    <div className="flex min-h-[calc(100vh-4rem)] flex-col lg:flex-row gap-0 lg:gap-2 py-8">
++    <div className="flex min-h-[calc(100vh-4rem)] flex-col lg:flex-row gap-0 lg:gap-2 px-6 md:px-8 py-6 md:py-8">
+       {/* Sidebar Izquierdo */}
+       <aside className="w-full lg:w-56 shrink-0 pr-4 print:hidden">
+         <div className="sticky top-24 space-y-6">
+diff --git a/src/modules/courses/application/forumActions.ts b/src/modules/courses/application/forumActions.ts
+index 581c4b2..b02f368 100644
+--- a/src/modules/courses/application/forumActions.ts
++++ b/src/modules/courses/application/forumActions.ts
+@@ -9,6 +9,7 @@ export interface ForumConfig {
+   description?: string
+   forumType: 'debate' | 'qa' | 'social'
+   isGraded: boolean
++  allowNestedReplies?: boolean
+   dueDate?: string
+   createdAt: string
+ }
+@@ -168,6 +169,7 @@ export async function getForumByLessonId(lessonId: string): Promise<ForumConfig
+       description: data.lessons?.content || data.description || '',
+       forumType: data.forum_type as any,
+       isGraded: data.is_graded,
++      allowNestedReplies: data.allow_nested_replies !== false,
+       dueDate: data.due_date,
+       createdAt: data.created_at
+     }
+@@ -185,6 +187,7 @@ export async function saveForumConfig(forumData: {
+   description?: string
+   forumType: 'debate' | 'qa' | 'social'
+   isGraded: boolean
++  allowNestedReplies?: boolean
+   dueDate?: string
+ }): Promise<{ data?: ForumConfig; error?: string }> {
+   const isDemo = checkDemoMode()
+@@ -196,6 +199,7 @@ export async function saveForumConfig(forumData: {
+         description: forumData.description,
+         forumType: forumData.forumType,
+         isGraded: forumData.isGraded,
++        allowNestedReplies: forumData.allowNestedReplies !== false,
+         dueDate: forumData.dueDate
+       } : f)
+       const updated = mockForums.find(f => f.id === forumData.id)
+@@ -208,6 +212,7 @@ export async function saveForumConfig(forumData: {
+         description: forumData.description,
+         forumType: forumData.forumType,
+         isGraded: forumData.isGraded,
++        allowNestedReplies: forumData.allowNestedReplies !== false,
+         dueDate: forumData.dueDate,
+         createdAt: new Date().toISOString()
+       }
+@@ -236,6 +241,7 @@ export async function saveForumConfig(forumData: {
+       lesson_id: forumData.lessonId,
+       forum_type: forumData.forumType,
+       is_graded: forumData.isGraded,
++      allow_nested_replies: forumData.allowNestedReplies !== false,
+       due_date: forumData.dueDate || null
+     }
+ 
+@@ -265,6 +271,7 @@ export async function saveForumConfig(forumData: {
+         description: forumData.description || '',
+         forumType: data.forum_type as any,
+         isGraded: data.is_graded,
++        allowNestedReplies: data.allow_nested_replies !== false,
+         dueDate: data.due_date || undefined,
+         createdAt: data.created_at
+       }
+@@ -757,6 +764,7 @@ export async function getForumById(forumId: string): Promise<ForumConfig | null>
+       description: lessonObj?.content || '',
+       forumType: data.forum_type,
+       isGraded: data.is_graded,
++      allowNestedReplies: data.allow_nested_replies !== false,
+       dueDate: data.due_date,
+       createdAt: data.created_at
+     }
+diff --git a/src/modules/courses/presentation/screens/CourseDetailScreen.tsx b/src/modules/courses/presentation/screens/CourseDetailScreen.tsx
+index d2c2f41..64a7381 100644
+--- a/src/modules/courses/presentation/screens/CourseDetailScreen.tsx
++++ b/src/modules/courses/presentation/screens/CourseDetailScreen.tsx
+@@ -10,6 +10,7 @@ import { createClient } from '@/core/config/supabase/client'
+ import { toast } from 'sonner'
+ import { MiniForumEditor } from '@/core/components/MiniForumEditor'
+ import { getAnnouncementsByCourse, markAnnouncementAsRead } from '../../application/announcementActions'
++import { uploadPdfAction } from '@/modules/resources/presentation/actions/resourceActions'
+ 
+ type LessonStatus = 'completed' | 'pending' | 'submitted' | 'graded' | 'late'
+ 
+@@ -74,9 +75,34 @@ function getEmbedUrl(url: string): string {
+   return url
+ }
+ 
+-function stripHtml(html: string): string {
++export function fixHtmlSpaces(html: string): string {
+   if (!html) return ''
+-  return html.replace(/<[^>]*>/g, '')
++  return html
++    .replace(/&nbsp;/gi, ' ')
++    .replace(/(<\/(?:span|strong|b|em|i|u|p|div|h[1-6]|li|a)>)([A-Za-z0-9├í├®├¡├│├║├ü├ë├ì├ô├Ü├▒├æ])/g, '$1 $2')
++    .replace(/([a-zA-Z├í├®├¡├│├║├ü├ë├ì├ô├Ü├▒├æ]):([a-zA-Z├í├®├¡├│├║├ü├ë├ì├ô├Ü├▒├æ])/g, '$1: $2')
++}
++
++function cleanHtmlPreview(html: string, maxLength: number = 0): string {
++  if (!html) return ''
++  let clean = fixHtmlSpaces(html)
++    .replace(/&amp;/gi, '&')
++    .replace(/&lt;/gi, '<')
++    .replace(/&gt;/gi, '>')
++    .replace(/&quot;/gi, '"')
++    .replace(/&#39;/gi, "'")
++    .replace(/<[^>]*>/g, ' ')
++    .replace(/\s+/g, ' ')
++    .trim()
++
++  if (maxLength > 0 && clean.length > maxLength) {
++    return clean.substring(0, maxLength) + '...'
++  }
++  return clean
++}
++
++function stripHtml(html: string): string {
++  return cleanHtmlPreview(html, 0)
+ }
+ 
+ function isContentEmpty(content: string): boolean {
+@@ -95,6 +121,10 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
+   const [courseData, setCourseData] = useState<CourseDetails | null>(null)
+   const [activeLesson, setActiveLesson] = useState<Lesson | null>(null)
+   const [taskResponse, setTaskResponse] = useState('')
++  const [taskFile, setTaskFile] = useState<File | null>(null)
++  const [taskFileUploading, setTaskFileUploading] = useState(false)
++  const [taskFileDragOver, setTaskFileDragOver] = useState(false)
++  const taskFileInputRef = React.useRef<HTMLInputElement>(null)
+   const [loading, setLoading] = useState(true)
+   const [error, setError] = useState<string | null>(null)
+   const [grades, setGrades] = useState<any[]>([])
+@@ -129,6 +159,8 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
+   const [editThreadContent, setEditThreadContent] = useState('')
+   const [editingReplyId, setEditingReplyId] = useState<string | null>(null)
+   const [editReplyContent, setEditReplyContent] = useState('')
++  const [replyingToParentId, setReplyingToParentId] = useState<string | null>(null)
++  const [inlineReplyContent, setInlineReplyContent] = useState('')
+ 
+   const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({})
+ 
+@@ -301,6 +333,46 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
+     }
+   }
+ 
++  const handleCreateInlineReply = async (e: React.FormEvent, parentId: string) => {
++    e.preventDefault()
++    if (isContentEmpty(inlineReplyContent) || !activeThread) {
++      toast.error('El contenido de la respuesta es requerido')
++      return
++    }
++
++    try {
++      const { createForumReply } = await import('../../application/forumActions')
++      const authorIdToUse = userId || 'stu1'
++      const result = await createForumReply({
++        threadId: activeThread.id,
++        parentId,
++        authorId: authorIdToUse,
++        content: inlineReplyContent.trim()
++      })
++
++      if (result.error) {
++        toast.error(result.error)
++      } else if (result.data) {
++        setThreadReplies(prev => [...prev, result.data!])
++        setInlineReplyContent('')
++        setReplyingToParentId(null)
++        toast.success('Respuesta agregada exitosamente')
++        
++        setForumThreads(prev => prev.map(t => t.id === activeThread.id ? { ...t, repliesCount: t.repliesCount + 1 } : t))
++        if (userId && activeThread) {
++          localStorage.setItem(`forum_thread_read_${userId}_${activeThread.id}`, (activeThread.repliesCount + 1).toString())
++        }
++
++        if (userRole === 'student' && activeLesson && activeLesson.status !== 'completed' && activeLesson.status !== 'graded') {
++          await handleMarkAsCompleted(activeLesson.id)
++        }
++      }
++    } catch (err) {
++      console.error('Error creating inline reply:', err)
++      toast.error('Error al agregar respuesta')
++    }
++  }
++
+   const canEditStudent = (createdAt: string) => {
+     const elapsed = Date.now() - new Date(createdAt).getTime()
+     return elapsed < 10 * 60 * 1000
+@@ -824,6 +896,8 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
+               status,
+               content: l.content || '',
+               submissionText,
++              // submissionType: read from DB column if it exists, otherwise default to 'file' for task lessons
++              submissionType: (l.submission_type as 'file' | 'text' | undefined) || (type === 'task' ? 'file' : undefined),
+               quizAttempt,
+               quiz: quiz || null,
+               grade: gradeEntry ? {
+@@ -1120,6 +1194,59 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
+     }
+   }, [activeLesson?.id])
+ 
++  const handleFileUploadAndSubmit = async () => {
++    if (!taskFile || !activeLesson || !courseData) return
++    setTaskFileUploading(true)
++    try {
++      const formData = new FormData()
++      formData.append('file', taskFile)
++      formData.append('title', `Entrega: ${activeLesson.title}`)
++      formData.append('description', `Entrega de tarea por estudiante en: ${activeLesson.title}`)
++      formData.append('courseId', courseData.id)
++      formData.append('courseName', courseData.title)
++      formData.append('uploadedBy', userId || 'student')
++
++      const result = await uploadPdfAction(formData)
++      if (!result.success || !result.resource) {
++        throw new Error(result.error || 'Error al subir el archivo a Drive')
++      }
++
++      const submissionData = JSON.stringify({
++        type: 'file',
++        fileName: taskFile.name,
++        fileSize: taskFile.size,
++        driveUrl: result.resource.driveUrl,
++        driveDownloadUrl: result.resource.driveDownloadUrl,
++        driveFileId: result.resource.driveFileId,
++        uploadedAt: new Date().toISOString()
++      })
++
++      await handleMarkAsCompleted(activeLesson.id, submissionData)
++      setTaskFile(null)
++    } catch (err: any) {
++      console.error('[FileUpload] Error:', err)
++      toast.error(err.message || 'Error al subir el archivo')
++    } finally {
++      setTaskFileUploading(false)
++    }
++  }
++
++  const handleFileDrop = (e: React.DragEvent<HTMLDivElement>) => {
++    e.preventDefault()
++    setTaskFileDragOver(false)
++    const file = e.dataTransfer.files?.[0]
++    if (file) setTaskFile(file)
++  }
++
++  const parseSubmissionFile = (submissionText?: string): { fileName: string; driveUrl: string; driveDownloadUrl: string } | null => {
++    if (!submissionText) return null
++    try {
++      const parsed = JSON.parse(submissionText)
++      if (parsed.type === 'file' && parsed.driveUrl) return parsed
++    } catch { /* not JSON */ }
++    return null
++  }
++
+   const handleMarkAsCompleted = async (lessonId: string, submissionText?: string) => {
+     const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+       process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
+@@ -1326,22 +1453,22 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
+   )
+ 
+   return (
+-    <div className="min-h-screen bg-[#f9fafb] dark:bg-slate-950 text-left flex flex-col">
+-      {/* Barra superior de navegaci├│n interna */}
+-      <div className="sticky top-16 z-20 flex flex-col bg-white/80 backdrop-blur-md dark:bg-slate-900/80 border-b border-slate-100 dark:border-slate-800/60 shadow-sm">
+-        <div className="flex h-14 items-center justify-between px-6">
++    <div className="bg-[#f9fafb] dark:bg-slate-950 text-left flex flex-col">
++      {/* Barra superior de navegaci├│n interna - sticky top-0 porque main es el scroll container */}
++      <div className="sticky top-0 z-30 flex flex-col bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800 shadow-sm">
++        <div className="flex py-2 px-6 items-center justify-between">
+           <div className="flex items-center gap-3">
+             <Link
+               href="/student/dashboard"
+-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-100 bg-white hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 text-slate-500 transition-colors"
++              className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-950 text-slate-500 transition-colors"
+             >
+-              <ArrowLeft className="h-4 w-4" />
++              <ArrowLeft className="h-3.5 w-3.5" />
+             </Link>
+             <div className="text-left">
+-              <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
++              <span className="text-[9px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider block leading-tight">
+                 {courseData.subject}
+               </span>
+-              <h2 className="text-sm font-bold text-slate-900 dark:text-white">
++              <h2 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white leading-tight">
+                 {courseData.title}
+               </h2>
+             </div>
+@@ -1349,7 +1476,7 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
+ 
+           <button
+             onClick={() => setIsMobileNavOpen(true)}
+-            className="flex items-center gap-1.5 rounded-xl border border-slate-100 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 md:hidden"
++            className="flex items-center gap-1.5 rounded-xl border border-slate-100 bg-white px-3 py-1 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 md:hidden"
+           >
+             <Menu className="h-4 w-4" />
+             <span>Men├║</span>
+@@ -1386,7 +1513,7 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
+       </div>
+ 
+       {activeTab === 'announcements' ? (
+-        <div className="flex-1 p-6 md:p-8 max-w-4xl mx-auto space-y-8 w-full animate-in fade-in duration-300">
++        <div className="flex-1 px-4 sm:px-6 md:px-8 py-4 max-w-4xl mx-auto space-y-6 w-full animate-in fade-in duration-300">
+           <div className="space-y-1">
+             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+               <Megaphone className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+@@ -1510,14 +1637,14 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
+           </div>
+         </div>
+       ) : activeTab === 'content' ? (
+-        <div className="relative flex flex-1 min-h-[calc(100vh-160px)]">
++        <div className="relative flex flex-1">
+           {/* Sidebar Izquierdo (Fijo en desktop) */}
+           <aside className="hidden md:block w-72 border-r border-slate-100 bg-white dark:border-slate-800/60 dark:bg-slate-900">
+             {sidebarContent}
+           </aside>
+ 
+           {/* Contenido Principal */}
+-          <div className="flex-1 p-6 md:p-8 max-w-4xl mx-auto space-y-8">
++          <div className="flex-1 px-4 sm:px-6 md:px-8 pt-7 pb-12 max-w-4xl mx-auto space-y-6">
+             {activeLesson ? (
+               <>
+                 {/* 1. Reproductor de Video */}
+@@ -1537,29 +1664,31 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
+                   </motion.div>
+                 )}
+ 
+-                {/* 2. Cabecera del Contenido */}
+-                <div className="space-y-3 pb-6 border-b border-slate-100 dark:border-slate-800">
+-                  <div className="flex items-center gap-2">
+-                    <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400">
+-                      {getIcon(activeLesson.type)}
+-                    </span>
+-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+-                      Lecci├│n Activa ({activeLesson.type === 'video' ? 'Video' : activeLesson.type === 'reading' ? 'Lectura' : activeLesson.type === 'file' ? 'Archivo' : activeLesson.type === 'quiz' ? 'Quiz' : activeLesson.type === 'forum' ? 'Foro' : 'Tarea'})
+-                    </span>
+-                  </div>
+-                  <div className="flex items-center justify-between">
+-                    <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+-                      {activeLesson.title}
+-                    </h1>
+-                    {/* Visual Status Indicator on Header */}
+-                    <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800">
+-                      {renderStatusIcon(activeLesson.status, "h-4 w-4 shrink-0")}
+-                      <span className="text-xs font-bold text-slate-700 dark:text-slate-300 capitalize">
+-                        {getStatusText(activeLesson.status, activeLesson.type)}
++                {/* 2. Cabecera del Contenido (Omitida en foros para no duplicar t├¡tulo) */}
++                {activeLesson.type !== 'forum' && (
++                  <div className="space-y-3 pb-6 border-b border-slate-100 dark:border-slate-800">
++                    <div className="flex items-center gap-2">
++                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400">
++                        {getIcon(activeLesson.type)}
++                      </span>
++                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
++                        Lecci├│n Activa ({activeLesson.type === 'video' ? 'Video' : activeLesson.type === 'reading' ? 'Lectura' : activeLesson.type === 'file' ? 'Archivo' : activeLesson.type === 'quiz' ? 'Quiz' : 'Tarea'})
+                       </span>
+                     </div>
++                    <div className="flex items-center justify-between">
++                      <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
++                        {activeLesson.title}
++                      </h1>
++                      {/* Visual Status Indicator on Header */}
++                      <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800">
++                        {renderStatusIcon(activeLesson.status, "h-4 w-4 shrink-0")}
++                        <span className="text-xs font-bold text-slate-700 dark:text-slate-300 capitalize">
++                          {getStatusText(activeLesson.status, activeLesson.type)}
++                        </span>
++                      </div>
++                    </div>
+                   </div>
+-                </div>
++                )}
+ 
+                 {/* 3. Contenido Escrito */}
+                 <article className="prose prose-slate max-w-none dark:prose-invert">
+@@ -1640,24 +1769,106 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
+                             </div>
+                           </div>
+                         )}
+-                        {activeLesson.submissionText && (
+-                          <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/50">
+-                            <h4 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Tu Respuesta</h4>
+-                            <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{activeLesson.submissionText}</p>
+-                          </div>
+-                        )}
++                        {activeLesson.submissionText && (() => {
++                            const fileMeta = parseSubmissionFile(activeLesson.submissionText)
++                            if (fileMeta) {
++                              return (
++                                <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/50">
++                                  <h4 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">Archivo Entregado</h4>
++                                  <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
++                                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-orange-100 dark:bg-orange-900/30">
++                                      <FileText className="h-5 w-5 text-orange-600 dark:text-orange-400" />
++                                    </div>
++                                    <div className="flex-1 min-w-0">
++                                      <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">{fileMeta.fileName}</p>
++                                      <p className="text-xs text-slate-500 dark:text-slate-400">Guardado en Google Drive</p>
++                                    </div>
++                                    <div className="flex items-center gap-2 shrink-0">
++                                      <a href={fileMeta.driveUrl} target="_blank" rel="noopener noreferrer"
++                                        className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 transition-colors">
++                                        <Eye className="h-3.5 w-3.5" />Ver
++                                      </a>
++                                      <a href={fileMeta.driveDownloadUrl} target="_blank" rel="noopener noreferrer"
++                                        className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">
++                                        <Download className="h-3.5 w-3.5" />Descargar
++                                      </a>
++                                    </div>
++                                  </div>
++                                </div>
++                              )
++                            }
++                            return (
++                              <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/50">
++                                <h4 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Tu Respuesta</h4>
++                                <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{activeLesson.submissionText}</p>
++                              </div>
++                            )
++                          })()
++                        }
+                       </div>
+                     ) : activeLesson.submissionType === 'file' ? (
+-                      <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-white p-8 text-center transition-colors hover:border-orange-300 dark:border-slate-700 dark:bg-slate-900/50">
+-                        <UploadCloud className="mx-auto h-10 w-10 text-slate-300 dark:text-slate-600 mb-3" />
+-                        <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Haz clic o arrastra tu archivo aqu├¡</h4>
+-                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-6">Soporta PDF, Word, Excel, PPT, o im├ígenes (Max 10MB)</p>
+-                        <button
+-                          onClick={() => handleMarkAsCompleted(activeLesson.id)}
+-                          className="rounded-xl bg-slate-900 px-6 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200 transition-all"
++                      <div className="space-y-4">
++                        {/* Hidden file input */}
++                        <input
++                          ref={taskFileInputRef}
++                          type="file"
++                          className="hidden"
++                          accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.png,.jpg,.jpeg,.gif,.webp"
++                          onChange={(e) => { const f = e.target.files?.[0]; if (f) setTaskFile(f) }}
++                        />
++                        {/* Drop Zone */}
++                        <div
++                          className={`relative rounded-2xl border-2 border-dashed p-8 text-center transition-all cursor-pointer ${
++                            taskFileDragOver
++                              ? 'border-orange-400 bg-orange-50/60 dark:border-orange-500 dark:bg-orange-950/30'
++                              : taskFile
++                              ? 'border-emerald-300 bg-emerald-50/40 dark:border-emerald-700 dark:bg-emerald-950/20'
++                              : 'border-slate-200 bg-white hover:border-orange-300 dark:border-slate-700 dark:bg-slate-900/50 hover:bg-slate-50/50'
++                          }`}
++                          onDragOver={(e) => { e.preventDefault(); setTaskFileDragOver(true) }}
++                          onDragLeave={() => setTaskFileDragOver(false)}
++                          onDrop={handleFileDrop}
++                          onClick={() => !taskFile && taskFileInputRef.current?.click()}
+                         >
+-                          Seleccionar Archivo
+-                        </button>
++                          {taskFile ? (
++                            <>
++                              <div className="flex items-center justify-center mb-3">
++                                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-900/30">
++                                  <FileText className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
++                                </div>
++                              </div>
++                              <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-0.5 truncate px-4">{taskFile.name}</p>
++                              <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">{(taskFile.size / 1024 / 1024).toFixed(2)} MB</p>
++                              <button
++                                type="button"
++                                onClick={(e) => { e.stopPropagation(); setTaskFile(null) }}
++                                className="text-xs text-red-500 hover:text-red-700 dark:text-red-400 underline"
++                              >Quitar archivo</button>
++                            </>
++                          ) : (
++                            <>
++                              <UploadCloud className="mx-auto h-10 w-10 text-slate-300 dark:text-slate-600 mb-3" />
++                              <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Arrastra tu archivo aqu├¡ o haz clic para seleccionar</h4>
++                              <p className="text-xs text-slate-500 dark:text-slate-400">PDF, Word, Excel, PPT, im├ígenes ┬À M├íx. 50 MB</p>
++                            </>
++                          )}
++                        </div>
++
++                        {/* Upload Button */}
++                        <div className="flex justify-end">
++                          <button
++                            type="button"
++                            disabled={!taskFile || taskFileUploading}
++                            onClick={handleFileUploadAndSubmit}
++                            className="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-orange-700 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
++                          >
++                            {taskFileUploading ? (
++                              <><Loader2 className="h-4 w-4 animate-spin" /><span>Subiendo a Drive...</span></>
++                            ) : (
++                              <><UploadCloud className="h-4 w-4" /><span>Subir y Entregar</span></>
++                            )}
++                          </button>
++                        </div>
+                       </div>
+                     ) : (
+                       <div className="space-y-4">
+@@ -2085,7 +2296,7 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
+                               <h3 className="text-lg font-bold text-slate-900 dark:text-white">{activeThread.title}</h3>
+                               <div 
+                                 className="text-sm text-slate-700 dark:text-slate-350 leading-relaxed ql-editor !p-0"
+-                                dangerouslySetInnerHTML={{ __html: activeThread.content }}
++                                dangerouslySetInnerHTML={{ __html: fixHtmlSpaces(activeThread.content) }}
+                               />
+                             </>
+                           )}
+@@ -2149,6 +2360,24 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
+                                         <Edit size={10} /> Editar
+                                       </button>
+                                     )}
++
++                                    {/* Reply Action when allowNestedReplies is true */}
++                                    {forumConfig?.allowNestedReplies !== false && !activeThread.isLocked && (
++                                      <button
++                                        onClick={() => {
++                                          if (replyingToParentId === reply.id) {
++                                            setReplyingToParentId(null)
++                                          } else {
++                                            setReplyingToParentId(reply.id)
++                                            setInlineReplyContent('')
++                                          }
++                                        }}
++                                        className="text-[10px] font-bold text-blue-600 hover:text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 rounded border-none cursor-pointer flex items-center gap-1 transition-all"
++                                        title="Responder a este comentario"
++                                      >
++                                        <CornerDownRight size={10} /> Responder
++                                      </button>
++                                    )}
+                                   </div>
+                                 </div>
+                                 
+@@ -2177,10 +2406,43 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
+                                     </div>
+                                   </form>
+                                 ) : (
+-                                  <div 
+-                                    className="mt-3 pl-10 text-xs text-slate-700 dark:text-slate-350 leading-relaxed ql-editor !p-0"
+-                                    dangerouslySetInnerHTML={{ __html: reply.content }}
+-                                  />
++                                  <>
++                                    <div 
++                                      className="mt-3 pl-10 text-xs text-slate-700 dark:text-slate-350 leading-relaxed ql-editor !p-0"
++                                      dangerouslySetInnerHTML={{ __html: fixHtmlSpaces(reply.content) }}
++                                    />
++                                    
++                                    {/* Inline Reply Form */}
++                                    {replyingToParentId === reply.id && (
++                                      <form onSubmit={(e) => handleCreateInlineReply(e, reply.id)} className="space-y-3 pl-4 sm:pl-10 mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 animate-in fade-in duration-200">
++                                        <div className="flex items-center justify-between text-xs font-semibold text-blue-600 dark:text-blue-400">
++                                          <span>Respondiendo a {reply.authorName}</span>
++                                          <button type="button" onClick={() => setReplyingToParentId(null)} className="text-slate-400 hover:text-slate-600 text-[10px] border-none bg-transparent cursor-pointer">Cancelar</button>
++                                        </div>
++                                        <MiniForumEditor
++                                          value={inlineReplyContent}
++                                          onChange={setInlineReplyContent}
++                                          placeholder={`Escribe tu respuesta a ${reply.authorName}...`}
++                                          minHeight="90px"
++                                        />
++                                        <div className="flex justify-end gap-2">
++                                          <button
++                                            type="button"
++                                            onClick={() => setReplyingToParentId(null)}
++                                            className="rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-900 dark:border-slate-800"
++                                          >
++                                            Cancelar
++                                          </button>
++                                          <button
++                                            type="submit"
++                                            className="rounded-xl bg-pink-600 hover:bg-pink-700 px-3 py-1 text-xs font-bold text-white shadow border-none cursor-pointer"
++                                          >
++                                            Publicar Respuesta
++                                          </button>
++                                        </div>
++                                      </form>
++                                    )}
++                                  </>
+                                 )}
+                               </div>
+                             ))}
+@@ -2688,3 +2950,5 @@ const mockTimeData = [
+ ]
+ 
+ 
++
++// Force hot reload
+diff --git a/src/modules/courses/presentation/screens/StudentJoinCourseScreen.tsx b/src/modules/courses/presentation/screens/StudentJoinCourseScreen.tsx
+index 9cd93c2..e0588a3 100644
+--- a/src/modules/courses/presentation/screens/StudentJoinCourseScreen.tsx
++++ b/src/modules/courses/presentation/screens/StudentJoinCourseScreen.tsx
+@@ -23,7 +23,7 @@ export function StudentJoinCourseScreen() {
+       }
+ 
+       const result = await createJoinRequest({ courseId, code })
+-      setMessage(`Solicitud enviada correctamente. ID: ${result.id}`)
++      setMessage('Esperando confirmaci├│n de Docente')
+       setCode('')
+     } catch (err: any) {
+       setError(err?.message || 'No se pudo enviar la solicitud')
+diff --git a/src/modules/courses/presentation/screens/StudentRequestsScreen.tsx b/src/modules/courses/presentation/screens/StudentRequestsScreen.tsx
+index 11230f8..1240c72 100644
+--- a/src/modules/courses/presentation/screens/StudentRequestsScreen.tsx
++++ b/src/modules/courses/presentation/screens/StudentRequestsScreen.tsx
+@@ -133,7 +133,7 @@ export function StudentRequestsScreen() {
+                         ) : (
+                           <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-100/30 px-2.5 py-1 text-xs font-semibold text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 animate-pulse">
+                             <Clock className="h-3.5 w-3.5" />
+-                            Pendiente
++                            Esperando confirmaci├│n de Docente
+                           </span>
+                         )}
+                       </td>
+@@ -197,7 +197,7 @@ export function StudentRequestsScreen() {
+                     ) : (
+                       <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-100/30 px-2.5 py-1 text-xs font-semibold text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
+                         <Clock className="h-3.5 w-3.5" />
+-                        Pendiente
++                        Esperando confirmaci├│n de Docente
+                       </span>
+                     )}
+                   </div>
+diff --git a/src/modules/courses/presentation/screens/TeacherCourseForumsScreen.tsx b/src/modules/courses/presentation/screens/TeacherCourseForumsScreen.tsx
+index d529299..6b2a01e 100644
+--- a/src/modules/courses/presentation/screens/TeacherCourseForumsScreen.tsx
++++ b/src/modules/courses/presentation/screens/TeacherCourseForumsScreen.tsx
+@@ -20,11 +20,33 @@ import { toast } from 'sonner'
+ import { createClient } from '@/core/config/supabase/client'
+ import { getForumsByCourseId } from '../../application/forumActions'
+ 
++function fixHtmlSpaces(html: string): string {
++  if (!html) return ''
++  return html
++    .replace(/&nbsp;/gi, ' ')
++    .replace(/(<\/(?:span|strong|b|em|i|u|p|div|h[1-6]|li|a)>)([A-Za-z0-9├í├®├¡├│├║├ü├ë├ì├ô├Ü├▒├æ])/g, '$1 $2')
++    .replace(/([a-zA-Z├í├®├¡├│├║├ü├ë├ì├ô├Ü├▒├æ]):([a-zA-Z├í├®├¡├│├║├ü├ë├ì├ô├Ü├▒├æ])/g, '$1: $2')
++}
++
++function cleanHtmlPreview(html: string): string {
++  if (!html) return ''
++  return fixHtmlSpaces(html)
++    .replace(/&amp;/gi, '&')
++    .replace(/&lt;/gi, '<')
++    .replace(/&gt;/gi, '>')
++    .replace(/&quot;/gi, '"')
++    .replace(/&#39;/gi, "'")
++    .replace(/<[^>]*>/g, ' ')
++    .replace(/\s+/g, ' ')
++    .trim()
++}
++
+ interface ForumItem {
+   id: string
+   lessonId: string
+   forumType: 'debate' | 'qa' | 'social'
+   isGraded: boolean
++  allowNestedReplies?: boolean
+   dueDate: string | null
+   createdAt: string
+   title: string
+@@ -186,7 +208,7 @@ export function TeacherCourseForumsScreen({ courseId }: { courseId: string }) {
+ 
+                 <div>
+                   <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 line-clamp-1">{forum.title}</h3>
+-                  <p className="text-xs text-slate-450 dark:text-slate-400 line-clamp-2 mt-1 leading-relaxed">{forum.description}</p>
++                  <p className="text-xs text-slate-450 dark:text-slate-400 line-clamp-2 mt-1 leading-relaxed">{cleanHtmlPreview(forum.description)}</p>
+                 </div>
+ 
+                 {/* Deadlines and dates */}
+diff --git a/src/modules/courses/presentation/screens/TeacherCourseSettingsScreen.tsx b/src/modules/courses/presentation/screens/TeacherCourseSettingsScreen.tsx
+index 4e8ccae..48f8c36 100644
+--- a/src/modules/courses/presentation/screens/TeacherCourseSettingsScreen.tsx
++++ b/src/modules/courses/presentation/screens/TeacherCourseSettingsScreen.tsx
+@@ -9,6 +9,7 @@ import {
+ } from 'lucide-react'
+ import { getCourseSettings, saveCourseSettings, CourseSettings, CourseGradeCategory } from '../../application/teacherActions'
+ import { regenerateCourseJoinCode } from '../../application/joinRequestsActions'
++import { toast } from 'sonner'
+ 
+ const SETTINGS_TABS = [
+   { id: 'general', label: 'Informaci├│n General', icon: Book },
+@@ -74,22 +75,30 @@ export function TeacherCourseSettingsScreen({ courseId }: { courseId: string })
+   }
+ 
+   const totalWeight = categories.reduce((sum, cat) => sum + (Number(cat.weight) || 0), 0)
+-  const isValidWeight = totalWeight === 100
++  // Permitimos guardar si no hay categor├¡as configuradas (sistema independiente), pero si hay, deben sumar 100
++  const isValidWeight = categories.length === 0 || totalWeight === 100
+ 
+   const handleRegenerateCode = async () => {
+     setRegeneratingCode(true)
+     try {
+       const newCode = await regenerateCourseJoinCode(courseId)
+       setJoinCode(newCode)
++      toast.success('Nuevo c├│digo generado')
+     } catch (err) {
+       console.error(err)
++      toast.error('Error al generar c├│digo')
+     } finally {
+       setRegeneratingCode(false)
+     }
+   }
+ 
+   const handleSave = async () => {
+-    if (!isValidWeight) return
++    if (!isValidWeight) {
++      toast.error('Las ponderaciones de evaluaci├│n deben sumar 100%')
++      setActiveTab('evaluation')
++      return
++    }
++    
+     setSaving(true)
+     try {
+       await saveCourseSettings(courseId, {
+@@ -100,8 +109,10 @@ export function TeacherCourseSettingsScreen({ courseId }: { courseId: string })
+         joinEnabled,
+         requireTeacherApproval
+       })
+-    } catch (err) {
++      toast.success('Configuraci├│n guardada correctamente')
++    } catch (err: any) {
+       console.error(err)
++      toast.error(err.message || 'Error al guardar configuraci├│n')
+     } finally {
+       setSaving(false)
+     }
+diff --git a/src/modules/courses/presentation/screens/TeacherCourseSubmissionsScreen.tsx b/src/modules/courses/presentation/screens/TeacherCourseSubmissionsScreen.tsx
+index 846db3d..4f5bac7 100644
+--- a/src/modules/courses/presentation/screens/TeacherCourseSubmissionsScreen.tsx
++++ b/src/modules/courses/presentation/screens/TeacherCourseSubmissionsScreen.tsx
+@@ -558,33 +558,72 @@ export function TeacherCourseSubmissionsScreen({ courseId }: { courseId: string
+               {/* Document Preview (Left) */}
+               <div className="flex-1 bg-slate-200/50 dark:bg-black/20 p-4 sm:p-8 overflow-y-auto flex items-center justify-center">
+                 <div className="w-full max-w-4xl h-full bg-white dark:bg-slate-800 shadow-xl rounded-xl border border-slate-200 dark:border-slate-700 flex flex-col items-center justify-start p-8 overflow-y-auto">
+-                  {activeSubmission.submissionText ? (
+-                    <div className="w-full text-left space-y-4">
+-                      <div className="border-b pb-4 border-slate-100 dark:border-slate-700">
+-                        <h3 className="text-lg font-bold text-slate-900 dark:text-white">Respuesta Escrita por el Estudiante</h3>
+-                        <p className="text-xs text-slate-500 mt-1">El estudiante respondi├│ a esta tarea escribiendo el siguiente texto:</p>
+-                      </div>
+-                      <div className="bg-slate-50 dark:bg-slate-900/40 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300 leading-relaxed shadow-inner">
+-                        {activeSubmission.submissionText}
++                  {(() => {
++                    // Try to parse as file metadata JSON
++                    let fileMeta: { fileName: string; driveUrl: string; driveDownloadUrl: string } | null = null
++                    if (activeSubmission.submissionText) {
++                      try {
++                        const parsed = JSON.parse(activeSubmission.submissionText)
++                        if (parsed.type === 'file' && parsed.driveUrl) fileMeta = parsed
++                      } catch { /* not JSON */ }
++                    }
++
++                    if (fileMeta) {
++                      return (
++                        <div className="w-full h-full flex flex-col">
++                          {/* Drive File Viewer (iframe embed) */}
++                          <iframe
++                            src={fileMeta.driveUrl}
++                            className="w-full flex-1 rounded-xl border border-slate-200 dark:border-slate-700 min-h-[400px]"
++                            title={fileMeta.fileName}
++                            allow="autoplay"
++                          />
++                          <div className="mt-4 flex items-center justify-between gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
++                            <div className="flex items-center gap-2 min-w-0">
++                              <FileText className="h-4 w-4 shrink-0 text-orange-500" />
++                              <span className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate">{fileMeta.fileName}</span>
++                            </div>
++                            <div className="flex items-center gap-2 shrink-0">
++                              <a href={fileMeta.driveUrl} target="_blank" rel="noopener noreferrer"
++                                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 transition-colors">
++                                <Eye className="h-3.5 w-3.5" />Ver en Drive
++                              </a>
++                              <a href={fileMeta.driveDownloadUrl} target="_blank" rel="noopener noreferrer"
++                                className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">
++                                <Download className="h-3.5 w-3.5" />Descargar
++                              </a>
++                            </div>
++                          </div>
++                        </div>
++                      )
++                    }
++
++                    if (activeSubmission.submissionText) {
++                      return (
++                        <div className="w-full text-left space-y-4">
++                          <div className="border-b pb-4 border-slate-100 dark:border-slate-700">
++                            <h3 className="text-lg font-bold text-slate-900 dark:text-white">Respuesta Escrita por el Estudiante</h3>
++                            <p className="text-xs text-slate-500 mt-1">El estudiante respondi├│ a esta tarea escribiendo el siguiente texto:</p>
++                          </div>
++                          <div className="bg-slate-50 dark:bg-slate-900/40 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300 leading-relaxed shadow-inner">
++                            {activeSubmission.submissionText}
++                          </div>
++                        </div>
++                      )
++                    }
++
++                    return (
++                      <div className="m-auto flex flex-col items-center justify-center">
++                        <FileText className="h-24 w-24 text-slate-200 dark:text-slate-600 mb-4" />
++                        <h3 className="text-lg font-bold text-slate-700 dark:text-slate-300 mb-2">{activeSubmission.fileName}</h3>
++                        <p className="text-slate-500 text-sm text-center max-w-md">
++                          {activeSubmission.fileName === 'Sin_Archivo'
++                            ? 'El estudiante no ha subido ning├║n archivo para esta actividad.'
++                            : 'El estudiante a├║n no ha subido el archivo de entrega.'}
++                        </p>
+                       </div>
+-                    </div>
+-                  ) : (
+-                    <div className="m-auto flex flex-col items-center justify-center">
+-                      <FileText className="h-24 w-24 text-slate-200 dark:text-slate-600 mb-4" />
+-                      <h3 className="text-lg font-bold text-slate-700 dark:text-slate-300 mb-2">{activeSubmission.fileName}</h3>
+-                      <p className="text-slate-500 text-sm text-center max-w-md">
+-                        {activeSubmission.fileName === 'Sin_Archivo' 
+-                          ? 'El estudiante no ha subido ning├║n archivo para esta actividad.'
+-                          : 'En producci├│n, aqu├¡ se incrustar├¡a el visor de documentos (PDF, im├ígenes, Word) para que el profesor pueda leer la entrega directamente sin descargarla.'}
+-                      </p>
+-                      {activeSubmission.fileName !== 'Sin_Archivo' && (
+-                        <button className="mt-6 flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 font-semibold rounded-lg text-sm hover:bg-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-400">
+-                          <Eye className="h-4 w-4" />
+-                          Abrir en nueva pesta├▒a
+-                        </button>
+-                      )}
+-                    </div>
+-                  )}
++                    )
++                  })()}
+                 </div>
+               </div>
+ 
+diff --git a/src/modules/courses/presentation/screens/TeacherCreateResourceScreen.tsx b/src/modules/courses/presentation/screens/TeacherCreateResourceScreen.tsx
+index 244cf2f..7439fff 100644
+--- a/src/modules/courses/presentation/screens/TeacherCreateResourceScreen.tsx
++++ b/src/modules/courses/presentation/screens/TeacherCreateResourceScreen.tsx
+@@ -16,6 +16,7 @@ export function TeacherCreateResourceScreen({ courseId, resourceId, courseName =
+   const [url, setUrl] = useState('')
+   const [forumType, setForumType] = useState<'debate' | 'qa' | 'social'>('debate')
+   const [isGraded, setIsGraded] = useState(false)
++  const [allowNestedReplies, setAllowNestedReplies] = useState(true)
+   const [dueDate, setDueDate] = useState('')
+   
+   const [isSaving, setIsSaving] = useState(false)
+@@ -68,6 +69,7 @@ export function TeacherCreateResourceScreen({ courseId, resourceId, courseName =
+             setType('forum')
+             setForumType(data.forum_type as any)
+             setIsGraded(data.is_graded)
++            setAllowNestedReplies(data.allow_nested_replies !== false)
+             if (data.due_date) {
+               setDueDate(new Date(data.due_date).toISOString().substring(0, 16))
+             }
+@@ -223,35 +225,54 @@ export function TeacherCreateResourceScreen({ courseId, resourceId, courseName =
+           lessonId = lesson.id
+         }
+ 
++        let forumPayload: any = {
++          forum_type: forumType,
++          is_graded: isGraded,
++          allow_nested_replies: allowNestedReplies,
++          due_date: dueDate ? new Date(dueDate).toISOString() : null
++        }
++
++        let dbError: any = null
++
+         if (resourceId) {
+-          const { error } = await supabase
++          const res = await supabase
+             .from('forums')
+-            .update({
+-              forum_type: forumType,
+-              is_graded: isGraded,
+-              due_date: dueDate ? new Date(dueDate).toISOString() : null
+-            })
++            .update(forumPayload)
+             .eq('id', resourceId)
+-          if (error) throw error
+-          toast.success('Foro actualizado correctamente')
++          dbError = res.error
+         } else {
+-          const { error } = await supabase
++          const res = await supabase
+             .from('forums')
+             .insert({
+-              lesson_id: lessonId,
+-              forum_type: forumType,
+-              is_graded: isGraded,
+-              due_date: dueDate ? new Date(dueDate).toISOString() : null
++              ...forumPayload,
++              lesson_id: lessonId
+             })
+-          if (error) throw error
+-          toast.success('Foro creado correctamente')
++          dbError = res.error
+         }
+ 
++        // Si la columna allow_nested_replies no existe en Supabase, reintentar sin ella
++        if (dbError && (dbError.message?.includes('allow_nested_replies') || dbError.code === 'PGRST204')) {
++          delete forumPayload.allow_nested_replies
++          if (resourceId) {
++            const retry = await supabase.from('forums').update(forumPayload).eq('id', resourceId)
++            dbError = retry.error
++          } else {
++            const retry = await supabase.from('forums').insert({ ...forumPayload, lesson_id: lessonId })
++            dbError = retry.error
++          }
++        }
++
++        if (dbError) {
++          throw new Error(dbError.message || dbError.details || dbError.hint || 'Error al guardar configuraci├│n en la base de datos')
++        }
++
++        toast.success(resourceId ? 'Foro actualizado correctamente' : 'Foro creado correctamente')
+         router.push(`/teacher/courses/${courseId}/resources`)
+         router.refresh()
+       } catch (err: any) {
+-        console.error('Error al guardar el foro:', err)
+-        toast.error(err.message || 'Error al guardar el foro')
++        const errorMsg = err?.message || err?.details || (typeof err === 'object' ? JSON.stringify(err) : String(err))
++        console.error('Error al guardar el foro:', errorMsg, err)
++        toast.error(errorMsg || 'Error al guardar el foro')
+       } finally {
+         setIsSaving(false)
+       }
+@@ -504,6 +525,24 @@ export function TeacherCreateResourceScreen({ courseId, resourceId, courseName =
+               </div>
+             </div>
+ 
++            <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800/30 p-4 rounded-xl border border-slate-100 dark:border-slate-800">
++              <input
++                id="allow-nested-checkbox"
++                type="checkbox"
++                checked={allowNestedReplies}
++                onChange={(e) => setAllowNestedReplies(e.target.checked)}
++                className="h-4.5 w-4.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
++              />
++              <div>
++                <label htmlFor="allow-nested-checkbox" className="text-sm font-bold text-slate-700 dark:text-slate-300 cursor-pointer">
++                  Permitir respuestas a respuestas (Hilos de discusi├│n)
++                </label>
++                <p className="text-xs text-slate-500">
++                  Permite a los usuarios responder directamente a comentarios de otros participantes generando debates anidados.
++                </p>
++              </div>
++            </div>
++
+             <div className="space-y-2">
+               <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Fecha L├¡mite de Entrega</label>
+               <input
+diff --git a/src/modules/courses/presentation/screens/TeacherForumBoardScreen.tsx b/src/modules/courses/presentation/screens/TeacherForumBoardScreen.tsx
+index 925e890..8b07e1e 100644
+--- a/src/modules/courses/presentation/screens/TeacherForumBoardScreen.tsx
++++ b/src/modules/courses/presentation/screens/TeacherForumBoardScreen.tsx
+@@ -15,7 +15,8 @@ import {
+   Award,
+   ChevronRight,
+   BookOpen,
+-  Edit
++  Edit,
++  CornerDownRight
+ } from 'lucide-react'
+ import { toast } from 'sonner'
+ import { createClient } from '@/core/config/supabase/client'
+@@ -37,9 +38,37 @@ import {
+ 
+ import { MiniForumEditor } from '@/core/components/MiniForumEditor'
+ 
+-function stripHtml(html: string): string {
++function fixHtmlSpaces(html: string): string {
+   if (!html) return ''
+-  return html.replace(/<[^>]*>/g, '')
++  return html
++    .replace(/&nbsp;/gi, ' ')
++    .replace(/(<\/(?:span|strong|b|em|i|u|p|div|h[1-6]|li|a)>)([A-Za-z0-9├í├®├¡├│├║├ü├ë├ì├ô├Ü├▒├æ])/g, '$1 $2')
++    .replace(/([a-zA-Z├í├®├¡├│├║├ü├ë├ì├ô├Ü├▒├æ]):([a-zA-Z├í├®├¡├│├║├ü├ë├ì├ô├Ü├▒├æ])/g, '$1: $2')
++}
++
++function cleanHtmlPreview(html: string, maxLength: number = 0): string {
++  if (!html) return ''
++  let clean = fixHtmlSpaces(html)
++    .replace(/&amp;/gi, '&')
++    .replace(/&lt;/gi, '<')
++    .replace(/&gt;/gi, '>')
++    .replace(/&amp;/gi, '&')
++    .replace(/&lt;/gi, '<')
++    .replace(/&gt;/gi, '>')
++    .replace(/&quot;/gi, '"')
++    .replace(/&#39;/gi, "'")
++    .replace(/<[^>]*>/g, ' ')
++    .replace(/\s+/g, ' ')
++    .trim()
++
++  if (maxLength > 0 && clean.length > maxLength) {
++    return clean.substring(0, maxLength) + '...'
++  }
++  return clean
++}
++
++function stripHtml(html: string): string {
++  return cleanHtmlPreview(html, 0)
+ }
+ 
+ function isContentEmpty(content: string): boolean {
+@@ -78,6 +107,8 @@ export function TeacherForumBoardScreen({
+   const [editThreadContent, setEditThreadContent] = useState('')
+   const [editingReplyId, setEditingReplyId] = useState<string | null>(null)
+   const [editReplyContent, setEditReplyContent] = useState('')
++  const [replyingToParentId, setReplyingToParentId] = useState<string | null>(null)
++  const [inlineReplyContent, setInlineReplyContent] = useState('')
+ 
+   const loadInitialData = async () => {
+     try {
+@@ -205,6 +236,37 @@ export function TeacherForumBoardScreen({
+     }
+   }
+ 
++  const handleCreateInlineReply = async (e: React.FormEvent, parentId: string) => {
++    e.preventDefault()
++    if (isContentEmpty(inlineReplyContent) || !activeThread) {
++      toast.error('El contenido de la respuesta es requerido')
++      return
++    }
++
++    try {
++      const authorIdToUse = userId || 'docente-id'
++      const result = await createForumReply({
++        threadId: activeThread.id,
++        parentId,
++        authorId: authorIdToUse,
++        content: inlineReplyContent.trim()
++      })
++
++      if (result.error) {
++        toast.error(result.error)
++      } else if (result.data) {
++        setThreadReplies(prev => [...prev, result.data!])
++        setInlineReplyContent('')
++        setReplyingToParentId(null)
++        toast.success('Respuesta agregada exitosamente')
++        setForumThreads(prev => prev.map(t => t.id === activeThread.id ? { ...t, repliesCount: t.repliesCount + 1 } : t))
++      }
++    } catch (err) {
++      console.error('Error creating inline reply:', err)
++      toast.error('Error al agregar respuesta')
++    }
++  }
++
+   const canEditStudent = (createdAt: string) => {
+     const elapsed = Date.now() - new Date(createdAt).getTime()
+     return elapsed < 10 * 60 * 1000
+@@ -554,7 +616,7 @@ export function TeacherForumBoardScreen({
+                     {/* Content */}
+                     <div 
+                       className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed pt-2 border-t border-slate-50 dark:border-slate-800/60 ql-editor !p-0"
+-                      dangerouslySetInnerHTML={{ __html: activeThread.content }}
++                      dangerouslySetInnerHTML={{ __html: fixHtmlSpaces(activeThread.content) }}
+                     />
+                   </>
+                 )}
+@@ -619,6 +681,23 @@ export function TeacherForumBoardScreen({
+                               <Edit size={10} /> Editar
+                             </button>
+                           )}
++
++                          {forumConfig?.allowNestedReplies !== false && !activeThread.isLocked && (
++                            <button
++                              onClick={() => {
++                                if (replyingToParentId === reply.id) {
++                                  setReplyingToParentId(null)
++                                } else {
++                                  setReplyingToParentId(reply.id)
++                                  setInlineReplyContent('')
++                                }
++                              }}
++                              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[9px] font-bold border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-950/40 dark:border-blue-900 dark:text-blue-400 cursor-pointer active:scale-95 transition-all"
++                              title="Responder a este comentario"
++                            >
++                              <CornerDownRight size={10} /> Responder
++                            </button>
++                          )}
+                         </div>
+                         
+                         {editingReplyId === reply.id ? (
+@@ -646,10 +725,43 @@ export function TeacherForumBoardScreen({
+                             </div>
+                           </form>
+                         ) : (
+-                          <div 
+-                            className="mt-3 pl-8 text-xs text-slate-700 dark:text-slate-350 leading-relaxed ql-editor !p-0"
+-                            dangerouslySetInnerHTML={{ __html: reply.content }}
+-                          />
++                          <>
++                            <div 
++                              className="mt-3 pl-8 text-xs text-slate-700 dark:text-slate-350 leading-relaxed ql-editor !p-0"
++                              dangerouslySetInnerHTML={{ __html: fixHtmlSpaces(reply.content) }}
++                            />
++
++                            {/* Inline Reply Form */}
++                            {replyingToParentId === reply.id && (
++                              <form onSubmit={(e) => handleCreateInlineReply(e, reply.id)} className="space-y-3 pl-4 sm:pl-8 mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 animate-in fade-in duration-200">
++                                <div className="flex items-center justify-between text-xs font-semibold text-blue-600 dark:text-blue-400">
++                                  <span>Respondiendo a {reply.authorName}</span>
++                                  <button type="button" onClick={() => setReplyingToParentId(null)} className="text-slate-400 hover:text-slate-600 text-[10px] border-none bg-transparent cursor-pointer">Cancelar</button>
++                                </div>
++                                <MiniForumEditor
++                                  value={inlineReplyContent}
++                                  onChange={setInlineReplyContent}
++                                  placeholder={`Escribe tu respuesta a ${reply.authorName}...`}
++                                  minHeight="90px"
++                                />
++                                <div className="flex justify-end gap-2">
++                                  <button
++                                    type="button"
++                                    onClick={() => setReplyingToParentId(null)}
++                                    className="rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-900 dark:border-slate-800"
++                                  >
++                                    Cancelar
++                                  </button>
++                                  <button
++                                    type="submit"
++                                    className="rounded-xl bg-pink-600 hover:bg-pink-700 px-3 py-1 text-xs font-bold text-white shadow border-none cursor-pointer"
++                                  >
++                                    Publicar Respuesta
++                                  </button>
++                                </div>
++                              </form>
++                            )}
++                          </>
+                         )}
+                       </div>
+                     ))}

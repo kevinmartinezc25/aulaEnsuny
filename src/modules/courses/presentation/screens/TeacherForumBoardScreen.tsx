@@ -727,7 +727,7 @@ export function TeacherForumBoardScreen({
                         ) : (
                           <>
                             <div 
-                              className="mt-3 pl-8 text-xs text-slate-700 dark:text-slate-350 leading-relaxed ql-editor !p-0"
+                              className="mt-3 pl-8 text-xs text-slate-700 dark:text-slate-350 leading-relaxed ql-editor !p-0 prose prose-sm prose-slate max-w-none dark:prose-invert overflow-x-auto"
                               dangerouslySetInnerHTML={{ __html: fixHtmlSpaces(reply.content) }}
                             />
 

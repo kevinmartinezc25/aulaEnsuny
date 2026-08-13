@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowLeft, BookOpen, Video, FileText, CheckCircle2, ChevronRight, Menu, X, ArrowRight, Play, Download, Award, BrainCircuit, Eye, Clock, AlertCircle, CheckCircle, BarChart3, LineChart as LineChartIcon, Activity, Target, Timer, ClipboardList, UploadCloud, Loader2, MessageSquare, Pin, Lock, Unlock, CornerDownRight, CheckSquare, Undo2, Plus, Edit, Megaphone, Paperclip, AlertTriangle, Bell, Trophy, Calendar } from 'lucide-react'
+import { ArrowLeft, BookOpen, Video, FileText, CheckCircle2, ChevronRight, ChevronDown, Menu, X, ArrowRight, Play, Download, Award, BrainCircuit, Eye, Clock, AlertCircle, CheckCircle, BarChart3, LineChart as LineChartIcon, Activity, Target, Timer, ClipboardList, UploadCloud, Loader2, MessageSquare, Pin, Lock, Unlock, CornerDownRight, CheckSquare, Undo2, Plus, Edit, Megaphone, Paperclip, AlertTriangle, Bell, Trophy, Calendar, User } from 'lucide-react'
 import Link from 'next/link'
 import { PdfViewer } from '@/modules/resources/presentation/components/PdfViewer'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts'
@@ -115,6 +115,7 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false)
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<'announcements' | 'content' | 'grades' | 'reports'>('announcements')
+  const [isMobileContentIndex, setIsMobileContentIndex] = useState(true)
   const [announcements, setAnnouncements] = useState<any[]>([])
   const [announcementsLoading, setAnnouncementsLoading] = useState(true)
 
@@ -485,8 +486,12 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
 
   // Helper functions
 
-  const handleLessonClick = (lesson: Lesson) => {
+  const handleLessonClick = async (lesson: Lesson) => {
     setActiveLesson(lesson)
+    setIsMobileContentIndex(false)
+    if (activeTab !== 'content') {
+      setActiveTab('content')
+    }
     setTaskResponse(lesson.submissionText || '')
     setIsMobileNavOpen(false)
 
@@ -566,10 +571,11 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
   }
 
   const getPerformanceLevel = (score: number) => {
+    if (score === 0) return 'Sin evaluar'
     if (score >= 4.6) return 'Superior'
     if (score >= 4.0) return 'Alto'
     if (score >= 3.0) return 'Básico'
-    return 'Bajo'
+    return 'Insuficiente'
   }
 
   // Helper to determine type of lesson
@@ -1410,10 +1416,28 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
             <div key={mod.id} className="space-y-2.5 text-left">
               <button
                 onClick={() => setExpandedModules(prev => ({ ...prev, [mod.id]: !prev[mod.id] }))}
-                className="flex w-full items-center justify-between text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider hover:text-slate-650 dark:hover:text-slate-350 transition-colors py-1 cursor-pointer bg-transparent border-none outline-none"
+                className="flex w-full items-start justify-between text-left transition-colors py-3 px-3 cursor-pointer bg-transparent border-none outline-none mb-1 group"
               >
-                <span>{mod.title}</span>
-                <ChevronRight className={`h-3.5 w-3.5 transition-transform duration-200 shrink-0 ml-2 ${isExpanded ? 'rotate-90' : 'rotate-0'}`} />
+                <div className="flex-1 min-w-0 pr-2">
+                  <p className="text-[10px] font-bold text-slate-900 dark:text-white mb-0.5">{mod.title.includes(':') ? mod.title.split(':')[0] : mod.title}</p>
+                  <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{mod.title.includes(':') ? mod.title.substring(mod.title.indexOf(':') + 1).trim() : mod.title}</p>
+                  {(() => {
+                    const totalL = mod.lessons.length;
+                    const compL = mod.lessons.filter(l => l.status === 'completed' || l.status === 'graded').length;
+                    const modProgress = totalL > 0 ? Math.round((compL / totalL) * 100) : 0;
+                    return (
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400">{modProgress}%</span>
+                        <div className="h-1.5 w-10 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                           <div className="h-full bg-blue-600 rounded-full" style={{ width: `${modProgress}%` }}></div>
+                        </div>
+                      </div>
+                    )
+                  })()}
+                </div>
+                <div className="bg-blue-50 dark:bg-blue-900/30 rounded-lg p-1 mt-1">
+                  <ChevronDown className={`h-3 w-3 text-blue-600 dark:text-blue-400 transition-transform duration-200 shrink-0 ${isExpanded ? 'rotate-180' : 'rotate-0'}`} />
+                </div>
               </button>
               {isExpanded && (
                 <div className="space-y-1">
@@ -1423,18 +1447,24 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
                       <button
                         key={lesson.id}
                         onClick={() => handleLessonClick(lesson)}
-                        className={`flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-xs font-semibold transition-all duration-150 ${
+                        className={`group relative flex w-full items-start gap-3 px-3 py-3 text-xs font-semibold transition-all duration-150 border-y outline-none cursor-pointer ${
                           isActive
-                            ? 'bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400'
-                            : 'text-slate-600 hover:bg-slate-55 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-slate-800/40 dark:hover:text-white'
+                            ? 'bg-white border-slate-100 dark:bg-slate-900 dark:border-slate-800 shadow-[0_2px_10px_rgb(0,0,0,0.02)] z-10'
+                            : 'bg-transparent border-transparent hover:bg-slate-50 dark:hover:bg-slate-800/40 text-slate-600 dark:text-slate-400'
                         }`}
                       >
-                        <span className="mt-0.5 shrink-0">{getIcon(lesson.type)}</span>
+                        {isActive && (
+                          <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-600 rounded-r-md"></div>
+                        )}
+                        <span className={`mt-0.5 shrink-0 flex h-7 w-7 items-center justify-center rounded-xl shadow-sm ${isActive ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'}`}>
+                          {getIcon(lesson.type)}
+                        </span>
                         <div className="flex-1 min-w-0 text-left space-y-1">
-                          <p className="truncate">{lesson.title}</p>
-                          <div className="flex items-center justify-between">
-                            <span className="text-[10px] text-slate-400 font-medium">{lesson.duration}</span>
-                            <div className={`flex items-center gap-1 text-[10px] font-bold ${getStatusColor(lesson.status)}`}>
+                          <p className={`truncate ${isActive ? 'text-blue-600 dark:text-blue-400 font-bold' : 'text-slate-700 dark:text-slate-300 font-semibold'}`}>{lesson.title}</p>
+                          <div className="flex items-center gap-1.5 mt-1 text-[10px] text-slate-500">
+                            <span className="capitalize">{lesson.type === 'video' ? 'Video' : lesson.type === 'task' ? 'Tarea' : lesson.type === 'quiz' ? 'Quiz' : 'Foro'}</span>
+                            <span>•</span>
+                            <div className={`flex items-center gap-1 font-bold ${getStatusColor(lesson.status)}`}>
                               {renderStatusIcon(lesson.status, "h-3 w-3 shrink-0")}
                               <span>{getStatusText(lesson.status, lesson.type)}</span>
                             </div>
@@ -1451,63 +1481,91 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
       </div>
     </div>
   )
+  const isForumClosedForStudent = userRole !== 'teacher' && userRole !== 'admin' && forumConfig?.dueDate && new Date() > new Date(forumConfig.dueDate);
 
   return (
     <div className="bg-[#f9fafb] dark:bg-slate-950 text-left flex flex-col">
       {/* Barra superior de navegación interna - sticky top-0 porque main es el scroll container */}
       <div className="sticky top-0 z-30 flex flex-col bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800 shadow-sm">
-        <div className="flex py-2 px-6 items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-col md:flex-row md:items-center justify-start gap-4 md:gap-8 py-4 px-4 sm:px-6 relative">
+          <div className="flex items-start gap-3 sm:gap-4 pr-12 md:pr-0">
             <Link
               href="/student/dashboard"
-              className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-950 text-slate-500 transition-colors"
+              className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors shadow-sm"
             >
-              <ArrowLeft className="h-3.5 w-3.5" />
+              <ArrowLeft className="h-4 w-4" />
             </Link>
-            <div className="text-left">
-              <span className="text-[9px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider block leading-tight">
+            <div className="text-left min-w-0">
+              <span className="text-[10px] sm:text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider block mb-0.5 truncate">
                 {courseData.subject}
               </span>
-              <h2 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white leading-tight">
+              <h2 className="text-base sm:text-lg md:text-xl font-bold text-slate-900 dark:text-white leading-tight truncate">
                 {courseData.title}
               </h2>
+              <div className="flex items-center gap-2 mt-1.5 text-[10px] sm:text-xs font-medium text-slate-500 dark:text-slate-400 flex-wrap">
+                <span className="flex items-center gap-1.5">
+                  <div className="h-4 w-4 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden flex items-center justify-center">
+                    <span className="text-[8px]">{courseData.teacherName ? courseData.teacherName.charAt(0) : 'D'}</span>
+                  </div>
+                  Docente: {courseData.teacherName || 'Asignado'}
+                </span>
+                <span className="hidden sm:inline">•</span>
+                <span>{courseData.period || '3.er periodo'}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Separador vertical */}
+          <div className="hidden md:block w-px h-12 bg-slate-200 dark:bg-slate-800" />
+
+          {/* Progress bar on Desktop Header */}
+          <div className="hidden md:flex flex-col w-64 shrink-0">
+            <div className="flex items-center justify-between text-xs mb-1.5">
+              <span className="text-slate-600 dark:text-slate-300 font-bold">Progreso del curso</span>
+              <span className="text-slate-500 dark:text-slate-400 text-[10px]">{stats.lessonsCompleted} de {stats.totalLessons} completadas</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-xl font-black text-slate-900 dark:text-white leading-none">{courseData.progress}%</span>
+              <div className="h-2 flex-1 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                <div style={{ width: `${courseData.progress}%` }} className="h-full rounded-full bg-blue-600 transition-all duration-500" />
+              </div>
             </div>
           </div>
 
           <button
             onClick={() => setIsMobileNavOpen(true)}
-            className="flex items-center gap-1.5 rounded-xl border border-slate-100 bg-white px-3 py-1 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 md:hidden"
+            className="absolute top-4 right-4 flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 md:hidden shadow-sm transition-colors"
+            aria-label="Menú"
           >
             <Menu className="h-4 w-4" />
-            <span>Menú</span>
           </button>
         </div>
 
         {/* Tab Navigation Banner */}
-        <div className="px-6 flex gap-6 overflow-x-auto hide-scrollbar border-t border-slate-100 dark:border-slate-800/60 pt-1">
+        <div className="px-4 sm:px-6 flex gap-2 sm:gap-6 overflow-x-auto hide-scrollbar border-t border-slate-100 dark:border-slate-800/60 pt-2">
           <button 
             onClick={() => setActiveTab('announcements')}
-            className={`pb-2.5 text-sm font-semibold whitespace-nowrap transition-colors border-b-2 ${activeTab === 'announcements' ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+            className={`pb-2.5 px-2 text-[10px] sm:text-sm font-bold whitespace-nowrap transition-colors border-b-2 flex flex-col sm:flex-row items-center gap-1.5 ${activeTab === 'announcements' ? 'border-blue-600 text-blue-700 dark:border-blue-500 dark:text-blue-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
           >
-            <div className="flex items-center gap-2"><Megaphone className="h-4 w-4" /> Novedades</div>
+            <Megaphone className="h-5 w-5 sm:h-4 sm:w-4" /> Novedades
           </button>
           <button 
             onClick={() => setActiveTab('content')}
-            className={`pb-2.5 text-sm font-semibold whitespace-nowrap transition-colors border-b-2 ${activeTab === 'content' ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+            className={`pb-2.5 px-2 text-[10px] sm:text-sm font-bold whitespace-nowrap transition-colors border-b-2 flex flex-col sm:flex-row items-center gap-1.5 ${activeTab === 'content' ? 'border-blue-600 text-blue-700 dark:border-blue-500 dark:text-blue-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
           >
-            <div className="flex items-center gap-2"><BookOpen className="h-4 w-4" /> Contenido</div>
+            <BookOpen className="h-5 w-5 sm:h-4 sm:w-4" /> Contenido
           </button>
           <button 
             onClick={() => setActiveTab('grades')}
-            className={`pb-2.5 text-sm font-semibold whitespace-nowrap transition-colors border-b-2 ${activeTab === 'grades' ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+            className={`pb-2.5 px-2 text-[10px] sm:text-sm font-bold whitespace-nowrap transition-colors border-b-2 flex flex-col sm:flex-row items-center gap-1.5 ${activeTab === 'grades' ? 'border-blue-600 text-blue-700 dark:border-blue-500 dark:text-blue-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
           >
-            <div className="flex items-center gap-2"><Award className="h-4 w-4" /> Calificaciones</div>
+            <Award className="h-5 w-5 sm:h-4 sm:w-4" /> Calificaciones
           </button>
           <button 
             onClick={() => setActiveTab('reports')}
-            className={`pb-2.5 text-sm font-semibold whitespace-nowrap transition-colors border-b-2 ${activeTab === 'reports' ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+            className={`pb-2.5 px-2 text-[10px] sm:text-sm font-bold whitespace-nowrap transition-colors border-b-2 flex flex-col sm:flex-row items-center gap-1.5 ${activeTab === 'reports' ? 'border-blue-600 text-blue-700 dark:border-blue-500 dark:text-blue-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
           >
-            <div className="flex items-center gap-2"><BarChart3 className="h-4 w-4" /> Reporte General</div>
+            <BarChart3 className="h-5 w-5 sm:h-4 sm:w-4" /> Reporte General
           </button>
         </div>
       </div>
@@ -1531,10 +1589,10 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
               </div>
             ) : announcements.length === 0 ? (
               <div className="text-center py-16 bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800/60 shadow-sm max-w-lg mx-auto">
-                <Megaphone className="h-12 w-12 mx-auto mb-4 text-slate-350 dark:text-slate-655" />
-                <h3 className="font-bold text-slate-800 dark:text-slate-205 text-sm">No hay novedades en este curso</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-xs mx-auto">
-                  El docente no ha publicado anuncios oficiales todavía. Vuelve más tarde.
+                <CheckCircle2 className="h-12 w-12 mx-auto mb-4 text-emerald-400 dark:text-emerald-500/80" />
+                <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">Todo está al día</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 max-w-sm mx-auto leading-relaxed">
+                  Tu docente aún no ha publicado novedades para este curso. En este espacio aparecerán anuncios, recordatorios, cambios de actividades y comunicaciones importantes.
                 </p>
               </div>
             ) : (
@@ -1610,7 +1668,7 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
                       </div>
                     </div>
 
-                    <div className="mt-4 pl-0 sm:pl-13 text-slate-650 dark:text-slate-350 text-sm leading-relaxed max-w-3xl">
+                    <div className="mt-4 pl-0 sm:pl-13 text-sm leading-relaxed max-w-3xl prose prose-sm prose-slate max-w-none dark:prose-invert overflow-x-auto">
                       <div dangerouslySetInnerHTML={{ __html: ann.content }} />
                     </div>
 
@@ -1637,14 +1695,21 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
           </div>
         </div>
       ) : activeTab === 'content' ? (
-        <div className="relative flex flex-1">
-          {/* Sidebar Izquierdo (Fijo en desktop) */}
-          <aside className="hidden md:block w-72 border-r border-slate-100 bg-white dark:border-slate-800/60 dark:bg-slate-900">
+        <div className="relative flex flex-1 flex-col md:flex-row">
+          {/* Sidebar Izquierdo (Fijo en desktop, Oculto en móvil si hay lección seleccionada) */}
+          <aside className={`${isMobileContentIndex ? 'block' : 'hidden'} md:block w-full md:w-72 lg:w-80 border-r border-slate-100 bg-white dark:border-slate-800/60 dark:bg-slate-900 shrink-0`}>
             {sidebarContent}
           </aside>
 
           {/* Contenido Principal */}
-          <div className="flex-1 px-4 sm:px-6 md:px-8 pt-7 pb-12 max-w-4xl mx-auto space-y-6">
+          <div className={`${!isMobileContentIndex ? 'block' : 'hidden'} md:block flex-1 px-4 sm:px-6 md:px-8 pt-4 sm:pt-7 pb-20 max-w-4xl mx-auto space-y-6 w-full min-w-0`}>
+            <button
+              onClick={() => setIsMobileContentIndex(true)}
+              className="md:hidden flex items-center gap-1.5 text-sm font-bold text-blue-600 dark:text-blue-400 mb-4 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 px-3 py-1.5 rounded-full w-fit transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4" /> Contenido
+            </button>
+
             {activeLesson ? (
               <>
                 {/* 1. Reproductor de Video */}
@@ -1664,78 +1729,100 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
                   </motion.div>
                 )}
 
-                {/* 2. Cabecera del Contenido (Omitida en foros para no duplicar título) */}
-                {activeLesson.type !== 'forum' && (
-                  <div className="space-y-3 pb-6 border-b border-slate-100 dark:border-slate-800">
-                    <div className="flex items-center gap-2">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400">
-                        {getIcon(activeLesson.type)}
-                      </span>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                        Lección Activa ({activeLesson.type === 'video' ? 'Video' : activeLesson.type === 'reading' ? 'Lectura' : activeLesson.type === 'file' ? 'Archivo' : activeLesson.type === 'quiz' ? 'Quiz' : 'Tarea'})
-                      </span>
+                {/* 2. Cabecera del Contenido (Nueva tarjeta tipo Mockup) */}
+                <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-sm mb-6 flex flex-col md:flex-row md:items-start justify-between gap-4">
+                  <div className="flex gap-4 items-start">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
+                      {getIcon(activeLesson.type)}
                     </div>
-                    <div className="flex items-center justify-between">
-                      <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
-                        {activeLesson.title}
-                      </h1>
-                      {/* Visual Status Indicator on Header */}
-                      <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800">
-                        {renderStatusIcon(activeLesson.status, "h-4 w-4 shrink-0")}
-                        <span className="text-xs font-bold text-slate-700 dark:text-slate-300 capitalize">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+                          {activeLesson.title}
+                        </h1>
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold ${getStatusColor(activeLesson.status)} bg-opacity-20`}>
                           {getStatusText(activeLesson.status, activeLesson.type)}
                         </span>
                       </div>
+                      <p className="mt-1.5 text-sm text-slate-600 dark:text-slate-400 max-w-2xl">
+                        {activeLesson.type === 'video' ? 'Visualiza el siguiente material de video y presta atención a los conceptos.' : activeLesson.type === 'task' ? 'Lee las instrucciones y sube tu entrega antes de la fecha límite.' : activeLesson.type === 'forum' ? 'Participa en el foro respondiendo la pregunta planteada por el docente.' : 'Resuelve el cuestionario para evaluar tus conocimientos sobre el tema.'}
+                      </p>
+                      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                        <span className="flex items-center gap-1.5 capitalize font-semibold text-slate-700 dark:text-slate-200">
+                          <span className="opacity-70 text-slate-500">{getIcon(activeLesson.type)}</span> 
+                          {activeLesson.type === 'video' ? 'Video' : activeLesson.type === 'task' ? 'Tarea' : activeLesson.type === 'quiz' ? 'Quiz' : activeLesson.type === 'forum' ? (forumConfig ? (forumConfig.forumType === 'debate' ? 'Debate Evaluativo' : forumConfig.forumType === 'qa' ? 'Dudas y Soporte' : 'Foro Libre') : 'Foro') : 'Foro'}
+                        </span>
+                        <span className="hidden sm:inline opacity-40">•</span>
+                        <span className="flex items-center gap-1.5"><span className="opacity-70"><User className="h-3.5 w-3.5" /></span> Individual</span>
+                        <span className="hidden sm:inline opacity-40">•</span>
+                        {activeLesson.type === 'forum' && forumConfig?.dueDate ? (
+                          <span className="flex items-center gap-1.5 font-bold text-pink-600 dark:text-pink-400 bg-pink-50 dark:bg-pink-500/10 px-2 py-1 rounded-md border border-pink-100 dark:border-pink-500/20 shadow-sm">
+                            <Clock className="h-3.5 w-3.5" />
+                            Límite: {new Date(forumConfig.dueDate).toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true })}
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1.5"><span className="opacity-70"><Calendar className="h-3.5 w-3.5" /></span> Sin fecha límite</span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                )}
+                </div>
 
-                {/* 3. Contenido Escrito */}
-                <article className="prose prose-slate max-w-none dark:prose-invert">
-                  <div 
-                    className="text-slate-600 dark:text-slate-300 leading-relaxed text-sm sm:text-base"
-                    dangerouslySetInnerHTML={{ __html: activeLesson.content || '' }}
-                  />
-                </article>
-
-                {/* Botón para marcar como completado (Lecturas y Videos) */}
-                {(activeLesson.type === 'reading' || activeLesson.type === 'video') && (
-                  <div className="pt-6 border-t border-slate-100 dark:border-slate-800 flex justify-end">
-                    {activeLesson.status === 'completed' ? (
-                      <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-semibold text-sm">
-                        <CheckCircle className="h-5 w-5" />
-                        <span>¡Lección Completada!</span>
+                {/* Content Layout */}
+                <div className="space-y-6">
+                  {/* Left Column: Descripción & Participación */}
+                  <div className="space-y-6">
+                    {/* Descripción Card */}
+                    {activeLesson.content && activeLesson.content.trim() !== '' && (
+                      <div className="rounded-2xl bg-blue-50/50 dark:bg-blue-900/10 p-6">
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-3">Descripción</h3>
+                        <article className="prose prose-sm prose-slate max-w-none dark:prose-invert text-slate-700 dark:text-slate-300 overflow-x-auto">
+                          <div dangerouslySetInnerHTML={{ __html: activeLesson.content }} />
+                        </article>
                       </div>
-                    ) : (
-                      <button
-                        onClick={() => handleMarkAsCompleted(activeLesson.id)}
-                        className="flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 px-6 py-2.5 text-sm font-semibold text-white transition-all active:scale-[0.98]"
-                      >
-                        <CheckCircle2 className="h-4 w-4" />
-                        <span>Marcar como Completado</span>
-                      </button>
                     )}
-                  </div>
-                )}
 
-                {/* 4. Entrega de Tareas (Nuevo) */}
-                {activeLesson.type === 'task' && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mt-8 rounded-3xl border border-orange-100 bg-orange-50/20 p-6 sm:p-8 dark:border-orange-900/30 dark:bg-orange-950/10"
-                  >
-                    <div className="flex items-center gap-3 mb-6">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500/10 text-orange-600 dark:bg-orange-500/20">
-                        <UploadCloud className="h-5 w-5" />
+                    {/* Botón para marcar como completado (Lecturas y Videos) */}
+                    {(activeLesson.type === 'reading' || activeLesson.type === 'video') && (
+                      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-sm">
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-bold text-slate-900 dark:text-white">Tu progreso</h3>
+                          {activeLesson.status === 'completed' ? (
+                            <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-semibold text-sm">
+                              <CheckCircle className="h-5 w-5" />
+                              <span>¡Lección Completada!</span>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => handleMarkAsCompleted(activeLesson.id)}
+                              className="flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 px-6 py-2 text-sm font-bold text-white transition-all active:scale-[0.98]"
+                            >
+                              <CheckCircle2 className="h-4 w-4" />
+                              <span>Marcar como Completado</span>
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <div>
-                        <h3 className="font-bold text-slate-900 dark:text-white text-lg">Zona de Entrega</h3>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">
-                          {activeLesson.submissionType === 'file' ? 'Sube tu documento para que el profesor lo evalúe.' : 'Escribe tu respuesta a continuación.'}
-                        </p>
-                      </div>
-                    </div>
+                    )}
+
+                    {/* 4. Entrega de Tareas (Nuevo) */}
+                    {activeLesson.type === 'task' && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-sm"
+                      >
+                        <div className="flex items-center gap-3 mb-6 border-b border-slate-100 dark:border-slate-800 pb-4">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400">
+                            <UploadCloud className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-slate-900 dark:text-white text-base">Tu participación</h3>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                              {activeLesson.submissionType === 'file' ? 'Sube tu documento para que el profesor lo evalúe.' : 'Escribe tu respuesta a continuación.'}
+                            </p>
+                          </div>
+                        </div>
 
                     {(activeLesson.status === 'submitted' || activeLesson.status === 'completed' || activeLesson.status === 'graded') && (activeLesson.submissionType === 'file' || activeLesson.submissionText) ? (
                       <div className="space-y-4">
@@ -2152,23 +2239,6 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
 
                 {activeLesson.type === 'forum' && (
                   <div className="space-y-6 animate-in fade-in slide-in-from-top-4 duration-300">
-                    {/* Header Foro info */}
-                    {forumConfig && (
-                      <div className="rounded-xl bg-pink-50/50 dark:bg-pink-950/10 p-4 border border-pink-100/40 dark:border-pink-950/20">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <span className="text-xs font-bold text-pink-700 dark:text-pink-400 bg-pink-100 dark:bg-pink-900/35 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-                            {forumConfig.forumType === 'debate' ? 'Debate Evaluativo' : forumConfig.forumType === 'qa' ? 'Dudas y Soporte (Q&A)' : 'Foro Libre'}
-                          </span>
-                          {forumConfig.dueDate && (
-                            <span className="text-xs font-medium text-slate-550 flex items-center gap-1">
-                              <Clock size={12} /> Límite: {new Date(forumConfig.dueDate).toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                          )}
-                        </div>
-                        <p className="mt-2 text-sm text-slate-650 dark:text-slate-350 leading-relaxed">{forumConfig.description}</p>
-                      </div>
-                    )}
-
                     {/* Forum Grade Banner */}
                     {activeLesson.status === 'graded' && activeLesson.grade && (
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-xl bg-purple-50 dark:bg-purple-950/10 p-4 border border-purple-100/40 dark:border-purple-900/30 text-sm text-purple-700 dark:text-purple-350 animate-in fade-in slide-in-from-top-2 duration-300">
@@ -2295,7 +2365,7 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
                             <>
                               <h3 className="text-lg font-bold text-slate-900 dark:text-white">{activeThread.title}</h3>
                               <div 
-                                className="text-sm text-slate-700 dark:text-slate-350 leading-relaxed ql-editor !p-0"
+                                className="text-sm leading-relaxed ql-editor !p-0 prose prose-sm prose-slate max-w-none dark:prose-invert overflow-x-auto"
                                 dangerouslySetInnerHTML={{ __html: fixHtmlSpaces(activeThread.content) }}
                               />
                             </>
@@ -2408,7 +2478,7 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
                                 ) : (
                                   <>
                                     <div 
-                                      className="mt-3 pl-10 text-xs text-slate-700 dark:text-slate-350 leading-relaxed ql-editor !p-0"
+                                      className="mt-3 pl-10 text-xs text-slate-700 dark:text-slate-350 leading-relaxed ql-editor !p-0 prose prose-sm prose-slate max-w-none dark:prose-invert overflow-x-auto"
                                       dangerouslySetInnerHTML={{ __html: fixHtmlSpaces(reply.content) }}
                                     />
                                     
@@ -2453,9 +2523,9 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
                         </div>
 
                         {/* Reply Form */}
-                        {activeThread.isLocked ? (
+                        {activeThread.isLocked || isForumClosedForStudent ? (
                           <div className="rounded-xl bg-slate-50 dark:bg-slate-900/50 p-4 border border-dashed text-center text-xs text-slate-550">
-                            Este tema de discusión ha sido bloqueado por el docente y no admite nuevas respuestas.
+                            {isForumClosedForStudent ? 'La fecha límite ha expirado y no se admiten nuevas participaciones.' : 'Este tema de discusión ha sido bloqueado por el docente y no admite nuevas respuestas.'}
                           </div>
                         ) : (
                           <form onSubmit={(e) => handleCreateReply(e)} className="space-y-3">
@@ -2516,15 +2586,17 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
                       </form>
                     ) : (
                       /* Thread List View */
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between gap-4">
-                          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Temas abiertos ({forumThreads.length})</h4>
-                          {forumConfig && (userRole === 'teacher' || userRole === 'admin' || forumConfig.forumType !== 'debate') && (
+                      <div className="space-y-4 rounded-3xl bg-blue-50/30 dark:bg-blue-900/10 p-6 border border-blue-100 dark:border-blue-900/30">
+                        <div className="flex items-center justify-between gap-4 border-b border-blue-100 dark:border-blue-900/30 pb-4">
+                          <h4 className="text-sm font-extrabold text-blue-900 dark:text-blue-400 uppercase tracking-wider flex items-center gap-2">
+                            <MessageSquare className="h-4 w-4" /> Temas abiertos ({forumThreads.length})
+                          </h4>
+                          {forumConfig && (userRole === 'teacher' || userRole === 'admin' || (forumConfig.forumType !== 'debate' && !isForumClosedForStudent)) && (
                             <button
                               onClick={() => setIsCreatingThread(true)}
-                              className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded-lg text-xs font-bold text-white shadow transition-all active:scale-[0.98] border-none cursor-pointer"
+                              className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-xl text-xs font-bold text-white shadow transition-all active:scale-[0.98] border-none cursor-pointer"
                             >
-                              <Plus size={12} /> Iniciar discusión
+                              <Plus size={14} /> Iniciar discusión
                             </button>
                           )}
                         </div>
@@ -2627,6 +2699,37 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
                     )}
                   </div>
                 )}
+              </div>
+            </div>
+                {/* Siguiente Actividad Widget */}
+                {(() => {
+                  if (!activeLesson || !courseData) return null;
+                  let allLessons: Lesson[] = [];
+                  courseData.modules.forEach(m => { allLessons = [...allLessons, ...m.lessons] });
+                  const currentIndex = allLessons.findIndex(l => l.id === activeLesson.id);
+                  const nextLesson = (currentIndex >= 0 && currentIndex < allLessons.length - 1) ? allLessons[currentIndex + 1] : null;
+                  
+                  if (!nextLesson) return null;
+                  
+                  return (
+                    <div className="mt-8 rounded-2xl border border-slate-200 bg-slate-50 p-6 dark:border-slate-800 dark:bg-slate-900/60 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1.5">Siguiente Actividad</p>
+                        <h4 className="text-sm font-bold text-slate-900 dark:text-white">{nextLesson.title}</h4>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 capitalize">{nextLesson.type === 'video' ? 'Video' : nextLesson.type === 'task' ? 'Tarea' : nextLesson.type === 'quiz' ? 'Quiz' : 'Foro'} • {nextLesson.duration}</p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          handleLessonClick(nextLesson);
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                        className="shrink-0 flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 px-5 py-2.5 text-xs font-bold text-white shadow-sm transition-colors border-none cursor-pointer"
+                      >
+                        Continuar <ChevronRight className="h-4 w-4" />
+                      </button>
+                    </div>
+                  );
+                })()}
               </>
             ) : (
               <div className="flex flex-col items-center justify-center min-h-[400px] text-center p-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800/60 shadow-sm">
@@ -2650,9 +2753,9 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="rounded-2xl bg-white border border-slate-100 p-6 shadow-sm dark:bg-slate-900 dark:border-slate-800">
-              <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Promedio General</p>
+              <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Promedio del curso</p>
               <h3 className="text-3xl font-black text-slate-900 dark:text-white mt-2">
-                {stats.averageGrade.toFixed(1)} <span className="text-base text-slate-400 font-normal">/ 5.0</span>
+                {stats.averageGrade === 0 ? '—' : stats.averageGrade.toFixed(1)} <span className="text-base text-slate-400 font-normal">/ 5.0</span>
               </h3>
             </div>
             <div className="rounded-2xl bg-white border border-slate-100 p-6 shadow-sm dark:bg-slate-900 dark:border-slate-800">
@@ -2663,7 +2766,7 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
             </div>
             <div className="rounded-2xl bg-white border border-slate-100 p-6 shadow-sm dark:bg-slate-900 dark:border-slate-800">
               <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Estado de Desempeño</p>
-              <h3 className={`text-3xl font-black mt-2 ${stats.averageGrade >= 3.0 ? 'text-emerald-500' : 'text-red-500'}`}>
+              <h3 className={`text-3xl font-black mt-2 ${stats.averageGrade === 0 ? 'text-slate-500 dark:text-slate-400' : stats.averageGrade >= 3.0 ? 'text-emerald-500' : 'text-red-500'}`}>
                 {getPerformanceLevel(stats.averageGrade)}
               </h3>
             </div>
@@ -2693,14 +2796,14 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
                     const scoreColor = score === null ? 'text-slate-400' : score >= 4.5 ? 'text-emerald-600 dark:text-emerald-400' : score >= 3.0 ? 'text-indigo-600 dark:text-indigo-400' : 'text-red-600 dark:text-red-400'
 
                     return (
-                      <tr key={grade.id}>
+                      <tr key={grade.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
                         <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">{grade.activityName}</td>
                         <td className="px-6 py-4">
                           <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${typeInfo.color}`}>
                             {typeInfo.label}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-slate-500 dark:text-slate-400 max-w-xs">
+                        <td className="px-6 py-4 text-slate-500 dark:text-slate-400 max-w-xs text-xs sm:text-sm">
                           {grade.feedback || (score !== null ? 'Calificado por el docente.' : 'Pendiente de calificación.')}
                         </td>
                         <td className={`px-6 py-4 text-right font-black text-lg ${scoreColor}`}>
@@ -2746,12 +2849,12 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
             <div className="rounded-2xl bg-white border border-slate-100 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.02)] dark:bg-slate-900 dark:border-slate-800">
               <div className="flex items-center gap-3 mb-3">
                 <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400"><Target className="h-5 w-5" /></div>
-                <p className="text-sm font-semibold text-slate-600 dark:text-slate-400">Puntaje Promedio</p>
+                <p className="text-sm font-semibold text-slate-600 dark:text-slate-400">Promedio del curso</p>
               </div>
               <h3 className="text-2xl font-black text-slate-900 dark:text-white">
-                {stats.averageGrade.toFixed(1)} <span className="text-sm text-slate-400 font-normal">/ 5.0</span>
+                {stats.averageGrade === 0 ? '—' : stats.averageGrade.toFixed(1)} <span className="text-sm text-slate-400 font-normal">/ 5.0</span>
               </h3>
-              <p className="text-xs text-emerald-500 font-medium mt-2 flex items-center gap-1">Rendimiento: {getPerformanceLevel(stats.averageGrade)}</p>
+              <p className={`text-xs font-medium mt-2 flex items-center gap-1 ${stats.averageGrade === 0 ? 'text-slate-500' : 'text-emerald-500'}`}>Rendimiento: {getPerformanceLevel(stats.averageGrade)}</p>
             </div>
             
             <div className="rounded-2xl bg-white border border-slate-100 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.02)] dark:bg-slate-900 dark:border-slate-800">
