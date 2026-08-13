@@ -71,7 +71,7 @@ export default function TeacherCourseLayout({
   ]
 
   return (
-    <div className="flex min-h-[calc(100vh-4rem)] flex-col lg:flex-row gap-0 lg:gap-2 py-8">
+    <div className="flex min-h-[calc(100vh-4rem)] flex-col lg:flex-row gap-0 lg:gap-2 px-6 md:px-8 py-6 md:py-8">
       {/* Sidebar Izquierdo */}
       <aside className="w-full lg:w-56 shrink-0 pr-4 print:hidden">
         <div className="sticky top-24 space-y-6">

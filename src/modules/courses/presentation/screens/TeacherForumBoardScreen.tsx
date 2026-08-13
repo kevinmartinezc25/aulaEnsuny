@@ -15,7 +15,8 @@ import {
   Award,
   ChevronRight,
   BookOpen,
-  Edit
+  Edit,
+  CornerDownRight
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { createClient } from '@/core/config/supabase/client'
@@ -37,9 +38,37 @@ import {
 
 import { MiniForumEditor } from '@/core/components/MiniForumEditor'
 
-function stripHtml(html: string): string {
+function fixHtmlSpaces(html: string): string {
   if (!html) return ''
-  return html.replace(/<[^>]*>/g, '')
+  return html
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/(<\/(?:span|strong|b|em|i|u|p|div|h[1-6]|li|a)>)([A-Za-z0-9áéíóúÁÉÍÓÚñÑ])/g, '$1 $2')
+    .replace(/([a-zA-ZáéíóúÁÉÍÓÚñÑ]):([a-zA-ZáéíóúÁÉÍÓÚñÑ])/g, '$1: $2')
+}
+
+function cleanHtmlPreview(html: string, maxLength: number = 0): string {
+  if (!html) return ''
+  let clean = fixHtmlSpaces(html)
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  if (maxLength > 0 && clean.length > maxLength) {
+    return clean.substring(0, maxLength) + '...'
+  }
+  return clean
+}
+
+function stripHtml(html: string): string {
+  return cleanHtmlPreview(html, 0)
 }
 
 function isContentEmpty(content: string): boolean {
@@ -78,6 +107,8 @@ export function TeacherForumBoardScreen({
   const [editThreadContent, setEditThreadContent] = useState('')
   const [editingReplyId, setEditingReplyId] = useState<string | null>(null)
   const [editReplyContent, setEditReplyContent] = useState('')
+  const [replyingToParentId, setReplyingToParentId] = useState<string | null>(null)
+  const [inlineReplyContent, setInlineReplyContent] = useState('')
 
   const loadInitialData = async () => {
     try {
@@ -201,6 +232,37 @@ export function TeacherForumBoardScreen({
       }
     } catch (err) {
       console.error('Error creating reply:', err)
+      toast.error('Error al agregar respuesta')
+    }
+  }
+
+  const handleCreateInlineReply = async (e: React.FormEvent, parentId: string) => {
+    e.preventDefault()
+    if (isContentEmpty(inlineReplyContent) || !activeThread) {
+      toast.error('El contenido de la respuesta es requerido')
+      return
+    }
+
+    try {
+      const authorIdToUse = userId || 'docente-id'
+      const result = await createForumReply({
+        threadId: activeThread.id,
+        parentId,
+        authorId: authorIdToUse,
+        content: inlineReplyContent.trim()
+      })
+
+      if (result.error) {
+        toast.error(result.error)
+      } else if (result.data) {
+        setThreadReplies(prev => [...prev, result.data!])
+        setInlineReplyContent('')
+        setReplyingToParentId(null)
+        toast.success('Respuesta agregada exitosamente')
+        setForumThreads(prev => prev.map(t => t.id === activeThread.id ? { ...t, repliesCount: t.repliesCount + 1 } : t))
+      }
+    } catch (err) {
+      console.error('Error creating inline reply:', err)
       toast.error('Error al agregar respuesta')
     }
   }
@@ -554,7 +616,7 @@ export function TeacherForumBoardScreen({
                     {/* Content */}
                     <div 
                       className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed pt-2 border-t border-slate-50 dark:border-slate-800/60 ql-editor !p-0"
-                      dangerouslySetInnerHTML={{ __html: activeThread.content }}
+                      dangerouslySetInnerHTML={{ __html: fixHtmlSpaces(activeThread.content) }}
                     />
                   </>
                 )}
@@ -619,6 +681,23 @@ export function TeacherForumBoardScreen({
                               <Edit size={10} /> Editar
                             </button>
                           )}
+
+                          {forumConfig?.allowNestedReplies !== false && !activeThread.isLocked && (
+                            <button
+                              onClick={() => {
+                                if (replyingToParentId === reply.id) {
+                                  setReplyingToParentId(null)
+                                } else {
+                                  setReplyingToParentId(reply.id)
+                                  setInlineReplyContent('')
+                                }
+                              }}
+                              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[9px] font-bold border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-950/40 dark:border-blue-900 dark:text-blue-400 cursor-pointer active:scale-95 transition-all"
+                              title="Responder a este comentario"
+                            >
+                              <CornerDownRight size={10} /> Responder
+                            </button>
+                          )}
                         </div>
                         
                         {editingReplyId === reply.id ? (
@@ -646,10 +725,43 @@ export function TeacherForumBoardScreen({
                             </div>
                           </form>
                         ) : (
-                          <div 
-                            className="mt-3 pl-8 text-xs text-slate-700 dark:text-slate-350 leading-relaxed ql-editor !p-0"
-                            dangerouslySetInnerHTML={{ __html: reply.content }}
-                          />
+                          <>
+                            <div 
+                              className="mt-3 pl-8 text-xs text-slate-700 dark:text-slate-350 leading-relaxed ql-editor !p-0"
+                              dangerouslySetInnerHTML={{ __html: fixHtmlSpaces(reply.content) }}
+                            />
+
+                            {/* Inline Reply Form */}
+                            {replyingToParentId === reply.id && (
+                              <form onSubmit={(e) => handleCreateInlineReply(e, reply.id)} className="space-y-3 pl-4 sm:pl-8 mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 animate-in fade-in duration-200">
+                                <div className="flex items-center justify-between text-xs font-semibold text-blue-600 dark:text-blue-400">
+                                  <span>Respondiendo a {reply.authorName}</span>
+                                  <button type="button" onClick={() => setReplyingToParentId(null)} className="text-slate-400 hover:text-slate-600 text-[10px] border-none bg-transparent cursor-pointer">Cancelar</button>
+                                </div>
+                                <MiniForumEditor
+                                  value={inlineReplyContent}
+                                  onChange={setInlineReplyContent}
+                                  placeholder={`Escribe tu respuesta a ${reply.authorName}...`}
+                                  minHeight="90px"
+                                />
+                                <div className="flex justify-end gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => setReplyingToParentId(null)}
+                                    className="rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-900 dark:border-slate-800"
+                                  >
+                                    Cancelar
+                                  </button>
+                                  <button
+                                    type="submit"
+                                    className="rounded-xl bg-pink-600 hover:bg-pink-700 px-3 py-1 text-xs font-bold text-white shadow border-none cursor-pointer"
+                                  >
+                                    Publicar Respuesta
+                                  </button>
+                                </div>
+                              </form>
+                            )}
+                          </>
                         )}
                       </div>
                     ))}

@@ -9,6 +9,7 @@ export interface ForumConfig {
   description?: string
   forumType: 'debate' | 'qa' | 'social'
   isGraded: boolean
+  allowNestedReplies?: boolean
   dueDate?: string
   createdAt: string
 }
@@ -168,6 +169,7 @@ export async function getForumByLessonId(lessonId: string): Promise<ForumConfig 
       description: data.lessons?.content || data.description || '',
       forumType: data.forum_type as any,
       isGraded: data.is_graded,
+      allowNestedReplies: data.allow_nested_replies !== false,
       dueDate: data.due_date,
       createdAt: data.created_at
     }
@@ -185,6 +187,7 @@ export async function saveForumConfig(forumData: {
   description?: string
   forumType: 'debate' | 'qa' | 'social'
   isGraded: boolean
+  allowNestedReplies?: boolean
   dueDate?: string
 }): Promise<{ data?: ForumConfig; error?: string }> {
   const isDemo = checkDemoMode()
@@ -196,6 +199,7 @@ export async function saveForumConfig(forumData: {
         description: forumData.description,
         forumType: forumData.forumType,
         isGraded: forumData.isGraded,
+        allowNestedReplies: forumData.allowNestedReplies !== false,
         dueDate: forumData.dueDate
       } : f)
       const updated = mockForums.find(f => f.id === forumData.id)
@@ -208,6 +212,7 @@ export async function saveForumConfig(forumData: {
         description: forumData.description,
         forumType: forumData.forumType,
         isGraded: forumData.isGraded,
+        allowNestedReplies: forumData.allowNestedReplies !== false,
         dueDate: forumData.dueDate,
         createdAt: new Date().toISOString()
       }
@@ -236,6 +241,7 @@ export async function saveForumConfig(forumData: {
       lesson_id: forumData.lessonId,
       forum_type: forumData.forumType,
       is_graded: forumData.isGraded,
+      allow_nested_replies: forumData.allowNestedReplies !== false,
       due_date: forumData.dueDate || null
     }
 
@@ -265,6 +271,7 @@ export async function saveForumConfig(forumData: {
         description: forumData.description || '',
         forumType: data.forum_type as any,
         isGraded: data.is_graded,
+        allowNestedReplies: data.allow_nested_replies !== false,
         dueDate: data.due_date || undefined,
         createdAt: data.created_at
       }
@@ -757,6 +764,7 @@ export async function getForumById(forumId: string): Promise<ForumConfig | null>
       description: lessonObj?.content || '',
       forumType: data.forum_type,
       isGraded: data.is_graded,
+      allowNestedReplies: data.allow_nested_replies !== false,
       dueDate: data.due_date,
       createdAt: data.created_at
     }

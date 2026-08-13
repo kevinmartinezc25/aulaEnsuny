@@ -20,11 +20,33 @@ import { toast } from 'sonner'
 import { createClient } from '@/core/config/supabase/client'
 import { getForumsByCourseId } from '../../application/forumActions'
 
+function fixHtmlSpaces(html: string): string {
+  if (!html) return ''
+  return html
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/(<\/(?:span|strong|b|em|i|u|p|div|h[1-6]|li|a)>)([A-Za-z0-9áéíóúÁÉÍÓÚñÑ])/g, '$1 $2')
+    .replace(/([a-zA-ZáéíóúÁÉÍÓÚñÑ]):([a-zA-ZáéíóúÁÉÍÓÚñÑ])/g, '$1: $2')
+}
+
+function cleanHtmlPreview(html: string): string {
+  if (!html) return ''
+  return fixHtmlSpaces(html)
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 interface ForumItem {
   id: string
   lessonId: string
   forumType: 'debate' | 'qa' | 'social'
   isGraded: boolean
+  allowNestedReplies?: boolean
   dueDate: string | null
   createdAt: string
   title: string
@@ -186,7 +208,7 @@ export function TeacherCourseForumsScreen({ courseId }: { courseId: string }) {
 
                 <div>
                   <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 line-clamp-1">{forum.title}</h3>
-                  <p className="text-xs text-slate-450 dark:text-slate-400 line-clamp-2 mt-1 leading-relaxed">{forum.description}</p>
+                  <p className="text-xs text-slate-450 dark:text-slate-400 line-clamp-2 mt-1 leading-relaxed">{cleanHtmlPreview(forum.description)}</p>
                 </div>
 
                 {/* Deadlines and dates */}
