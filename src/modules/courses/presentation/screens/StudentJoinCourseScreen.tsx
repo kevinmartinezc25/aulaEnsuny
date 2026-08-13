@@ -23,7 +23,7 @@ export function StudentJoinCourseScreen() {
       }
 
       const result = await createJoinRequest({ courseId, code })
-      setMessage(`Solicitud enviada correctamente. ID: ${result.id}`)
+      setMessage('Esperando confirmación de Docente')
       setCode('')
     } catch (err: any) {
       setError(err?.message || 'No se pudo enviar la solicitud')

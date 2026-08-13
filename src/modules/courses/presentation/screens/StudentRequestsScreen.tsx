@@ -133,7 +133,7 @@ export function StudentRequestsScreen() {
                         ) : (
                           <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-100/30 px-2.5 py-1 text-xs font-semibold text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 animate-pulse">
                             <Clock className="h-3.5 w-3.5" />
-                            Pendiente
+                            Esperando confirmación de Docente
                           </span>
                         )}
                       </td>
@@ -197,7 +197,7 @@ export function StudentRequestsScreen() {
                     ) : (
                       <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-100/30 px-2.5 py-1 text-xs font-semibold text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
                         <Clock className="h-3.5 w-3.5" />
-                        Pendiente
+                        Esperando confirmación de Docente
                       </span>
                     )}
                   </div>

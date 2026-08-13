@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { getCourseSettings, saveCourseSettings, CourseSettings, CourseGradeCategory } from '../../application/teacherActions'
 import { regenerateCourseJoinCode } from '../../application/joinRequestsActions'
+import { toast } from 'sonner'
 
 const SETTINGS_TABS = [
   { id: 'general', label: 'Información General', icon: Book },
@@ -74,22 +75,30 @@ export function TeacherCourseSettingsScreen({ courseId }: { courseId: string }) 
   }
 
   const totalWeight = categories.reduce((sum, cat) => sum + (Number(cat.weight) || 0), 0)
-  const isValidWeight = totalWeight === 100
+  // Permitimos guardar si no hay categorías configuradas (sistema independiente), pero si hay, deben sumar 100
+  const isValidWeight = categories.length === 0 || totalWeight === 100
 
   const handleRegenerateCode = async () => {
     setRegeneratingCode(true)
     try {
       const newCode = await regenerateCourseJoinCode(courseId)
       setJoinCode(newCode)
+      toast.success('Nuevo código generado')
     } catch (err) {
       console.error(err)
+      toast.error('Error al generar código')
     } finally {
       setRegeneratingCode(false)
     }
   }
 
   const handleSave = async () => {
-    if (!isValidWeight) return
+    if (!isValidWeight) {
+      toast.error('Las ponderaciones de evaluación deben sumar 100%')
+      setActiveTab('evaluation')
+      return
+    }
+    
     setSaving(true)
     try {
       await saveCourseSettings(courseId, {
@@ -100,8 +109,10 @@ export function TeacherCourseSettingsScreen({ courseId }: { courseId: string }) 
         joinEnabled,
         requireTeacherApproval
       })
-    } catch (err) {
+      toast.success('Configuración guardada correctamente')
+    } catch (err: any) {
       console.error(err)
+      toast.error(err.message || 'Error al guardar configuración')
     } finally {
       setSaving(false)
     }

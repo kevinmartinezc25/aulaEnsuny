@@ -16,6 +16,7 @@ export function TeacherCreateResourceScreen({ courseId, resourceId, courseName =
   const [url, setUrl] = useState('')
   const [forumType, setForumType] = useState<'debate' | 'qa' | 'social'>('debate')
   const [isGraded, setIsGraded] = useState(false)
+  const [allowNestedReplies, setAllowNestedReplies] = useState(true)
   const [dueDate, setDueDate] = useState('')
   
   const [isSaving, setIsSaving] = useState(false)
@@ -68,6 +69,7 @@ export function TeacherCreateResourceScreen({ courseId, resourceId, courseName =
             setType('forum')
             setForumType(data.forum_type as any)
             setIsGraded(data.is_graded)
+            setAllowNestedReplies(data.allow_nested_replies !== false)
             if (data.due_date) {
               setDueDate(new Date(data.due_date).toISOString().substring(0, 16))
             }
@@ -223,35 +225,54 @@ export function TeacherCreateResourceScreen({ courseId, resourceId, courseName =
           lessonId = lesson.id
         }
 
-        if (resourceId) {
-          const { error } = await supabase
-            .from('forums')
-            .update({
-              forum_type: forumType,
-              is_graded: isGraded,
-              due_date: dueDate ? new Date(dueDate).toISOString() : null
-            })
-            .eq('id', resourceId)
-          if (error) throw error
-          toast.success('Foro actualizado correctamente')
-        } else {
-          const { error } = await supabase
-            .from('forums')
-            .insert({
-              lesson_id: lessonId,
-              forum_type: forumType,
-              is_graded: isGraded,
-              due_date: dueDate ? new Date(dueDate).toISOString() : null
-            })
-          if (error) throw error
-          toast.success('Foro creado correctamente')
+        let forumPayload: any = {
+          forum_type: forumType,
+          is_graded: isGraded,
+          allow_nested_replies: allowNestedReplies,
+          due_date: dueDate ? new Date(dueDate).toISOString() : null
         }
 
+        let dbError: any = null
+
+        if (resourceId) {
+          const res = await supabase
+            .from('forums')
+            .update(forumPayload)
+            .eq('id', resourceId)
+          dbError = res.error
+        } else {
+          const res = await supabase
+            .from('forums')
+            .insert({
+              ...forumPayload,
+              lesson_id: lessonId
+            })
+          dbError = res.error
+        }
+
+        // Si la columna allow_nested_replies no existe en Supabase, reintentar sin ella
+        if (dbError && (dbError.message?.includes('allow_nested_replies') || dbError.code === 'PGRST204')) {
+          delete forumPayload.allow_nested_replies
+          if (resourceId) {
+            const retry = await supabase.from('forums').update(forumPayload).eq('id', resourceId)
+            dbError = retry.error
+          } else {
+            const retry = await supabase.from('forums').insert({ ...forumPayload, lesson_id: lessonId })
+            dbError = retry.error
+          }
+        }
+
+        if (dbError) {
+          throw new Error(dbError.message || dbError.details || dbError.hint || 'Error al guardar configuración en la base de datos')
+        }
+
+        toast.success(resourceId ? 'Foro actualizado correctamente' : 'Foro creado correctamente')
         router.push(`/teacher/courses/${courseId}/resources`)
         router.refresh()
       } catch (err: any) {
-        console.error('Error al guardar el foro:', err)
-        toast.error(err.message || 'Error al guardar el foro')
+        const errorMsg = err?.message || err?.details || (typeof err === 'object' ? JSON.stringify(err) : String(err))
+        console.error('Error al guardar el foro:', errorMsg, err)
+        toast.error(errorMsg || 'Error al guardar el foro')
       } finally {
         setIsSaving(false)
       }
@@ -500,6 +521,24 @@ export function TeacherCreateResourceScreen({ courseId, resourceId, courseName =
                 </label>
                 <p className="text-xs text-slate-500">
                   Si se activa, esta actividad aparecerá en la matriz de calificaciones y podrá ser puntuada.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800/30 p-4 rounded-xl border border-slate-100 dark:border-slate-800">
+              <input
+                id="allow-nested-checkbox"
+                type="checkbox"
+                checked={allowNestedReplies}
+                onChange={(e) => setAllowNestedReplies(e.target.checked)}
+                className="h-4.5 w-4.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              />
+              <div>
+                <label htmlFor="allow-nested-checkbox" className="text-sm font-bold text-slate-700 dark:text-slate-300 cursor-pointer">
+                  Permitir respuestas a respuestas (Hilos de discusión)
+                </label>
+                <p className="text-xs text-slate-500">
+                  Permite a los usuarios responder directamente a comentarios de otros participantes generando debates anidados.
                 </p>
               </div>
             </div>

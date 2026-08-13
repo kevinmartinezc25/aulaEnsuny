@@ -811,7 +811,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       )}
 
       {/* Main Container */}
-      <div className={`flex flex-1 flex-col transition-all duration-300 min-w-0 overflow-hidden ${(isCourseSection || isDocsPage) ? 'pl-0' : (isSidebarCollapsed ? 'md:pl-20' : 'md:pl-64')}`}>
+      <div className={`flex flex-1 flex-col transition-all duration-300 min-w-0 ${(isCourseSection || isDocsPage) ? 'pl-0' : (isSidebarCollapsed ? 'md:pl-20' : 'md:pl-64')}`}>
         {/* Header */}
         {!isDocsPage && (
           <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-slate-100 bg-white px-6 dark:border-slate-800/60 dark:bg-slate-950 print:hidden">
@@ -876,8 +876,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </header>
         )}
 
-        <main className={`flex-1 min-w-0 overflow-hidden ${isDocsPage ? 'p-0' : 'p-6 md:p-8'}`}>{children}</main>
-        {!isDocsPage && (
+        <main className={`flex-1 min-w-0 ${
+          isDocsPage ? 'overflow-hidden p-0'
+          : isCourseSection ? 'overflow-y-auto p-0 h-[calc(100vh-4rem)]'
+          : 'overflow-hidden p-6 md:p-8'
+        }`}>{children}</main>
+        {!isDocsPage && !isCourseSection && (
           <footer className="border-t border-slate-100 py-6 text-center text-xs text-slate-400 dark:border-slate-800/60 dark:text-slate-500">
             <p>© {new Date().getFullYear()} aulaEnsuny. Todos los derechos reservados.</p>
           </footer>

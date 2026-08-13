@@ -10,6 +10,7 @@ import { createClient } from '@/core/config/supabase/client'
 import { toast } from 'sonner'
 import { MiniForumEditor } from '@/core/components/MiniForumEditor'
 import { getAnnouncementsByCourse, markAnnouncementAsRead } from '../../application/announcementActions'
+import { uploadPdfAction } from '@/modules/resources/presentation/actions/resourceActions'
 
 type LessonStatus = 'completed' | 'pending' | 'submitted' | 'graded' | 'late'
 
@@ -74,9 +75,34 @@ function getEmbedUrl(url: string): string {
   return url
 }
 
-function stripHtml(html: string): string {
+export function fixHtmlSpaces(html: string): string {
   if (!html) return ''
-  return html.replace(/<[^>]*>/g, '')
+  return html
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/(<\/(?:span|strong|b|em|i|u|p|div|h[1-6]|li|a)>)([A-Za-z0-9áéíóúÁÉÍÓÚñÑ])/g, '$1 $2')
+    .replace(/([a-zA-ZáéíóúÁÉÍÓÚñÑ]):([a-zA-ZáéíóúÁÉÍÓÚñÑ])/g, '$1: $2')
+}
+
+function cleanHtmlPreview(html: string, maxLength: number = 0): string {
+  if (!html) return ''
+  let clean = fixHtmlSpaces(html)
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  if (maxLength > 0 && clean.length > maxLength) {
+    return clean.substring(0, maxLength) + '...'
+  }
+  return clean
+}
+
+function stripHtml(html: string): string {
+  return cleanHtmlPreview(html, 0)
 }
 
 function isContentEmpty(content: string): boolean {
@@ -95,6 +121,10 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
   const [courseData, setCourseData] = useState<CourseDetails | null>(null)
   const [activeLesson, setActiveLesson] = useState<Lesson | null>(null)
   const [taskResponse, setTaskResponse] = useState('')
+  const [taskFile, setTaskFile] = useState<File | null>(null)
+  const [taskFileUploading, setTaskFileUploading] = useState(false)
+  const [taskFileDragOver, setTaskFileDragOver] = useState(false)
+  const taskFileInputRef = React.useRef<HTMLInputElement>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [grades, setGrades] = useState<any[]>([])
@@ -129,6 +159,8 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
   const [editThreadContent, setEditThreadContent] = useState('')
   const [editingReplyId, setEditingReplyId] = useState<string | null>(null)
   const [editReplyContent, setEditReplyContent] = useState('')
+  const [replyingToParentId, setReplyingToParentId] = useState<string | null>(null)
+  const [inlineReplyContent, setInlineReplyContent] = useState('')
 
   const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({})
 
@@ -297,6 +329,46 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
       }
     } catch (err) {
       console.error('Error creating reply:', err)
+      toast.error('Error al agregar respuesta')
+    }
+  }
+
+  const handleCreateInlineReply = async (e: React.FormEvent, parentId: string) => {
+    e.preventDefault()
+    if (isContentEmpty(inlineReplyContent) || !activeThread) {
+      toast.error('El contenido de la respuesta es requerido')
+      return
+    }
+
+    try {
+      const { createForumReply } = await import('../../application/forumActions')
+      const authorIdToUse = userId || 'stu1'
+      const result = await createForumReply({
+        threadId: activeThread.id,
+        parentId,
+        authorId: authorIdToUse,
+        content: inlineReplyContent.trim()
+      })
+
+      if (result.error) {
+        toast.error(result.error)
+      } else if (result.data) {
+        setThreadReplies(prev => [...prev, result.data!])
+        setInlineReplyContent('')
+        setReplyingToParentId(null)
+        toast.success('Respuesta agregada exitosamente')
+        
+        setForumThreads(prev => prev.map(t => t.id === activeThread.id ? { ...t, repliesCount: t.repliesCount + 1 } : t))
+        if (userId && activeThread) {
+          localStorage.setItem(`forum_thread_read_${userId}_${activeThread.id}`, (activeThread.repliesCount + 1).toString())
+        }
+
+        if (userRole === 'student' && activeLesson && activeLesson.status !== 'completed' && activeLesson.status !== 'graded') {
+          await handleMarkAsCompleted(activeLesson.id)
+        }
+      }
+    } catch (err) {
+      console.error('Error creating inline reply:', err)
       toast.error('Error al agregar respuesta')
     }
   }
@@ -824,6 +896,8 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
               status,
               content: l.content || '',
               submissionText,
+              // submissionType: read from DB column if it exists, otherwise default to 'file' for task lessons
+              submissionType: (l.submission_type as 'file' | 'text' | undefined) || (type === 'task' ? 'file' : undefined),
               quizAttempt,
               quiz: quiz || null,
               grade: gradeEntry ? {
@@ -1120,6 +1194,59 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
     }
   }, [activeLesson?.id])
 
+  const handleFileUploadAndSubmit = async () => {
+    if (!taskFile || !activeLesson || !courseData) return
+    setTaskFileUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', taskFile)
+      formData.append('title', `Entrega: ${activeLesson.title}`)
+      formData.append('description', `Entrega de tarea por estudiante en: ${activeLesson.title}`)
+      formData.append('courseId', courseData.id)
+      formData.append('courseName', courseData.title)
+      formData.append('uploadedBy', userId || 'student')
+
+      const result = await uploadPdfAction(formData)
+      if (!result.success || !result.resource) {
+        throw new Error(result.error || 'Error al subir el archivo a Drive')
+      }
+
+      const submissionData = JSON.stringify({
+        type: 'file',
+        fileName: taskFile.name,
+        fileSize: taskFile.size,
+        driveUrl: result.resource.driveUrl,
+        driveDownloadUrl: result.resource.driveDownloadUrl,
+        driveFileId: result.resource.driveFileId,
+        uploadedAt: new Date().toISOString()
+      })
+
+      await handleMarkAsCompleted(activeLesson.id, submissionData)
+      setTaskFile(null)
+    } catch (err: any) {
+      console.error('[FileUpload] Error:', err)
+      toast.error(err.message || 'Error al subir el archivo')
+    } finally {
+      setTaskFileUploading(false)
+    }
+  }
+
+  const handleFileDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    setTaskFileDragOver(false)
+    const file = e.dataTransfer.files?.[0]
+    if (file) setTaskFile(file)
+  }
+
+  const parseSubmissionFile = (submissionText?: string): { fileName: string; driveUrl: string; driveDownloadUrl: string } | null => {
+    if (!submissionText) return null
+    try {
+      const parsed = JSON.parse(submissionText)
+      if (parsed.type === 'file' && parsed.driveUrl) return parsed
+    } catch { /* not JSON */ }
+    return null
+  }
+
   const handleMarkAsCompleted = async (lessonId: string, submissionText?: string) => {
     const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL ||
       process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
@@ -1326,22 +1453,22 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
   )
 
   return (
-    <div className="min-h-screen bg-[#f9fafb] dark:bg-slate-950 text-left flex flex-col">
-      {/* Barra superior de navegación interna */}
-      <div className="sticky top-16 z-20 flex flex-col bg-white/80 backdrop-blur-md dark:bg-slate-900/80 border-b border-slate-100 dark:border-slate-800/60 shadow-sm">
-        <div className="flex h-14 items-center justify-between px-6">
+    <div className="bg-[#f9fafb] dark:bg-slate-950 text-left flex flex-col">
+      {/* Barra superior de navegación interna - sticky top-0 porque main es el scroll container */}
+      <div className="sticky top-0 z-30 flex flex-col bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800 shadow-sm">
+        <div className="flex py-2 px-6 items-center justify-between">
           <div className="flex items-center gap-3">
             <Link
               href="/student/dashboard"
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-100 bg-white hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 text-slate-500 transition-colors"
+              className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-950 text-slate-500 transition-colors"
             >
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="h-3.5 w-3.5" />
             </Link>
             <div className="text-left">
-              <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
+              <span className="text-[9px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider block leading-tight">
                 {courseData.subject}
               </span>
-              <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+              <h2 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white leading-tight">
                 {courseData.title}
               </h2>
             </div>
@@ -1349,7 +1476,7 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
 
           <button
             onClick={() => setIsMobileNavOpen(true)}
-            className="flex items-center gap-1.5 rounded-xl border border-slate-100 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 md:hidden"
+            className="flex items-center gap-1.5 rounded-xl border border-slate-100 bg-white px-3 py-1 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 md:hidden"
           >
             <Menu className="h-4 w-4" />
             <span>Menú</span>
@@ -1386,7 +1513,7 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
       </div>
 
       {activeTab === 'announcements' ? (
-        <div className="flex-1 p-6 md:p-8 max-w-4xl mx-auto space-y-8 w-full animate-in fade-in duration-300">
+        <div className="flex-1 px-4 sm:px-6 md:px-8 py-4 max-w-4xl mx-auto space-y-6 w-full animate-in fade-in duration-300">
           <div className="space-y-1">
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
               <Megaphone className="h-6 w-6 text-blue-600 dark:text-blue-400" />
@@ -1510,14 +1637,14 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
           </div>
         </div>
       ) : activeTab === 'content' ? (
-        <div className="relative flex flex-1 min-h-[calc(100vh-160px)]">
+        <div className="relative flex flex-1">
           {/* Sidebar Izquierdo (Fijo en desktop) */}
           <aside className="hidden md:block w-72 border-r border-slate-100 bg-white dark:border-slate-800/60 dark:bg-slate-900">
             {sidebarContent}
           </aside>
 
           {/* Contenido Principal */}
-          <div className="flex-1 p-6 md:p-8 max-w-4xl mx-auto space-y-8">
+          <div className="flex-1 px-4 sm:px-6 md:px-8 pt-7 pb-12 max-w-4xl mx-auto space-y-6">
             {activeLesson ? (
               <>
                 {/* 1. Reproductor de Video */}
@@ -1537,29 +1664,31 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
                   </motion.div>
                 )}
 
-                {/* 2. Cabecera del Contenido */}
-                <div className="space-y-3 pb-6 border-b border-slate-100 dark:border-slate-800">
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400">
-                      {getIcon(activeLesson.type)}
-                    </span>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                      Lección Activa ({activeLesson.type === 'video' ? 'Video' : activeLesson.type === 'reading' ? 'Lectura' : activeLesson.type === 'file' ? 'Archivo' : activeLesson.type === 'quiz' ? 'Quiz' : activeLesson.type === 'forum' ? 'Foro' : 'Tarea'})
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
-                      {activeLesson.title}
-                    </h1>
-                    {/* Visual Status Indicator on Header */}
-                    <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800">
-                      {renderStatusIcon(activeLesson.status, "h-4 w-4 shrink-0")}
-                      <span className="text-xs font-bold text-slate-700 dark:text-slate-300 capitalize">
-                        {getStatusText(activeLesson.status, activeLesson.type)}
+                {/* 2. Cabecera del Contenido (Omitida en foros para no duplicar título) */}
+                {activeLesson.type !== 'forum' && (
+                  <div className="space-y-3 pb-6 border-b border-slate-100 dark:border-slate-800">
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400">
+                        {getIcon(activeLesson.type)}
+                      </span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Lección Activa ({activeLesson.type === 'video' ? 'Video' : activeLesson.type === 'reading' ? 'Lectura' : activeLesson.type === 'file' ? 'Archivo' : activeLesson.type === 'quiz' ? 'Quiz' : 'Tarea'})
                       </span>
                     </div>
+                    <div className="flex items-center justify-between">
+                      <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+                        {activeLesson.title}
+                      </h1>
+                      {/* Visual Status Indicator on Header */}
+                      <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800">
+                        {renderStatusIcon(activeLesson.status, "h-4 w-4 shrink-0")}
+                        <span className="text-xs font-bold text-slate-700 dark:text-slate-300 capitalize">
+                          {getStatusText(activeLesson.status, activeLesson.type)}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* 3. Contenido Escrito */}
                 <article className="prose prose-slate max-w-none dark:prose-invert">
@@ -1640,24 +1769,106 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
                             </div>
                           </div>
                         )}
-                        {activeLesson.submissionText && (
-                          <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/50">
-                            <h4 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Tu Respuesta</h4>
-                            <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{activeLesson.submissionText}</p>
-                          </div>
-                        )}
+                        {activeLesson.submissionText && (() => {
+                            const fileMeta = parseSubmissionFile(activeLesson.submissionText)
+                            if (fileMeta) {
+                              return (
+                                <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/50">
+                                  <h4 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">Archivo Entregado</h4>
+                                  <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+                                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-orange-100 dark:bg-orange-900/30">
+                                      <FileText className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">{fileMeta.fileName}</p>
+                                      <p className="text-xs text-slate-500 dark:text-slate-400">Guardado en Google Drive</p>
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      <a href={fileMeta.driveUrl} target="_blank" rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 transition-colors">
+                                        <Eye className="h-3.5 w-3.5" />Ver
+                                      </a>
+                                      <a href={fileMeta.driveDownloadUrl} target="_blank" rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">
+                                        <Download className="h-3.5 w-3.5" />Descargar
+                                      </a>
+                                    </div>
+                                  </div>
+                                </div>
+                              )
+                            }
+                            return (
+                              <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/50">
+                                <h4 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Tu Respuesta</h4>
+                                <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{activeLesson.submissionText}</p>
+                              </div>
+                            )
+                          })()
+                        }
                       </div>
                     ) : activeLesson.submissionType === 'file' ? (
-                      <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-white p-8 text-center transition-colors hover:border-orange-300 dark:border-slate-700 dark:bg-slate-900/50">
-                        <UploadCloud className="mx-auto h-10 w-10 text-slate-300 dark:text-slate-600 mb-3" />
-                        <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Haz clic o arrastra tu archivo aquí</h4>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-6">Soporta PDF, Word, Excel, PPT, o imágenes (Max 10MB)</p>
-                        <button
-                          onClick={() => handleMarkAsCompleted(activeLesson.id)}
-                          className="rounded-xl bg-slate-900 px-6 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200 transition-all"
+                      <div className="space-y-4">
+                        {/* Hidden file input */}
+                        <input
+                          ref={taskFileInputRef}
+                          type="file"
+                          className="hidden"
+                          accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.png,.jpg,.jpeg,.gif,.webp"
+                          onChange={(e) => { const f = e.target.files?.[0]; if (f) setTaskFile(f) }}
+                        />
+                        {/* Drop Zone */}
+                        <div
+                          className={`relative rounded-2xl border-2 border-dashed p-8 text-center transition-all cursor-pointer ${
+                            taskFileDragOver
+                              ? 'border-orange-400 bg-orange-50/60 dark:border-orange-500 dark:bg-orange-950/30'
+                              : taskFile
+                              ? 'border-emerald-300 bg-emerald-50/40 dark:border-emerald-700 dark:bg-emerald-950/20'
+                              : 'border-slate-200 bg-white hover:border-orange-300 dark:border-slate-700 dark:bg-slate-900/50 hover:bg-slate-50/50'
+                          }`}
+                          onDragOver={(e) => { e.preventDefault(); setTaskFileDragOver(true) }}
+                          onDragLeave={() => setTaskFileDragOver(false)}
+                          onDrop={handleFileDrop}
+                          onClick={() => !taskFile && taskFileInputRef.current?.click()}
                         >
-                          Seleccionar Archivo
-                        </button>
+                          {taskFile ? (
+                            <>
+                              <div className="flex items-center justify-center mb-3">
+                                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-900/30">
+                                  <FileText className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+                                </div>
+                              </div>
+                              <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-0.5 truncate px-4">{taskFile.name}</p>
+                              <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">{(taskFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); setTaskFile(null) }}
+                                className="text-xs text-red-500 hover:text-red-700 dark:text-red-400 underline"
+                              >Quitar archivo</button>
+                            </>
+                          ) : (
+                            <>
+                              <UploadCloud className="mx-auto h-10 w-10 text-slate-300 dark:text-slate-600 mb-3" />
+                              <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Arrastra tu archivo aquí o haz clic para seleccionar</h4>
+                              <p className="text-xs text-slate-500 dark:text-slate-400">PDF, Word, Excel, PPT, imágenes · Máx. 50 MB</p>
+                            </>
+                          )}
+                        </div>
+
+                        {/* Upload Button */}
+                        <div className="flex justify-end">
+                          <button
+                            type="button"
+                            disabled={!taskFile || taskFileUploading}
+                            onClick={handleFileUploadAndSubmit}
+                            className="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-orange-700 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {taskFileUploading ? (
+                              <><Loader2 className="h-4 w-4 animate-spin" /><span>Subiendo a Drive...</span></>
+                            ) : (
+                              <><UploadCloud className="h-4 w-4" /><span>Subir y Entregar</span></>
+                            )}
+                          </button>
+                        </div>
                       </div>
                     ) : (
                       <div className="space-y-4">
@@ -2085,7 +2296,7 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
                               <h3 className="text-lg font-bold text-slate-900 dark:text-white">{activeThread.title}</h3>
                               <div 
                                 className="text-sm text-slate-700 dark:text-slate-350 leading-relaxed ql-editor !p-0"
-                                dangerouslySetInnerHTML={{ __html: activeThread.content }}
+                                dangerouslySetInnerHTML={{ __html: fixHtmlSpaces(activeThread.content) }}
                               />
                             </>
                           )}
@@ -2149,6 +2360,24 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
                                         <Edit size={10} /> Editar
                                       </button>
                                     )}
+
+                                    {/* Reply Action when allowNestedReplies is true */}
+                                    {forumConfig?.allowNestedReplies !== false && !activeThread.isLocked && (
+                                      <button
+                                        onClick={() => {
+                                          if (replyingToParentId === reply.id) {
+                                            setReplyingToParentId(null)
+                                          } else {
+                                            setReplyingToParentId(reply.id)
+                                            setInlineReplyContent('')
+                                          }
+                                        }}
+                                        className="text-[10px] font-bold text-blue-600 hover:text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 rounded border-none cursor-pointer flex items-center gap-1 transition-all"
+                                        title="Responder a este comentario"
+                                      >
+                                        <CornerDownRight size={10} /> Responder
+                                      </button>
+                                    )}
                                   </div>
                                 </div>
                                 
@@ -2177,10 +2406,43 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
                                     </div>
                                   </form>
                                 ) : (
-                                  <div 
-                                    className="mt-3 pl-10 text-xs text-slate-700 dark:text-slate-350 leading-relaxed ql-editor !p-0"
-                                    dangerouslySetInnerHTML={{ __html: reply.content }}
-                                  />
+                                  <>
+                                    <div 
+                                      className="mt-3 pl-10 text-xs text-slate-700 dark:text-slate-350 leading-relaxed ql-editor !p-0"
+                                      dangerouslySetInnerHTML={{ __html: fixHtmlSpaces(reply.content) }}
+                                    />
+                                    
+                                    {/* Inline Reply Form */}
+                                    {replyingToParentId === reply.id && (
+                                      <form onSubmit={(e) => handleCreateInlineReply(e, reply.id)} className="space-y-3 pl-4 sm:pl-10 mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 animate-in fade-in duration-200">
+                                        <div className="flex items-center justify-between text-xs font-semibold text-blue-600 dark:text-blue-400">
+                                          <span>Respondiendo a {reply.authorName}</span>
+                                          <button type="button" onClick={() => setReplyingToParentId(null)} className="text-slate-400 hover:text-slate-600 text-[10px] border-none bg-transparent cursor-pointer">Cancelar</button>
+                                        </div>
+                                        <MiniForumEditor
+                                          value={inlineReplyContent}
+                                          onChange={setInlineReplyContent}
+                                          placeholder={`Escribe tu respuesta a ${reply.authorName}...`}
+                                          minHeight="90px"
+                                        />
+                                        <div className="flex justify-end gap-2">
+                                          <button
+                                            type="button"
+                                            onClick={() => setReplyingToParentId(null)}
+                                            className="rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-900 dark:border-slate-800"
+                                          >
+                                            Cancelar
+                                          </button>
+                                          <button
+                                            type="submit"
+                                            className="rounded-xl bg-pink-600 hover:bg-pink-700 px-3 py-1 text-xs font-bold text-white shadow border-none cursor-pointer"
+                                          >
+                                            Publicar Respuesta
+                                          </button>
+                                        </div>
+                                      </form>
+                                    )}
+                                  </>
                                 )}
                               </div>
                             ))}
@@ -2688,3 +2950,5 @@ const mockTimeData = [
 ]
 
 
+
+// Force hot reload
