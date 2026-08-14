@@ -106,6 +106,20 @@ export function TeacherCourseModulesScreen({ courseId }: { courseId: string }) {
                   status: 'active'
                 })))
               }
+
+              // Fetch forums (filtered by lessons of this course)
+              const { data: dbForums } = await supabase
+                .from('forums')
+                .select('id, lessons!inner(title)')
+                .in('lesson_id', lIds)
+              
+              if (dbForums) {
+                setAvailableForums(dbForums.map((f: any) => ({
+                  id: f.id,
+                  name: f.lessons?.title || 'Foro de Discusión',
+                  type: 'forum'
+                })))
+              }
             }
           }
 
@@ -132,23 +146,6 @@ export function TeacherCourseModulesScreen({ courseId }: { courseId: string }) {
                 size: r.file_size ? `${(r.file_size / 1024 / 1024).toFixed(1)} MB` : 'Enlace Web'
               }
             }))
-          }
-
-          // Fetch forums
-          try {
-            const { data: dbForums } = await supabase
-              .from('forums')
-              .select('id, lessons(title)')
-            
-            if (dbForums) {
-              setAvailableForums(dbForums.map((f: any) => ({
-                id: f.id,
-                name: f.lessons?.title || 'Foro de Discusión',
-                type: 'forum'
-              })))
-            }
-          } catch (e) {
-            console.error('Error fetching forums for linking:', e)
           }
         } else {
           setAvailableQuizzes(MOCK_QUIZZES)
