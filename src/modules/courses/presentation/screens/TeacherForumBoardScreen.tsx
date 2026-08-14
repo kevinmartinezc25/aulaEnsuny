@@ -630,15 +630,18 @@ export function TeacherForumBoardScreen({
                   <div className="text-center py-6 text-xs text-slate-400">Cargando respuestas...</div>
                 ) : (
                   <div className="space-y-3">
-                    {threadReplies.map(reply => (
-                      <div 
-                        key={reply.id} 
-                        className={`p-4 rounded-xl border shadow-sm transition-all duration-200 ${
-                          reply.isTeacherVerified 
-                            ? 'bg-emerald-50/40 border-emerald-100 dark:bg-emerald-950/10 dark:border-emerald-900/30' 
-                            : 'bg-white border-slate-100 dark:bg-slate-900 dark:border-slate-800/60'
-                        }`}
-                      >
+                    {(() => {
+                      const renderReply = (reply: any, level: number = 0) => {
+                        const children = threadReplies.filter(r => r.parentId === reply.id).sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+                        return (
+                          <div key={reply.id} className={level > 0 ? 'ml-6 sm:ml-12 mt-3 border-l-2 border-slate-100 dark:border-slate-800 pl-4' : ''}>
+                            <div 
+                              className={`p-4 rounded-xl border shadow-sm transition-all duration-200 ${
+                                reply.isTeacherVerified 
+                                  ? 'bg-emerald-50/40 border-emerald-100 dark:bg-emerald-950/10 dark:border-emerald-900/30' 
+                                  : 'bg-white border-slate-100 dark:bg-slate-900 dark:border-slate-800/60'
+                              }`}
+                            >
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex items-center gap-2">
                             <div className="h-6 w-6 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-bold text-[10px] text-slate-500">
@@ -763,8 +766,17 @@ export function TeacherForumBoardScreen({
                             )}
                           </>
                         )}
-                      </div>
-                    ))}
+                            </div>
+                            {children.length > 0 && (
+                              <div className="space-y-3 mt-3">
+                                {children.map(child => renderReply(child, level + 1))}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      }
+                      return threadReplies.filter(r => !r.parentId).map(r => renderReply(r, 0))
+                    })()}
                     
                     {threadReplies.length === 0 && (
                       <div className="text-center py-6 text-xs text-slate-400">Aún no hay aportaciones en este tema. Escribe un comentario para iniciar la conversación.</div>
