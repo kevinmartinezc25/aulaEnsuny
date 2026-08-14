@@ -16,6 +16,7 @@ const YoutubeIcon = (props: React.SVGProps<SVGSVGElement>) => (
 
 interface Course {
   id: string
+  slug?: string
   title: string
   subject: string
   studentsCount: number
@@ -150,6 +151,7 @@ export function TeacherDashboardScreen() {
 
             return {
               id: c.id,
+              slug: c.slug,
               title: c.title,
               subject: c.subject || 'General',
               studentsCount,
@@ -405,7 +407,7 @@ export function TeacherDashboardScreen() {
 
                       <div className="mt-6 flex gap-2">
                         <Link
-                          href={`/teacher/courses/${course.id}`}
+                          href={`/teacher/courses/${course.slug || course.id}`}
                           className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-slate-100 bg-white px-3 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300"
                         >
                           <Edit className="h-3.5 w-3.5" />

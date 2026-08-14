@@ -2,6 +2,25 @@
 
 import { createClient, createAdminClient } from '@/core/config/supabase/server'
 
+export async function getCourseIdBySlug(slugOrId: string): Promise<string | null> {
+  const supabase = createAdminClient()
+  
+  // First, check if the string itself is a valid UUID
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  if (uuidRegex.test(slugOrId)) {
+    return slugOrId
+  }
+
+  const { data, error } = await supabase
+    .from('courses')
+    .select('id')
+    .eq('slug', slugOrId)
+    .single()
+    
+  if (error || !data) return null
+  return data.id
+}
+
 export interface TeacherCourseStats {
   id: string
   title: string
@@ -562,7 +581,7 @@ export interface CourseStudent {
   firstName?: string
   lastName?: string
   email: string
-  status: 'active' | 'at_risk'
+  status: 'completed' | 'in_progress' | 'pending' | 'at_risk'
   attendance: string
   avatar: string
   progress?: number
@@ -692,15 +711,32 @@ export async function getCourseStudents(courseId: string): Promise<CourseStudent
     completedCountMap[p.student_id] = (completedCountMap[p.student_id] || 0) + 1
   })
 
+  // Fetch user emails from auth
+  const { data: authData } = await supabase.auth.admin.listUsers({
+    perPage: 1000,
+  })
+  const authUsers = authData?.users || []
+
   return dbStudents.map(student => {
     const finalGrade = gradesMap[student.id]
-    const status = finalGrade !== undefined && finalGrade < 3.0 ? 'at_risk' : 'active'
+    const isAtRisk = finalGrade !== undefined && finalGrade < 3.0
     
-    const cleanFirstName = (student.first_name || 'estudiante').toLowerCase().replace(/\s+/g, '')
-    const cleanLastName = (student.last_name || 'nuevo').toLowerCase().replace(/\s+/g, '')
-    const email = `${cleanFirstName}.${cleanLastName}@estudiante.ensuny.edu.co`
     const totalItems = lessonsCount + resourcesCount
     const progress = totalItems > 0 ? Math.min(100, Math.round(((completedCountMap[student.id] || 0) / totalItems) * 100)) : 0
+
+    let status: 'completed' | 'in_progress' | 'pending' | 'at_risk' = 'pending'
+    if (progress === 100) {
+      status = 'completed'
+    } else if (progress > 0) {
+      status = 'in_progress'
+    }
+
+    if (isAtRisk) {
+      status = 'at_risk'
+    }
+    
+    const authUser = authUsers.find(u => u.id === student.id)
+    const email = authUser?.email || (student as any).email || 'sin-correo@ensuny.edu.co'
 
     return {
       id: student.id,

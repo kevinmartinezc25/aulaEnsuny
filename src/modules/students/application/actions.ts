@@ -214,6 +214,12 @@ export async function getTeacherStudents(): Promise<TeacherStudent[]> {
       }
     })
 
+    // Fetch user emails from auth
+    const { data: authData } = await adminClient.auth.admin.listUsers({
+      perPage: 1000,
+    })
+    const authUsers = authData?.users || []
+
     // 6. Construir lista final de estudiantes
     return matchingProfiles.map(p => {
       const studentGrades = gradesByStudent.get(p.id) || []
@@ -245,16 +251,15 @@ export async function getTeacherStudents(): Promise<TeacherStudent[]> {
         }
       })
 
-      const cleanFirstName = (p.first_name || 'estudiante').toLowerCase().replace(/\s+/g, '')
-      const cleanLastName = (p.last_name || 'nuevo').toLowerCase().replace(/\s+/g, '')
-      const fallbackEmail = `${cleanFirstName}.${cleanLastName}@estudiante.ensuny.edu.co`
+      const authUser = authUsers.find(u => u.id === p.id)
+      const email = authUser?.email || (p as any).email || 'sin-correo@ensuny.edu.co'
 
       return {
         id: p.id,
         name: `${p.first_name} ${p.last_name}`,
         firstName: p.first_name || '',
         lastName: p.last_name || '',
-        email: p.email || fallbackEmail,
+        email: email,
         gradeLevel: p.grade_level || '8°',
         groupName: p.group_name || '1',
         courses: studentCourses,

@@ -9,6 +9,7 @@ import { getStudentLatestAnnouncements } from '../../application/announcementAct
 
 interface Course {
   id: string
+  slug?: string
   title: string
   topic: string
   progress: number
@@ -479,6 +480,7 @@ export function StudentDashboardScreen() {
 
             return {
               id: c.id,
+              slug: c.slug,
               title: c.title,
               topic: c.description || 'Sin descripción',
               progress: courseProgress,
@@ -846,7 +848,7 @@ export function StudentDashboardScreen() {
                       {/* Button */}
                       <div className="mt-6">
                         <Link
-                          href={`/student/courses/${course.id}`}
+                          href={`/student/courses/${course.slug || course.id}`}
                           className={`flex w-full items-center justify-between rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-200 ${course.bgColor} ${course.textColor} hover:opacity-90 active:scale-[0.98]`}
                         >
                           <span>Continuar</span>

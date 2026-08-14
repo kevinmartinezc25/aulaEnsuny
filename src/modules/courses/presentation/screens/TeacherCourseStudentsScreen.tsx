@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
-import { Users, Search, Mail, Filter, MoreHorizontal, ShieldAlert, CheckCircle2, UserCircle, Trash2 } from 'lucide-react'
+import { Users, Search, Mail, Filter, MoreHorizontal, ShieldAlert, CheckCircle2, UserCircle, Trash2, Loader2, MinusCircle } from 'lucide-react'
 import { MessageModal } from '../components/MessageModal'
 import { toast } from 'sonner'
 
@@ -76,11 +76,11 @@ export function TeacherCourseStudentsScreen({ courseId }: { courseId: string }) 
 
         if (isDemoMode) {
           setStudents([
-            { id: 's1', name: 'Ana García', firstName: 'Ana', lastName: 'García', email: 'ana.garcia@colegio.edu', status: 'active', attendance: '95%', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&q=80&w=100', progress: 85 },
+            { id: 's1', name: 'Ana García', firstName: 'Ana', lastName: 'García', email: 'ana.garcia@colegio.edu', status: 'in_progress', attendance: '95%', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&q=80&w=100', progress: 85 },
             { id: 's2', name: 'Carlos López', firstName: 'Carlos', lastName: 'López', email: 'carlos.lopez@colegio.edu', status: 'at_risk', attendance: '70%', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=100', progress: 45 },
-            { id: 's3', name: 'Laura Martínez', firstName: 'Laura', lastName: 'Martínez', email: 'laura.m@colegio.edu', status: 'active', attendance: '100%', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=100', progress: 95 },
+            { id: 's3', name: 'Laura Martínez', firstName: 'Laura', lastName: 'Martínez', email: 'laura.m@colegio.edu', status: 'completed', attendance: '100%', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=100', progress: 100 },
             { id: 's4', name: 'Diego Fernández', firstName: 'Diego', lastName: 'Fernández', email: 'diego.f@colegio.edu', status: 'at_risk', attendance: '60%', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=100', progress: 30 },
-            { id: 's5', name: 'Sofía Castro', firstName: 'Sofía', lastName: 'Castro', email: 'sofia.c@colegio.edu', status: 'active', attendance: '90%', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=100', progress: 75 },
+            { id: 's5', name: 'Sofía Castro', firstName: 'Sofía', lastName: 'Castro', email: 'sofia.c@colegio.edu', status: 'in_progress', attendance: '90%', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=100', progress: 75 },
           ])
           setLoading(false)
           return
@@ -236,10 +236,19 @@ export function TeacherCourseStudentsScreen({ courseId }: { courseId: string }) 
                     </td>
 
                     <td className="whitespace-nowrap px-6 py-4">
-                      {student.status === 'active' ? (
+                      {student.status === 'completed' ? (
                         <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
                           <CheckCircle2 className="h-3.5 w-3.5" />
                           Al día
+                        </span>
+                      ) : student.status === 'in_progress' ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 dark:bg-blue-500/10 dark:text-blue-400">
+                          En Progreso
+                        </span>
+                      ) : student.status === 'pending' ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700 dark:bg-slate-500/10 dark:text-slate-400">
+                          <MinusCircle className="h-3.5 w-3.5" />
+                          Pendiente
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700 dark:bg-red-500/10 dark:text-red-400">

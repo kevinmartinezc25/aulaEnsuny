@@ -347,6 +347,18 @@ export async function getTeachersList() {
 /**
  * Crear un nuevo curso.
  */
+function generateCourseSlug(title: string): string {
+  const baseSlug = title
+    .toLowerCase()
+    .trim()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Remove accents
+    .replace(/[^\w\s-]/g, '')
+    .replace(/[\s_-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+  const randomSuffix = Math.random().toString(36).substring(2, 7)
+  return `${baseSlug}-${randomSuffix}`
+}
+
 export async function createAdminCourse(data: {
   title: string
   subject: string
@@ -356,6 +368,7 @@ export async function createAdminCourse(data: {
 }) {
   try {
     const adminClient = createAdminClient()
+    const slug = generateCourseSlug(data.title)
 
     const { error } = await adminClient
       .from('courses')
@@ -365,7 +378,8 @@ export async function createAdminCourse(data: {
         grade_level: data.grade,
         teacher_id: data.teacherId,
         status: data.status,
-        description: `Curso de ${data.subject} diseñado para estudiantes de ${data.grade}.`
+        description: `Curso de ${data.subject} diseñado para estudiantes de ${data.grade}.`,
+        slug: slug
       })
 
     if (error) {
