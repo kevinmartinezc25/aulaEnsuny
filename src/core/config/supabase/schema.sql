@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS lessons (
     title VARCHAR(255) NOT NULL,
     content TEXT, -- Markdown o HTML limpio
     video_url TEXT, -- URL de YouTube únicamente
+    due_date TIMESTAMP WITH TIME ZONE, -- Fecha límite (especialmente para tareas)
     sort_order INT NOT NULL DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );

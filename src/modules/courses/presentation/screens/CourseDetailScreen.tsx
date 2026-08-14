@@ -19,6 +19,7 @@ interface Lesson {
   title: string
   type: 'video' | 'reading' | 'file' | 'quiz' | 'task' | 'forum'
   duration?: string
+  dueDate?: string
   videoUrl?: string
   driveUrl?: string
   status?: LessonStatus
@@ -1778,7 +1779,7 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
                     {activeLesson.content && activeLesson.content.trim() !== '' && (
                       <div className="rounded-2xl bg-blue-50/50 dark:bg-blue-900/10 p-6">
                         <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-3">Descripción</h3>
-                        <article className="prose prose-sm prose-slate max-w-none dark:prose-invert text-slate-700 dark:text-slate-300 overflow-x-auto">
+                        <article className="prose prose-sm prose-slate max-w-none dark:prose-invert text-slate-700 dark:text-slate-300 overflow-hidden break-words whitespace-pre-wrap">
                           <div dangerouslySetInnerHTML={{ __html: activeLesson.content }} />
                         </article>
                       </div>
@@ -1889,7 +1890,7 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
                             return (
                               <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/50">
                                 <h4 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Tu Respuesta</h4>
-                                <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{activeLesson.submissionText}</p>
+                                <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap break-words">{activeLesson.submissionText}</p>
                               </div>
                             )
                           })()
@@ -2378,12 +2379,16 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
                         <div className="space-y-4">
                           <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Respuestas ({threadReplies.length})</h4>
                           <div className="space-y-3">
-                            {threadReplies.map(reply => (
-                              <div key={reply.id} className={`rounded-xl border p-4 shadow-sm transition-all ${
-                                reply.authorRole === 'teacher' 
-                                  ? 'bg-blue-50/20 border-blue-100/40 dark:bg-blue-950/5 dark:border-blue-900/10' 
-                                  : 'bg-white border-slate-100 dark:bg-slate-950/30 dark:border-slate-800'
-                              }`}>
+                            {(() => {
+                              const renderReply = (reply: any, level: number = 0) => {
+                                const children = threadReplies.filter(r => r.parentId === reply.id).sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+                                return (
+                                  <div key={reply.id} className={level > 0 ? 'ml-6 sm:ml-12 mt-3 border-l-2 border-slate-100 dark:border-slate-800 pl-4' : ''}>
+                                    <div className={`rounded-xl border p-4 shadow-sm transition-all ${
+                                      reply.authorRole === 'teacher' 
+                                        ? 'bg-blue-50/20 border-blue-100/40 dark:bg-blue-950/5 dark:border-blue-900/10' 
+                                        : 'bg-white border-slate-100 dark:bg-slate-950/30 dark:border-slate-800'
+                                    }`}>
                                 <div className="flex items-start justify-between gap-4">
                                   <div className="flex items-center gap-2.5">
                                     <div className={`h-8 w-8 rounded-full flex items-center justify-center font-bold text-xs text-white ${
@@ -2516,8 +2521,17 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
                                     )}
                                   </>
                                 )}
-                              </div>
-                            ))}
+                                    </div>
+                                    {children.length > 0 && (
+                                      <div className="space-y-3 mt-3">
+                                        {children.map(child => renderReply(child, level + 1))}
+                                      </div>
+                                    )}
+                                  </div>
+                                )
+                              }
+                              return threadReplies.filter(r => !r.parentId).map(r => renderReply(r, 0))
+                            })()}
                             {threadReplies.length === 0 && (
                               <div className="text-center py-6 text-xs text-slate-400">No hay respuestas en este tema. ¡Sé el primero en responder!</div>
                             )}

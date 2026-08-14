@@ -68,7 +68,8 @@ export function TeacherLessonEditorScreen({
     duration: '',
     url: '',
     content: '',
-    submissionType: 'file'
+    submissionType: 'file',
+    dueDate: ''
   })
 
   const [isSaving, setIsSaving] = useState(false)
@@ -91,7 +92,8 @@ export function TeacherLessonEditorScreen({
           duration: '10 min',
           url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
           content: 'Contenido de ejemplo para la versión de demostración.',
-          submissionType: 'file'
+          submissionType: 'file',
+          dueDate: ''
         })
         setLoading(false)
         return
@@ -117,7 +119,8 @@ export function TeacherLessonEditorScreen({
             duration: data.video_url ? '10 min' : '',
             url: data.video_url || '',
             content: data.content || '',
-            submissionType: 'file'
+            submissionType: 'file',
+            dueDate: data.due_date ? new Date(new Date(data.due_date).getTime() - (new Date(data.due_date).getTimezoneOffset() * 60000)).toISOString().slice(0, 16) : ''
           })
         }
       } catch (err: any) {
@@ -180,7 +183,8 @@ export function TeacherLessonEditorScreen({
             content: formData.type === 'video' ? '' : formData.content,
             video_url: formData.type === 'video' ? formData.url : null,
             sort_order: newOrder,
-            type: formData.type === 'text' ? 'reading' : formData.type
+            type: formData.type === 'text' ? 'reading' : formData.type,
+            due_date: formData.type === 'task' && formData.dueDate ? new Date(formData.dueDate).toISOString() : null
           })
 
         if (insertErr) throw insertErr
@@ -193,7 +197,8 @@ export function TeacherLessonEditorScreen({
             title: formData.title.trim(),
             content: formData.type === 'video' ? '' : formData.content,
             video_url: formData.type === 'video' ? formData.url : null,
-            type: formData.type === 'text' ? 'reading' : formData.type
+            type: formData.type === 'text' ? 'reading' : formData.type,
+            due_date: formData.type === 'task' && formData.dueDate ? new Date(formData.dueDate).toISOString() : null
           })
           .eq('id', lessonId)
 
@@ -431,6 +436,16 @@ export function TeacherLessonEditorScreen({
                       value={formData.content}
                       onChange={(value) => setFormData({ ...formData, content: value })}
                       placeholder="Describe qué debe hacer el estudiante detalladamente..."
+                    />
+                  </div>
+
+                  <div className="space-y-2 pt-4 border-t border-slate-100 dark:border-slate-800/60">
+                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Fecha y Hora Límite</label>
+                    <input
+                      type="datetime-local"
+                      value={formData.dueDate}
+                      onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm outline-none transition-all focus:border-blue-500 focus:bg-white dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:focus:border-blue-500"
                     />
                   </div>
 
