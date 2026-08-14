@@ -47,6 +47,8 @@ interface CourseDetails {
   subject: string
   progress: number
   modules: Module[]
+  teacherName?: string
+  period?: string
 }
 
 // Helper to extract embed URL for YouTube and Vimeo
