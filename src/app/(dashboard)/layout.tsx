@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   BookOpen, Calendar, Settings, Bell, Menu, X, ChevronDown, LogOut, Award, TrendingUp,
   PanelLeftClose, PanelLeftOpen, Moon, Sun, LayoutDashboard, Users, GraduationCap,
-  ClipboardList, BarChart2, BellRing, FolderOpen, ShieldCheck, UserCog, Activity, ChevronRight, FileText, CalendarDays
+  ClipboardList, BarChart2, BellRing, FolderOpen, ShieldCheck, ShieldAlert, UserCog, Activity, ChevronRight, FileText, CalendarDays
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
@@ -29,6 +29,7 @@ const ADMIN_NAV = [
       { name: 'Cursos', href: '/admin/courses', icon: BookOpen },
       { name: 'Docentes', href: '/admin/teachers', icon: UserCog },
       { name: 'Estudiantes', href: '/admin/students', icon: GraduationCap },
+      { name: 'Convivencia', href: '/admin/disciplinary', icon: ShieldAlert },
       { name: 'Evaluaciones', href: '/admin/evaluations', icon: ClipboardList },
       { name: 'Registro Académico', href: '/admin/academic-registry', icon: ClipboardList },
       { name: 'Reportes Académicos', href: '/admin/academic-reports', icon: BarChart2 },
@@ -95,7 +96,7 @@ function AdminSidebar({ onClose, user, enabledModules = [], isCollapsed = false 
       ...group,
       items: group.items.filter(item => {
         const key = item.href.split('/').pop()!
-        if (key === 'dashboard' || key === 'schedules') return true
+        if (key === 'dashboard' || key === 'schedules' || item.href === '/admin/disciplinary') return true
         return enabledModules.includes(key)
       })
     }
@@ -299,6 +300,7 @@ function SidebarContent({ onClose, isCollapsed = false, user }: SidebarProps) {
       { name: 'Horario (Docente)', href: '/teacher/schedule', icon: CalendarDays },
       { name: 'Calificaciones', href: '/teacher/grades', icon: ClipboardList },
       { name: 'Mis Estudiantes', href: '/teacher/students', icon: TrendingUp },
+      { name: 'Convivencia Escolar', href: '/teacher/disciplinary', icon: ShieldAlert },
       { name: 'Calendario', href: '/teacher/calendar', icon: Calendar },
       { name: 'Agenda', href: '/teacher/institutional-agenda', icon: ClipboardList },
       { name: 'Jurado Electoral', href: '/juror/elections', icon: ShieldCheck },

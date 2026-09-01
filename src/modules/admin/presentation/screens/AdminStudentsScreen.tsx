@@ -2,12 +2,15 @@
 
 import React, { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   GraduationCap, Search, UserPlus, Trash2, Edit,
-  Filter, CheckCircle, Loader2, AlertCircle, BookOpen, Link as LinkIcon
+  Filter, CheckCircle, Loader2, AlertCircle, BookOpen, Link as LinkIcon,
+  FileSpreadsheet, Users
 } from 'lucide-react'
 import { getAcademicLevels, getAdminStudents, deleteAdminUser } from '../../application/actions'
+import { getDirectoryStats } from '../../application/studentImportActions'
 import { AcademicLevel } from '../../application/types'
 
 interface Student {
@@ -34,6 +37,7 @@ export function AdminStudentsScreen() {
   const [successMsg, setSuccessMsg] = useState('')
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [directoryStats, setDirectoryStats] = useState<{ totalDirectory: number; withAccount: number; withoutAccount: number } | null>(null)
 
   const mockStudents: Student[] = [
     { id: 's-1', name: 'Ana María Torres', firstName: 'Ana María', lastName: 'Torres', email: 'a.torres@estudiante.ensuny.edu.co', gradeLevel: '8°', groupName: '1', status: 'active', joinedDate: '2025-01-20' },
@@ -51,6 +55,14 @@ export function AdminStudentsScreen() {
         setAcademicLevels(levelsData)
       } catch (err) {
         console.error('Error loading academic levels:', err)
+      }
+
+      // Cargar estadísticas del directorio
+      try {
+        const stats = await getDirectoryStats()
+        setDirectoryStats(stats)
+      } catch (err) {
+        console.error('Error loading directory stats:', err)
       }
 
       const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL ||
@@ -162,20 +174,28 @@ export function AdminStudentsScreen() {
             Matricula alumnos, asigna grados escolares y controla sus estados académicos.
           </p>
         </div>
-        <div className="flex items-center gap-3 self-start sm:self-center">
+        <div className="flex items-center gap-2 self-start sm:self-center flex-wrap">
           <button
             onClick={copyRegistrationLink}
             className="flex items-center gap-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 px-4 py-3 text-sm font-semibold active:scale-[0.98] transition-all cursor-pointer"
             title="Copiar enlace público de registro"
           >
-            <LinkIcon className="h-4.5 w-4.5" />
+            <LinkIcon className="h-4 w-4" />
             <span className="hidden sm:inline">Copiar Enlace</span>
           </button>
+          <Link
+            href="/admin/students/import"
+            className="flex items-center gap-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 px-4 py-3 text-sm font-semibold active:scale-[0.98] transition-all"
+            title="Importar estudiantes desde Excel o CSV"
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+            <span className="hidden sm:inline">Importar</span>
+          </Link>
           <button
             onClick={openCreate}
             className="flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 text-sm font-semibold active:scale-[0.98] transition-all cursor-pointer"
           >
-            <UserPlus className="h-4.5 w-4.5" />
+            <UserPlus className="h-4 w-4" />
             <span>Matricular Alumno</span>
           </button>
         </div>
