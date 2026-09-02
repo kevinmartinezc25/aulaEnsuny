@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useRef, useCallback } from 'react'
+import React, { useState, useRef, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Upload, Download, FileSpreadsheet, CheckCircle2, AlertCircle,
@@ -22,6 +22,8 @@ import {
 // ─────────────────────────────────────────────────────────────────────────────
 // TIPOS
 // ─────────────────────────────────────────────────────────────────────────────
+
+type ImportRowState = ImportRowValidated & { _needsValidation?: boolean }
 
 type ImportStep = 'upload' | 'preview' | 'importing' | 'done'
 
@@ -113,6 +115,15 @@ function parseFileToRows(file: File): Promise<StudentImportRow[]> {
 // COMPONENTES AUXILIARES
 // ─────────────────────────────────────────────────────────────────────────────
 
+function useDebounceValue<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value)
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedValue(value), delay)
+    return () => clearTimeout(timer)
+  }, [value, delay])
+  return debouncedValue
+}
+
 function StepIndicator({ step }: { step: ImportStep }) {
   const steps = [
     { key: 'upload', label: 'Subir archivo' },
@@ -183,11 +194,45 @@ export function AdminStudentImportScreen() {
   const [file, setFile] = useState<File | null>(null)
   const [parseError, setParseError] = useState<string | null>(null)
   const [validating, setValidating] = useState(false)
-  const [rows, setRows] = useState<ImportRowValidated[]>([])
+  const [rows, setRows] = useState<ImportRowState[]>([])
   const [excluded, setExcluded] = useState<Set<number>>(new Set()) // rowIndex excluidos
   const [importResult, setImportResult] = useState<ImportResult | null>(null)
   const [importProgress, setImportProgress] = useState(0)
   const [downloadingTemplate, setDownloadingTemplate] = useState(false)
+
+  // Re-validación en tiempo real
+  const debouncedRows = useDebounceValue(rows, 800)
+
+  useEffect(() => {
+    const rowsToValidate = debouncedRows.filter(r => r._needsValidation)
+    if (rowsToValidate.length === 0) return
+
+    async function revalidate() {
+      try {
+        const validated = await validateImportRows(rowsToValidate)
+        setRows(currentRows => {
+          const newRows = [...currentRows]
+          for (const vRow of validated) {
+            const index = newRows.findIndex(r => r.rowIndex === vRow.rowIndex)
+            if (index !== -1) {
+              newRows[index] = {
+                ...newRows[index],
+                errors: vRow.errors,
+                isDuplicate: vRow.isDuplicate,
+                duplicateId: vRow.duplicateId,
+                _needsValidation: false
+              }
+            }
+          }
+          return newRows
+        })
+      } catch (err) {
+        console.error('Error re-validando', err)
+      }
+    }
+    
+    revalidate()
+  }, [debouncedRows])
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -268,7 +313,7 @@ export function AdminStudentImportScreen() {
   const handleCellEdit = (rowIndex: number, field: keyof StudentImportRow, value: string) => {
     setRows(prev => prev.map(r =>
       r.rowIndex === rowIndex
-        ? { ...r, [field]: value, errors: [] } // limpiar errores al editar
+        ? { ...r, [field]: value, errors: [], isDuplicate: false, _needsValidation: true }
         : r
     ))
   }

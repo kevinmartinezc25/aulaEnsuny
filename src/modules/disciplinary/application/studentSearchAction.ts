@@ -15,6 +15,7 @@ export async function searchStudentsUnified(
   queryText: string,
   filterGroupName?: string
 ): Promise<StudentRef[]> {
+  console.log(`[DEBUG] searchStudentsUnified: queryText="${queryText}", filterGroupName="${filterGroupName}"`)
   if (!queryText || queryText.trim().length < 2) return []
 
   try {
@@ -33,11 +34,16 @@ export async function searchStudentsUnified(
         .select('student_id')
         .in('group_name', possibleGroups)
       
-      if (enrollments) {
-        allowedStudentIds = enrollments.map(e => e.student_id)
-      } else {
-        allowedStudentIds = []
-      }
+      const { data: profileGroups } = await adminClient
+        .from('profiles')
+        .select('id')
+        .in('group_name', possibleGroups)
+
+      const ids = new Set<string>()
+      if (enrollments) enrollments.forEach(e => ids.add(e.student_id))
+      if (profileGroups) profileGroups.forEach(p => ids.add(p.id))
+
+      allowedStudentIds = Array.from(ids)
     }
 
     // ── 1. Buscar perfiles de estudiantes por nombre ──────────────────────────
@@ -48,7 +54,7 @@ export async function searchStudentsUnified(
 
     let profilesQuery = adminClient
       .from('profiles')
-      .select('id, first_name, last_name, grade_level, status, roles!inner(name)')
+      .select('id, first_name, last_name, grade_level, group_name, status, roles!inner(name)')
       .eq('roles.name', 'student')
       .or(orParts.join(','))
       .limit(15)
@@ -93,7 +99,7 @@ export async function searchStudentsUnified(
         if (extraIds.length > 0) {
           const { data: extraProfiles } = await adminClient
             .from('profiles')
-            .select('id, first_name, last_name, grade_level, status, roles!inner(name)')
+            .select('id, first_name, last_name, grade_level, group_name, status, roles!inner(name)')
             .in('id', extraIds)
 
           if (extraProfiles) {
@@ -180,8 +186,8 @@ export async function searchStudentsUnified(
 
       // Grado: preferir el de la matrícula más reciente, si no el de profiles
       const gradeLevel = enrollment?.grade || p.grade_level || 'Sin grado'
-      // Grupo: viene de student_enrollments
-      const groupName = enrollment?.group || 'Sin grupo'
+      // Grupo: preferir matrícula, luego profiles
+      const groupName = enrollment?.group || p.group_name || 'Sin grupo'
 
       results.push({
         source: 'profile',
@@ -214,14 +220,26 @@ export async function searchStudentsUnified(
     }
     
     // Si filtramos por grupo, asegurarnos de que la lista final lo cumpla
-    // (Por si la matrícula más reciente no coincide o algo en profiles)
     if (filterGroupName) {
       const cleanStr = (s: string) => s.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()
+      const filterClean = cleanStr(filterGroupName)
+      const suffix = filterGroupName.split('-').pop()?.trim()
+      const prefix = filterGroupName.split('-')[0]?.trim()
+
       results = results.filter(r => {
-        return cleanStr(r.groupName) === cleanStr(filterGroupName) ||
-               cleanStr(`${r.gradeLevel}${r.groupName}`) === cleanStr(filterGroupName) ||
-               r.groupName === filterGroupName ||
-               r.groupName === filterGroupName.split('-').pop()?.trim()
+        const rGroupClean = cleanStr(r.groupName)
+        
+        if (r.groupName === filterGroupName) return true
+        if (rGroupClean === filterClean) return true
+        if (cleanStr(`${r.gradeLevel}${r.groupName}`) === filterClean) return true
+        if (cleanStr(`${r.gradeLevel}-${r.groupName}`) === filterClean) return true
+
+        if (r.groupName === suffix || rGroupClean === cleanStr(suffix || '')) {
+          if (r.gradeLevel === prefix || cleanStr(r.gradeLevel) === cleanStr(prefix || '')) {
+            return true
+          }
+        }
+        return false
       })
     }
 
@@ -231,3 +249,4 @@ export async function searchStudentsUnified(
     return []
   }
 }
+// Forzando recarga de Next.js Turbopack

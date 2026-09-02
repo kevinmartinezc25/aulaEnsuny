@@ -237,6 +237,9 @@ export async function deleteAdminUser(id: string) {
     // 3. Garantizar la eliminación en la tabla profiles
     const { error: profileError } = await adminClient.from('profiles').delete().eq('id', id)
 
+    // 4. Garantizar la eliminación en student_directory (por si es una cuenta precargada huérfana)
+    await adminClient.from('student_directory').delete().eq('id', id)
+
     if (authError && profileError) {
       return { error: authError.message || profileError.message }
     }
@@ -700,7 +703,16 @@ export async function getAdminStudents(): Promise<AdminStudent[]> {
 
     if (uError) throw uError
 
-    return (profiles || []).map(p => {
+    // 3. Obtener estudiantes del directorio que no tienen cuenta virtual (profile_id IS NULL)
+    const { data: directoryStudents, error: dirError } = await adminClient
+      .from('student_directory')
+      .select('*')
+      .is('profile_id', null)
+      .order('created_at', { ascending: false })
+
+    if (dirError) throw dirError
+
+    const registeredStudents = (profiles || []).map(p => {
       const authUser = authUsers?.find(u => u.id === p.id)
       return {
         id: p.id,
@@ -711,9 +723,25 @@ export async function getAdminStudents(): Promise<AdminStudent[]> {
         gradeLevel: p.grade_level || '8°',
         groupName: p.group_name || '',
         status: (p.status || 'active') as 'active' | 'inactive',
-        joinedDate: new Date(p.created_at).toISOString().split('T')[0]
+        joinedDate: new Date(p.created_at).toISOString().split('T')[0],
+        source: 'profiles' as const
       }
     })
+
+    const unregisteredStudents = (directoryStudents || []).map(d => ({
+      id: d.id,
+      name: `${d.first_name} ${d.last_name}`,
+      firstName: d.first_name || '',
+      lastName: d.last_name || '',
+      email: 'Sin cuenta virtual',
+      gradeLevel: d.grade_level || '',
+      groupName: d.group_name || '',
+      status: (d.status || 'active') as 'active' | 'inactive',
+      joinedDate: new Date(d.created_at).toISOString().split('T')[0],
+      source: 'directory' as const
+    }))
+
+    return [...registeredStudents, ...unregisteredStudents]
   } catch (error) {
     console.error('Error al obtener estudiantes:', error)
     return []

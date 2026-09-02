@@ -70,6 +70,12 @@ export function StudentRegistrationScreen() {
 
   const documentNumber = watch('documentNumber')
 
+  useEffect(() => {
+    if (errorMsg === 'Este documento ya se encuentra registrado. Por favor, inicia sesión o recupera tu contraseña.') {
+      setErrorMsg(null)
+    }
+  }, [documentNumber])
+
   const handleCheckDocument = async () => {
     if (!documentNumber || documentNumber.length < 5) return
     setIsCheckingDoc(true)
@@ -182,7 +188,8 @@ export function StudentRegistrationScreen() {
             className="mb-6 sm:mb-8 w-full flex justify-center px-6 sm:px-0"
           >
             <div className="relative w-full max-w-[240px] sm:max-w-[320px] aspect-[416/145]">
-              <img src="/logo.svg?v=2" alt="aulaEnsuny Logo" className="object-contain w-full h-full" />
+              <img src="/logo.svg?v=2" alt="aulaEnsuny Logo" className="object-contain w-full h-full dark:hidden" />
+              <img src="/logo_dark.svg?v=2" alt="aulaEnsuny Logo" className="object-contain w-full h-full hidden dark:block" />
             </div>
           </motion.div>
 
@@ -410,8 +417,8 @@ export function StudentRegistrationScreen() {
                   <motion.div variants={itemVariants} className="pt-2">
                     <Button
                       type="submit"
-                      disabled={isLoading}
-                      className="w-full bg-[#1F4E31] text-white hover:bg-[#1a4229] transition-all h-12 rounded-xl font-semibold text-sm sm:text-base shadow-md dark:shadow-none"
+                      disabled={isLoading || errorMsg === 'Este documento ya se encuentra registrado. Por favor, inicia sesión o recupera tu contraseña.'}
+                      className="w-full bg-[#1F4E31] text-white hover:bg-[#1a4229] transition-all h-12 rounded-xl font-semibold text-sm sm:text-base shadow-md dark:shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isLoading ? (
                         <>
