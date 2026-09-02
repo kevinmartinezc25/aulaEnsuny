@@ -21,12 +21,18 @@ export function ReportPreviewDocument({ student, situation, teacherDescription, 
     )
   }
 
-  // Formatear fecha
+  // Formatear fecha y hora
   const formattedDate = date.toLocaleDateString('es-CO', {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
     day: 'numeric'
+  })
+
+  const formattedTime = date.toLocaleTimeString('es-CO', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
   })
 
   // Generar el texto estructurado del reporte
@@ -35,18 +41,12 @@ export function ReportPreviewDocument({ student, situation, teacherDescription, 
   return (
     <div className="bg-white text-slate-900 border border-slate-200 shadow-sm rounded-xl overflow-hidden print:shadow-none print:border-none print:rounded-none max-w-3xl mx-auto font-serif">
       {/* Membrete institucional */}
-      <div className="border-b-2 border-slate-900 p-6 sm:p-8 flex items-center justify-between">
-        <div className="flex-1 text-center">
-          <h2 className="text-xl font-bold uppercase tracking-wider mb-1">
-            Institución Educativa
-          </h2>
-          <h1 className="text-2xl font-black uppercase mb-1">
-            aulaEnsuny
-          </h1>
-          <p className="text-sm text-slate-600 font-sans">
-            Módulo de Gestión de Convivencia Escolar
-          </p>
-        </div>
+      <div className="border-b-2 border-slate-900 p-4 sm:p-6 flex items-center justify-center">
+        <img
+          src="/institutional-header.png"
+          alt="Institución Educativa Escuela Normal Superior del Nordeste - Yolombó Antioquia"
+          className="w-full max-w-2xl h-auto object-contain mx-auto"
+        />
       </div>
 
       <div className="p-6 sm:p-8 sm:pt-6">
@@ -55,8 +55,8 @@ export function ReportPreviewDocument({ student, situation, teacherDescription, 
           <h3 className="text-lg font-bold uppercase underline underline-offset-4 mb-2">
             Reporte de Novedad Disciplinaria
           </h3>
-          <p className="text-sm text-slate-500 font-sans">
-            {formattedDate}
+          <p className="text-sm text-slate-600 font-sans capitalize">
+            {formattedDate} &bull; Hora: {formattedTime}
           </p>
         </div>
 

@@ -157,6 +157,14 @@ export function DisciplinaryReportFormScreen() {
           toast.error('La descripción debe ser más detallada (mínimo 20 caracteres)')
           return false
         }
+        if (studentDefense.trim().length < 5) {
+          toast.error('Los descargos del estudiante son obligatorios (mínimo 5 caracteres)')
+          return false
+        }
+        if (studentCommitment.trim().length < 5) {
+          toast.error('El compromiso del estudiante es obligatorio (mínimo 5 caracteres)')
+          return false
+        }
         return true
       case 4:
         return true
@@ -381,8 +389,8 @@ export function DisciplinaryReportFormScreen() {
             className="space-y-6"
           >
             <div>
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
-                Paso 3: Descripción de los Hechos
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
+                Paso 3: Descripción de los Hechos <span className="text-red-500 text-sm">*</span>
               </h2>
               <p className="text-slate-500 dark:text-slate-400">
                 Describe detalladamente cómo ocurrieron los hechos. Esta información es crucial para el debido proceso.
@@ -412,8 +420,8 @@ export function DisciplinaryReportFormScreen() {
             </div>
 
             <div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2 mt-4">
-                Descargos del Estudiante (Opcional)
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2 mt-4 flex items-center gap-2">
+                Descargos del Estudiante <span className="text-red-500 text-sm">*</span>
               </h3>
               <div className="relative">
                 <textarea
@@ -426,8 +434,8 @@ export function DisciplinaryReportFormScreen() {
             </div>
 
             <div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2 mt-4">
-                Compromiso Final (Opcional)
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2 mt-4 flex items-center gap-2">
+                Compromiso Final <span className="text-red-500 text-sm">*</span>
               </h3>
               <div className="relative">
                 <textarea

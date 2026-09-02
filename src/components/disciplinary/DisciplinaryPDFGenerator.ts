@@ -18,17 +18,23 @@ export async function generateDisciplinaryPDF(report: DisciplinaryReport) {
 
   // 1. Membrete
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(16)
-  addText('INSTITUCIÓN EDUCATIVA AULAENSUNY', pageWidth / 2, currentY, { align: 'center' })
+  doc.setFontSize(13)
+  addText('INSTITUCIÓN EDUCATIVA ESCUELA NORMAL SUPERIOR DEL NORDESTE', pageWidth / 2, currentY, { align: 'center' })
   
+  currentY += 5
+  doc.setFontSize(9)
+  doc.setFont('helvetica', 'italic')
+  addText('YOLOMBÓ – ANTIOQUIA | DANE 105890001331 | NIT 811.019.740-8', pageWidth / 2, currentY, { align: 'center' })
+
   currentY += 8
   doc.setFontSize(12)
-  doc.setFont('helvetica', 'normal')
+  doc.setFont('helvetica', 'bold')
   addText('REPORTE DE NOVEDAD DISCIPLINARIA', pageWidth / 2, currentY, { align: 'center' })
 
   currentY += 6
   doc.setFontSize(10)
-  addText(`Fecha del reporte: ${report.reportDate} ${report.reportTime.substring(0, 5)}`, pageWidth / 2, currentY, { align: 'center' })
+  doc.setFont('helvetica', 'normal')
+  addText(`Fecha del reporte: ${report.reportDate} | Hora: ${report.reportTime.substring(0, 5)}`, pageWidth / 2, currentY, { align: 'center' })
 
   currentY += 10
   doc.setLineWidth(0.5)
