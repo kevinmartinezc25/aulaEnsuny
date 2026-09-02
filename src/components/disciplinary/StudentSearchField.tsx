@@ -19,9 +19,10 @@ interface Props {
   value?: StudentRef | null
   onChange: (student: StudentRef | null) => void
   error?: string
+  groupName?: string
 }
 
-export function StudentSearchField({ value, onChange, error }: Props) {
+export function StudentSearchField({ value, onChange, error, groupName }: Props) {
   const [query, setQuery] = useState('')
   const debouncedQuery = useDebounceValue(query, 400)
   const [results, setResults] = useState<StudentRef[]>([])
@@ -50,7 +51,7 @@ export function StudentSearchField({ value, onChange, error }: Props) {
       
       setLoading(true)
       try {
-        const data = await searchStudentsUnified(debouncedQuery)
+        const data = await searchStudentsUnified(debouncedQuery, groupName)
         setResults(data)
         setIsOpen(true)
       } catch (err) {
@@ -62,7 +63,7 @@ export function StudentSearchField({ value, onChange, error }: Props) {
     }
 
     performSearch()
-  }, [debouncedQuery])
+  }, [debouncedQuery, groupName])
 
   // Si hay un valor seleccionado, no mostrar buscador sino el valor
   if (value) {

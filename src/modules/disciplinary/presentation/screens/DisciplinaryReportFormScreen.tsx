@@ -5,17 +5,18 @@ import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ChevronRight, ChevronLeft, Save, AlertCircle, CheckCircle2,
-  UserCheck, ShieldAlert, FileText, PenTool, LayoutDashboard
+  UserCheck, ShieldAlert, FileText, PenTool, LayoutDashboard, Users
 } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
 import { createClient } from '@/core/config/supabase/client'
-import { StudentRef, DisciplinarySituation, createDisciplinaryReport, getStudentDisciplinaryHistory } from '@/modules/disciplinary/application/actions'
+import { StudentRef, DisciplinarySituation, createDisciplinaryReport, getStudentDisciplinaryHistory, getTeacherAssignedGroups } from '@/modules/disciplinary/application/actions'
 import { getSituations } from '@/modules/disciplinary/application/situationsActions'
 import { StudentSearchField } from '@/components/disciplinary/StudentSearchField'
 import { SituationSearchField } from '@/components/disciplinary/SituationSearchField'
 import { ReportPreviewDocument } from '@/components/disciplinary/ReportPreviewDocument'
 import { SignatureCanvas, SignatureCanvasRef } from '@/components/disciplinary/SignatureCanvas'
+import { ConfidentialityModal } from '@/components/disciplinary/ConfidentialityModal'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TIPOS
@@ -84,6 +85,8 @@ export function DisciplinaryReportFormScreen() {
   const [student, setStudent] = useState<StudentRef | null>(null)
   const [situation, setSituation] = useState<DisciplinarySituation | null>(null)
   const [description, setDescription] = useState('')
+  const [studentDefense, setStudentDefense] = useState('')
+  const [studentCommitment, setStudentCommitment] = useState('')
   const signatureRef = useRef<SignatureCanvasRef>(null)
   
   // ── ESTADO DE DATOS EXTERNOS ───────────────────────────────────────────────
@@ -91,6 +94,11 @@ export function DisciplinaryReportFormScreen() {
   const [history, setHistory] = useState<any>(null) // StudentDisciplinaryHistory
   const [historyLoading, setHistoryLoading] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  
+  const [showConfidentiality, setShowConfidentiality] = useState(true)
+  const [teacherGroups, setTeacherGroups] = useState<{id: string, name: string, level: string}[]>([])
+  const [selectedGroupName, setSelectedGroupName] = useState<string>('')
+  const [groupsLoading, setGroupsLoading] = useState(true)
 
   // Cargar catálogo de situaciones activas al inicio
   useEffect(() => {
@@ -99,6 +107,16 @@ export function DisciplinaryReportFormScreen() {
       setSituations(data)
     }
     loadSituations()
+  }, [])
+  
+  // Cargar grupos del docente
+  useEffect(() => {
+    async function loadGroups() {
+      const groups = await getTeacherAssignedGroups()
+      setTeacherGroups(groups)
+      setGroupsLoading(false)
+    }
+    loadGroups()
   }, [])
 
   // Cargar historial del estudiante al seleccionarlo
@@ -217,6 +235,8 @@ export function DisciplinaryReportFormScreen() {
           manualReference: situation.manualReference,
         },
         teacherDescription: description.trim(),
+        studentDefense: studentDefense.trim(),
+        studentCommitment: studentCommitment.trim(),
         generatedReport: reportText,
         studentSignatureUrl: signatureUrl,
         signatureConfirmed: true, // Si llegamos aquí, la firma fue hecha
@@ -252,14 +272,45 @@ export function DisciplinaryReportFormScreen() {
                 Paso 1: Seleccionar Estudiante
               </h2>
               <p className="text-slate-500 dark:text-slate-400">
-                Busca al estudiante involucrado. Puedes buscar por nombre o documento.
+                Busca al estudiante involucrado. Filtra por tus grupos asignados.
               </p>
             </div>
             
-            <StudentSearchField
-              value={student}
-              onChange={setStudent}
-            />
+            <div className="bg-white dark:bg-slate-900 rounded-xl p-4 sm:p-6 border border-slate-200 dark:border-slate-800 space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-2">
+                  <Users className="h-4 w-4 text-blue-500" /> Grupo Asignado
+                </label>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={selectedGroupName}
+                    onChange={(e) => {
+                      setSelectedGroupName(e.target.value)
+                      setStudent(null)
+                    }}
+                    disabled={groupsLoading || teacherGroups.length === 0}
+                    className="w-full sm:w-1/2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                  >
+                    <option value="">Todos mis grupos</option>
+                    {teacherGroups.map(g => (
+                      <option key={g.id} value={g.name}>{g.name} ({g.level})</option>
+                    ))}
+                  </select>
+                  {groupsLoading && <span className="text-xs text-slate-500">Cargando grupos...</span>}
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  Buscar Estudiante
+                </label>
+                <StudentSearchField
+                  value={student}
+                  onChange={setStudent}
+                  groupName={selectedGroupName || undefined}
+                />
+              </div>
+            </div>
 
             {historyLoading && (
               <div className="animate-pulse bg-slate-100 dark:bg-slate-800 h-32 rounded-xl" />
@@ -353,10 +404,38 @@ export function DisciplinaryReportFormScreen() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Ejemplo: Durante la clase de matemáticas a las 10:30 am, el estudiante..."
-                className="w-full h-48 p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none transition-colors"
+                className="w-full h-32 p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none transition-colors"
               />
               <div className="absolute bottom-3 right-3 text-xs text-slate-400 font-mono">
                 {description.length} caracteres
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2 mt-4">
+                Descargos del Estudiante (Opcional)
+              </h3>
+              <div className="relative">
+                <textarea
+                  value={studentDefense}
+                  onChange={(e) => setStudentDefense(e.target.value)}
+                  placeholder="Versión de los hechos según el estudiante..."
+                  className="w-full h-24 p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none transition-colors"
+                />
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2 mt-4">
+                Compromiso Final (Opcional)
+              </h3>
+              <div className="relative">
+                <textarea
+                  value={studentCommitment}
+                  onChange={(e) => setStudentCommitment(e.target.value)}
+                  placeholder="Compromiso asumido por el estudiante frente a la situación..."
+                  className="w-full h-24 p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none transition-colors"
+                />
               </div>
             </div>
           </motion.div>
@@ -387,6 +466,8 @@ export function DisciplinaryReportFormScreen() {
                 student={student}
                 situation={situation}
                 teacherDescription={description}
+                studentDefense={studentDefense}
+                studentCommitment={studentCommitment}
                 date={new Date()}
               />
             </div>
@@ -447,7 +528,12 @@ export function DisciplinaryReportFormScreen() {
   // ─────────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-20">
+    <>
+      <ConfidentialityModal 
+        isOpen={showConfidentiality} 
+        onAccept={() => setShowConfidentiality(false)} 
+      />
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-20">
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Encabezado */}
         <div className="flex items-center gap-4 mb-8">
@@ -504,5 +590,6 @@ export function DisciplinaryReportFormScreen() {
         )}
       </div>
     </div>
+    </>
   )
 }

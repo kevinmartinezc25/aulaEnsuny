@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { motion, Variants } from 'framer-motion'
-import { selfRegisterStudent } from '@/modules/auth/application/studentRegistrationActions'
+import { selfRegisterStudent, checkStudentPreloaded } from '@/modules/auth/application/studentRegistrationActions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -36,6 +36,8 @@ export function StudentRegistrationScreen() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [isCheckingDoc, setIsCheckingDoc] = useState(false)
+  const [isPreloaded, setIsPreloaded] = useState(false)
 
   useEffect(() => {
     const root = document.documentElement
@@ -53,6 +55,8 @@ export function StudentRegistrationScreen() {
   const {
     register,
     handleSubmit,
+    setValue,
+    watch,
     formState: { errors },
   } = useForm<RegistrationInput>({
     resolver: zodResolver(registrationSchema),
@@ -63,6 +67,37 @@ export function StudentRegistrationScreen() {
       groupName: ''
     }
   })
+
+  const documentNumber = watch('documentNumber')
+
+  const handleCheckDocument = async () => {
+    if (!documentNumber || documentNumber.length < 5) return
+    setIsCheckingDoc(true)
+    setErrorMsg(null)
+    try {
+      const res = await checkStudentPreloaded(documentNumber)
+      
+      if (res.alreadyRegistered) {
+        setErrorMsg('Este documento ya se encuentra registrado. Por favor, inicia sesión o recupera tu contraseña.')
+        setIsPreloaded(false)
+        return
+      }
+
+      if (res.found && res.student) {
+        setValue('firstName', res.student.firstName, { shouldValidate: true })
+        setValue('lastName', res.student.lastName, { shouldValidate: true })
+        setValue('gradeLevel', res.student.gradeLevel, { shouldValidate: true })
+        setValue('groupName', res.student.groupName, { shouldValidate: true })
+        setIsPreloaded(true)
+      } else {
+        setIsPreloaded(false)
+      }
+    } catch {
+      setIsPreloaded(false)
+    } finally {
+      setIsCheckingDoc(false)
+    }
+  }
 
   const onSubmit = async (data: RegistrationInput) => {
     setIsLoading(true)
@@ -204,43 +239,15 @@ export function StudentRegistrationScreen() {
                   onSubmit={handleSubmit(onSubmit)}
                   className="space-y-4"
                 >
-                  {/* ─ Sección: Datos personales ─ */}
+                  {/* ─ Sección: Documento de Identidad ─ */}
                   <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500 pt-1">
-                    Datos personales
+                    Documento de Identidad
                   </p>
 
-                  {/* Nombres & Apellidos — stacked on mobile, 2-col on sm+ */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <motion.div variants={itemVariants} className="space-y-1.5">
-                      <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">Nombres *</Label>
-                      <Input
-                        {...register('firstName')}
-                        type="text"
-                        placeholder="Ej. Juan Carlos"
-                        disabled={isLoading}
-                        className={inputClass}
-                      />
-                      {errors.firstName && <p className="text-[12px] text-red-500 mt-1">{errors.firstName.message}</p>}
-                    </motion.div>
-
-                    <motion.div variants={itemVariants} className="space-y-1.5">
-                      <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">Apellidos *</Label>
-                      <Input
-                        {...register('lastName')}
-                        type="text"
-                        placeholder="Ej. Pérez Gómez"
-                        disabled={isLoading}
-                        className={inputClass}
-                      />
-                      {errors.lastName && <p className="text-[12px] text-red-500 mt-1">{errors.lastName.message}</p>}
-                    </motion.div>
-                  </div>
-
-                  {/* Tipo doc & N° — tipo siempre compacto, número ocupa el resto */}
-                  <div className="grid grid-cols-[auto_1fr] gap-3">
+                  <div className="grid grid-cols-[auto_1fr_auto] gap-3 items-end">
                     <motion.div variants={itemVariants} className="space-y-1.5">
                       <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">Tipo *</Label>
-                      <select {...register('documentType')} disabled={isLoading} className={selectClass}>
+                      <select {...register('documentType')} disabled={isLoading || isPreloaded} className={selectClass}>
                         <option value="TI">TI</option>
                         <option value="CC">CC</option>
                         <option value="CE">CE</option>
@@ -257,10 +264,59 @@ export function StudentRegistrationScreen() {
                         {...register('documentNumber')}
                         type="text"
                         placeholder="1002300400"
-                        disabled={isLoading}
+                        disabled={isLoading || isPreloaded}
                         className={inputClass}
+                        onBlur={handleCheckDocument}
                       />
                       {errors.documentNumber && <p className="text-[12px] text-red-500 mt-1">{errors.documentNumber.message}</p>}
+                    </motion.div>
+                    
+                    <motion.div variants={itemVariants} className="pb-0.5">
+                      {isCheckingDoc ? (
+                         <div className="h-11 w-11 flex items-center justify-center bg-slate-100 dark:bg-slate-800 rounded-xl"><Loader2 className="h-4 w-4 animate-spin text-slate-400" /></div>
+                      ) : isPreloaded ? (
+                         <div className="h-11 w-11 flex items-center justify-center bg-emerald-50 dark:bg-emerald-900/30 rounded-xl border border-emerald-200 dark:border-emerald-800"><CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" /></div>
+                      ) : (
+                         <div className="h-11 w-11 flex items-center justify-center bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800"><span className="text-xs text-slate-400">?</span></div>
+                      )}
+                    </motion.div>
+                  </div>
+
+                  {isPreloaded && (
+                    <motion.p initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="text-xs text-emerald-600 dark:text-emerald-400 font-medium bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2 rounded-lg border border-emerald-100 dark:border-emerald-800/30">
+                      ¡Estudiante encontrado! Se han precargado tus datos institucionales.
+                    </motion.p>
+                  )}
+
+                  {/* ─ Sección: Datos personales ─ */}
+                  <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500 pt-3">
+                    Información Básica
+                  </p>
+
+                  {/* Nombres & Apellidos */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <motion.div variants={itemVariants} className="space-y-1.5">
+                      <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">Nombres *</Label>
+                      <Input
+                        {...register('firstName')}
+                        type="text"
+                        placeholder="Ej. Juan Carlos"
+                        disabled={isLoading || isPreloaded}
+                        className={`${inputClass} ${isPreloaded ? 'bg-slate-100 dark:bg-slate-900 text-slate-500' : ''}`}
+                      />
+                      {errors.firstName && <p className="text-[12px] text-red-500 mt-1">{errors.firstName.message}</p>}
+                    </motion.div>
+
+                    <motion.div variants={itemVariants} className="space-y-1.5">
+                      <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">Apellidos *</Label>
+                      <Input
+                        {...register('lastName')}
+                        type="text"
+                        placeholder="Ej. Pérez Gómez"
+                        disabled={isLoading || isPreloaded}
+                        className={`${inputClass} ${isPreloaded ? 'bg-slate-100 dark:bg-slate-900 text-slate-500' : ''}`}
+                      />
+                      {errors.lastName && <p className="text-[12px] text-red-500 mt-1">{errors.lastName.message}</p>}
                     </motion.div>
                   </div>
 
@@ -276,11 +332,11 @@ export function StudentRegistrationScreen() {
                     {errors.birthDate && <p className="text-[12px] text-red-500 mt-1">{errors.birthDate.message}</p>}
                   </motion.div>
 
-                  {/* Grado & Grupo — 2 columnas siempre (etiquetas cortas) */}
+                  {/* Grado & Grupo */}
                   <div className="grid grid-cols-2 gap-3">
                     <motion.div variants={itemVariants} className="space-y-1.5">
                       <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">Grado *</Label>
-                      <select {...register('gradeLevel')} disabled={isLoading} className={selectClass}>
+                      <select {...register('gradeLevel')} disabled={isLoading || isPreloaded} className={`${selectClass} ${isPreloaded ? 'bg-slate-100 dark:bg-slate-900 text-slate-500' : ''}`}>
                         <option value="" disabled>Grado…</option>
                         <option value="6°">6°</option>
                         <option value="7°">7°</option>
@@ -295,7 +351,7 @@ export function StudentRegistrationScreen() {
 
                     <motion.div variants={itemVariants} className="space-y-1.5">
                       <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">Grupo *</Label>
-                      <select {...register('groupName')} disabled={isLoading} className={selectClass}>
+                      <select {...register('groupName')} disabled={isLoading || isPreloaded} className={`${selectClass} ${isPreloaded ? 'bg-slate-100 dark:bg-slate-900 text-slate-500' : ''}`}>
                         <option value="" disabled>Grupo…</option>
                         <option value="1">1</option>
                         <option value="2">2</option>

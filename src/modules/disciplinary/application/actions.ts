@@ -43,6 +43,8 @@ export interface CreateReportInput {
     manualReference: string | null
   }
   teacherDescription: string
+  studentDefense?: string
+  studentCommitment?: string
   generatedReport: string
   studentSignatureUrl?: string
   signatureConfirmed?: boolean
@@ -69,6 +71,8 @@ export interface DisciplinaryReport {
     manualReference: string | null
   }
   teacherDescription: string
+  studentDefense: string | null
+  studentCommitment: string | null
   generatedReport: string
   studentSignatureUrl: string | null
   signatureConfirmed: boolean
@@ -118,6 +122,8 @@ function mapReport(row: Record<string, unknown>): DisciplinaryReport {
     situationId: row.situation_id as string,
     situationSnapshot: row.situation_snapshot as DisciplinaryReport['situationSnapshot'],
     teacherDescription: row.teacher_description as string,
+    studentDefense: (row.student_defense as string) || null,
+    studentCommitment: (row.student_commitment as string) || null,
     generatedReport: row.generated_report as string,
     studentSignatureUrl: (row.student_signature_url as string) || null,
     signatureConfirmed: (row.signature_confirmed as boolean) || false,
@@ -172,6 +178,8 @@ export async function createDisciplinaryReport(
       situation_snapshot: input.situationSnapshot,
       // Narrativa
       teacher_description: input.teacherDescription,
+      student_defense: input.studentDefense || null,
+      student_commitment: input.studentCommitment || null,
       generated_report: input.generatedReport,
       // Firma
       student_signature_url: input.studentSignatureUrl || null,
@@ -641,5 +649,41 @@ export async function getDisciplinaryStats(year?: number): Promise<{
   } catch (error) {
     console.error('Error al obtener estadísticas:', error)
     return { total: 0, tipoI: 0, tipoII: 0, tipoIII: 0, openCases: 0, byMonth: [], byGrade: [] }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OBTENER GRUPOS ASIGNADOS AL DOCENTE (CARGA ACADÉMICA)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function getTeacherAssignedGroups(): Promise<{ id: string, name: string, level: string }[]> {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return []
+
+    const adminClient = createAdminClient()
+
+    const { data, error } = await adminClient
+      .from('sch_curriculum')
+      .select('group_id, sch_groups(id, name, level)')
+      .eq('teacher_id', user.id)
+
+    if (error) throw error
+
+    // Extraer los grupos y eliminar duplicados
+    const groupsMap = new Map<string, { id: string, name: string, level: string }>()
+    
+    data?.forEach((row: any) => {
+      const g = row.sch_groups
+      if (g && !Array.isArray(g)) {
+        groupsMap.set(g.id, { id: g.id, name: g.name, level: g.level || '' })
+      }
+    })
+
+    return Array.from(groupsMap.values()).sort((a, b) => a.name.localeCompare(b.name))
+  } catch (error) {
+    console.error('Error al obtener grupos del docente:', error)
+    return []
   }
 }

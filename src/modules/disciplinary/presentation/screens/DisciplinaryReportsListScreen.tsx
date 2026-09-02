@@ -7,7 +7,7 @@ import {
   Search, Plus, Calendar, Filter, FileText, ChevronRight, 
   Clock, ShieldAlert, ArrowUpRight, AlertCircle 
 } from 'lucide-react'
-import { DisciplinaryReport, ReportStatus, getTeacherReports } from '@/modules/disciplinary/application/actions'
+import { DisciplinaryReport, ReportStatus, getTeacherReports, getTeacherAssignedGroups } from '@/modules/disciplinary/application/actions'
 import { DisciplinaryStatusBadge } from '@/components/disciplinary/DisciplinaryStatusBadge'
 
 export function DisciplinaryReportsListScreen() {
@@ -21,20 +21,39 @@ export function DisciplinaryReportsListScreen() {
   const [gradeFilter, setGradeFilter] = useState<string>('')
   const [groupFilter, setGroupFilter] = useState<string>('')
 
+  const [teacherGroups, setTeacherGroups] = useState<{id: string, name: string, level: string}[]>([])
+
   useEffect(() => {
-    async function loadReports() {
+    async function loadData() {
       setLoading(true)
       try {
-        const data = await getTeacherReports()
+        const [data, groups] = await Promise.all([
+          getTeacherReports(),
+          getTeacherAssignedGroups()
+        ])
         setReports(data)
+        setTeacherGroups(groups)
       } catch (error) {
-        console.error('Error cargando reportes:', error)
+        console.error('Error cargando datos:', error)
       } finally {
         setLoading(false)
       }
     }
-    loadReports()
+    loadData()
   }, [])
+
+  const uniqueGrades = useMemo(() => {
+    const grades = new Set<string>();
+    teacherGroups.forEach(g => {
+      const match = g.name.match(/\d+/);
+      if (match) grades.add(match[0] + '°');
+    });
+    return Array.from(grades).sort((a, b) => parseInt(a) - parseInt(b));
+  }, [teacherGroups]);
+
+  const uniqueGroups = useMemo(() => {
+    return Array.from(new Set(teacherGroups.map(g => g.name))).filter(Boolean).sort();
+  }, [teacherGroups]);
 
   const filteredReports = useMemo(() => {
     return reports.filter(r => {
@@ -49,7 +68,11 @@ export function DisciplinaryReportsListScreen() {
         r.studentGrade === gradeFilter.replace('°', '') || 
         r.studentGrade === `${gradeFilter.replace('°', '')}°`
 
-      const matchGroup = !groupFilter || r.studentGroup === groupFilter
+      const cleanStr = (s: string) => s.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()
+      const matchGroup = !groupFilter || 
+        cleanStr(r.studentGroup) === cleanStr(groupFilter) ||
+        cleanStr(`${r.studentGrade}${r.studentGroup}`) === cleanStr(groupFilter) ||
+        r.studentGroup === groupFilter
       
       return matchStatus && matchSearch && matchGrade && matchGroup
     })
@@ -57,16 +80,17 @@ export function DisciplinaryReportsListScreen() {
 
   // Estadísticas rápidas
   const stats = useMemo(() => {
-    const total = reports.length
-    const thisMonth = reports.filter(r => {
-      const reportDate = new Date(r.reportDate)
+    const total = filteredReports.length
+    const thisMonth = filteredReports.filter(r => {
+      // Usar la fecha local sin problemas de zona horaria
+      const [year, month] = r.reportDate.split('-').map(Number)
       const now = new Date()
-      return reportDate.getMonth() === now.getMonth() && reportDate.getFullYear() === now.getFullYear()
+      return (month - 1) === now.getMonth() && year === now.getFullYear()
     }).length
-    const active = reports.filter(r => ['registered', 'reviewing', 'following'].includes(r.status)).length
+    const active = filteredReports.filter(r => ['registered', 'reviewing', 'following'].includes(r.status)).length
 
     return { total, thisMonth, active }
-  }, [reports])
+  }, [filteredReports])
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 text-left pb-12">
@@ -165,7 +189,7 @@ export function DisciplinaryReportsListScreen() {
             className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/50 appearance-none text-sm cursor-pointer"
           >
             <option value="">Grados</option>
-            {['1°', '2°', '3°', '4°', '5°', '6°', '7°', '8°', '9°', '10°', '11°'].map(g => (
+            {uniqueGrades.map(g => (
               <option key={g} value={g}>{g}</option>
             ))}
           </select>
@@ -184,7 +208,7 @@ export function DisciplinaryReportsListScreen() {
             className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/50 appearance-none text-sm cursor-pointer"
           >
             <option value="">Grupos</option>
-            {['1', '2', '3', '4'].map(g => (
+            {uniqueGroups.map(g => (
               <option key={g} value={g}>{g}</option>
             ))}
           </select>
@@ -251,10 +275,16 @@ export function DisciplinaryReportsListScreen() {
                   </div>
                   
                   <div className="flex items-center gap-x-4 gap-y-2 text-sm text-slate-600 dark:text-slate-400 flex-wrap">
-                    <span className="flex items-center gap-1.5">
-                      <Calendar className="h-3.5 w-3.5" />
-                      {new Date(report.reportDate).toLocaleDateString('es-CO')}
-                    </span>
+                    <div className="flex flex-col gap-0.5">
+                      <span className="flex items-center gap-1.5">
+                        <Calendar className="h-3.5 w-3.5" />
+                        {new Date(`${report.reportDate}T${report.reportTime || '00:00:00'}`).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                      </span>
+                      <span className="flex items-center gap-1.5 text-xs text-slate-400 pl-5">
+                        <Clock className="h-3 w-3" />
+                        {new Date(`${report.reportDate}T${report.reportTime || '00:00:00'}`).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                      </span>
+                    </div>
                     <span className="flex items-center gap-1.5 truncate max-w-[300px]">
                       <AlertCircle className="h-3.5 w-3.5 shrink-0" />
                       <span className="truncate">{report.situationSnapshot.code} - {report.situationSnapshot.title}</span>

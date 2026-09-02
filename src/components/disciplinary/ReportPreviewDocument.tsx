@@ -7,10 +7,12 @@ interface Props {
   student: StudentRef | null
   situation: DisciplinarySituation | null
   teacherDescription: string
+  studentDefense?: string | null
+  studentCommitment?: string | null
   date: Date
 }
 
-export function ReportPreviewDocument({ student, situation, teacherDescription, date }: Props) {
+export function ReportPreviewDocument({ student, situation, teacherDescription, studentDefense, studentCommitment, date }: Props) {
   if (!student || !situation) {
     return (
       <div className="flex items-center justify-center h-64 bg-slate-50 dark:bg-slate-900 border border-dashed border-slate-200 dark:border-slate-700 rounded-xl text-slate-400">
@@ -119,6 +121,37 @@ export function ReportPreviewDocument({ student, situation, teacherDescription, 
             </div>
           </div>
         </div>
+
+        {/* Descargos y Compromiso */}
+        {(studentDefense || studentCommitment) && (
+          <div className="mb-6">
+            <h4 className="font-bold text-slate-900 mb-2 border-l-4 border-slate-900 pl-2 font-sans">
+              3. Descargos y Compromiso del Estudiante
+            </h4>
+            <div className="pl-3 space-y-4">
+              {studentDefense && (
+                <div className="bg-slate-50 border border-slate-200 p-4 rounded font-sans text-sm">
+                  <p className="font-semibold text-slate-700 mb-2 uppercase text-xs tracking-wider">
+                    Descargos del Estudiante:
+                  </p>
+                  <p className="whitespace-pre-wrap text-slate-800 leading-relaxed text-justify">
+                    {studentDefense}
+                  </p>
+                </div>
+              )}
+              {studentCommitment && (
+                <div className="bg-slate-50 border border-slate-200 p-4 rounded font-sans text-sm">
+                  <p className="font-semibold text-slate-700 mb-2 uppercase text-xs tracking-wider">
+                    Compromiso Asumido:
+                  </p>
+                  <p className="whitespace-pre-wrap text-slate-800 leading-relaxed text-justify">
+                    {studentCommitment}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Constancia de notificación */}
         <div className="mt-12 pt-6 border-t border-slate-300">
