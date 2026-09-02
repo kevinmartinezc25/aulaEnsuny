@@ -285,27 +285,67 @@ function SidebarContent({ onClose, isCollapsed = false, user }: SidebarProps) {
 
   const isTeacher = user?.role === 'teacher' || pathname.startsWith('/teacher')
 
-  let menuItems = [
-    { name: 'Mis cursos', href: '/student/dashboard', icon: BookOpen },
-    { name: 'Mis solicitudes', href: '/student/requests', icon: ClipboardList },
-    { name: 'Calificaciones', href: '/student/grades', icon: TrendingUp },
-    { name: 'Calendario', href: '/student/calendar', icon: Calendar },
-    { name: 'Votaciones', href: '/student/elections', icon: ShieldCheck },
-    { name: 'Configuración', href: '/student/settings', icon: Settings },
+  let menuGroups = [
+    {
+      label: 'Académico',
+      items: [
+        { name: 'Mis cursos', href: '/student/dashboard', icon: BookOpen },
+        { name: 'Mis solicitudes', href: '/student/requests', icon: ClipboardList },
+        { name: 'Calificaciones', href: '/student/grades', icon: TrendingUp },
+      ]
+    },
+    {
+      label: 'Gestión',
+      items: [
+        { name: 'Calendario', href: '/student/calendar', icon: Calendar },
+        { name: 'Votaciones', href: '/student/elections', icon: ShieldCheck },
+      ]
+    },
+    {
+      label: 'Sistema',
+      items: [
+        { name: 'Configuración', href: '/student/settings', icon: Settings },
+      ]
+    }
   ]
 
   if (isTeacher) {
-    menuItems = [
-      { name: 'Panel Docente', href: '/teacher/dashboard', icon: BookOpen },
-      { name: 'Horario (Docente)', href: '/teacher/schedule', icon: CalendarDays },
-      { name: 'Calificaciones', href: '/teacher/grades', icon: ClipboardList },
-      { name: 'Mis Estudiantes', href: '/teacher/students', icon: TrendingUp },
-      { name: 'Convivencia Escolar', href: '/teacher/disciplinary', icon: ShieldAlert },
-      { name: 'Calendario', href: '/teacher/calendar', icon: Calendar },
-      { name: 'Agenda', href: '/teacher/institutional-agenda', icon: ClipboardList },
-      { name: 'Jurado Electoral', href: '/juror/elections', icon: ShieldCheck },
-      { name: 'Documentación', href: '/teacher/docs', icon: FileText },
-      { name: 'Configuración', href: '/teacher/settings', icon: Settings },
+    menuGroups = [
+      {
+        label: 'Principal',
+        items: [
+          { name: 'Panel Docente', href: '/teacher/dashboard', icon: BookOpen },
+        ]
+      },
+      {
+        label: 'Académico',
+        items: [
+          { name: 'Mis Estudiantes', href: '/teacher/students', icon: TrendingUp },
+          { name: 'Horario (Docente)', href: '/teacher/schedule', icon: CalendarDays },
+          { name: 'Calificaciones', href: '/teacher/grades', icon: ClipboardList },
+        ]
+      },
+      {
+        label: 'Gestión de Aula',
+        items: [
+          { name: 'Convivencia Escolar', href: '/teacher/disciplinary', icon: ShieldAlert },
+          { name: 'Agenda', href: '/teacher/institutional-agenda', icon: ClipboardList },
+          { name: 'Calendario', href: '/teacher/calendar', icon: Calendar },
+        ]
+      },
+      {
+        label: 'Institucional',
+        items: [
+          { name: 'Jurado Electoral', href: '/juror/elections', icon: ShieldCheck },
+          { name: 'Documentación', href: '/teacher/docs', icon: FileText },
+        ]
+      },
+      {
+        label: 'Sistema',
+        items: [
+          { name: 'Configuración', href: '/teacher/settings', icon: Settings },
+        ]
+      }
     ]
   }
 
@@ -325,7 +365,7 @@ function SidebarContent({ onClose, isCollapsed = false, user }: SidebarProps) {
 
   return (
     <div className={`flex h-full flex-col justify-between ${isCollapsed ? 'p-4' : 'p-6'}`}>
-      <div className="space-y-8">
+      <div className="space-y-8 flex-1 overflow-y-auto pr-1 -mr-1 no-scrollbar">
         {/* Logo */}
         <Link href="/" className={`flex items-center gap-2.5 ${isCollapsed ? 'justify-center' : 'px-2'}`} onClick={onClose}>
           <img src="/logo_1.svg" alt="aulaEnsuny Logo" className="h-10 shrink-0 object-contain" />
@@ -335,29 +375,40 @@ function SidebarContent({ onClose, isCollapsed = false, user }: SidebarProps) {
         </Link>
 
         {/* Menu */}
-        <nav className="space-y-2">
-          {menuItems.map((item) => {
-            const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
-            const Icon = item.icon
-            return (
-              <Link
-                key={item.name}
-                href={item.href}
-                onClick={onClose}
-                title={isCollapsed ? item.name : undefined}
-                className={`group flex items-center rounded-xl transition-colors duration-200 ${
-                  isCollapsed ? 'justify-center p-3' : 'gap-3 px-4 py-3'
-                } text-sm font-medium ${
-                  isActive
-                    ? 'bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400'
-                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white'
-                }`}
-              >
-                <Icon className={`h-5 w-5 shrink-0 ${isActive ? 'text-blue-600 dark:text-blue-400' : ''}`} />
-                {!isCollapsed && <span className="truncate">{item.name}</span>}
-              </Link>
-            )
-          })}
+        <nav className="space-y-5">
+          {menuGroups.map((group, groupIdx) => (
+            <div key={groupIdx} className="space-y-1">
+              {group.label && !isCollapsed && (
+                <p className="px-4 text-[10px] font-bold tracking-widest text-slate-400 dark:text-slate-500 uppercase mb-2">
+                  {group.label}
+                </p>
+              )}
+              <div className="space-y-0.5">
+                {group.items.map((item) => {
+                  const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
+                  const Icon = item.icon
+                  return (
+                    <Link
+                      key={item.name}
+                      href={item.href}
+                      onClick={onClose}
+                      title={isCollapsed ? item.name : undefined}
+                      className={`group flex items-center rounded-xl transition-colors duration-200 ${
+                        isCollapsed ? 'justify-center p-3' : 'gap-3 px-4 py-2.5'
+                      } text-sm font-medium ${
+                        isActive
+                          ? 'bg-blue-500/10 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400'
+                          : 'text-slate-500 hover:bg-slate-50 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white'
+                      }`}
+                    >
+                      <Icon className={`h-5 w-5 shrink-0 ${isActive ? 'text-blue-700 dark:text-blue-400' : ''}`} />
+                      {!isCollapsed && <span className="truncate">{item.name}</span>}
+                    </Link>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
       </div>
 

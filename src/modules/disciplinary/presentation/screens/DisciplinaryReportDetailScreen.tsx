@@ -204,6 +204,28 @@ export function DisciplinaryReportDetailScreen({ reportId, basePath = '/teacher/
                 {report.teacherDescription}
               </p>
             </div>
+            
+            {report.studentDefense && (
+              <div className="mt-4">
+                <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wide">
+                  Descargos del Estudiante:
+                </p>
+                <p className="whitespace-pre-wrap text-slate-600 dark:text-slate-400 text-sm leading-relaxed border-l-2 border-blue-200 dark:border-blue-700 pl-4 py-1">
+                  {report.studentDefense}
+                </p>
+              </div>
+            )}
+
+            {report.studentCommitment && (
+              <div className="mt-4">
+                <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wide">
+                  Compromiso Asumido:
+                </p>
+                <p className="whitespace-pre-wrap text-slate-600 dark:text-slate-400 text-sm leading-relaxed border-l-2 border-emerald-200 dark:border-emerald-700 pl-4 py-1">
+                  {report.studentCommitment}
+                </p>
+              </div>
+            )}
           </div>
 
         </div>
