@@ -16,7 +16,6 @@ export interface DirectoryStudent {
   documentId: string | null
   gradeLevel: string
   groupName: string
-  email: string | null
   status: 'active' | 'inactive'
   profileId: string | null
   hasAccount: boolean
@@ -109,7 +108,7 @@ export async function getStudentDirectory(filters?: {
       documentId: row.document_id || null,
       gradeLevel: row.grade_level,
       groupName: row.group_name,
-      email: row.email || null,
+      email: null,
       status: row.status as 'active' | 'inactive',
       profileId: row.profile_id || null,
       hasAccount: !!row.profile_id,
@@ -213,9 +212,10 @@ export async function validateImportRows(
         }
       }
 
+      const originalRowIndex = (row as any).rowIndex
       return {
         ...row,
-        rowIndex: i + 2, // +2 porque la fila 1 es el encabezado
+        rowIndex: originalRowIndex !== undefined ? originalRowIndex : i + 2,
         errors,
         isDuplicate,
         duplicateId,
@@ -258,10 +258,7 @@ export async function importStudentsBatch(
         document_id: row.documentId?.trim() || null,
         grade_level: row.gradeLevel.trim(),
         group_name: row.groupName.trim(),
-        email: row.email?.trim() || null,
-        status: 'active' as const,
-        imported_by: user.id,
-        imported_at: new Date().toISOString(),
+        status: 'active' as const
       }))
 
       const { data, error } = await adminClient
@@ -309,7 +306,6 @@ export async function updateDirectoryStudent(
     if (data.documentId !== undefined) updatePayload.document_id = data.documentId || null
     if (data.gradeLevel !== undefined) updatePayload.grade_level = data.gradeLevel.trim()
     if (data.groupName !== undefined) updatePayload.group_name = data.groupName.trim()
-    if (data.email !== undefined) updatePayload.email = data.email?.trim() || null
 
     const { error } = await adminClient
       .from('student_directory')
