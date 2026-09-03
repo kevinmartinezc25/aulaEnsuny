@@ -142,6 +142,7 @@ export function TeacherSettingsScreen() {
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
+  const [documentId, setDocumentId] = useState('')
   const [roleName, setRoleName] = useState('Docente')
   const [bio, setBio] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
@@ -169,6 +170,7 @@ export function TeacherSettingsScreen() {
             setFirstName(session.first_name || '')
             setLastName(session.last_name || '')
             setEmail(session.email || '')
+            setDocumentId(session.document_id || '')
             setBio(session.bio || '')
             setAvatarUrl(session.avatar_url || '')
             setUserId('demo-teacher-id')
@@ -199,11 +201,13 @@ export function TeacherSettingsScreen() {
           if (profile) {
             setFirstName(profile.first_name || '')
             setLastName(profile.last_name || '')
+            setDocumentId(profile.document_id || user.user_metadata?.document_id || '')
             setAvatarUrl(profile.avatar_url || '')
             setBio(user.user_metadata?.bio || '')
           } else {
             setFirstName(user.user_metadata?.first_name || '')
             setLastName(user.user_metadata?.last_name || '')
+            setDocumentId(user.user_metadata?.document_id || user.user_metadata?.document || '')
             setAvatarUrl(user.user_metadata?.avatar_url || '')
             setBio(user.user_metadata?.bio || '')
           }
@@ -257,6 +261,7 @@ export function TeacherSettingsScreen() {
             ...session,
             first_name: firstName,
             last_name: lastName,
+            document_id: documentId,
             bio: bio,
             avatar_url: avatarUrl
           }
@@ -283,17 +288,18 @@ export function TeacherSettingsScreen() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
-        // Actualizar metadatos de auth
+        // 1. Actualizar metadatos de auth (donde document_id se guarda nativamente en user_metadata)
         const { error: authError } = await supabase.auth.updateUser({
           data: {
             first_name: firstName,
             last_name: lastName,
+            document_id: documentId,
             bio: bio,
             avatar_url: avatarUrl
           }
         })
 
-        // Actualizar tabla profiles
+        // 2. Actualizar tabla profiles (columnas estándar de profiles)
         const { error: profileError } = await supabase
           .from('profiles')
           .update({
@@ -303,8 +309,20 @@ export function TeacherSettingsScreen() {
           })
           .eq('id', user.id)
 
+        // 3. Intentar guardar document_id en profiles de forma segura si la columna está disponible
+        if (!profileError && documentId) {
+          try {
+            await supabase
+              .from('profiles')
+              .update({ document_id: documentId })
+              .eq('id', user.id)
+          } catch {
+            // No bloquear si la columna no existe en profiles
+          }
+        }
+
         if (authError || profileError) {
-          console.error('Error al guardar perfil:', authError || profileError)
+          console.error('Error al guardar perfil:', authError?.message || profileError?.message)
           alert('Error al guardar perfil: ' + (authError?.message || profileError?.message))
         } else {
           setShowSuccess(true)
@@ -491,6 +509,17 @@ export function TeacherSettingsScreen() {
                         readOnly
                         className="w-full rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm text-slate-500 outline-none cursor-not-allowed dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400"
                       />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Cédula / Documento de Identidad</label>
+                      <input
+                        type="text"
+                        value={documentId}
+                        onChange={(e) => setDocumentId(e.target.value.replace(/[^0-9]/g, ''))}
+                        placeholder="Ej: 1098765432"
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition-all focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:focus:border-blue-500"
+                      />
+                      <p className="text-xs text-slate-400 mt-1">Utilizada en solicitudes oficiales de permisos institucionales.</p>
                     </div>
                     <div className="space-y-2 sm:col-span-2">
                       <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Sobre Mí (Biografía Académica)</label>

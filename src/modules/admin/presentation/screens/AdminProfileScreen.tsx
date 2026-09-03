@@ -262,6 +262,20 @@ export function AdminProfileScreen() {
           }
           document.cookie = `aulaensuny-demo-session=${encodeURIComponent(JSON.stringify(updated))}; path=/; max-age=${60 * 60 * 24}`
           
+          if (typeof window !== 'undefined') {
+            try {
+              const storedSchool = localStorage.getItem('schoolInfo')
+              const fullProfileName = `${firstName} ${lastName}`.trim()
+              if (storedSchool) {
+                const parsed = JSON.parse(storedSchool)
+                parsed.rector = fullProfileName
+                localStorage.setItem('schoolInfo', JSON.stringify(parsed))
+              } else {
+                localStorage.setItem('schoolInfo', JSON.stringify({ rector: fullProfileName }))
+              }
+            } catch (e) {}
+          }
+
           setIsSaving(false)
           setShowSuccess(true)
           setTimeout(() => {
@@ -302,6 +316,20 @@ export function AdminProfileScreen() {
             avatar_url: avatarUrl
           })
           .eq('id', user.id)
+
+        if (typeof window !== 'undefined') {
+          try {
+            const storedSchool = localStorage.getItem('schoolInfo')
+            const fullProfileName = `${firstName} ${lastName}`.trim()
+            if (storedSchool) {
+              const parsed = JSON.parse(storedSchool)
+              parsed.rector = fullProfileName
+              localStorage.setItem('schoolInfo', JSON.stringify(parsed))
+            } else {
+              localStorage.setItem('schoolInfo', JSON.stringify({ rector: fullProfileName }))
+            }
+          } catch (e) {}
+        }
 
         if (authError || profileError) {
           console.error('Error al guardar perfil:', authError || profileError)

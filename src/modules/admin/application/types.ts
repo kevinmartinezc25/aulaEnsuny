@@ -38,6 +38,7 @@ export interface AdminTeacher {
   name: string
   email: string
   phone: string
+  documentId?: string
   subjects: string[]
   status: 'active' | 'inactive'
   joinedDate: string

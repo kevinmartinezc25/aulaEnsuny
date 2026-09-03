@@ -17,6 +17,7 @@ interface Teacher {
   name: string
   email: string
   phone: string
+  documentId?: string
   subjects: string[]
   status: 'active' | 'inactive'
   joinedDate: string
@@ -31,7 +32,7 @@ export function AdminTeachersScreen() {
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null)
-  const [form, setForm] = useState({ name: '', email: '', phone: '', subjects: '', status: 'active' as 'active' | 'inactive', password: '' })
+  const [form, setForm] = useState({ name: '', email: '', phone: '', documentId: '', subjects: '', status: 'active' as 'active' | 'inactive', password: '' })
   const [errorMsg, setErrorMsg] = useState('')
   const [successMsg, setSuccessMsg] = useState('')
   const [teacherToDelete, setTeacherToDelete] = useState<Teacher | null>(null)
@@ -96,7 +97,7 @@ export function AdminTeachersScreen() {
 
   const openCreate = () => {
     setEditingTeacher(null)
-    setForm({ name: '', email: '', phone: '', subjects: '', status: 'active', password: '' })
+    setForm({ name: '', email: '', phone: '', documentId: '', subjects: '', status: 'active', password: '' })
     setErrorMsg('')
     setIsModalOpen(true)
   }
@@ -107,6 +108,7 @@ export function AdminTeachersScreen() {
       name: t.name, 
       email: t.email, 
       phone: t.phone === 'No registrado' ? '' : t.phone, 
+      documentId: t.documentId || '',
       subjects: t.subjects.join(', '), 
       status: t.status,
       password: ''
@@ -135,6 +137,7 @@ export function AdminTeachersScreen() {
             name: form.name,
             email: form.email,
             phone: form.phone,
+            documentId: form.documentId,
             subjects: form.subjects.split(',').map(s => s.trim()).filter(Boolean),
             status: form.status
           } : t))
@@ -145,6 +148,7 @@ export function AdminTeachersScreen() {
             name: form.name,
             email: form.email,
             phone: form.phone,
+            documentId: form.documentId,
             subjects: form.subjects.split(',').map(s => s.trim()).filter(Boolean),
             status: form.status,
             joinedDate: new Date().toISOString().split('T')[0]
@@ -171,6 +175,7 @@ export function AdminTeachersScreen() {
           name: form.name,
           email: form.email,
           phone: form.phone,
+          documentId: form.documentId.trim() || undefined,
           role: 'teacher',
           status: form.status,
           password: form.password || undefined
@@ -212,6 +217,7 @@ export function AdminTeachersScreen() {
           name: form.name,
           email: form.email,
           phone: form.phone,
+          documentId: form.documentId.trim() || undefined,
           role: 'teacher',
           status: form.status,
           password: form.password || undefined
@@ -482,8 +488,11 @@ export function AdminTeachersScreen() {
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/40">
               {filteredTeachers.map(t => (
                 <tr key={t.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/10 transition-colors">
-                  <td className="px-6 py-4 font-semibold text-slate-900 dark:text-white">
-                    {t.name}
+                  <td className="px-6 py-4">
+                    <div className="font-semibold text-slate-900 dark:text-white">{t.name}</div>
+                    {t.documentId && (
+                      <div className="text-[11px] text-slate-400 font-normal mt-0.5">C.C. {t.documentId}</div>
+                    )}
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex flex-wrap gap-1">
@@ -582,6 +591,17 @@ export function AdminTeachersScreen() {
                     value={form.name}
                     onChange={e => setForm({ ...form, name: e.target.value })}
                     placeholder="Ej: Alejandro Giraldo"
+                    className="w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:text-white text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-450 uppercase mb-1">Cédula / Documento de Identidad</label>
+                  <input
+                    type="text"
+                    value={form.documentId}
+                    onChange={e => setForm({ ...form, documentId: e.target.value.replace(/[^0-9]/g, '') })}
+                    placeholder="Ej: 1098765432"
                     className="w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:text-white text-sm"
                   />
                 </div>

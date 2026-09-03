@@ -65,6 +65,7 @@ export async function createAdminUser(data: {
   phone?: string
   grade?: string
   password?: string
+  documentId?: string
 }) {
   try {
     const adminClient = createAdminClient()
@@ -84,6 +85,7 @@ export async function createAdminUser(data: {
         last_name: lastName,
         full_name: data.name,
         phone: data.phone || null,
+        document_id: data.documentId || null,
         role_name: data.role,
         grade_level: data.role === 'student' ? data.grade : null,
       }
@@ -98,14 +100,27 @@ export async function createAdminUser(data: {
     }
 
     // 2. Dado que el trigger handle_new_user() crea el perfil automáticamente al insertarse en auth.users,
-    // actualizamos el estado del perfil recién creado (status).
+    // actualizamos el estado del perfil recién creado.
     const { error: updateProfileError } = await adminClient
       .from('profiles')
-      .update({ status: data.status })
+      .update({ 
+        status: data.status
+      })
       .eq('id', newUser.user.id)
 
     if (updateProfileError) {
       console.error('Error al actualizar estado del perfil:', updateProfileError)
+    }
+
+    if (data.documentId) {
+      try {
+        await adminClient
+          .from('profiles')
+          .update({ document_id: data.documentId })
+          .eq('id', newUser.user.id)
+      } catch {
+        // user_metadata ya contiene document_id
+      }
     }
 
     revalidatePath('/admin/users')
@@ -129,6 +144,7 @@ export async function updateAdminUser(
     phone?: string
     grade?: string
     password?: string
+    documentId?: string
   }
 ) {
   try {
@@ -151,19 +167,32 @@ export async function updateAdminUser(
     }
 
     // 2. Actualizar la tabla profiles de la BD
+    const profileUpdate: any = {
+      first_name: firstName,
+      last_name: lastName,
+      role_id: roleData.id,
+      grade_level: data.role === 'student' ? data.grade : null,
+      status: data.status,
+    }
+
     const { error: profileError } = await adminClient
       .from('profiles')
-      .update({
-        first_name: firstName,
-        last_name: lastName,
-        role_id: roleData.id,
-        grade_level: data.role === 'student' ? data.grade : null,
-        status: data.status,
-      })
+      .update(profileUpdate)
       .eq('id', id)
 
     if (profileError) {
       return { error: profileError.message }
+    }
+
+    if (data.documentId !== undefined) {
+      try {
+        await adminClient
+          .from('profiles')
+          .update({ document_id: data.documentId || null })
+          .eq('id', id)
+      } catch {
+        // user_metadata persiste document_id de forma segura
+      }
     }
 
     // 3. Actualizar Supabase Auth (si el usuario existe en Auth)
@@ -177,7 +206,8 @@ export async function updateAdminUser(
         role_name: data.role,
         grade_level: data.role === 'student' ? data.grade : null,
       } as any
-      if (data.phone) metadataPayload.phone = data.phone
+      if (data.phone !== undefined) metadataPayload.phone = data.phone
+      if (data.documentId !== undefined) metadataPayload.document_id = data.documentId || null
 
       // Preparar payload de actualización para Auth
       const authPayload: any = {
@@ -669,6 +699,7 @@ export async function getAdminTeachers(): Promise<AdminTeacher[]> {
         name: `${p.first_name} ${p.last_name}`,
         email: authUser?.email || (p as any).email || 'sin-correo@ensuny.edu.co',
         phone: authUser?.user_metadata?.phone || authUser?.phone || (p as any).phone || 'No registrado',
+        documentId: p.document_id || authUser?.user_metadata?.document_id || '',
         subjects,
         status: (p.status || 'active') as 'active' | 'inactive',
         joinedDate: new Date(p.created_at).toISOString().split('T')[0]
