@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Users, BookOpen, Activity, FileText, GraduationCap, TrendingUp, ArrowUpRight, AlertTriangle, BarChart2, Loader2, Calendar, ClipboardList } from 'lucide-react'
+import { Users, BookOpen, Activity, FileText, GraduationCap, TrendingUp, ArrowUpRight, AlertTriangle, BarChart2, Loader2, Calendar, ClipboardList, UserCheck } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts'
 import { getAdminDashboardStats } from '../../application/actions'
 
@@ -51,6 +51,7 @@ const mockTopCourses = [
 
 export function AdminDashboardScreen() {
   const [userRole, setUserRole] = useState<string>('admin')
+  const [rectorName, setRectorName] = useState<string>('')
   const [isDemoData, setIsDemoData] = useState(false)
   const [loading, setLoading] = useState(true)
   const [kpiData, setKpiData] = useState<any[]>(mockKpis)
@@ -72,7 +73,8 @@ export function AdminDashboardScreen() {
     async function loadDashboardData() {
       setLoading(true)
 
-      // Cargar el rol del usuario
+      // Cargar el rol y nombre del usuario de su cuenta
+      let currentAccountName = ''
       try {
         const { createClient } = await import('@/core/config/supabase/client')
         const supabase = createClient()
@@ -89,6 +91,12 @@ export function AdminDashboardScreen() {
           } else if (authUser.user_metadata?.role_name) {
             setUserRole(authUser.user_metadata.role_name)
           }
+
+          if (profile?.first_name || profile?.last_name) {
+            currentAccountName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim()
+          } else if (authUser.user_metadata?.first_name) {
+            currentAccountName = `${authUser.user_metadata.first_name} ${authUser.user_metadata.last_name || ''}`.trim()
+          }
         } else {
           // Verificar cookie de sesión demo
           const getCookie = (name: string) => {
@@ -103,10 +111,63 @@ export function AdminDashboardScreen() {
             if (session.role) {
               setUserRole(session.role)
             }
+            if (session.first_name || session.last_name) {
+              currentAccountName = `${session.first_name || ''} ${session.last_name || ''}`.trim()
+            }
           }
         }
       } catch (roleErr) {
         console.warn('Error recuperando el rol del usuario:', roleErr)
+      }
+
+      // Cargar nombre del rector coincidente con Configuración de Cuenta
+      try {
+        let rector = ''
+
+        // 1. Prioridad: Si hay nombre en la cuenta de SuperAdmin (Rector actual), usar ese nombre exacto
+        if (currentAccountName) {
+          rector = currentAccountName
+        }
+
+        // 2. Si no hay nombre directo, consultar perfil de SuperAdmin en BD
+        if (!rector) {
+          try {
+            const { createClient } = await import('@/core/config/supabase/client')
+            const supabase = createClient()
+            const { data: superProfile } = await supabase
+              .from('profiles')
+              .select('first_name, last_name, roles!inner(name)')
+              .eq('roles.name', 'superadmin')
+              .limit(1)
+              .maybeSingle()
+
+            if (superProfile) {
+              const sName = `${superProfile.first_name || ''} ${superProfile.last_name || ''}`.trim()
+              if (sName) rector = sName
+            }
+          } catch (e) {}
+        }
+
+        // 3. Si se configuró en Ajustes Institucionales (schoolInfo)
+        if (!rector && typeof window !== 'undefined') {
+          const storedSchool = localStorage.getItem('schoolInfo')
+          if (storedSchool) {
+            const parsed = JSON.parse(storedSchool)
+            if (parsed?.rector && parsed.rector !== 'Dr. Fernando Restrepo') {
+              rector = parsed.rector
+            }
+          }
+        }
+
+        // 4. Respaldo coherente
+        if (!rector) {
+          rector = currentAccountName || 'Administrador Ensuny'
+        }
+
+        setRectorName(rector)
+      } catch (rectorErr) {
+        console.warn('Error al cargar configuración del rector:', rectorErr)
+        setRectorName(currentAccountName || 'Administrador Ensuny')
       }
 
       try {
@@ -237,6 +298,17 @@ export function AdminDashboardScreen() {
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
             Resumen general del sistema académico institucional.
           </p>
+          {rectorName && (
+            <div className="mt-2.5 flex items-center gap-2">
+              <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                Rector institucional:
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-800/80 shadow-2xs">
+                <UserCheck className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                {rectorName}
+              </span>
+            </div>
+          )}
         </div>
         {isDemoData ? (
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-50 border border-amber-100 dark:bg-amber-500/10 dark:border-amber-500/20 self-start sm:self-auto">

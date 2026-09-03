@@ -2,6 +2,7 @@
 
 import React from 'react'
 import { StudentRef, DisciplinarySituation } from '@/modules/disciplinary/application/actions'
+import { InstitutionalReportHeader } from '@/components/reports/InstitutionalReportHeader'
 
 interface Props {
   student: StudentRef | null
@@ -40,25 +41,14 @@ export function ReportPreviewDocument({ student, situation, teacherDescription, 
 
   return (
     <div className="bg-white text-slate-900 border border-slate-200 shadow-sm rounded-xl overflow-hidden print:shadow-none print:border-none print:rounded-none max-w-3xl mx-auto font-serif">
-      {/* Membrete institucional */}
-      <div className="border-b-2 border-slate-900 p-4 sm:p-6 flex items-center justify-center">
-        <img
-          src="/institutional-header.png"
-          alt="Institución Educativa Escuela Normal Superior del Nordeste - Yolombó Antioquia"
-          className="w-full max-w-2xl h-auto object-contain mx-auto"
-        />
-      </div>
+      {/* Membrete institucional con logos */}
+      <InstitutionalReportHeader
+        documentTitle="Reporte de Novedad Disciplinaria"
+        date={date}
+        time={formattedTime}
+      />
 
-      <div className="p-6 sm:p-8 sm:pt-6">
-        {/* Título del documento */}
-        <div className="text-center mb-8">
-          <h3 className="text-lg font-bold uppercase underline underline-offset-4 mb-2">
-            Reporte de Novedad Disciplinaria
-          </h3>
-          <p className="text-sm text-slate-600 font-sans capitalize">
-            {formattedDate} &bull; Hora: {formattedTime}
-          </p>
-        </div>
+      <div className="p-6 sm:p-8 sm:pt-4">
 
         {/* Datos del Estudiante */}
         <div className="mb-6 border border-slate-300 rounded bg-slate-50 p-4 font-sans text-sm">

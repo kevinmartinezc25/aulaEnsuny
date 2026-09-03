@@ -11,6 +11,7 @@ import { toast } from 'sonner'
 import { getReportDetail, DisciplinaryReport, ReportHistoryEntry } from '@/modules/disciplinary/application/actions'
 import { DisciplinaryStatusBadge } from '@/components/disciplinary/DisciplinaryStatusBadge'
 import { generateDisciplinaryPDF } from '@/components/disciplinary/DisciplinaryPDFGenerator'
+import { InstitutionalReportHeader } from '@/components/reports/InstitutionalReportHeader'
 
 interface Props {
   reportId: string
@@ -75,8 +76,18 @@ export function DisciplinaryReportDetailScreen({ reportId, basePath = '/teacher/
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-12">
-      {/* ── HEADER & BREADCRUMBS ────────────────────────────────────────── */}
-      <div className="mb-6 flex items-center justify-between">
+      {/* ── MEMBRETE INSTITUCIONAL EN MODO IMPRESIÓN ── */}
+      <div className="hidden print:block">
+        <InstitutionalReportHeader
+          documentTitle="REPORTE DE NOVEDAD DISCIPLINARIA"
+          date={report.reportDate}
+          time={report.reportTime.substring(0, 5)}
+          variant="formal"
+        />
+      </div>
+
+      {/* ── HEADER & BREADCRUMBS (OCULTO EN IMPRESIÓN) ── */}
+      <div className="mb-6 flex items-center justify-between print:hidden">
         <button 
           onClick={() => router.push(basePath)}
           className="flex items-center text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"

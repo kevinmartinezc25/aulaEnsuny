@@ -44,13 +44,36 @@ export function AdminSettingsScreen() {
       const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL ||
         process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
 
+      let defaultRector = 'Administrador Ensuny'
+      const getCookie = (name: string) => {
+        const value = `; ${document.cookie}`
+        const parts = value.split(`; ${name}=`)
+        if (parts.length === 2) return parts.pop()?.split(';').shift()
+        return null
+      }
+      const demoCookie = getCookie('aulaensuny-demo-session')
+      if (demoCookie) {
+        try {
+          const session = JSON.parse(decodeURIComponent(demoCookie))
+          if (session.first_name || session.last_name) {
+            defaultRector = `${session.first_name || ''} ${session.last_name || ''}`.trim()
+          }
+        } catch (e) {}
+      }
+
       if (storedSchool) {
-        try { setSchoolInfo(JSON.parse(storedSchool)) } catch(e){}
-      } else if (isDemoMode) {
+        try {
+          const parsed = JSON.parse(storedSchool)
+          if (!parsed.rector || parsed.rector === 'Dr. Fernando Restrepo') {
+            parsed.rector = defaultRector
+          }
+          setSchoolInfo(parsed)
+        } catch(e){}
+      } else {
         setSchoolInfo({
-          name: 'Colegio Campestre Ensuny',
+          name: 'Escuela Normal Superior del Nordeste',
           nit: '901.458.732-5',
-          rector: 'Dr. Fernando Restrepo',
+          rector: defaultRector,
           contactEmail: 'rectoria@ensuny.edu.co',
           contactPhone: '+57 (601) 456-7890',
           academicYear: '2026'

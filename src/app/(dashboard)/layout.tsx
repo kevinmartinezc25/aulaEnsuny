@@ -30,6 +30,7 @@ const ADMIN_NAV = [
       { name: 'Docentes', href: '/admin/teachers', icon: UserCog },
       { name: 'Estudiantes', href: '/admin/students', icon: GraduationCap },
       { name: 'Convivencia', href: '/admin/disciplinary', icon: ShieldAlert },
+      { name: 'Permisos Docentes', href: '/admin/permissions', icon: ClipboardList },
       { name: 'Evaluaciones', href: '/admin/evaluations', icon: ClipboardList },
       { name: 'Registro Académico', href: '/admin/academic-registry', icon: ClipboardList },
       { name: 'Reportes Académicos', href: '/admin/academic-reports', icon: BarChart2 },
@@ -77,28 +78,62 @@ function AdminSidebar({ onClose, user, enabledModules = [], isCollapsed = false 
   const pathname = usePathname()
   const router = useRouter()
   const [isProfileOpen, setIsProfileOpen] = useState(false)
+  const [pendingPermissionsCount, setPendingPermissionsCount] = useState<number>(0)
+
+  useEffect(() => {
+    async function loadPendingCount() {
+      try {
+        const { getPendingPermissionsCount } = await import('@/modules/permissions/application/adminActions')
+        const counts = await getPendingPermissionsCount()
+        if (user?.role === 'superadmin') {
+          // El Rector (SuperAdmin) revisa solicitudes en Etapa 1
+          const count = counts.rectorPending > 0 ? counts.rectorPending : counts.totalPending
+          setPendingPermissionsCount(count)
+        } else {
+          // Coordinación (Admin) gestiona cobertura y aprobación en Etapa 2
+          const count = counts.coordinatorPending > 0 ? counts.coordinatorPending : counts.totalPending
+          setPendingPermissionsCount(count)
+        }
+      } catch (e) {
+        console.warn('Error al consultar solicitudes pendientes:', e)
+      }
+    }
+
+    loadPendingCount()
+  }, [user?.role, pathname])
   
   const navItems = ADMIN_NAV.map(group => {
+    let items = group.items
+
     if (user?.role === 'superadmin') {
       if (group.section === 'Sistema') {
+        items = [
+          ...items,
+          { name: 'Gestión de Módulos', href: '/superadmin/modules', icon: ShieldCheck }
+        ]
+      }
+    } else {
+      items = items.filter(item => {
+        const key = item.href.split('/').pop()!
+        if (key === 'dashboard' || key === 'schedules' || item.href === '/admin/disciplinary' || item.href === '/admin/permissions') return true
+        return enabledModules.includes(key)
+      })
+    }
+
+    // Inyectar badge dinámico de solicitudes pendientes en Permisos Docentes
+    const mappedItems = items.map(item => {
+      if (item.href === '/admin/permissions' && pendingPermissionsCount > 0) {
         return {
-          ...group,
-          items: [
-            ...group.items,
-            { name: 'Gestión de Módulos', href: '/superadmin/modules', icon: ShieldCheck }
-          ]
+          ...item,
+          badge: pendingPermissionsCount
         }
       }
-      return group
-    }
+      return item
+    })
 
     return {
       ...group,
-      items: group.items.filter(item => {
-        const key = item.href.split('/').pop()!
-        if (key === 'dashboard' || key === 'schedules' || item.href === '/admin/disciplinary') return true
-        return enabledModules.includes(key)
-      })
+      items: mappedItems
     }
   }).filter(group => group.items.length > 0);
 
@@ -185,8 +220,8 @@ function AdminSidebar({ onClose, user, enabledModules = [], isCollapsed = false 
                             key={item.name}
                             href={item.href}
                             onClick={onClose}
-                            title={isCollapsed ? item.name : undefined}
-                            className={`group flex items-center rounded-xl transition-colors duration-150 ${
+                            title={isCollapsed ? `${item.name}${(item as any).badge ? ` (${(item as any).badge} pendientes)` : ''}` : undefined}
+                            className={`group flex items-center rounded-xl transition-colors duration-150 relative ${
                               isCollapsed ? 'justify-center p-3' : 'justify-between px-3 py-2.5'
                             } text-sm font-medium ${
                               isActive
@@ -198,12 +233,27 @@ function AdminSidebar({ onClose, user, enabledModules = [], isCollapsed = false 
                               <Icon className="h-4 w-4 shrink-0" />
                               {!isCollapsed && <span className="truncate">{item.name}</span>}
                             </span>
-                            {!isCollapsed && (item as any).badge && !isActive && (
-                              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 text-[10px] font-bold text-white">
+                            {!isCollapsed && (item as any).badge && (
+                              <span
+                                className={`flex h-5 min-w-[20px] px-1.5 items-center justify-center rounded-full text-[10px] font-bold shadow-xs ${
+                                  item.href === '/admin/permissions'
+                                    ? (isActive ? 'bg-rose-500 text-white font-extrabold' : 'bg-rose-500 text-white animate-pulse font-extrabold')
+                                    : (isActive ? 'bg-white text-slate-900' : 'bg-blue-500 text-white')
+                                }`}
+                              >
                                 {(item as any).badge}
                               </span>
                             )}
-                            {!isCollapsed && isActive && <ChevronRight className="h-3.5 w-3.5 opacity-60" />}
+                            {isCollapsed && (item as any).badge && (
+                              <span
+                                className={`absolute top-1.5 right-1.5 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full text-[9px] font-bold shadow-xs ${
+                                  item.href === '/admin/permissions' ? 'bg-rose-500 text-white' : 'bg-blue-500 text-white'
+                                }`}
+                              >
+                                {(item as any).badge}
+                              </span>
+                            )}
+                            {!isCollapsed && isActive && !(item as any).badge && <ChevronRight className="h-3.5 w-3.5 opacity-60" />}
                           </Link>
                         )
                       })}
@@ -336,6 +386,7 @@ function SidebarContent({ onClose, isCollapsed = false, user }: SidebarProps) {
       {
         label: 'Institucional',
         items: [
+          { name: 'Permisos', href: '/teacher/permissions', icon: ClipboardList },
           { name: 'Jurado Electoral', href: '/juror/elections', icon: ShieldCheck },
           { name: 'Documentación', href: '/teacher/docs', icon: FileText },
         ]

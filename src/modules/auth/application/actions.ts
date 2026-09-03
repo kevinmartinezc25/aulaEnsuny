@@ -30,13 +30,13 @@ export async function login(input: LoginInput) {
       role = 'admin'
     } else if (email === 'estudiante@colegio.edu') {
       role = 'student'
-    } else if (email === 'superadmin@colegio.edu' || email === 'admin@ensuny.edu.co') {
+    } else if (email === 'superadmin@colegio.edu' || email === 'admin@ensuny.edu.co' || email === 'superadmin_alt@ensuny.edu.co') {
       role = 'superadmin'
     } else {
-      return { error: 'Credenciales demo incorrectas. Prueba con admin@ensuny.edu.co o admin_pruebas@ensuny.edu.co' }
+      return { error: 'Credenciales demo incorrectas. Prueba con admin@ensuny.edu.co o superadmin_alt@ensuny.edu.co' }
     }
 
-    if (email === 'admin@ensuny.edu.co' || email === 'admin_pruebas@ensuny.edu.co') {
+    if (email === 'admin@ensuny.edu.co' || email === 'admin_pruebas@ensuny.edu.co' || email === 'superadmin_alt@ensuny.edu.co') {
       if (input.password !== 'Admin123!') {
         return { error: 'Contraseña incorrecta para Administrador.' }
       }
