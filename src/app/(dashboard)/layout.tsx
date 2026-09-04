@@ -5,12 +5,15 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   BookOpen, Calendar, Settings, Bell, Menu, X, ChevronDown, LogOut, Award, TrendingUp,
   PanelLeftClose, PanelLeftOpen, Moon, Sun, LayoutDashboard, Users, GraduationCap,
-  ClipboardList, BarChart2, BellRing, FolderOpen, ShieldCheck, ShieldAlert, UserCog, Activity, ChevronRight, FileText, CalendarDays, Download
+  ClipboardList, BarChart2, BellRing, FolderOpen, ShieldCheck, ShieldAlert, UserCog, Activity, ChevronRight, FileText, CalendarDays, Download,
+  Layers, FileCheck2, FileSpreadsheet, Vote, CalendarCheck, SlidersHorizontal, CheckSquare,
+  Building2
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { logout } from '@/modules/auth/application/actions'
 import { createClient } from '@/core/config/supabase/client'
+import { PendingPermissionsAlertModal } from '@/modules/permissions/presentation/components/PendingPermissionsAlertModal'
 
 // ─── Admin Sidebar (grouped sections) ──────────────────────────────────────────
 const ADMIN_NAV = [
@@ -23,29 +26,39 @@ const ADMIN_NAV = [
   {
     section: 'Gestión Académica',
     items: [
-      { name: 'Horarios', href: '/admin/schedules', icon: CalendarDays },
-      { name: 'Usuarios', href: '/admin/users', icon: Users },
-      { name: 'Grados', href: '/admin/grade-levels', icon: ClipboardList },
-      { name: 'Cursos', href: '/admin/courses', icon: BookOpen },
       { name: 'Docentes', href: '/admin/teachers', icon: UserCog },
       { name: 'Estudiantes', href: '/admin/students', icon: GraduationCap },
-      { name: 'Convivencia', href: '/admin/disciplinary', icon: ShieldAlert },
-      { name: 'Permisos Docentes', href: '/admin/permissions', icon: ClipboardList },
-      { name: 'Evaluaciones', href: '/admin/evaluations', icon: ClipboardList },
-      { name: 'Registro Académico', href: '/admin/academic-registry', icon: ClipboardList },
-      { name: 'Reportes Académicos', href: '/admin/academic-reports', icon: BarChart2 },
-      { name: 'Elecciones', href: '/admin/elections', icon: Award },
+      { name: 'Usuarios', href: '/admin/users', icon: Users },
+      { name: 'Grados y Niveles', href: '/admin/grade-levels', icon: Layers },
+      { name: 'Cursos y Materias', href: '/admin/courses', icon: BookOpen },
+      { name: 'Horarios', href: '/admin/schedules', icon: CalendarDays },
+      { name: 'Evaluaciones', href: '/admin/evaluations', icon: CheckSquare },
+      { name: 'Registro Académico', href: '/admin/academic-registry', icon: FileSpreadsheet },
     ],
   },
   {
-    section: 'Análisis',
+    section: 'Gestión Institucional',
     items: [
-      { name: 'Analíticas', href: '/admin/analytics', icon: BarChart2 },
+      { name: 'Permisos Docentes', href: '/admin/permissions', icon: FileCheck2 },
+      { name: 'Convivencia', href: '/admin/disciplinary', icon: ShieldAlert },
+      { name: 'Elecciones', href: '/admin/elections', icon: Vote },
+    ],
+  },
+  {
+    section: 'Planificación y Recursos',
+    items: [
+      { name: 'Agenda', href: '/admin/institutional-agenda', icon: CalendarCheck },
       { name: 'Calendario', href: '/admin/calendar', icon: Calendar },
-      { name: 'Agenda', href: '/admin/institutional-agenda', icon: ClipboardList },
-      { name: 'Notificaciones', href: '/admin/notifications', icon: BellRing, badge: 3 },
-      { name: 'Recursos', href: '/admin/resources', icon: FolderOpen },
+      { name: 'Notificaciones', href: '/admin/notifications', icon: BellRing },
       { name: 'Centro de Docs', href: '/admin/docs', icon: FileText },
+      { name: 'Recursos', href: '/admin/resources', icon: FolderOpen },
+    ],
+  },
+  {
+    section: 'Reportes y Analíticas',
+    items: [
+      { name: 'Analíticas', href: '/admin/analytics', icon: TrendingUp },
+      { name: 'Reportes Académicos', href: '/admin/academic-reports', icon: BarChart2 },
     ],
   },
   {
@@ -57,7 +70,16 @@ const ADMIN_NAV = [
   },
 ]
 
+const SECTION_ICONS: Record<string, any> = {
+  'Gestión Académica': GraduationCap,
+  'Gestión Institucional': Building2,
+  'Planificación y Recursos': CalendarDays,
+  'Reportes y Analíticas': BarChart2,
+  'Sistema': Settings,
+}
+
 interface UserSessionInfo {
+  id?: string
   name: string
   email: string
   role: string
@@ -78,29 +100,6 @@ function AdminSidebar({ onClose, user, enabledModules = [], isCollapsed = false 
   const pathname = usePathname()
   const router = useRouter()
   const [isProfileOpen, setIsProfileOpen] = useState(false)
-  const [pendingPermissionsCount, setPendingPermissionsCount] = useState<number>(0)
-
-  useEffect(() => {
-    async function loadPendingCount() {
-      try {
-        const { getPendingPermissionsCount } = await import('@/modules/permissions/application/adminActions')
-        const counts = await getPendingPermissionsCount()
-        if (user?.role === 'superadmin') {
-          // El Rector (SuperAdmin) revisa solicitudes en Etapa 1
-          const count = counts.rectorPending > 0 ? counts.rectorPending : counts.totalPending
-          setPendingPermissionsCount(count)
-        } else {
-          // Coordinación (Admin) gestiona cobertura y aprobación en Etapa 2
-          const count = counts.coordinatorPending > 0 ? counts.coordinatorPending : counts.totalPending
-          setPendingPermissionsCount(count)
-        }
-      } catch (e) {
-        console.warn('Error al consultar solicitudes pendientes:', e)
-      }
-    }
-
-    loadPendingCount()
-  }, [user?.role, pathname])
   
   const navItems = ADMIN_NAV.map(group => {
     let items = group.items
@@ -109,43 +108,55 @@ function AdminSidebar({ onClose, user, enabledModules = [], isCollapsed = false 
       if (group.section === 'Sistema') {
         items = [
           ...items,
-          { name: 'Gestión de Módulos', href: '/superadmin/modules', icon: ShieldCheck }
+          { name: 'Gestión de Módulos', href: '/superadmin/modules', icon: SlidersHorizontal }
         ]
       }
     } else {
       items = items.filter(item => {
         const key = item.href.split('/').pop()!
-        if (key === 'dashboard' || key === 'schedules' || item.href === '/admin/disciplinary' || item.href === '/admin/permissions') return true
+        if (key === 'dashboard') return true
         return enabledModules.includes(key)
       })
     }
 
-    // Inyectar badge dinámico de solicitudes pendientes en Permisos Docentes
-    const mappedItems = items.map(item => {
-      if (item.href === '/admin/permissions' && pendingPermissionsCount > 0) {
-        return {
-          ...item,
-          badge: pendingPermissionsCount
-        }
-      }
-      return item
-    })
-
     return {
       ...group,
-      items: mappedItems
+      items
     }
   }).filter(group => group.items.length > 0);
 
-  // Start all sections open
-  const [openSections, setOpenSections] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(navItems.map(g => [g.section, true]))
-  )
+  // Iniciar colapsados los grupos de submódulos; solo abrir el que contenga la ruta actual
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
+    const initial: Record<string, boolean> = {}
+    navItems.forEach(g => {
+      const hasActive = g.items.some(
+        item => pathname === item.href || pathname.startsWith(item.href + '/')
+      )
+      initial[g.section] = hasActive
+    })
+    return initial
+  })
+
+  // Sincronizar automáticamente si la ruta cambia a un módulo de otra sección
+  useEffect(() => {
+    navItems.forEach(g => {
+      const hasActive = g.items.some(
+        item => pathname === item.href || pathname.startsWith(item.href + '/')
+      )
+      if (hasActive) {
+        setOpenSections(prev => ({ ...prev, [g.section]: true }))
+      }
+    })
+  }, [pathname])
+
   const toggleSection = (section: string) =>
     setOpenSections(prev => ({ ...prev, [section]: !prev[section] }))
 
   const handleLogout = async () => {
     if (onClose) onClose()
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('pending_permissions_popup_dismissed')
+    }
 
     try {
       const result = await logout()
@@ -175,34 +186,83 @@ function AdminSidebar({ onClose, user, enabledModules = [], isCollapsed = false 
       </div>
 
       {/* Nav Sections */}
-      <nav className="flex-1 overflow-y-auto overflow-x-hidden py-4 px-3 space-y-2 custom-scrollbar">
+      <nav className="flex-1 overflow-y-auto overflow-x-hidden py-3 px-3 space-y-2 custom-scrollbar">
         {navItems.map((group) => {
-          const isOpen = openSections[group.section] ?? true
+          // Sección "Principal" (Dashboard): enlace directo sin acordeón
+          if (group.section === 'Principal') {
+            return (
+              <div key={group.section} className="space-y-1 pb-1">
+                {group.items.map(item => {
+                  const isActive = pathname === item.href || (item.href !== '/admin/dashboard' && pathname.startsWith(item.href + '/'))
+                  const Icon = item.icon
+                  return (
+                    <Link
+                      key={item.name}
+                      href={item.href}
+                      onClick={onClose}
+                      title={isCollapsed ? item.name : undefined}
+                      className={`group flex items-center rounded-xl transition-all duration-150 relative ${
+                        isCollapsed ? 'justify-center p-3' : 'justify-between px-3 py-2.5'
+                      } text-sm font-semibold ${
+                        isActive
+                          ? 'bg-blue-600 text-white shadow-xs'
+                          : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-white'
+                      }`}
+                    >
+                      <span className={`flex items-center gap-3 ${isCollapsed ? '' : 'truncate'}`}>
+                        <Icon className="h-4 w-4 shrink-0" />
+                        {!isCollapsed && <span className="truncate">{item.name}</span>}
+                      </span>
+                    </Link>
+                  )
+                })}
+              </div>
+            )
+          }
+
+          // Secciones de submódulos agrupados
+          const isOpen = openSections[group.section] ?? false
+          const hasActiveChild = group.items.some(
+            item => pathname === item.href || pathname.startsWith(item.href + '/')
+          )
+          const GroupIcon = SECTION_ICONS[group.section] || Layers
+
           return (
-            <div key={group.section}>
-              {/* Section Header — Clickable Toggle */}
+            <div key={group.section} className="rounded-2xl transition-all">
+              {/* Encabezado del Grupo (Botón Clicable para Desplegar/Plegar) */}
               <button
+                type="button"
                 onClick={() => !isCollapsed && toggleSection(group.section)}
-                className={`w-full flex items-center px-3 py-1.5 mb-0.5 rounded-lg transition-colors ${
-                  isCollapsed ? 'justify-center cursor-default' : 'justify-between hover:bg-slate-50 dark:hover:bg-slate-800/40 cursor-pointer group'
+                className={`w-full flex items-center rounded-xl transition-all duration-150 ${
+                  isCollapsed
+                    ? 'justify-center p-2.5 cursor-default'
+                    : 'justify-between px-3 py-2 cursor-pointer group select-none'
+                } ${
+                  hasActiveChild
+                    ? 'bg-blue-50/80 text-blue-900 dark:bg-blue-950/40 dark:text-blue-200 border border-blue-200/60 dark:border-blue-900/40'
+                    : 'text-slate-600 hover:bg-slate-100/80 dark:text-slate-400 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white'
                 }`}
                 title={isCollapsed ? group.section : undefined}
               >
-                {!isCollapsed ? (
-                  <>
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-600 group-hover:text-slate-500 dark:group-hover:text-slate-500 transition-colors">
+                <div className="flex items-center gap-2.5 truncate">
+                  <GroupIcon className={`h-4 w-4 shrink-0 ${hasActiveChild ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-700 dark:group-hover:text-slate-300'}`} />
+                  {!isCollapsed && (
+                    <span className="text-xs font-bold truncate tracking-tight">
                       {group.section}
                     </span>
-                    <ChevronDown className={`h-3 w-3 text-slate-300 dark:text-slate-700 transition-transform duration-200 ${isOpen ? 'rotate-0' : '-rotate-90'}`} />
-                  </>
-                ) : (
-                  <div className="w-4 border-t-2 border-slate-200 dark:border-slate-700 rounded my-2"></div>
+                  )}
+                </div>
+
+                {!isCollapsed && (
+                  <div className="flex items-center shrink-0">
+                    <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${isOpen ? 'rotate-0 text-slate-600 dark:text-slate-300' : '-rotate-90 text-slate-400 dark:text-slate-500'}`} />
+                  </div>
                 )}
               </button>
 
-              {/* Section Items */}
+              {/* Submódulos Desplegables */}
               <AnimatePresence initial={false}>
-                {isOpen && (
+                {(isOpen || isCollapsed) && (
                   <motion.div
                     key={group.section + '-items'}
                     initial={{ height: 0, opacity: 0 }}
@@ -211,7 +271,7 @@ function AdminSidebar({ onClose, user, enabledModules = [], isCollapsed = false 
                     transition={{ duration: 0.2, ease: 'easeInOut' }}
                     className="overflow-hidden"
                   >
-                    <div className="space-y-0.5 pb-2">
+                    <div className={`space-y-0.5 py-1 ${!isCollapsed ? 'ml-3.5 pl-2.5 border-l-2 border-slate-150 dark:border-slate-800/90' : ''}`}>
                       {group.items.map((item) => {
                         const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
                         const Icon = item.icon
@@ -220,40 +280,19 @@ function AdminSidebar({ onClose, user, enabledModules = [], isCollapsed = false 
                             key={item.name}
                             href={item.href}
                             onClick={onClose}
-                            title={isCollapsed ? `${item.name}${(item as any).badge ? ` (${(item as any).badge} pendientes)` : ''}` : undefined}
-                            className={`group flex items-center rounded-xl transition-colors duration-150 relative ${
-                              isCollapsed ? 'justify-center p-3' : 'justify-between px-3 py-2.5'
-                            } text-sm font-medium ${
+                            title={isCollapsed ? item.name : undefined}
+                            className={`group flex items-center rounded-xl transition-all duration-150 relative ${
+                              isCollapsed ? 'justify-center p-2.5 my-0.5' : 'justify-between px-2.5 py-2 my-0.5'
+                            } text-xs font-medium ${
                               isActive
-                                ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
-                                : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-white'
+                                ? 'bg-blue-600 text-white font-bold shadow-xs'
+                                : 'text-slate-600 hover:bg-slate-100/70 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-white'
                             }`}
                           >
-                            <span className={`flex items-center gap-3 ${isCollapsed ? '' : 'truncate'}`}>
-                              <Icon className="h-4 w-4 shrink-0" />
+                            <span className={`flex items-center gap-2.5 ${isCollapsed ? '' : 'truncate'}`}>
+                              <Icon className="h-3.5 w-3.5 shrink-0" />
                               {!isCollapsed && <span className="truncate">{item.name}</span>}
                             </span>
-                            {!isCollapsed && (item as any).badge && (
-                              <span
-                                className={`flex h-5 min-w-[20px] px-1.5 items-center justify-center rounded-full text-[10px] font-bold shadow-xs ${
-                                  item.href === '/admin/permissions'
-                                    ? (isActive ? 'bg-rose-500 text-white font-extrabold' : 'bg-rose-500 text-white animate-pulse font-extrabold')
-                                    : (isActive ? 'bg-white text-slate-900' : 'bg-blue-500 text-white')
-                                }`}
-                              >
-                                {(item as any).badge}
-                              </span>
-                            )}
-                            {isCollapsed && (item as any).badge && (
-                              <span
-                                className={`absolute top-1.5 right-1.5 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full text-[9px] font-bold shadow-xs ${
-                                  item.href === '/admin/permissions' ? 'bg-rose-500 text-white' : 'bg-blue-500 text-white'
-                                }`}
-                              >
-                                {(item as any).badge}
-                              </span>
-                            )}
-                            {!isCollapsed && isActive && !(item as any).badge && <ChevronRight className="h-3.5 w-3.5 opacity-60" />}
                           </Link>
                         )
                       })}
@@ -559,21 +598,117 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
   const [user, setUser] = useState<UserSessionInfo | null>(null)
   const [enabledModules, setEnabledModules] = useState<string[]>([])
+  const [pendingAlertModal, setPendingAlertModal] = useState<{ isOpen: boolean; count: number }>({
+    isOpen: false,
+    count: 0
+  })
 
   useEffect(() => {
     async function loadPermissions() {
       try {
-        const { getAdminModulePermissions } = await import('@/modules/admin/application/actions')
-        const permissions = await getAdminModulePermissions()
+        const { getUserModulePermissions } = await import('@/modules/admin/application/actions')
+        const adminUserId = user?.id || (user?.email ? (
+          user.email === 'convivencia@ensuny.edu.co' ? 'demo-admin-disc' :
+          user.email === 'secretaria@ensuny.edu.co' ? 'demo-admin-sec' :
+          user.email === 'admin_pruebas@ensuny.edu.co' ? 'demo-admin-coord' : undefined
+        ) : undefined)
+
+        // En modo cliente, verificar si hay permisos en localStorage
+        if (adminUserId && typeof window !== 'undefined') {
+          const localStored = localStorage.getItem(`aulaensuny-module-perms-${adminUserId}`) || localStorage.getItem('aulaensuny-module-perms-global')
+          if (localStored) {
+            try {
+              const parsed = JSON.parse(localStored)
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                setEnabledModules(parsed.filter((p: any) => p.is_enabled).map((p: any) => p.module_key))
+                return
+              }
+            } catch (e) {}
+          }
+        }
+
+        const permissions = await getUserModulePermissions(adminUserId)
         if (permissions && permissions.length > 0) {
           setEnabledModules(permissions.filter(p => p.is_enabled).map(p => p.module_key))
         }
       } catch (e) {
-        console.error(e)
+        console.error('Error al cargar permisos dinámicos en layout:', e)
       }
     }
-    loadPermissions()
-  }, [pathname])
+
+    if (user?.role === 'admin') {
+      loadPermissions()
+    } else if (user?.role === 'superadmin') {
+      // SuperAdmin siempre tiene todos los módulos habilitados
+      setEnabledModules([])
+    }
+
+    const handlePermsUpdated = () => {
+      loadPermissions()
+    }
+    window.addEventListener('module-permissions-updated', handlePermsUpdated)
+    return () => window.removeEventListener('module-permissions-updated', handlePermsUpdated)
+  }, [user, pathname])
+
+  // Notificación Pop-up de permisos pendientes para SuperAdmin o Admin (con módulo de permisos) al ingresar
+  useEffect(() => {
+    async function checkPendingPermissionsAlert() {
+      if (!user) return
+      if (user.role !== 'superadmin' && user.role !== 'admin') return
+
+      // Si es Admin, validar que tenga habilitado el módulo de permisos
+      if (user.role === 'admin') {
+        const hasPermsModule = enabledModules.length === 0 || enabledModules.includes('permissions')
+        if (!hasPermsModule) return
+      }
+
+      // Si el usuario ya está en la vista de permisos, no mostrar el pop-up
+      if (pathname.startsWith('/admin/permissions')) return
+
+      // Verificar si ya fue cerrado o atendido durante la sesión actual
+      if (typeof window !== 'undefined') {
+        const isDismissed = sessionStorage.getItem('pending_permissions_popup_dismissed') === 'true'
+        if (isDismissed) return
+      }
+
+      try {
+        const { getPendingPermissionsCount } = await import('@/modules/permissions/application/adminActions')
+        const counts = await getPendingPermissionsCount()
+
+        let pendingCount = 0
+        if (user.role === 'superadmin') {
+          // Rectoría: solicitudes radicadas pendientes de su decisión institucional
+          pendingCount = counts.rectorPending > 0 ? counts.rectorPending : counts.totalPending
+        } else {
+          // Coordinación: solicitudes en trámite o cobertura
+          pendingCount = counts.coordinatorPending > 0 ? counts.coordinatorPending : counts.totalPending
+        }
+
+        if (pendingCount > 0) {
+          setPendingAlertModal({ isOpen: true, count: pendingCount })
+        }
+      } catch (err) {
+        console.warn('Error al verificar alertas de permisos pendientes:', err)
+      }
+    }
+
+    checkPendingPermissionsAlert()
+  }, [user, enabledModules, pathname])
+
+  const handleReviewPermissions = () => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('pending_permissions_popup_dismissed', 'true')
+    }
+    setPendingAlertModal({ isOpen: false, count: 0 })
+    router.push('/admin/permissions')
+  }
+
+  const handleClosePermissionsAlert = () => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('pending_permissions_popup_dismissed', 'true')
+    }
+    setPendingAlertModal({ isOpen: false, count: 0 })
+  }
 
   const [notifications, setNotifications] = useState<any[]>([])
 
@@ -636,7 +771,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         if (demoCookie) {
           try {
             const session = JSON.parse(decodeURIComponent(demoCookie))
+            const demoId = session.id || (
+              session.email === 'convivencia@ensuny.edu.co' ? 'demo-admin-disc' :
+              session.email === 'secretaria@ensuny.edu.co' ? 'demo-admin-sec' :
+              session.email === 'admin_pruebas@ensuny.edu.co' ? 'demo-admin-coord' : 'demo-admin-coord'
+            )
             setUser({
+              id: demoId,
               name: `${session.first_name} ${session.last_name}`,
               email: session.email || '',
               role: session.role || 'student',
@@ -663,6 +804,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
           if (profile) {
             setUser({
+              id: authUser.id,
               name: `${profile.first_name} ${profile.last_name}`,
               email: authUser.email || '',
               role: profile.roles?.name || 'student',
@@ -671,6 +813,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             })
           } else {
             setUser({
+              id: authUser.id,
               name: `${authUser.user_metadata?.first_name || 'Usuario'} ${authUser.user_metadata?.last_name || ''}`,
               email: authUser.email || '',
               role: authUser.user_metadata?.role_name || 'student',
@@ -1035,6 +1178,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </>
         )}
       </AnimatePresence>
+      {/* Pop-up de Alerta de Nuevas Solicitudes Pendientes para SuperAdmin y Admin autorizados */}
+      <PendingPermissionsAlertModal
+        isOpen={pendingAlertModal.isOpen}
+        count={pendingAlertModal.count}
+        role={(user?.role === 'superadmin' ? 'superadmin' : 'admin')}
+        onClose={handleClosePermissionsAlert}
+        onReview={handleReviewPermissions}
+      />
     </div>
   )
 }

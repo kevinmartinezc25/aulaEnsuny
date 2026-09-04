@@ -66,6 +66,9 @@ export function LoginScreen() {
       }
 
       if (response?.success && response.redirectTo) {
+        if (typeof window !== 'undefined') {
+          sessionStorage.removeItem('pending_permissions_popup_dismissed')
+        }
         router.push(response.redirectTo)
         return
       }
