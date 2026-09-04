@@ -48,7 +48,12 @@ export async function updateSession(request: NextRequest) {
   const isAuthCallback = pathname.startsWith('/auth/callback')
   const isRecoveryReset = pathname.startsWith('/recovery/reset')
   const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/register') || (pathname.startsWith('/recovery') && !isRecoveryReset)
-  const isPublicFile = pathname.match(/\.(png|jpg|jpeg|gif|svg|ico|css|js)$/)
+  const isPwaResource = pathname === '/manifest.webmanifest' ||
+                        pathname === '/manifest.json' ||
+                        pathname === '/sw.js' ||
+                        pathname === '/offline' ||
+                        pathname.startsWith('/icons/')
+  const isPublicFile = pathname.match(/\.(png|jpg|jpeg|gif|svg|ico|css|js|webmanifest|json)$/) || isPwaResource
   const isPublicDocs = pathname.startsWith('/docs')
   const isLandingPage = pathname === '/'
 
@@ -57,7 +62,7 @@ export async function updateSession(request: NextRequest) {
     const session = demoSessionCookie ? JSON.parse(demoSessionCookie.value) : null
 
     // 1. Caso: Invitado intentando entrar a ruta protegida
-    if (!session && !isAuthPage && !isRecoveryReset && !isAuthCallback && !isPublicFile && !isPublicDocs && !isLandingPage) {
+    if (!session && !isAuthPage && !isRecoveryReset && !isAuthCallback && !isPublicFile && !isPublicDocs && !isLandingPage && !isPwaResource) {
       const url = request.nextUrl.clone()
       url.pathname = '/login'
       return NextResponse.redirect(url)
@@ -133,7 +138,7 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   // 1. Caso: Usuario no autenticado
-  if (!user && !isAuthPage && !isAuthCallback && !isPublicFile && !isPublicDocs && !isLandingPage) {
+  if (!user && !isAuthPage && !isRecoveryReset && !isAuthCallback && !isPublicFile && !isPublicDocs && !isLandingPage && !isPwaResource) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
