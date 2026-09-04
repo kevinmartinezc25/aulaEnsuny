@@ -16,14 +16,14 @@ const mockKpis = [
   { title: 'Promedio Académico', value: '4.1', change: '↑ vs período anterior', icon: TrendingUp, color: 'text-teal-600', bg: 'bg-teal-50 dark:bg-teal-950/30' },
 ]
 
-const mockActivityData = [
-  { day: 'Lun', accesos: 420 },
-  { day: 'Mar', accesos: 560 },
-  { day: 'Mié', accesos: 490 },
-  { day: 'Jue', accesos: 610 },
-  { day: 'Vie', accesos: 580 },
-  { day: 'Sáb', accesos: 130 },
-  { day: 'Dom', accesos: 85 },
+const defaultEmptyActivityData = [
+  { day: 'Lun', accesos: 0 },
+  { day: 'Mar', accesos: 0 },
+  { day: 'Mié', accesos: 0 },
+  { day: 'Jue', accesos: 0 },
+  { day: 'Vie', accesos: 0 },
+  { day: 'Sáb', accesos: 0 },
+  { day: 'Dom', accesos: 0 },
 ]
 
 const mockPerformanceData = [
@@ -55,7 +55,7 @@ export function AdminDashboardScreen() {
   const [isDemoData, setIsDemoData] = useState(false)
   const [loading, setLoading] = useState(true)
   const [kpiData, setKpiData] = useState<any[]>(mockKpis)
-  const [accessData, setAccessData] = useState<any[]>(mockActivityData)
+  const [accessData, setAccessData] = useState<any[]>(defaultEmptyActivityData)
   const [perfData, setPerfData] = useState<any[]>(mockPerformanceData)
   const [riskStudents, setRiskStudents] = useState<any[]>(mockAtRiskStudents)
   const [activeCoursesList, setActiveCoursesList] = useState<any[]>(mockTopCourses)
@@ -191,24 +191,19 @@ export function AdminDashboardScreen() {
           ]
           setKpiData(updatedKpis)
 
-          // Use realistic access logs for week chart
-          const generatedAccessData = [
-            { day: 'Lun', accesos: 420 },
-            { day: 'Mar', accesos: 560 },
-            { day: 'Mié', accesos: 490 },
-            { day: 'Jue', accesos: 610 },
-            { day: 'Vie', accesos: 580 },
-            { day: 'Sáb', accesos: 130 },
-            { day: 'Dom', accesos: 85 }
-          ]
-          setAccessData(generatedAccessData)
+          // Asignar actividad real consultada en el servidor (sin mock de accesos)
+          if (stats.accessData && stats.accessData.length > 0) {
+            setAccessData(stats.accessData)
+          } else {
+            setAccessData(defaultEmptyActivityData)
+          }
           setPerfData(stats.performanceData)
           setRiskStudents(stats.atRiskStudents)
           setActiveCoursesList(stats.topCourses)
         } else {
           setIsDemoData(true)
           setKpiData(mockKpis)
-          setAccessData(mockActivityData)
+          setAccessData(defaultEmptyActivityData)
           setPerfData(mockPerformanceData)
           setRiskStudents(mockAtRiskStudents)
           setActiveCoursesList(mockTopCourses)
@@ -301,7 +296,7 @@ export function AdminDashboardScreen() {
           {rectorName && (
             <div className="mt-2.5 flex items-center gap-2">
               <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                Rector institucional:
+                Responsable:
               </span>
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-800/80 shadow-2xs">
                 <UserCheck className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
@@ -356,10 +351,11 @@ export function AdminDashboardScreen() {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h2 className="text-base font-bold text-slate-900 dark:text-white">Actividad de la Plataforma</h2>
-              <p className="text-xs text-slate-400 mt-0.5">Accesos estimados por día de la semana</p>
+              <p className="text-xs text-slate-400 mt-0.5">Accesos e interacciones registradas por día de la semana</p>
             </div>
-            <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-              <ArrowUpRight className="h-3.5 w-3.5" /> En tiempo real
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-2.5 py-1 rounded-full border border-blue-200/60 dark:border-blue-900/40">
+              <Activity className="h-3.5 w-3.5" />
+              <span>{accessData.reduce((sum, d) => sum + (d.accesos || 0), 0)} eventos registrados</span>
             </div>
           </div>
           <div className="h-52">
@@ -367,9 +363,10 @@ export function AdminDashboardScreen() {
               <BarChart data={accessData} margin={{ top: 0, right: 0, left: -24, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" className="dark:stroke-slate-800" />
                 <XAxis dataKey="day" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
-                <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} allowDecimals={false} />
                 <Tooltip
                   cursor={{ fill: 'rgba(0,0,0,0.04)' }}
+                  formatter={(val: any) => [`${val} accesos/eventos`, 'Actividad']}
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', fontSize: '12px' }}
                 />
                 <Bar dataKey="accesos" fill="#3b82f6" radius={[6, 6, 0, 0]} />

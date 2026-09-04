@@ -49,15 +49,14 @@ export async function getPermissionsReportMetrics(): Promise<PermissionReportMet
     const typeCountMap: Record<string, number> = {}
     const teacherMap: Record<string, { name: string; email: string; count: number; hours: number }> = {}
 
-    // Meses (últimos 6 meses)
+    // Meses (últimos 6 meses calculados dinámicamente en ceros)
     const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
-    const monthlyMap: Record<string, { total: number; approved: number; rejected: number }> = {
-      'Abr': { total: 3, approved: 3, rejected: 0 },
-      'May': { total: 5, approved: 4, rejected: 1 },
-      'Jun': { total: 4, approved: 4, rejected: 0 },
-      'Jul': { total: 2, approved: 2, rejected: 0 },
-      'Ago': { total: 6, approved: 5, rejected: 1 },
-      'Sep': { total: 1, approved: 1, rejected: 0 },
+    const now = new Date()
+    const monthlyMap: Record<string, { total: number; approved: number; rejected: number }> = {}
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      const mName = monthNames[d.getMonth()]
+      monthlyMap[mName] = { total: 0, approved: 0, rejected: 0 }
     }
 
     requests.forEach(r => {

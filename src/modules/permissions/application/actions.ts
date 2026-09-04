@@ -15,130 +15,8 @@ import {
 import { CreatePermissionRequestInput, createPermissionRequestSchema } from '../domain/validation'
 import { PermissionNotificationService } from '../infrastructure/PermissionNotificationService'
 
-// Memoria estática para soporte en modo demo / fallback
-let fallbackPermissions: PermissionRequest[] = [
-  {
-    id: 'perm-demo-1',
-    requestNumber: 'PER-2026-0001',
-    teacherId: 'demo-user-id',
-    teacherSnapshot: {
-      id: 'demo-user-id',
-      fullName: 'Prof. Alejandro Gómez',
-      email: 'docente@colegio.edu',
-      document: '1098765432',
-      role: 'Docente',
-      campus: 'Sede Principal',
-      mainSubject: 'Física y Matemáticas',
-      phone: '312 456 7890'
-    },
-    typeId: 'cita-med-2',
-    typeSnapshot: {
-      code: 'CITA_MEDICA',
-      name: 'Cita médica',
-      requiresAttachment: true,
-      affectsClasses: true,
-    },
-    startDate: '2026-09-08',
-    endDate: '2026-09-08',
-    isFullDay: false,
-    startTime: '08:00',
-    endTime: '12:00',
-    reason: 'Cita con especialista de cardiología programada en EPS Sura, sede centro.',
-    attachmentUrl: null,
-    attachmentName: 'cita_medica_sura.pdf',
-    attachmentType: 'pdf',
-    affectsAcademicDuty: true,
-    academicImpact: [
-      {
-        id: 'imp-1',
-        date: '2026-09-08',
-        courseName: 'Física I - Grado 10°-1',
-        gradeGroup: '10°-1',
-        subject: 'Física',
-        hoursCount: 2,
-        startTime: '08:00',
-        endTime: '09:40'
-      },
-      {
-        id: 'imp-2',
-        date: '2026-09-08',
-        courseName: 'Matemáticas - Grado 9°-2',
-        gradeGroup: '9°-2',
-        subject: 'Matemáticas',
-        hoursCount: 2,
-        startTime: '10:00',
-        endTime: '11:40'
-      }
-    ],
-    leavesStudentActivities: true,
-    studentActivities: [
-      {
-        id: 'act-1',
-        groupName: '10°-1',
-        title: 'Taller de Cinemática y Leyes de Newton',
-        instructions: 'Resolver la guía práctica entregada en fotocopia y subir el reporte al foro de la asignatura.',
-        resourceLinks: []
-      }
-    ],
-    coveragePlan: [
-      {
-        academicItemIndex: 0,
-        groupName: '10°-1',
-        subject: 'Física',
-        periodOrTime: '1ª y 2ª hora',
-        substituteTeacherName: 'Carlos Pérez',
-        observations: 'Acompañamiento en resolución del taller'
-      }
-    ],
-    status: 'approved',
-    rectorId: 'rector-1',
-    rectorName: 'Rectoría Institucional',
-    rectorApprovalDate: '2026-09-03T10:30:00Z',
-    rectorNotes: 'Solicitud aprobada con base en la justificación y soporte médico adjunto.',
-    coordinatorId: 'coord-1',
-    coordinatorName: 'Coordinación Académica',
-    coordinatorApprovalDate: '2026-09-03T11:45:00Z',
-    coordinatorNotes: 'Cobertura asignada con el Prof. Carlos Pérez.',
-    verificationCode: 'a8f4c2e917d0b31e987c2b4e',
-    createdAt: '2026-09-02T08:15:00Z',
-    updatedAt: '2026-09-03T11:45:00Z',
-    history: [
-      {
-        id: 'h-1',
-        requestId: 'perm-demo-1',
-        changedBy: 'demo-user-id',
-        changedByName: 'Prof. Alejandro Gómez',
-        action: 'submitted',
-        fromStatus: null,
-        toStatus: 'submitted',
-        notes: 'Solicitud radicada por el docente',
-        createdAt: '2026-09-02T08:15:00Z'
-      },
-      {
-        id: 'h-2',
-        requestId: 'perm-demo-1',
-        changedBy: 'rector-1',
-        changedByName: 'Rectoría Institucional',
-        action: 'rector_approved',
-        fromStatus: 'submitted',
-        toStatus: 'approved_rector',
-        notes: 'Aprobado por Rectoría, remitido a Coordinación Académica',
-        createdAt: '2026-09-03T10:30:00Z'
-      },
-      {
-        id: 'h-3',
-        requestId: 'perm-demo-1',
-        changedBy: 'coord-1',
-        changedByName: 'Coordinación Académica',
-        action: 'coord_approved',
-        fromStatus: 'approved_rector',
-        toStatus: 'approved',
-        notes: 'Cobertura verificada y permiso aprobado definitivamente',
-        createdAt: '2026-09-03T11:45:00Z'
-      }
-    ]
-  }
-]
+// Memoria estática para soporte de sesión en modo demo / offline (inicia vacía para mostrar únicamente solicitudes reales)
+let fallbackPermissions: PermissionRequest[] = []
 
 export async function getAllFallbackPermissions(): Promise<PermissionRequest[]> {
   return fallbackPermissions
@@ -388,7 +266,7 @@ export async function getTeacherPermissions(statusFilter?: string): Promise<{
         approved: fallbackPermissions.filter(r => r.status === 'approved').length,
         rejected: fallbackPermissions.filter(r => r.status === 'rejected').length,
         returned: fallbackPermissions.filter(r => r.status === 'returned_correction').length,
-        totalHoursAffected: 4
+        totalHoursAffected: 0
       }
     }
   }
