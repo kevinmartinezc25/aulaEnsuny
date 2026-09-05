@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient, createAdminClient } from '@/core/config/supabase/server'
+import { cookies } from 'next/headers'
 import { revalidatePath } from 'next/cache'
 import { randomUUID } from 'crypto'
 import {
@@ -16,7 +17,7 @@ import { CreatePermissionRequestInput, createPermissionRequestSchema } from '../
 import { PermissionNotificationService } from '../infrastructure/PermissionNotificationService'
 
 // Memoria estática para soporte de sesión en modo demo / offline (inicia vacía para mostrar únicamente solicitudes reales)
-let fallbackPermissions: PermissionRequest[] = []
+const fallbackPermissions: PermissionRequest[] = []
 
 export async function getAllFallbackPermissions(): Promise<PermissionRequest[]> {
   return fallbackPermissions
@@ -31,6 +32,29 @@ export async function getAllFallbackPermissions(): Promise<PermissionRequest[]> 
  */
 export async function getTeacherPermissionProfile(): Promise<TeacherSnapshot> {
   try {
+    // 1. Verificar si hay sesión demo en la cookie (donde TeacherSettingsScreen guarda los cambios)
+    const cookieStore = await cookies()
+    const demoCookie = cookieStore.get('aulaensuny-demo-session')?.value
+    if (demoCookie) {
+      try {
+        const session = JSON.parse(decodeURIComponent(demoCookie))
+        if (session) {
+          return {
+            id: session.id || 'demo-user-id',
+            fullName: `${session.first_name || ''} ${session.last_name || ''}`.trim() || session.name || 'Prof. Alejandro Gómez',
+            email: session.email || 'docente@colegio.edu',
+            document: session.document_id || session.document || null,
+            role: session.role === 'teacher' ? 'Docente de Aula' : session.role || 'Docente',
+            campus: session.campus || 'Sede Principal',
+            mainSubject: session.main_subject || session.bio || 'Física y Matemáticas',
+            phone: session.phone || '312 456 7890'
+          }
+        }
+      } catch (e) {
+        console.error('Error parseando demo-session cookie en permisos:', e)
+      }
+    }
+
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -40,7 +64,7 @@ export async function getTeacherPermissionProfile(): Promise<TeacherSnapshot> {
         id: 'demo-user-id',
         fullName: 'Prof. Alejandro Gómez',
         email: 'docente@colegio.edu',
-        document: '1098765432',
+        document: null,
         role: 'Docente',
         campus: 'Sede Principal',
         mainSubject: 'Física y Matemáticas',
@@ -58,10 +82,10 @@ export async function getTeacherPermissionProfile(): Promise<TeacherSnapshot> {
       id: user.id,
       fullName: profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() : user.user_metadata?.first_name ? `${user.user_metadata.first_name} ${user.user_metadata.last_name || ''}`.trim() : user.email || 'Docente',
       email: user.email || profile?.email || '',
-      document: profile?.document_id || user.user_metadata?.document || null,
-      role: profile?.roles?.name || user.user_metadata?.role_name || 'Docente',
-      campus: profile?.campus || 'Sede Principal',
-      mainSubject: profile?.bio || profile?.grade_level || 'Asignaturas Varias',
+      document: profile?.document_id || user.user_metadata?.document_id || user.user_metadata?.document || null,
+      role: profile?.roles?.name || user.user_metadata?.role_name || user.user_metadata?.role || 'Docente',
+      campus: profile?.campus || user.user_metadata?.campus || 'Sede Principal',
+      mainSubject: profile?.bio || profile?.grade_level || user.user_metadata?.bio || 'Asignaturas Varias',
       phone: profile?.phone || user.user_metadata?.phone || null,
     }
   } catch (error) {
@@ -70,7 +94,7 @@ export async function getTeacherPermissionProfile(): Promise<TeacherSnapshot> {
       id: 'demo-user-id',
       fullName: 'Prof. Alejandro Gómez',
       email: 'docente@colegio.edu',
-      document: '1098765432',
+      document: null,
       role: 'Docente',
       campus: 'Sede Principal',
       mainSubject: 'Física y Matemáticas',
@@ -529,9 +553,10 @@ export async function createPermissionRequest(
     revalidatePath('/teacher/permissions')
     revalidatePath('/admin/permissions')
     return { success: true, requestNumber, id }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Error en createPermissionRequest:', err)
-    return { success: false, error: err.message || 'Error al radicar solicitud.' }
+    const message = err instanceof Error ? err.message : 'Error al radicar solicitud.'
+    return { success: false, error: message }
   }
 }
 
@@ -594,8 +619,9 @@ export async function cancelPermissionRequest(id: string): Promise<{ success: bo
     revalidatePath('/teacher/permissions')
     revalidatePath(`/teacher/permissions/${id}`)
     return { success: true }
-  } catch (error: any) {
-    return { success: false, error: error.message || 'Error al cancelar la solicitud.' }
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Error al cancelar la solicitud.'
+    return { success: false, error: message }
   }
 }
 
@@ -670,7 +696,7 @@ export async function submitPermissionPostSupport(
     // Notificar a Rectoría
     try {
       await PermissionNotificationService.notifyNewRequestSubmitted(
-        found || ({ requestNumber: 'Permiso', teacherSnapshot: teacher } as any)
+        found || ({ requestNumber: 'Permiso', teacherSnapshot: teacher } as unknown as PermissionRequest)
       )
     } catch {
       // Notificación silenciosa
@@ -682,9 +708,10 @@ export async function submitPermissionPostSupport(
     revalidatePath(`/admin/permissions/${requestId}`)
 
     return { success: true }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error al radicar soporte post-permiso:', error)
-    return { success: false, error: error.message || 'Error al adjuntar el soporte.' }
+    const message = error instanceof Error ? error.message : 'Error al adjuntar el soporte.'
+    return { success: false, error: message }
   }
 }
 
@@ -737,7 +764,7 @@ export async function submitDraftPermission(id: string): Promise<{ success: bool
 
     try {
       await PermissionNotificationService.notifyNewRequestSubmitted(
-        found || ({ requestNumber: 'Permiso', teacherSnapshot: teacher } as any)
+        found || ({ requestNumber: 'Permiso', teacherSnapshot: teacher } as unknown as PermissionRequest)
       )
     } catch {
       // Notificación silenciosa
@@ -747,8 +774,9 @@ export async function submitDraftPermission(id: string): Promise<{ success: bool
     revalidatePath(`/teacher/permissions/${id}`)
     revalidatePath('/admin/permissions')
     return { success: true }
-  } catch (error: any) {
-    return { success: false, error: error.message || 'Error al radicar el borrador.' }
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Error al radicar el borrador.'
+    return { success: false, error: message }
   }
 }
 
@@ -782,7 +810,8 @@ export async function deleteDraftPermission(id: string): Promise<{ success: bool
     revalidatePath('/teacher/permissions')
     revalidatePath(`/teacher/permissions/${id}`)
     return { success: true }
-  } catch (error: any) {
-    return { success: false, error: error.message || 'Error al eliminar el borrador.' }
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Error al eliminar el borrador.'
+    return { success: false, error: message }
   }
 }

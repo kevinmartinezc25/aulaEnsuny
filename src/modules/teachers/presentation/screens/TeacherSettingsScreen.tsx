@@ -9,7 +9,13 @@ export function TeacherSettingsScreen() {
   const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'notifications' | 'appearance'>('profile')
   const [isSaving, setIsSaving] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
-  const [theme, setThemeState] = useState<'light' | 'dark' | 'system'>('system')
+  const [theme, setThemeState] = useState<'light' | 'dark' | 'system'>(() => {
+    if (typeof window !== 'undefined') {
+      const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | 'system' | null
+      return savedTheme || 'system'
+    }
+    return 'system'
+  })
   
   // Custom states for security & notifications
   const [userId, setUserId] = useState('')
@@ -28,22 +34,22 @@ export function TeacherSettingsScreen() {
   })
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | 'system' | null
-      setThemeState(savedTheme || 'system')
-    }
-  }, [])
-
-  useEffect(() => {
+    let active = true
     if (typeof window !== 'undefined' && userId) {
-      const savedPrefs = localStorage.getItem(`notifications_preferences_${userId}`)
-      if (savedPrefs) {
-        try {
-          setNotifPreferences(JSON.parse(savedPrefs))
-        } catch (e) {
-          console.error(e)
+      Promise.resolve().then(() => {
+        if (!active) return
+        const savedPrefs = localStorage.getItem(`notifications_preferences_${userId}`)
+        if (savedPrefs) {
+          try {
+            setNotifPreferences(JSON.parse(savedPrefs))
+          } catch (e) {
+            console.error(e)
+          }
         }
-      }
+      })
+    }
+    return () => {
+      active = false
     }
   }, [userId])
 
@@ -116,8 +122,8 @@ export function TeacherSettingsScreen() {
         setConfirmPassword('')
         setTimeout(() => setPasswordSuccess(false), 3000)
       }
-    } catch (err: any) {
-      setPasswordError(err?.message || 'Error al actualizar contraseña.')
+    } catch (err: unknown) {
+      setPasswordError(err instanceof Error ? err.message : 'Error al actualizar contraseña.')
     } finally {
       setIsUpdatingPassword(false)
     }
@@ -254,33 +260,34 @@ export function TeacherSettingsScreen() {
       }
 
       const demoCookie = getCookie('aulaensuny-demo-session')
+      let sessionData: Record<string, unknown> = {
+        id: 'demo-user-id',
+        email: email || 'docente@colegio.edu',
+        role: 'teacher'
+      }
       if (demoCookie) {
         try {
-          const session = JSON.parse(decodeURIComponent(demoCookie))
-          const updated = {
-            ...session,
-            first_name: firstName,
-            last_name: lastName,
-            document_id: documentId,
-            bio: bio,
-            avatar_url: avatarUrl
-          }
-          document.cookie = `aulaensuny-demo-session=${encodeURIComponent(JSON.stringify(updated))}; path=/; max-age=${60 * 60 * 24}`
-          
-          setIsSaving(false)
-          setShowSuccess(true)
-          setTimeout(() => {
-            setShowSuccess(false)
-            window.location.reload()
-          }, 1000)
-          return
+          sessionData = JSON.parse(decodeURIComponent(demoCookie))
         } catch (e) {
           console.error(e)
-          setIsSaving(false)
-          return
         }
       }
+      const updated = {
+        ...sessionData,
+        first_name: firstName,
+        last_name: lastName,
+        document_id: documentId,
+        bio: bio,
+        avatar_url: avatarUrl
+      }
+      document.cookie = `aulaensuny-demo-session=${encodeURIComponent(JSON.stringify(updated))}; path=/; max-age=${60 * 60 * 24}`
+      
       setIsSaving(false)
+      setShowSuccess(true)
+      setTimeout(() => {
+        setShowSuccess(false)
+        window.location.reload()
+      }, 1000)
       return
     }
 

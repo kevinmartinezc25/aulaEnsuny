@@ -1,13 +1,12 @@
 'use client'
 
-import React, { useState, useEffect, useMemo } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import React, { useState, useMemo } from 'react'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   User,
   Calendar,
-  Clock,
   FileText,
   Upload,
   GraduationCap,
@@ -17,8 +16,6 @@ import {
   ArrowLeft,
   Save,
   Send,
-  HelpCircle,
-  Paperclip,
   Check,
   AlertCircle,
   X,
@@ -43,6 +40,7 @@ interface Props {
 
 export function PermissionWizardForm({ teacher, availableTypes, availableCourses }: Props) {
   const router = useRouter()
+  const shouldReduceMotion = useReducedMotion()
   const [currentStep, setCurrentStep] = useState(1)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -74,13 +72,9 @@ export function PermissionWizardForm({ teacher, availableTypes, availableCourses
   const [activityInstructions, setActivityInstructions] = useState('')
   const [activitiesList, setActivitiesList] = useState<StudentActivityPlan[]>([])
 
-  const selectedType = availableTypes.find(t => t.id === selectedTypeId) || availableTypes[0]
-
-  useEffect(() => {
-    if (isSingleDay) {
-      setEndDate(startDate)
-    }
-  }, [startDate, isSingleDay])
+  // Tipo activo garantizado en todo momento
+  const activeTypeId = selectedTypeId || availableTypes[0]?.id || ''
+  const selectedType = availableTypes.find(t => t.id === activeTypeId) || availableTypes[0]
 
   const daysInAdvance = useMemo(() => {
     if (!startDate) return 0
@@ -117,18 +111,18 @@ export function PermissionWizardForm({ teacher, availableTypes, availableCourses
   }
 
   const steps = [
-    { num: 1, label: 'Docente', icon: User },
-    { num: 2, label: 'Tipo', icon: FileText },
-    { num: 3, label: 'Fechas', icon: Calendar },
-    { num: 4, label: 'Motivo y Soporte', icon: Upload },
-    { num: 5, label: 'Impacto Académico', icon: GraduationCap },
-    { num: 6, label: 'Plan de Actividades', icon: BookOpen },
-    { num: 7, label: 'Resumen y Envío', icon: CheckCircle2 },
+    { num: 1, label: 'Docente', desc: 'Identificación institucional', icon: User },
+    { num: 2, label: 'Tipo', desc: 'Selección reglamentaria', icon: FileText },
+    { num: 3, label: 'Fechas y Horario', desc: 'Vigencia y jornada', icon: Calendar },
+    { num: 4, label: 'Motivo y Soporte', desc: 'Justificación documental', icon: Upload },
+    { num: 5, label: 'Impacto Académico', desc: 'Cursos y horas asignadas', icon: GraduationCap },
+    { num: 6, label: 'Plan de Actividades', desc: 'Contingencia pedagógica', icon: BookOpen },
+    { num: 7, label: 'Resumen y Envío', desc: 'Verificación final y radicado', icon: CheckCircle2 },
   ]
 
   const handleNext = () => {
     // Validaciones por paso
-    if (currentStep === 2 && !selectedTypeId) {
+    if (currentStep === 2 && !activeTypeId) {
       toast.error('Debe seleccionar un tipo de permiso institucional')
       return
     }
@@ -218,9 +212,9 @@ export function PermissionWizardForm({ teacher, availableTypes, availableCourses
         : []
 
       const res = await createPermissionRequest({
-        typeId: selectedTypeId,
+        typeId: activeTypeId,
         startDate,
-        endDate,
+        endDate: isSingleDay ? startDate : endDate,
         isFullDay,
         startTime: !isFullDay ? startTime : undefined,
         endTime: !isFullDay ? endTime : undefined,
@@ -247,8 +241,9 @@ export function PermissionWizardForm({ teacher, availableTypes, availableCourses
         toast.success(`Solicitud enviada correctamente. Radicado: ${res.requestNumber}`)
         router.push(`/teacher/permissions/${res.id}`)
       }
-    } catch (err: any) {
-      toast.error(err.message || 'Error al enviar la solicitud.')
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error al enviar la solicitud.'
+      toast.error(msg)
     } finally {
       setIsSubmitting(false)
     }
@@ -256,62 +251,201 @@ export function PermissionWizardForm({ teacher, availableTypes, availableCourses
 
   return (
     <div className="space-y-6">
-      {/* Barra de progreso por pasos */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 border border-slate-200/80 dark:border-slate-800 shadow-xs">
-        <div className="flex items-center justify-between overflow-x-auto gap-2 pb-2 sm:pb-0 custom-scrollbar">
+      {/* ── BARRA COMPACTA ADAPTATIVA PARA MÓVILES (< lg) ── */}
+      <div className="lg:hidden relative bg-white/85 dark:bg-slate-900/85 backdrop-blur-xl rounded-[22px] border border-white/80 dark:border-white/10 p-4 shadow-[0_4px_20px_rgba(0,0,0,0.02)] overflow-hidden">
+        {/* Luz especular superior */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white dark:via-white/20 to-transparent" />
+
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+              Paso {currentStep} de {steps.length}
+            </span>
+            <h3 className="text-xs font-bold text-slate-900 dark:text-white truncate">
+              {steps[currentStep - 1]?.label}
+            </h3>
+          </div>
+          <span className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-xl border border-blue-500/20 shrink-0">
+            {Math.round((currentStep / steps.length) * 100)}%
+          </span>
+        </div>
+
+        {/* Barra de progreso fluida sin desborde */}
+        <div className="w-full bg-slate-100 dark:bg-slate-800/80 h-1.5 rounded-full overflow-hidden mt-3">
+          <motion.div
+            className="h-full bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full"
+            initial={false}
+            animate={{ width: `${(currentStep / steps.length) * 100}%` }}
+            transition={shouldReduceMotion ? { duration: 0 } : { type: 'spring', damping: 25, stiffness: 220 }}
+          />
+        </div>
+
+        {/* 7 Micro-píldoras adaptativas (caben en cualquier pantalla sin scroll) */}
+        <div className="grid grid-cols-7 gap-1.5 mt-3 pt-2 border-t border-slate-100/80 dark:border-white/5">
           {steps.map((step) => {
-            const Icon = step.icon
             const isCompleted = currentStep > step.num
             const isCurrent = currentStep === step.num
 
             return (
-              <div
+              <button
                 key={step.num}
+                type="button"
+                disabled={!isCompleted && !isCurrent}
                 onClick={() => isCompleted && setCurrentStep(step.num)}
-                className={`flex items-center gap-2 shrink-0 ${
-                  isCompleted ? 'cursor-pointer' : ''
+                title={`${step.num}. ${step.label}`}
+                className={`h-1.5 rounded-full transition-all duration-200 ${
+                  isCurrent
+                    ? 'bg-blue-600 ring-2 ring-blue-500/30'
+                    : isCompleted
+                    ? 'bg-emerald-500 cursor-pointer hover:opacity-80'
+                    : 'bg-slate-200 dark:bg-slate-800'
                 }`}
-              >
-                <div
-                  className={`flex h-8 w-8 items-center justify-center rounded-xl text-xs font-bold transition-all ${
-                    isCompleted
-                      ? 'bg-emerald-500 text-white shadow-xs'
-                      : isCurrent
-                      ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
-                  }`}
-                >
-                  {isCompleted ? <Check className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
-                </div>
-                <div className="hidden md:block text-left">
-                  <p className="text-[10px] text-slate-400 font-semibold uppercase">Paso {step.num}</p>
-                  <p
-                    className={`text-xs font-bold truncate max-w-[100px] ${
-                      isCurrent
-                        ? 'text-blue-600 dark:text-blue-400'
-                        : isCompleted
-                        ? 'text-slate-800 dark:text-slate-200'
-                        : 'text-slate-400'
-                    }`}
-                  >
-                    {step.label}
-                  </p>
-                </div>
-                {step.num < steps.length && (
-                  <div
-                    className={`hidden lg:block w-6 h-0.5 mx-1 ${
-                      currentStep > step.num ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-slate-800'
-                    }`}
-                  />
-                )}
-              </div>
+              />
             )
           })}
         </div>
       </div>
 
-      {/* Tarjeta del Paso Actual */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-6 sm:p-8 shadow-xs">
+      {/* ── CONTENEDOR DE 2 COLUMNAS (DESKTOP & TABLET) ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* COLUMNA IZQUIERDA: STEPPER VERTICAL STICKY (lg:col-span-4) */}
+        <aside className="hidden lg:block lg:col-span-4 sticky top-6 space-y-4">
+          <div className="relative bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-[28px] border border-white/80 dark:border-white/10 p-6 shadow-[0_4px_24px_rgba(0,0,0,0.02)] overflow-hidden">
+            {/* Luz especular superior */}
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white dark:via-white/20 to-transparent" />
+
+            {/* Cabecera del Stepper */}
+            <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100 dark:border-white/10">
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Progreso</h3>
+                <p className="text-sm font-extrabold text-slate-900 dark:text-white">
+                  Paso {currentStep} de {steps.length}
+                </p>
+              </div>
+              <span className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-xl border border-blue-500/20">
+                {Math.round((currentStep / steps.length) * 100)}%
+              </span>
+            </div>
+
+            {/* Barra de progreso superior en sidebar */}
+            <div className="w-full bg-slate-100 dark:bg-slate-800/80 h-1.5 rounded-full overflow-hidden mb-5">
+              <motion.div
+                className="h-full bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full"
+                initial={false}
+                animate={{ width: `${(currentStep / steps.length) * 100}%` }}
+                transition={shouldReduceMotion ? { duration: 0 } : { type: 'spring', damping: 25, stiffness: 220 }}
+              />
+            </div>
+
+            {/* Lista Vertical de Pasos con conectores */}
+            <div className="space-y-1">
+              {steps.map((step, idx) => {
+                const Icon = step.icon
+                const isCompleted = currentStep > step.num
+                const isCurrent = currentStep === step.num
+                const isClickable = isCompleted
+
+                return (
+                  <div
+                    key={step.num}
+                    onClick={() => isClickable && setCurrentStep(step.num)}
+                    className={`relative flex items-start gap-3.5 p-2 rounded-2xl transition-all duration-150 ${
+                      isClickable
+                        ? 'cursor-pointer hover:bg-slate-100/70 dark:hover:bg-slate-800/60 active:scale-[0.98]'
+                        : isCurrent
+                        ? 'bg-blue-50/60 dark:bg-blue-950/30'
+                        : 'opacity-70'
+                    }`}
+                  >
+                    {/* Línea vertical conectora */}
+                    {idx < steps.length - 1 && (
+                      <div
+                        className={`absolute left-[23px] top-[34px] w-0.5 h-[calc(100%-14px)] transition-colors duration-300 z-0 ${
+                          currentStep > step.num
+                            ? 'bg-emerald-500'
+                            : 'bg-slate-200 dark:bg-slate-800'
+                        }`}
+                      />
+                    )}
+
+                    {/* Icono del Paso */}
+                    <div
+                      className={`relative z-10 flex h-8 w-8 items-center justify-center rounded-xl text-xs font-bold transition-all shrink-0 ${
+                        isCompleted
+                          ? 'bg-emerald-500 text-white shadow-xs'
+                          : isCurrent
+                          ? 'bg-gradient-to-tr from-blue-600 to-indigo-600 text-white ring-4 ring-blue-500/20 shadow-md shadow-blue-500/25 scale-105'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border border-slate-200/60 dark:border-white/5'
+                      }`}
+                    >
+                      {isCompleted ? <Check className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
+                    </div>
+
+                    {/* Textos del Paso */}
+                    <div className="min-w-0 flex-1 pt-0.5">
+                      <div className="flex items-center justify-between">
+                        <span
+                          className={`text-xs font-bold truncate ${
+                            isCurrent
+                              ? 'text-blue-600 dark:text-blue-400'
+                              : isCompleted
+                              ? 'text-slate-800 dark:text-slate-200'
+                              : 'text-slate-400 dark:text-slate-500'
+                          }`}
+                        >
+                          {step.label}
+                        </span>
+                        {isCompleted && (
+                          <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                            Listo
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
+                        {step.desc}
+                      </p>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Mini Ficha de Contexto en Vivo */}
+          <div className="relative bg-white/70 dark:bg-slate-900/70 backdrop-blur-md rounded-2xl border border-white/70 dark:border-white/10 p-4 text-xs space-y-2.5 shadow-2xs overflow-hidden">
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white dark:via-white/20 to-transparent" />
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+              Resumen en tiempo real
+            </span>
+            <div className="space-y-1.5 text-[11px]">
+              <div className="flex items-center justify-between text-slate-600 dark:text-slate-300">
+                <span className="text-slate-400">Tipo:</span>
+                <span className="font-semibold truncate max-w-[150px]">{selectedType?.name || 'Por definir'}</span>
+              </div>
+              <div className="flex items-center justify-between text-slate-600 dark:text-slate-300">
+                <span className="text-slate-400">Vigencia:</span>
+                <span className="font-semibold">
+                  {startDate ? (isSingleDay ? startDate : `${startDate} al ${endDate}`) : 'Por definir'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-slate-600 dark:text-slate-300">
+                <span className="text-slate-400">Jornada:</span>
+                <span className="font-semibold">{isFullDay ? 'Completa' : `${startTime} - ${endTime}`}</span>
+              </div>
+              {affectsDuty && (
+                <div className="flex items-center justify-between text-amber-600 dark:text-amber-400 font-semibold">
+                  <span>Impacto:</span>
+                  <span>{impactItems.length} grupo(s)</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </aside>
+
+        {/* COLUMNA DERECHA: FORMULARIO PRINCIPAL (lg:col-span-8) */}
+        <main className="lg:col-span-8 relative bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-[28px] border border-white/80 dark:border-white/10 p-6 sm:p-8 shadow-[0_4px_24px_rgba(0,0,0,0.02)] overflow-hidden">
+          {/* Luz especular superior */}
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white dark:via-white/20 to-transparent" />
         <AnimatePresence mode="wait">
           {/* ── PASO 1: INFORMACIÓN DEL DOCENTE ── */}
           {currentStep === 1 && (
@@ -331,7 +465,7 @@ export function PermissionWizardForm({ teacher, availableTypes, availableCourses
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 bg-slate-50 dark:bg-slate-800/40 p-5 rounded-2xl border border-slate-200/60 dark:border-slate-800">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 bg-slate-50 dark:bg-slate-800/40 p-5 rounded-2xl border border-slate-200/60 dark:border-slate-800">
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
                     Nombre Completo
@@ -343,7 +477,36 @@ export function PermissionWizardForm({ teacher, availableTypes, availableCourses
                   <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
                     Correo Institucional
                   </label>
-                  <p className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate">{teacher.email}</p>
+                  <p className="text-sm font-medium text-slate-700 dark:text-slate-300 break-words select-all">{teacher.email}</p>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                    Documento de Identidad
+                  </label>
+                  {teacher.document ? (
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-bold text-slate-900 dark:text-white font-mono">{teacher.document}</p>
+                      <a
+                        href="/teacher/settings"
+                        className="text-[11px] text-blue-600 hover:text-blue-700 dark:text-blue-400 hover:underline font-medium"
+                        title="Modificar en Configuración del perfil"
+                      >
+                        (Editar en Perfil)
+                      </a>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">No configurado</span>
+                      <a
+                        href="/teacher/settings"
+                        className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 font-semibold hover:underline"
+                        title="Ir a Configuración del perfil para registrar su documento"
+                      >
+                        Configurar en Perfil →
+                      </a>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -367,13 +530,6 @@ export function PermissionWizardForm({ teacher, availableTypes, availableCourses
                     Sede Institucional
                   </label>
                   <p className="text-sm font-medium text-slate-700 dark:text-slate-300">{teacher.campus || 'Sede Principal'}</p>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
-                    Documento de Identidad
-                  </label>
-                  <p className="text-sm font-medium text-slate-700 dark:text-slate-300">{teacher.document || 'No registrado'}</p>
                 </div>
               </div>
 
@@ -404,7 +560,7 @@ export function PermissionWizardForm({ teacher, availableTypes, availableCourses
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {availableTypes.map((type) => {
-                  const isSelected = selectedTypeId === type.id
+                  const isSelected = activeTypeId === type.id
                   return (
                     <div
                       key={type.id}
@@ -465,7 +621,10 @@ export function PermissionWizardForm({ teacher, availableTypes, availableCourses
               <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  onClick={() => setIsSingleDay(true)}
+                  onClick={() => {
+                    setIsSingleDay(true)
+                    setEndDate(startDate)
+                  }}
                   className={`px-4 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
                     isSingleDay
                       ? 'bg-blue-600 text-white border-blue-600'
@@ -496,7 +655,13 @@ export function PermissionWizardForm({ teacher, availableTypes, availableCourses
                     type="date"
                     required
                     value={startDate}
-                    onChange={e => setStartDate(e.target.value)}
+                    onChange={e => {
+                      const val = e.target.value
+                      setStartDate(val)
+                      if (isSingleDay) {
+                        setEndDate(val)
+                      }
+                    }}
                     className="w-full text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 text-slate-800 dark:text-slate-200 focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
@@ -1001,26 +1166,26 @@ export function PermissionWizardForm({ teacher, availableTypes, availableCourses
         </AnimatePresence>
 
         {/* Botones de navegación del Wizard */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-6 mt-6 border-t border-slate-100 dark:border-slate-800">
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-6 mt-8 border-t border-slate-100 dark:border-white/10">
           <div>
             {currentStep > 1 && (
               <button
                 type="button"
                 onClick={handlePrev}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all duration-100 active:scale-95 border border-slate-200/60 dark:border-white/5 cursor-pointer"
               >
-                <ArrowLeft className="h-4 w-4" />
-                {currentStep === 7 ? 'Editar solicitud' : 'Atrás'}
+                <ArrowLeft className="h-3.5 w-3.5" />
+                <span>{currentStep === 7 ? 'Editar solicitud' : 'Atrás'}</span>
               </button>
             )}
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             {currentStep < 7 ? (
               <button
                 type="button"
                 onClick={handleNext}
-                className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 transition-all cursor-pointer"
+                className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-2xl text-xs font-semibold shadow-[0_4px_16px_rgba(37,99,235,0.25)] transition-all duration-100 active:scale-[0.98] cursor-pointer"
               >
                 <span>Continuar</span>
                 <ArrowRight className="h-4 w-4" />
@@ -1031,25 +1196,26 @@ export function PermissionWizardForm({ teacher, availableTypes, availableCourses
                   type="button"
                   disabled={isSubmitting}
                   onClick={() => handleSubmit(true)}
-                  className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-2xl text-xs font-semibold transition-all duration-100 active:scale-95 border border-slate-200/60 dark:border-white/5 cursor-pointer disabled:opacity-50"
                 >
-                  <Save className="h-4 w-4" />
+                  <Save className="h-3.5 w-3.5" />
                   <span>Guardar Borrador</span>
                 </button>
                 <button
                   type="button"
                   disabled={isSubmitting}
                   onClick={() => handleSubmit(false)}
-                  className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-500/20 transition-all cursor-pointer disabled:opacity-50"
+                  className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-2xl text-xs font-semibold shadow-[0_4px_16px_rgba(16,185,129,0.25)] transition-all duration-100 active:scale-[0.98] cursor-pointer disabled:opacity-50"
                 >
-                  <Send className="h-4 w-4" />
+                  <Send className="h-3.5 w-3.5" />
                   <span>{isSubmitting ? 'Enviando...' : 'Enviar solicitud'}</span>
                 </button>
               </>
             )}
           </div>
         </div>
-      </div>
+      </main>
     </div>
-  )
+  </div>
+)
 }
