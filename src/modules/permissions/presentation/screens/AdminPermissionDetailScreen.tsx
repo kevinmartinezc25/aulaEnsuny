@@ -2,19 +2,13 @@
 
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   ArrowLeft,
-  Calendar,
   Clock,
   Download,
   FileText,
   UserCheck,
-  CheckCircle2,
-  AlertCircle,
-  XCircle,
-  RotateCcw,
   Loader2,
   Paperclip,
   GraduationCap,
@@ -46,7 +40,6 @@ interface Props {
 }
 
 export function AdminPermissionDetailScreen({ permissionId }: Props) {
-  const router = useRouter()
   const [request, setRequest] = useState<PermissionRequest | null>(null)
   const [availableTeachers, setAvailableTeachers] = useState<Array<{ id: string; name: string; email: string; subject: string }>>([])
   const [adminRole, setAdminRole] = useState<{
@@ -73,7 +66,6 @@ export function AdminPermissionDetailScreen({ permissionId }: Props) {
   const [isRectorReviewModalOpen, setIsRectorReviewModalOpen] = useState(false)
 
   const loadData = async () => {
-    setLoading(true)
     try {
       const [reqData, teachersData, roleData] = await Promise.all([
         getPermissionById(permissionId),
@@ -92,7 +84,32 @@ export function AdminPermissionDetailScreen({ permissionId }: Props) {
   }
 
   useEffect(() => {
-    loadData()
+    let active = true
+
+    async function initialize() {
+      try {
+        const [reqData, teachersData, roleData] = await Promise.all([
+          getPermissionById(permissionId),
+          getAvailableSubstituteTeachers(),
+          getCurrentAdminRoleInfo()
+        ])
+        if (!active) return
+        setRequest(reqData)
+        setAvailableTeachers(teachersData)
+        setAdminRole(roleData)
+      } catch (e) {
+        console.error(e)
+        if (active) toast.error('Error al cargar expediente institucional')
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+
+    initialize()
+
+    return () => {
+      active = false
+    }
   }, [permissionId])
 
   const handleDownloadPDF = async () => {
@@ -101,7 +118,7 @@ export function AdminPermissionDetailScreen({ permissionId }: Props) {
       toast.info('Generando constancia oficial de permiso...')
       await generatePermissionPDF(request)
       toast.success('Constancia PDF descargada con éxito')
-    } catch (err) {
+    } catch {
       toast.error('No se pudo generar el documento PDF')
     }
   }
@@ -382,18 +399,18 @@ export function AdminPermissionDetailScreen({ permissionId }: Props) {
               <span>Información del Docente Solicitante</span>
             </h3>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs bg-slate-50 dark:bg-slate-800/40 p-4 rounded-xl border border-slate-100 dark:border-slate-800">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs bg-slate-50 dark:bg-slate-800/40 p-4 rounded-xl border border-slate-100 dark:border-slate-800">
               <div>
                 <span className="text-slate-400 font-medium block">Nombre:</span>
                 <span className="font-bold text-slate-800 dark:text-slate-200">{request.teacherSnapshot.fullName}</span>
               </div>
               <div>
                 <span className="text-slate-400 font-medium block">Correo:</span>
-                <span className="font-medium text-slate-800 dark:text-slate-200 truncate block">{request.teacherSnapshot.email}</span>
+                <span className="font-medium text-slate-800 dark:text-slate-200 break-words block">{request.teacherSnapshot.email}</span>
               </div>
               <div>
                 <span className="text-slate-400 font-medium block">Documento:</span>
-                <span className="font-medium text-slate-800 dark:text-slate-200">{request.teacherSnapshot.document || 'No registrado'}</span>
+                <span className="font-medium text-slate-800 dark:text-slate-200 font-mono">{request.teacherSnapshot.document || 'No registrado'}</span>
               </div>
               <div>
                 <span className="text-slate-400 font-medium block">Cargo:</span>
@@ -557,7 +574,7 @@ export function AdminPermissionDetailScreen({ permissionId }: Props) {
                   </p>
                 )}
                 {request.rectorNotes && (
-                  <p className="text-[11px] text-slate-500 mt-1 italic">"{request.rectorNotes}"</p>
+                  <p className="text-[11px] text-slate-500 mt-1 italic">&ldquo;{request.rectorNotes}&rdquo;</p>
                 )}
               </div>
 
@@ -572,7 +589,7 @@ export function AdminPermissionDetailScreen({ permissionId }: Props) {
                   </p>
                 )}
                 {request.coordinatorNotes && (
-                  <p className="text-[11px] text-slate-500 mt-1 italic">"{request.coordinatorNotes}"</p>
+                  <p className="text-[11px] text-slate-500 mt-1 italic">&ldquo;{request.coordinatorNotes}&rdquo;</p>
                 )}
               </div>
             </div>

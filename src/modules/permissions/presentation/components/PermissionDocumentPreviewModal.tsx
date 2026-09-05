@@ -8,12 +8,7 @@ import {
   FileText,
   User,
   Calendar,
-  Clock,
-  Building,
-  GraduationCap,
-  ShieldCheck,
-  CheckCircle2,
-  AlertCircle
+  GraduationCap
 } from 'lucide-react'
 import { PermissionRequest, PERMISSION_STATUS_LABELS } from '../../domain/entities'
 import { InstitutionalReportHeader } from '@/components/reports/InstitutionalReportHeader'
@@ -121,12 +116,18 @@ export function PermissionDocumentPreviewModal({ request, isOpen, onClose }: Pro
                 </div>
                 <div>
                   <span className="text-slate-500 font-semibold block text-xs">Correo Electrónico:</span>
-                  <span className="text-slate-800">{request.teacherSnapshot.email}</span>
+                  <span className="text-slate-800 break-all">{request.teacherSnapshot.email}</span>
                 </div>
                 {request.teacherSnapshot.campus && (
                   <div>
                     <span className="text-slate-500 font-semibold block text-xs">Sede Educativa:</span>
                     <span className="text-slate-800">{request.teacherSnapshot.campus}</span>
+                  </div>
+                )}
+                {request.teacherSnapshot.document && (
+                  <div>
+                    <span className="text-slate-500 font-semibold block text-xs">Documento de Identidad:</span>
+                    <span className="text-slate-800 font-mono font-medium">{request.teacherSnapshot.document}</span>
                   </div>
                 )}
                 <div>
