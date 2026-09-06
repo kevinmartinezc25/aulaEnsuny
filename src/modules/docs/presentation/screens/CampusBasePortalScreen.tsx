@@ -180,11 +180,10 @@ export function CampusBasePortalScreen({
                       if (el) el.scrollIntoView({ behavior: 'smooth' })
                     }
                   }}
-                  className={`px-3 py-1 rounded-full text-xs font-semibold transition-all active:scale-[0.97] cursor-pointer ${
-                    isActive
-                      ? 'bg-[#0071e3] text-white shadow-2xs'
-                      : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-                  }`}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold transition-all active:scale-[0.97] cursor-pointer ${isActive
+                    ? 'bg-[#0071e3] text-white shadow-2xs'
+                    : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`}
                 >
                   {pill.label}
                 </button>
@@ -300,7 +299,7 @@ export function CampusBasePortalScreen({
 
         <div className="flex items-center gap-2 w-full md:w-auto justify-end shrink-0">
           <a
-            href="mailto:coordinacion@ensuny.edu.co?subject=Solicitud%20de%20Documento%20Académico"
+            href="mailto:coordinacion.academico@ensuny.edu.co?subject=Solicitud%20de%20Documento%20Académico"
             className="px-3.5 py-2 rounded-xl bg-[#0071e3] hover:bg-[#005bb5] text-white text-xs font-semibold shadow-2xs transition-all active:scale-[0.98]"
           >
             Solicitar Material
@@ -315,35 +314,8 @@ export function CampusBasePortalScreen({
             {INSTITUTION_INFO.shortName}
           </span>
           <span className="hidden sm:inline text-slate-300 dark:text-slate-700">•</span>
-          <span>© 2025 Todos los derechos reservados.</span>
+          <span>© 2026 Todos los derechos reservados.</span>
         </div>
-
-        <nav className="flex flex-wrap items-center justify-center gap-3 text-xs font-medium">
-          <button
-            onClick={() => onSelectSubject('pei')}
-            className="hover:text-[#0071e3] dark:hover:text-blue-400 transition-colors cursor-pointer"
-          >
-            PEI
-          </button>
-          <button
-            onClick={() => onSelectSubject('manual-convivencia')}
-            className="hover:text-[#0071e3] dark:hover:text-blue-400 transition-colors cursor-pointer"
-          >
-            Manual de Convivencia
-          </button>
-          <button
-            onClick={() => onSelectSubject('siee')}
-            className="hover:text-[#0071e3] dark:hover:text-blue-400 transition-colors cursor-pointer"
-          >
-            SIEE
-          </button>
-          <button
-            onClick={() => onSelectSubject('formatos')}
-            className="hover:text-[#0071e3] dark:hover:text-blue-400 transition-colors cursor-pointer"
-          >
-            Formatos
-          </button>
-        </nav>
       </footer>
 
       {/* Confirm Delete Folder Modal for Author */}

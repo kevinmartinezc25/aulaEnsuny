@@ -21,22 +21,26 @@ import {
 import { Button } from '@/components/ui/button'
 
 export default function LandingPage() {
-  const [isDark, setIsDark] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false
-    const savedTheme = window.localStorage.getItem('theme')
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-    return savedTheme === 'dark' || (!savedTheme && prefersDark)
-  })
+  const [isDark, setIsDark] = useState<boolean>(false)
+  const [mounted, setMounted] = useState<boolean>(false)
   const shouldReduceMotion = useReducedMotion()
 
   useEffect(() => {
-    const root = document.documentElement
-    root.classList.toggle('dark', isDark)
-    window.localStorage.setItem('theme', isDark ? 'dark' : 'light')
-  }, [isDark])
+    setMounted(true)
+    const savedTheme = window.localStorage.getItem('theme')
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+    const isDarkMode = savedTheme === 'dark' || (!savedTheme && prefersDark)
+    setIsDark(isDarkMode)
+    document.documentElement.classList.toggle('dark', isDarkMode)
+  }, [])
 
   const toggleTheme = () => {
-    setIsDark((prev) => !prev)
+    setIsDark((prev) => {
+      const next = !prev
+      document.documentElement.classList.toggle('dark', next)
+      window.localStorage.setItem('theme', next ? 'dark' : 'light')
+      return next
+    })
   }
 
   // Animaciones Apple Design con resortes de amortiguación crítica
@@ -156,7 +160,11 @@ export default function LandingPage() {
               title="Cambiar tema"
               aria-label="Cambiar tema"
             >
-              {isDark ? <Sun className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> : <Moon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}
+              {mounted && isDark ? (
+                <Sun className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              ) : (
+                <Moon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              )}
             </button>
 
             {/* Botón CTA Header anti-desbordamiento */}
@@ -360,11 +368,6 @@ export default function LandingPage() {
                       <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
                         {feature.description}
                       </p>
-                    </div>
-
-                    <div className="pt-4 mt-2 border-t border-slate-100 dark:border-white/5 flex items-center text-xs font-semibold text-[#1F4E31] dark:text-emerald-400 group-hover:translate-x-0.5 transition-transform duration-150">
-                      <span>Explorar módulo</span>
-                      <ArrowRight className="h-3.5 w-3.5 ml-1" />
                     </div>
                   </div>
                 </motion.div>
