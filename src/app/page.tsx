@@ -86,9 +86,9 @@ export default function LandingPage() {
     },
     {
       icon: FileText,
-      title: 'Centro de Documentación',
+      title: 'Portal de Conocimiento Escolar',
       description:
-        'Repositorio institucional para circulares, manuales académicos, guías y formatos. Acceso público y seguro para padres y la comunidad.',
+        'Repositorio pedagógico para planes de aula, mallas curriculares, manuales y acuerdos. Acceso abierto y seguro para docentes y la comunidad.',
       badge: 'Acceso Abierto',
       accent: 'indigo',
       iconBg: 'bg-indigo-500/10 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-400 border border-indigo-500/20',
@@ -393,16 +393,16 @@ export default function LandingPage() {
               </div>
 
               <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight leading-tight">
-                Repositorio de Documentación Institucional
+                Portal de Conocimiento Escolar
               </h2>
               <p className="text-xs sm:text-sm text-emerald-100/85 leading-relaxed max-w-xl mx-auto font-normal">
-                ¿Necesitas acceder a manuales, reglamentos o circulares oficiales? Ingresa directamente al Centro de Documentación de forma abierta y sin iniciar sesión.
+                ¿Necesitas acceder a planes de aula, mallas curriculares, manuales o acuerdos oficiales? Ingresa directamente al Portal de Conocimiento Escolar de forma abierta y sin iniciar sesión.
               </p>
 
               <div className="pt-3">
                 <Link href="/docs">
                   <Button className="rounded-2xl bg-white hover:bg-slate-100 text-[#1F4E31] font-bold text-sm px-6 h-11 transition-all shadow-md active:scale-[0.98] duration-100 ease-out cursor-pointer inline-flex items-center gap-2">
-                    <span>Ver Documentación Pública</span>
+                    <span>Explorar Portal de Conocimiento</span>
                     <ArrowUpRight className="h-4 w-4" />
                   </Button>
                 </Link>

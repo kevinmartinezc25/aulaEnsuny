@@ -58,6 +58,7 @@ function mapFolder(row: Record<string, unknown>): DocFolder {
   return {
     id: row.id as string,
     name: row.name as string,
+    description: (row.description as string | null) ?? null,
     parentId: (row.parent_id as string | null) ?? null,
     color: (row.color as string | null) ?? null,
     createdBy: row.created_by as string,
@@ -112,11 +113,11 @@ async function checkCanEditResource(
   user: any,
   resourceCreatedBy: string | null | undefined
 ): Promise<boolean> {
-  if (!user || !resourceCreatedBy) return false
-  if (user.id === resourceCreatedBy) return true
+  if (!user) return false
 
-  const userRole = user.user_metadata?.role_name
-  if (userRole === 'admin' || userRole === 'superadmin') return true
+  // 1. SuperAdmin y Admin tienen privilegios totales sobre TODOS los recursos
+  const metaRole = user.user_metadata?.role_name || user.user_metadata?.role || user.app_metadata?.role
+  if (metaRole === 'admin' || metaRole === 'superadmin') return true
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -124,8 +125,13 @@ async function checkCanEditResource(
     .eq('id', user.id)
     .single()
 
-  const roleName = (profile?.roles as any)?.name
-  return roleName === 'admin' || roleName === 'superadmin'
+  const roleName = (profile?.roles as any)?.name || (profile as any)?.role
+  if (roleName === 'admin' || roleName === 'superadmin') return true
+
+  // 2. Si no es admin/superadmin, verificar que sea el autor del recurso
+  if (resourceCreatedBy && user.id === resourceCreatedBy) return true
+
+  return false
 }
 
 // ─── Get Recent Activity ──────────────────────────────────────────────────────
@@ -187,7 +193,8 @@ export async function createFolder(
 // ─── Update Folder ────────────────────────────────────────────────────────────
 export async function updateFolder(
   id: string,
-  name: string
+  name: string,
+  description?: string
 ): Promise<{ data: DocFolder | null; error: string | null }> {
   try {
     const supabase = await createServerClient()
@@ -202,12 +209,33 @@ export async function updateFolder(
       return { data: null, error: 'No tienes permisos para modificar esta carpeta. Solo el autor, un Administrador o SuperAdmin pueden modificarla.' }
     }
 
-    const { data, error } = await supabase
+    const updatePayload: Record<string, any> = {
+      name: name.trim(),
+      updated_at: new Date().toISOString()
+    }
+    if (description !== undefined) {
+      updatePayload.description = description.trim() || null
+    }
+
+    let { data, error } = await supabase
       .from('doc_folders')
-      .update({ name: name.trim(), updated_at: new Date().toISOString() })
+      .update(updatePayload)
       .eq('id', id)
       .select()
       .single()
+
+    // Resiliencia si la columna description no ha sido creada aún en Supabase
+    if (error && error.message?.includes('description')) {
+      delete updatePayload.description
+      const retry = await supabase
+        .from('doc_folders')
+        .update(updatePayload)
+        .eq('id', id)
+        .select()
+        .single()
+      data = retry.data
+      error = retry.error
+    }
 
     if (error) return { data: null, error: error.message }
 
@@ -218,7 +246,7 @@ export async function updateFolder(
       supabase,
       user.id,
       'update_folder',
-      `${userName} renombró la categoría "${oldFolder?.name || 'Categoría'}" a "${name.trim()}"`
+      `${userName} actualizó la carpeta "${oldFolder?.name || 'Categoría'}"`
     )
 
     revalidatePath('/admin/docs')
@@ -395,7 +423,7 @@ export async function createDocument(input: {
         fileName: input.fileName,
         mimeType: input.mimeType,
         fileBuffer: fileBuffer,
-        courseName: 'Centro de Documentación',
+        courseName: 'Portal de Conocimiento Escolar',
         moduleName: categoryName
       })
 
@@ -523,7 +551,7 @@ export async function updateDocument(
         fileName: input.fileName,
         mimeType: input.mimeType,
         fileBuffer: fileBuffer,
-        courseName: 'Centro de Documentación',
+        courseName: 'Portal de Conocimiento Escolar',
         moduleName: categoryName
       })
 

@@ -1,13 +1,13 @@
 import { DocCenterScreen } from '@/modules/docs/presentation/screens/DocCenterScreen'
 
 export const metadata = {
-  title: 'Documentación Institucional Pública | aulaEnsuny',
-  description: 'Consulta los documentos académicos e institucionales públicos.',
+  title: 'Portal de Conocimiento Escolar | aulaEnsuny',
+  description: 'Consulta los planes de aula, mallas curriculares y acuerdos del Portal de Conocimiento Escolar.',
 }
 
 export default function PublicDocsPage() {
   return (
-    <div className="h-screen w-screen p-6 md:p-8 bg-slate-50 dark:bg-slate-950 overflow-hidden">
+    <div className="min-h-screen w-full bg-[#faf8fe] dark:bg-[#12141a]">
       <DocCenterScreen userRole="guest" />
     </div>
   )

@@ -39,7 +39,9 @@ export interface DocTag {
 export interface DocFolder {
   id: string
   name: string
+  description?: string | null
   parentId: string | null
+  parent_id?: string | null
   color: string | null
   createdBy: string
   sortOrder: number
