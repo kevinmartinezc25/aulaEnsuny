@@ -38,6 +38,7 @@ interface DocCenterScreenProps {
 
 function DocCenterScreenInner({ userRole }: DocCenterScreenProps) {
   const router = useRouter()
+  const [currentRole, setCurrentRole] = useState<'admin' | 'superadmin' | 'teacher' | 'student' | 'guest'>(userRole)
   const [isDark, setIsDark] = useState(false)
 
   // ─── Theme Synchronization ──────────────────────────────────────────────────
@@ -81,16 +82,52 @@ function DocCenterScreenInner({ userRole }: DocCenterScreenProps) {
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.getUser().then(async ({ data }) => {
       if (data?.user) {
         setCurrentUserId(data.user.id)
         const meta = data.user.user_metadata || {}
         const fn = meta.first_name || meta.firstName || userProfile.firstName
         const ln = meta.last_name || meta.lastName || userProfile.lastName
+
+        let detectedRole: 'admin' | 'superadmin' | 'teacher' | 'student' | 'guest' = userRole
+        const metaRole = meta.role_name || meta.role
+        if (['admin', 'superadmin', 'teacher', 'student'].includes(metaRole)) {
+          detectedRole = metaRole
+        } else if (userRole === 'guest') {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('role_id')
+            .eq('id', data.user.id)
+            .single()
+
+          if (profile?.role_id) {
+            const { data: role } = await supabase
+              .from('roles')
+              .select('name')
+              .eq('id', profile.role_id)
+              .single()
+
+            if (role?.name && ['admin', 'superadmin', 'teacher', 'student'].includes(role.name)) {
+              detectedRole = role.name as any
+            }
+          }
+        }
+
+        setCurrentRole(detectedRole)
+
+        const roleLabel =
+          detectedRole === 'student'
+            ? 'Estudiante • Normalista'
+            : detectedRole === 'teacher'
+              ? 'Docente • ENSUNY'
+              : detectedRole === 'admin' || detectedRole === 'superadmin'
+                ? 'Administrador'
+                : 'Visitante'
+
         setUserProfile({
           firstName: fn,
           lastName: ln,
-          roleLabel: userRole === 'student' ? 'Estudiante • Normalista' : userRole === 'teacher' ? 'Docente • ENSUNY' : 'Administrador',
+          roleLabel,
           avatarUrl: meta.avatar_url || null,
         })
       }
@@ -101,6 +138,7 @@ function DocCenterScreenInner({ userRole }: DocCenterScreenProps) {
     try {
       const result = await logout()
       if (result?.success) {
+        setCurrentRole('guest')
         router.replace('/login')
       }
     } catch (error) {
@@ -293,7 +331,7 @@ function DocCenterScreenInner({ userRole }: DocCenterScreenProps) {
     <div className="min-h-screen w-full bg-[#faf8fe] dark:bg-[#12141a] text-slate-900 dark:text-slate-100 flex flex-col font-sans selection:bg-[#0071e3]/20 selection:text-[#0059b5] transition-colors duration-200">
       {/* Cupertino Sticky Header */}
       <CupertinoHeader
-        userRole={userRole}
+        userRole={currentRole}
         isDark={isDark}
         onToggleTheme={toggleTheme}
         onLogout={handleLogout}

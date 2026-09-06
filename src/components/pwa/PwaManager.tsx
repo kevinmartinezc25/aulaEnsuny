@@ -4,6 +4,8 @@ import React, { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { Wifi, WifiOff } from 'lucide-react'
 
+import { PwaWelcomeModal } from './PwaWelcomeModal'
+
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: string[]
   readonly userChoice: Promise<{
@@ -18,16 +20,33 @@ let globalDeferredPrompt: BeforeInstallPromptEvent | null = null
 
 export function PwaManager() {
   const [isStandalone, setIsStandalone] = useState(false)
+  const [showWelcome, setShowWelcome] = useState(false)
+
+  const handleCloseWelcome = () => {
+    setShowWelcome(false)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('aulaensuny_pwa_first_welcome_seen', 'true')
+    }
+  }
 
   useEffect(() => {
-    // 1. Detección de modo instalado (standalone)
-    const checkStandalone = () => {
+    // 1. Detección de modo instalado (standalone) y primer inicio
+    const checkStandaloneAndWelcome = () => {
       const standalone =
         window.matchMedia('(display-mode: standalone)').matches ||
         (window.navigator as unknown as { standalone?: boolean }).standalone === true
       setIsStandalone(standalone)
+
+      if (standalone) {
+        const welcomeSeen = localStorage.getItem('aulaensuny_pwa_first_welcome_seen')
+        if (!welcomeSeen) {
+          setTimeout(() => {
+            setShowWelcome(true)
+          }, 350)
+        }
+      }
     }
-    checkStandalone()
+    checkStandaloneAndWelcome()
 
     // 2. Registro del Service Worker
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
@@ -116,11 +135,19 @@ export function PwaManager() {
 
     window.addEventListener('open-pwa-install', handleDirectInstall)
 
+    // Escuchar evento para abrir bienvenida (útil para pruebas o reactivación)
+    const handleTriggerWelcome = () => {
+      setShowWelcome(true)
+    }
+    window.addEventListener('open-pwa-welcome', handleTriggerWelcome)
+
     // Escuchar cuando la app se instala con éxito
     const handleAppInstalled = () => {
       globalDeferredPrompt = null
       setIsStandalone(true)
       toast.success('¡aulaEnsuny ahora está lista en tu pantalla de inicio!')
+      // Resetear para que al abrir la app instalada aparezca la bienvenida
+      localStorage.removeItem('aulaensuny_pwa_first_welcome_seen')
     }
     window.addEventListener('appinstalled', handleAppInstalled)
 
@@ -129,9 +156,10 @@ export function PwaManager() {
       window.removeEventListener('offline', handleOffline)
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
       window.removeEventListener('open-pwa-install', handleDirectInstall)
+      window.removeEventListener('open-pwa-welcome', handleTriggerWelcome)
       window.removeEventListener('appinstalled', handleAppInstalled)
     }
   }, [])
 
-  return null
+  return <PwaWelcomeModal isOpen={showWelcome} onClose={handleCloseWelcome} />
 }
