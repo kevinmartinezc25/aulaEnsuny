@@ -50,7 +50,7 @@ const ADMIN_NAV = [
       { name: 'Agenda', href: '/admin/institutional-agenda', icon: CalendarCheck },
       { name: 'Calendario', href: '/admin/calendar', icon: Calendar },
       { name: 'Notificaciones', href: '/admin/notifications', icon: BellRing },
-      { name: 'Centro de Docs', href: '/admin/docs', icon: FileText },
+      { name: 'Portal de Conocimiento', href: '/admin/docs', icon: FileText },
       { name: 'Recursos', href: '/admin/resources', icon: FolderOpen },
     ],
   },
@@ -427,7 +427,7 @@ function SidebarContent({ onClose, isCollapsed = false, user }: SidebarProps) {
         items: [
           { name: 'Permisos', href: '/teacher/permissions', icon: ClipboardList },
           { name: 'Jurado Electoral', href: '/juror/elections', icon: ShieldCheck },
-          { name: 'Documentación', href: '/teacher/docs', icon: FileText },
+          { name: 'Portal de Conocimiento', href: '/teacher/docs', icon: FileText },
         ]
       },
       {

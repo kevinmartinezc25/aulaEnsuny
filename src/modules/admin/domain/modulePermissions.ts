@@ -45,7 +45,7 @@ export const ALL_ADMIN_MODULES: AdminModuleDefinition[] = [
   { key: 'institutional-agenda', name: 'Agenda', section: 'Planificación y Recursos', description: 'Programación de reuniones, circulares y citas directivas.', href: '/admin/institutional-agenda' },
   { key: 'calendar', name: 'Calendario', section: 'Planificación y Recursos', description: 'Cronograma y eventos institucionales del año escolar.', href: '/admin/calendar' },
   { key: 'notifications', name: 'Notificaciones', section: 'Planificación y Recursos', description: 'Centro de envíos y comunicados masivos a la comunidad.', href: '/admin/notifications' },
-  { key: 'docs', name: 'Centro de Docs', section: 'Planificación y Recursos', description: 'Documentos oficiales, manuales y reglamentación escolar.', href: '/admin/docs' },
+  { key: 'docs', name: 'Portal de Conocimiento Escolar', section: 'Planificación y Recursos', description: 'Planes de aula, mallas curriculares y documentación institucional.', href: '/admin/docs' },
   { key: 'resources', name: 'Recursos', section: 'Planificación y Recursos', description: 'Inventario de aulas especializadas y material educativo.', href: '/admin/resources' },
 
   // Reportes y Analíticas

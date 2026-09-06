@@ -153,7 +153,7 @@ export function DocSearch({ onSelect, onClose }: DocSearchProps) {
               <span className="flex items-center gap-1"><kbd className="font-mono">↑↓</kbd> navegar</span>
               <span className="flex items-center gap-1"><kbd className="font-mono">↵</kbd> abrir</span>
             </div>
-            <span className="text-[10px] text-slate-300 dark:text-slate-600">Centro de Documentación</span>
+            <span className="text-[10px] text-slate-300 dark:text-slate-600">Portal de Conocimiento Escolar</span>
           </div>
         </div>
       </motion.div>

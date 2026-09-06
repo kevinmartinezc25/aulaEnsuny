@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="es" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manual Oficial de Operación • Aula ENSUNY</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Text"', '"SF Pro Display"', 'Inter', 'system-ui', 'sans-serif'],
+          },
+          colors: {
+            apple: {
+              blue: '#0071e3',
+              'blue-hover': '#005bb5',
+              green: '#34c759',
+              amber: '#ff9500',
+              red: '#ff3b30',
+              indigo: '#5856d6',
+              teal: '#30b0c7',
+              canvas: '#f5f5f7',
+              card: '#ffffff',
+              border: 'rgba(0, 0, 0, 0.08)',
+              subtle: '#86868b',
+              darkCanvas: '#000000',
+              darkCard: '#1c1c1e',
+              darkBorder: 'rgba(255, 255, 255, 0.1)'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Disciplina tipográfica estilo Apple: una sola familia, tamaño base unificado (15px) */
+    html {
+      font-size: 15px;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", Inter, system-ui, sans-serif;
+      line-height: 1.65;
+      letter-spacing: -0.01em;
+      color: #1d1d1f;
+    }
+    .dark body {
+      color: #f5f5f7;
+    }
+    /* Estilo de materiales translúcidos Apple */
+    .apple-glass {
+      background: rgba(255, 255, 255, 0.82);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border-bottom: 1px solid rgba(0, 0, 0, 0.07);
+    }
+    .dark .apple-glass {
+      background: rgba(28, 28, 30, 0.85);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .apple-card {
+      background: #ffffff;
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      border-top: 1px solid rgba(255, 255, 255, 0.8);
+      box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.04), 0 2px 6px -1px rgba(0, 0, 0, 0.02);
+      border-radius: 20px;
+    }
+    .dark .apple-card {
+      background: #1c1c1e;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-top: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 0 4px 24px -2px rgba(0, 0, 0, 0.3);
+    }
+    .step-pill {
+      font-feature-settings: "tnum";
+      font-variant-numeric: tabular-nums;
+    }
+    @media print {
+      .no-print { display: none !important; }
+      body { background: white !important; color: black !important; font-size: 12pt; }
+      .apple-card { box-shadow: none !important; border: 1px solid #ddd !important; }
+    }
+  </style>
+</head>
+<body class="bg-[#fbfbfd] dark:bg-[#000000] min-h-screen selection:bg-apple-blue selection:text-white pb-24">
+
+  <!-- ── 1. APPLE TRANSLUCENT NAVIGATION BAR ── -->
+  <header class="sticky top-0 z-50 apple-glass px-4 sm:px-8 py-3 transition-all no-print">
+    <div class="max-w-7xl mx-auto flex items-center justify-between">
+      <div class="flex items-center gap-3.5">
+        <div class="w-9 h-9 rounded-xl bg-apple-blue text-white flex items-center justify-center font-bold text-xs shadow-sm shadow-apple-blue/20">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+          </svg>
+        </div>
+        <div>
+          <span class="text-xs font-bold text-[#1d1d1f] dark:text-white block leading-tight tracking-tight">Escuela Normal Superior del Nordeste</span>
+          <span class="text-[11px] text-[#86868b] dark:text-[#a1a1a6] font-medium">Portal de Conocimiento Escolar • Manual Institucional</span>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2.5">
+        <a href="#permisos" class="hidden md:inline-flex px-3 py-1.5 rounded-full text-xs font-medium text-[#515154] dark:text-[#a1a1a6] hover:text-apple-blue hover:bg-black/5 dark:hover:bg-white/5 transition-all">
+          Permisos
+        </a>
+        <a href="#convivencia" class="hidden md:inline-flex px-3 py-1.5 rounded-full text-xs font-medium text-[#515154] dark:text-[#a1a1a6] hover:text-apple-blue hover:bg-black/5 dark:hover:bg-white/5 transition-all">
+          Convivencia
+        </a>
+        <a href="#portal" class="hidden md:inline-flex px-3 py-1.5 rounded-full text-xs font-medium text-[#515154] dark:text-[#a1a1a6] hover:text-apple-blue hover:bg-black/5 dark:hover:bg-white/5 transition-all">
+          Portal de Conocimiento
+        </a>
+        <a href="#faq" class="hidden md:inline-flex px-3 py-1.5 rounded-full text-xs font-medium text-[#515154] dark:text-[#a1a1a6] hover:text-apple-blue hover:bg-black/5 dark:hover:bg-white/5 transition-all">
+          FAQ
+        </a>
+
+        <div class="h-4 w-px bg-black/10 dark:bg-white/10 mx-1 hidden sm:block"></div>
+
+        <button onclick="window.print()" class="px-3.5 py-1.5 rounded-full bg-apple-blue hover:bg-apple-blue-hover text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm shadow-apple-blue/25 transition-all active:scale-95">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+          </svg>
+          <span>Imprimir PDF</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── 2. HERO PRESENTATION BANNER (APPLE STYLE) ── -->
+  <section class="max-w-5xl mx-auto px-4 sm:px-6 pt-10 pb-8 text-center">
+    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950/40 text-apple-blue border border-blue-200/60 dark:border-blue-800/40 text-[11px] font-semibold mb-4">
+      <span class="w-1.5 h-1.5 rounded-full bg-apple-blue animate-pulse"></span>
+      <span>Guía Oficial • Docentes y Coordinación</span>
+    </div>
+
+    <h1 class="text-3xl sm:text-4xl md:text-5xl font-extrabold text-[#1d1d1f] dark:text-white tracking-tight max-w-3xl mx-auto leading-tight">
+      Manual de Operación Institucional
+    </h1>
+
+    <p class="text-sm sm:text-base text-[#86868b] dark:text-[#a1a1a6] max-w-2xl mx-auto mt-3 font-normal leading-relaxed">
+      Procedimientos estandarizados para la gestión de <strong class="text-[#1d1d1f] dark:text-white font-semibold">Permisos Laborales</strong>, seguimiento a la <strong class="text-[#1d1d1f] dark:text-white font-semibold">Convivencia Escolar</strong> y consulta en el <strong class="text-[#1d1d1f] dark:text-white font-semibold">Portal de Conocimiento</strong> de la ENSUNY.
+    </p>
+
+    <!-- Metadata Badges Strip -->
+    <div class="flex items-center justify-center flex-wrap gap-2.5 mt-6 text-xs text-[#515154] dark:text-[#a1a1a6]">
+      <span class="px-3 py-1 rounded-xl bg-white dark:bg-[#1c1c1e] border border-black/5 dark:border-white/10 shadow-2xs font-medium">
+        🏛️ I.E. Escuela Normal Superior del Nordeste
+      </span>
+      <span class="px-3 py-1 rounded-xl bg-white dark:bg-[#1c1c1e] border border-black/5 dark:border-white/10 shadow-2xs font-medium">
+        📍 Yolombó, Antioquia
+      </span>
+      <span class="px-3 py-1 rounded-xl bg-white dark:bg-[#1c1c1e] border border-black/5 dark:border-white/10 shadow-2xs font-medium">
+        📅 Año Lectivo 2025 - 2026
+      </span>
+      <span class="px-3 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/40 font-semibold">
+        ✓ Versión 1.0 Aprobada
+      </span>
+    </div>
+  </section>
+
+  <!-- ── 3. THREE CORE MODULES SUMMARY BENTO GRID ── -->
+  <section class="max-w-5xl mx-auto px-4 sm:px-6 mb-12">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <!-- Card 1: Permisos -->
+      <a href="#permisos" class="apple-card p-5 group hover:border-apple-blue/40 transition-all hover:scale-[1.01] block">
+        <div class="w-10 h-10 rounded-2xl bg-blue-500/10 text-apple-blue flex items-center justify-center mb-3.5 group-hover:scale-105 transition-transform">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+        </div>
+        <span class="text-[11px] font-bold text-apple-blue uppercase tracking-wider block">Módulo 01</span>
+        <h3 class="text-base font-bold text-[#1d1d1f] dark:text-white mt-1">Permisos y Licencias</h3>
+        <p class="text-xs text-[#86868b] dark:text-[#a1a1a6] mt-1.5 leading-relaxed">
+          Radicación por pasos, cálculo de horas afectadas, planes de contingencia para alumnos y alertas de 5 días.
+        </p>
+        <div class="mt-4 flex items-center text-xs font-semibold text-apple-blue gap-1 group-hover:translate-x-1 transition-transform">
+          <span>Ver procedimiento</span>
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+        </div>
+      </a>
+
+      <!-- Card 2: Convivencia -->
+      <a href="#convivencia" class="apple-card p-5 group hover:border-emerald-500/40 transition-all hover:scale-[1.01] block">
+        <div class="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-3.5 group-hover:scale-105 transition-transform">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+          </svg>
+        </div>
+        <span class="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block">Módulo 02</span>
+        <h3 class="text-base font-bold text-[#1d1d1f] dark:text-white mt-1">Convivencia Escolar</h3>
+        <p class="text-xs text-[#86868b] dark:text-[#a1a1a6] mt-1.5 leading-relaxed">
+          Tipificación Ley 1620 (I, II y III), descargos del estudiante, compromisos pedagógicos y firma digital en canvas.
+        </p>
+        <div class="mt-4 flex items-center text-xs font-semibold text-emerald-600 dark:text-emerald-400 gap-1 group-hover:translate-x-1 transition-transform">
+          <span>Ver procedimiento</span>
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+        </div>
+      </a>
+
+      <!-- Card 3: Portal de Conocimiento -->
+      <a href="#portal" class="apple-card p-5 group hover:border-purple-500/40 transition-all hover:scale-[1.01] block">
+        <div class="w-10 h-10 rounded-2xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center mb-3.5 group-hover:scale-105 transition-transform">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+          </svg>
+        </div>
+        <span class="text-[11px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider block">Módulo 03</span>
+        <h3 class="text-base font-bold text-[#1d1d1f] dark:text-white mt-1">Portal de Conocimiento</h3>
+        <p class="text-xs text-[#86868b] dark:text-[#a1a1a6] mt-1.5 leading-relaxed">
+          Áreas y documentos institucionales, búsqueda rápida Spotlight (⌘K), visor integrado y permisos por autoría.
+        </p>
+        <div class="mt-4 flex items-center text-xs font-semibold text-purple-600 dark:text-purple-400 gap-1 group-hover:translate-x-1 transition-transform">
+          <span>Ver procedimiento</span>
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+        </div>
+      </a>
+    </div>
+  </section>
+
+  <!-- ── 4. DETAILED CONTENT BODY ── -->
+  <main class="max-w-5xl mx-auto px-4 sm:px-6 space-y-16">
+
+    <!-- ══════════════════════════════════════════════════════════════════════════ -->
+    <!-- SECCIÓN 1: MÓDULO DE PERMISOS -->
+    <!-- ══════════════════════════════════════════════════════════════════════════ -->
+    <section id="permisos" class="space-y-6 pt-6">
+      <div class="flex items-center gap-3 border-b border-black/5 dark:border-white/10 pb-4">
+        <div class="w-9 h-9 rounded-xl bg-blue-500/10 text-apple-blue flex items-center justify-center font-bold text-sm">
+          01
+        </div>
+        <div>
+          <span class="text-xs font-bold text-apple-blue uppercase tracking-wider">Gestión del Talento Docente</span>
+          <h2 class="text-2xl font-bold text-[#1d1d1f] dark:text-white tracking-tight">Módulo de Permisos y Licencias</h2>
+        </div>
+      </div>
+
+      <!-- Vector Interactive Process Diagram (Pure CSS/SVG, No raster images) -->
+      <div class="apple-card p-6 space-y-4">
+        <div class="flex items-center justify-between pb-3 border-b border-black/5 dark:border-white/10">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-apple-blue"></span>
+            <span class="text-xs font-bold text-[#1d1d1f] dark:text-white uppercase tracking-wider">Flujo de Trámite del Permiso</span>
+          </div>
+          <span class="text-[11px] font-medium text-apple-blue bg-blue-50 dark:bg-blue-950/40 px-2.5 py-0.5 rounded-full">Proceso Digital ENSUNY</span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-1">
+          <div class="p-3.5 rounded-xl bg-[#f5f5f7] dark:bg-[#2c2c2e] border border-black/5 dark:border-white/5 space-y-1">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-bold text-apple-blue uppercase">Fase 1</span>
+              <span class="w-2 h-2 rounded-full bg-blue-400"></span>
+            </div>
+            <strong class="text-xs font-bold text-[#1d1d1f] dark:text-white block">Radicación Docente</strong>
+            <span class="text-[11px] text-[#86868b] dark:text-[#a1a1a6] block leading-tight">Diligenciamiento guiado en 7 pasos con justificación y afectación.</span>
+          </div>
+
+          <div class="p-3.5 rounded-xl bg-[#f5f5f7] dark:bg-[#2c2c2e] border border-black/5 dark:border-white/5 space-y-1">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-bold text-purple-600 dark:text-purple-400 uppercase">Fase 2</span>
+              <span class="w-2 h-2 rounded-full bg-purple-400"></span>
+            </div>
+            <strong class="text-xs font-bold text-[#1d1d1f] dark:text-white block">Plan de Aula</strong>
+            <span class="text-[11px] text-[#86868b] dark:text-[#a1a1a6] block leading-tight">Talleres o guías de contingencia pedagógica para los estudiantes.</span>
+          </div>
+
+          <div class="p-3.5 rounded-xl bg-[#f5f5f7] dark:bg-[#2c2c2e] border border-black/5 dark:border-white/5 space-y-1">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 uppercase">Fase 3</span>
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            </div>
+            <strong class="text-xs font-bold text-[#1d1d1f] dark:text-white block">Resolución</strong>
+            <span class="text-[11px] text-[#86868b] dark:text-[#a1a1a6] block leading-tight">Evaluación y aprobación por Coordinación Académica y Rectoría.</span>
+          </div>
+
+          <div class="p-3.5 rounded-xl bg-[#f5f5f7] dark:bg-[#2c2c2e] border border-black/5 dark:border-white/5 space-y-1">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-bold text-apple-amber uppercase">Fase 4</span>
+              <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+            </div>
+            <strong class="text-xs font-bold text-[#1d1d1f] dark:text-white block">Legalización</strong>
+            <span class="text-[11px] text-[#86868b] dark:text-[#a1a1a6] block leading-tight">Carga de constancia médica o soporte en máximo 5 días hábiles.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Legal Context Card -->
+      <div class="apple-card p-6 space-y-4">
+        <h3 class="text-base font-bold text-[#1d1d1f] dark:text-white">1.1 Marco Normativo y Propósito</h3>
+        <p class="text-xs sm:text-sm text-[#515154] dark:text-[#a1a1a6] leading-relaxed">
+          El módulo digitaliza la radicación y resolución de permisos según los lineamientos del <strong>Decreto 1278 de 2002</strong>, el <strong>Decreto 2277 de 1979</strong> y el <strong>Decreto 1075 de 2015</strong>. Su propósito esencial es velar por la continuidad de la prestación del servicio educativo, garantizando que todo permiso que afecte horas lectivas incluya previamente una contingencia pedagógica para los educandos.
+        </p>
+
+        <!-- Tipology Grid -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+          <div class="p-3.5 rounded-xl bg-[#f5f5f7] dark:bg-[#2c2c2e] border border-black/5 dark:border-white/5">
+            <span class="text-xs font-bold text-[#1d1d1f] dark:text-white block">Permiso Remunerado Ordinario</span>
+            <span class="text-xs text-[#86868b] dark:text-[#a1a1a6] mt-0.5 block">Hasta 3 días hábiles continuos por calamidad o fuerza mayor justificada. Radicar con 2 a 3 días de antelación.</span>
+          </div>
+          <div class="p-3.5 rounded-xl bg-[#f5f5f7] dark:bg-[#2c2c2e] border border-black/5 dark:border-white/5">
+            <span class="text-xs font-bold text-[#1d1d1f] dark:text-white block">Cita Médica o Especialista</span>
+            <span class="text-xs text-[#86868b] dark:text-[#a1a1a6] mt-0.5 block">Por horas o fracción de jornada. Soporte: citación previa o constancia médica expedida por la EPS tratante.</span>
+          </div>
+          <div class="p-3.5 rounded-xl bg-[#f5f5f7] dark:bg-[#2c2c2e] border border-black/5 dark:border-white/5">
+            <span class="text-xs font-bold text-[#1d1d1f] dark:text-white block">Licencia por Luto (Ley 1280/2009)</span>
+            <span class="text-xs text-[#86868b] dark:text-[#a1a1a6] mt-0.5 block">5 días hábiles remunerados por fallecimiento de cónyuge, padres, hijos, hermanos, abuelos o suegros.</span>
+          </div>
+          <div class="p-3.5 rounded-xl bg-[#f5f5f7] dark:bg-[#2c2c2e] border border-black/5 dark:border-white/5">
+            <span class="text-xs font-bold text-[#1d1d1f] dark:text-white block">Comisión de Servicios / Capacitación</span>
+            <span class="text-xs text-[#86868b] dark:text-[#a1a1a6] mt-0.5 block">Eventos pedagógicos, olimpiadas o representación oficial autorizada previamente por la Rectoría.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 7 Steps Workflow -->
+      <div class="apple-card p-6 space-y-4">
+        <h3 class="text-base font-bold text-[#1d1d1f] dark:text-white">1.2 Flujo Guiado de Radicación (7 Pasos)</h3>
+        
+        <div class="space-y-3">
+          <div class="flex items-start gap-3.5 p-3 rounded-xl hover:bg-black/2 dark:hover:bg-white/2 transition-colors">
+            <span class="step-pill w-6 h-6 rounded-full bg-apple-blue/10 text-apple-blue font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">1</span>
+            <div>
+              <strong class="text-xs font-bold text-[#1d1d1f] dark:text-white block">Identificación del Docente:</strong>
+              <span class="text-xs text-[#86868b] dark:text-[#a1a1a6]">El sistema precarga automáticamente su cédula, sede, jornada y vinculación laboral.</span>
+            </div>
+          </div>
+
+          <div class="flex items-start gap-3.5 p-3 rounded-xl hover:bg-black/2 dark:hover:bg-white/2 transition-colors">
+            <span class="step-pill w-6 h-6 rounded-full bg-apple-blue/10 text-apple-blue font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">2</span>
+            <div>
+              <strong class="text-xs font-bold text-[#1d1d1f] dark:text-white block">Selección del Tipo Reglamentario:</strong>
+              <span class="text-xs text-[#86868b] dark:text-[#a1a1a6]">Elige la causal jurídica correspondiente de la lista aprobada institucionalmente.</span>
+            </div>
+          </div>
+
+          <div class="flex items-start gap-3.5 p-3 rounded-xl hover:bg-black/2 dark:hover:bg-white/2 transition-colors">
+            <span class="step-pill w-6 h-6 rounded-full bg-apple-blue/10 text-apple-blue font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">3</span>
+            <div>
+              <strong class="text-xs font-bold text-[#1d1d1f] dark:text-white block">Fechas y Rango Horario:</strong>
+              <span class="text-xs text-[#86868b] dark:text-[#a1a1a6]">Define si es jornada completa o por horas (ej: 8:00 AM a 11:00 AM). El sistema computa los días de anticipación de forma inmediata.</span>
+            </div>
+          </div>
+
+          <div class="flex items-start gap-3.5 p-3 rounded-xl hover:bg-black/2 dark:hover:bg-white/2 transition-colors">
+            <span class="step-pill w-6 h-6 rounded-full bg-apple-blue/10 text-apple-blue font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">4</span>
+            <div>
+              <strong class="text-xs font-bold text-[#1d1d1f] dark:text-white block">Motivo y Carga de Soportes:</strong>
+              <span class="text-xs text-[#86868b] dark:text-[#a1a1a6]">Redacta la justificación y adjunta el documento probatorio (PDF, JPG, PNG). Si es imprevisto, se habilita la entrega posterior.</span>
+            </div>
+          </div>
+
+          <div class="flex items-start gap-3.5 p-3 rounded-xl hover:bg-black/2 dark:hover:bg-white/2 transition-colors">
+            <span class="step-pill w-6 h-6 rounded-full bg-apple-blue/10 text-apple-blue font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">5</span>
+            <div>
+              <strong class="text-xs font-bold text-[#1d1d1f] dark:text-white block">Declaración de Afectación Académica:</strong>
+              <span class="text-xs text-[#86868b] dark:text-[#a1a1a6]">Selecciona los cursos, materias y total de horas de clase presenciales que no se dictarán sincrónicamente.</span>
+            </div>
+          </div>
+
+          <div class="flex items-start gap-3.5 p-3 rounded-xl hover:bg-black/2 dark:hover:bg-white/2 transition-colors">
+            <span class="step-pill w-6 h-6 rounded-full bg-apple-blue/10 text-apple-blue font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">6</span>
+            <div>
+              <strong class="text-xs font-bold text-[#1d1d1f] dark:text-white block">Plan de Contingencia Pedagógica:</strong>
+              <span class="text-xs text-[#86868b] dark:text-[#a1a1a6]">Formula el taller, guía o actividad autónoma que desarrollarán los estudiantes durante su ausencia.</span>
+            </div>
+          </div>
+
+          <div class="flex items-start gap-3.5 p-3 rounded-xl hover:bg-black/2 dark:hover:bg-white/2 transition-colors">
+            <span class="step-pill w-6 h-6 rounded-full bg-apple-blue/10 text-apple-blue font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">7</span>
+            <div>
+              <strong class="text-xs font-bold text-[#1d1d1f] dark:text-white block">Resumen y Radicación:</strong>
+              <span class="text-xs text-[#86868b] dark:text-[#a1a1a6]">Verificación global con opción de guardar borrador temporal o radicar oficialmente ante la Coordinación.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Legalization Alert Callout -->
+      <div class="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-[#1d1d1f] dark:text-white flex items-start gap-3">
+        <div class="text-apple-amber mt-0.5">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+        </div>
+        <div class="text-xs leading-relaxed">
+          <strong class="font-bold text-apple-amber block">Monitoreo de Soportes Post-Permiso (Plazo de 5 Días):</strong>
+          Si el permiso fue concedido por urgencia médica o calamidad sobreviniente, el docente cuenta con <strong>5 días hábiles</strong> tras el retorno a labores para subir la constancia definitiva. El sistema alerta automáticamente al docente y a la coordinación si dicho plazo se excede.
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════════════════════════ -->
+    <!-- SECCIÓN 2: MÓDULO DE CONVIVENCIA ESCOLAR -->
+    <!-- ══════════════════════════════════════════════════════════════════════════ -->
+    <section id="convivencia" class="space-y-6 pt-6">
+      <div class="flex items-center gap-3 border-b border-black/5 dark:border-white/10 pb-4">
+        <div class="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-sm">
+          02
+        </div>
+        <div>
+          <span class="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Ley 1620 y Manual de Convivencia</span>
+          <h2 class="text-2xl font-bold text-[#1d1d1f] dark:text-white tracking-tight">Módulo de Convivencia Escolar</h2>
+        </div>
+      </div>
+
+      <!-- Vector Interactive Process Diagram (Pure CSS/SVG, No raster images) -->
+      <div class="apple-card p-6 space-y-4">
+        <div class="flex items-center justify-between pb-3 border-b border-black/5 dark:border-white/10">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+            <span class="text-xs font-bold text-[#1d1d1f] dark:text-white uppercase tracking-wider">Ruta Garantista del Debido Proceso</span>
+          </div>
+          <span class="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-0.5 rounded-full">Ley 1620 de 2013</span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+          <div class="p-3.5 rounded-xl bg-[#f5f5f7] dark:bg-[#2c2c2e] border border-black/5 dark:border-white/5 space-y-1">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 uppercase">Etapa 1</span>
+              <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+            </div>
+            <strong class="text-xs font-bold text-[#1d1d1f] dark:text-white block">Identificación & Diálogo</strong>
+            <span class="text-[11px] text-[#86868b] dark:text-[#a1a1a6] block leading-tight">Búsqueda del estudiante, revisión de antecedentes y escucha reflexiva.</span>
+          </div>
+
+          <div class="p-3.5 rounded-xl bg-[#f5f5f7] dark:bg-[#2c2c2e] border border-black/5 dark:border-white/5 space-y-1">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-bold text-apple-blue uppercase">Etapa 2</span>
+              <span class="w-2 h-2 rounded-full bg-apple-blue"></span>
+            </div>
+            <strong class="text-xs font-bold text-[#1d1d1f] dark:text-white block">Descargos & Compromiso</strong>
+            <span class="text-[11px] text-[#86868b] dark:text-[#a1a1a6] block leading-tight">Registro textual de la versión del menor y formulación del acuerdo reparador.</span>
+          </div>
+
+          <div class="p-3.5 rounded-xl bg-[#f5f5f7] dark:bg-[#2c2c2e] border border-black/5 dark:border-white/5 space-y-1">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-bold text-purple-600 dark:text-purple-400 uppercase">Etapa 3</span>
+              <span class="w-2 h-2 rounded-full bg-purple-500"></span>
+            </div>
+            <strong class="text-xs font-bold text-[#1d1d1f] dark:text-white block">Firma en Pantalla (Canvas)</strong>
+            <span class="text-[11px] text-[#86868b] dark:text-[#a1a1a6] block leading-tight">Firma digital manuscrita en dispositivo táctil y radicación formal.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Situations Classification Table -->
+      <div class="apple-card p-6 space-y-4">
+        <h3 class="text-base font-bold text-[#1d1d1f] dark:text-white">2.1 Clasificación Legal de Situaciones (Ley 1620 de 2013)</h3>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3.5 pt-1">
+          <!-- Tipo I -->
+          <div class="p-4 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-500/20 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="px-2 py-0.5 rounded-full bg-emerald-500 text-white text-[10px] font-bold tracking-wider uppercase">Tipo I</span>
+              <span class="text-[11px] text-emerald-700 dark:text-emerald-300 font-semibold">Mediación en Aula</span>
+            </div>
+            <h4 class="text-xs font-bold text-[#1d1d1f] dark:text-white">Conflictos Leves y Cotidianos</h4>
+            <p class="text-xs text-[#515154] dark:text-[#a1a1a6] leading-relaxed">
+              Interrupciones de clase, discusiones verbales esporádicas o incumplimiento de normas sin afectación física. Tratadas por el docente titular con descargos y acta de compromiso.
+            </p>
+          </div>
+
+          <!-- Tipo II -->
+          <div class="p-4 rounded-2xl bg-blue-50/60 dark:bg-blue-950/20 border border-blue-500/20 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="px-2 py-0.5 rounded-full bg-apple-blue text-white text-[10px] font-bold tracking-wider uppercase">Tipo II</span>
+              <span class="text-[11px] text-apple-blue font-semibold">Comité & Acudiente</span>
+            </div>
+            <h4 class="text-xs font-bold text-[#1d1d1f] dark:text-white">Agresión Reiterada o Bullying</h4>
+            <p class="text-xs text-[#515154] dark:text-[#a1a1a6] leading-relaxed">
+              Acoso escolar sostenido, ciberacoso o agresiones que no generen incapacidad médica. Requiere citación formal a padres de familia y remisión a Orientación Escolar.
+            </p>
+          </div>
+
+          <!-- Tipo III -->
+          <div class="p-4 rounded-2xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-500/20 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="px-2 py-0.5 rounded-full bg-apple-amber text-white text-[10px] font-bold tracking-wider uppercase">Tipo III</span>
+              <span class="text-[11px] text-apple-amber font-semibold">Ruta Externa / Rectoría</span>
+            </div>
+            <h4 class="text-xs font-bold text-[#1d1d1f] dark:text-white">Presuntos Delitos o Daño Grave</h4>
+            <p class="text-xs text-[#515154] dark:text-[#a1a1a6] leading-relaxed">
+              Hechos que revisten características de delito o lesiones graves a la integridad física o sexual. Se activa inmediatamente la ruta con ICBF, Comisaría y Policía de Infancia.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5 Steps Flow Card -->
+      <div class="apple-card p-6 space-y-4">
+        <h3 class="text-base font-bold text-[#1d1d1f] dark:text-white">2.2 Registro de Novedades por el Docente (5 Pasos)</h3>
+
+        <div class="space-y-3">
+          <div class="flex items-start gap-3.5 p-3 rounded-xl hover:bg-black/2 dark:hover:bg-white/2 transition-colors">
+            <span class="step-pill w-6 h-6 rounded-full bg-emerald-500/10 text-emerald-600 font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">1</span>
+            <div>
+              <strong class="text-xs font-bold text-[#1d1d1f] dark:text-white block">Estudiante e Historial:</strong>
+              <span class="text-xs text-[#86868b] dark:text-[#a1a1a6]">Búsqueda por curso asignado o directorio general. El sistema exhibe el conteo de faltas previas en el período para identificar reincidencias.</span>
+            </div>
+          </div>
+
+          <div class="flex items-start gap-3.5 p-3 rounded-xl hover:bg-black/2 dark:hover:bg-white/2 transition-colors">
+            <span class="step-pill w-6 h-6 rounded-full bg-emerald-500/10 text-emerald-600 font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">2</span>
+            <div>
+              <strong class="text-xs font-bold text-[#1d1d1f] dark:text-white block">Tipificación de la Situación:</strong>
+              <span class="text-xs text-[#86868b] dark:text-[#a1a1a6]">Selección precisa del catálogo del Manual de Convivencia con el artículo y numeral tipificado.</span>
+            </div>
+          </div>
+
+          <div class="flex items-start gap-3.5 p-3 rounded-xl hover:bg-black/2 dark:hover:bg-white/2 transition-colors">
+            <span class="step-pill w-6 h-6 rounded-full bg-emerald-500/10 text-emerald-600 font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">3</span>
+            <div>
+              <strong class="text-xs font-bold text-[#1d1d1f] dark:text-white block">Hechos, Descargos y Compromiso Reparador:</strong>
+              <span class="text-xs text-[#86868b] dark:text-[#a1a1a6]">Narración objetiva de lo ocurrido, registro textual de las explicaciones del estudiante (garantía del debido proceso) y formulación de la acción pedagógica reparadora.</span>
+            </div>
+          </div>
+
+          <div class="flex items-start gap-3.5 p-3 rounded-xl hover:bg-black/2 dark:hover:bg-white/2 transition-colors">
+            <span class="step-pill w-6 h-6 rounded-full bg-emerald-500/10 text-emerald-600 font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">4</span>
+            <div>
+              <strong class="text-xs font-bold text-[#1d1d1f] dark:text-white block">Vista Previa Institucional:</strong>
+              <span class="text-xs text-[#86868b] dark:text-[#a1a1a6]">Previsualización formal del acta completa con el membrete oficial de la Normal Superior antes de rubricarla.</span>
+            </div>
+          </div>
+
+          <div class="flex items-start gap-3.5 p-3 rounded-xl hover:bg-black/2 dark:hover:bg-white/2 transition-colors">
+            <span class="step-pill w-6 h-6 rounded-full bg-emerald-500/10 text-emerald-600 font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">5</span>
+            <div>
+              <strong class="text-xs font-bold text-[#1d1d1f] dark:text-white block">Firma Digital en Pantalla (Canvas) y Radicación:</strong>
+              <span class="text-xs text-[#86868b] dark:text-[#a1a1a6]">El estudiante estampa su firma manuscrita en el lienzo táctil como notificación oficial. El reporte queda radicado de inmediato para la Coordinación de Convivencia.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════════════════════════ -->
+    <!-- SECCIÓN 3: PORTAL DE CONOCIMIENTO ESCOLAR -->
+    <!-- ══════════════════════════════════════════════════════════════════════════ -->
+    <section id="portal" class="space-y-6 pt-6">
+      <div class="flex items-center gap-3 border-b border-black/5 dark:border-white/10 pb-4">
+        <div class="w-9 h-9 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold text-sm">
+          03
+        </div>
+        <div>
+          <span class="text-xs font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider">Gobernanza y Repositorio Curricular</span>
+          <h2 class="text-2xl font-bold text-[#1d1d1f] dark:text-white tracking-tight">Portal de Conocimiento Escolar</h2>
+        </div>
+      </div>
+
+      <!-- Vector Architecture Component (Pure CSS/SVG, No raster images) -->
+      <div class="apple-card p-6 space-y-4">
+        <div class="flex items-center justify-between pb-3 border-b border-black/5 dark:border-white/10">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-purple-500"></span>
+            <span class="text-xs font-bold text-[#1d1d1f] dark:text-white uppercase tracking-wider">Esquema del Repositorio Digital</span>
+          </div>
+          <div class="flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-[#f5f5f7] dark:bg-[#2c2c2e] font-mono text-[11px] text-[#515154] dark:text-[#a1a1a6] border border-black/5 dark:border-white/10">
+            <span>Búsqueda Rápida: ⌘K</span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+          <div class="p-4 rounded-xl bg-blue-50/40 dark:bg-blue-950/20 border border-blue-500/20 space-y-1.5">
+            <span class="text-xs font-bold text-apple-blue uppercase tracking-wider block">1. Áreas de Conocimiento</span>
+            <p class="text-xs text-[#515154] dark:text-[#a1a1a6] leading-relaxed">
+              Tecnología, Matemáticas, Ciencias Naturales, Ciencias Sociales, Lenguaje, Inglés, Artística, Educación Física, Religión/Ética y Programa de Formación Complementaria (PFC).
+            </p>
+            <span class="text-[11px] text-apple-blue font-semibold block">Contenido: Mallas curriculares, planes de aula y proyectos.</span>
+          </div>
+
+          <div class="p-4 rounded-xl bg-emerald-50/40 dark:bg-emerald-950/20 border border-emerald-500/20 space-y-1.5">
+            <span class="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block">2. Documentos Institucionales</span>
+            <p class="text-xs text-[#515154] dark:text-[#a1a1a6] leading-relaxed">
+              PEI (Proyecto Educativo Institucional), Manual de Convivencia Escolar, SIEE (Sistema de Evaluación) y Formatos y Plantillas Oficiales de la Normal.
+            </p>
+            <span class="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold block">Contenido: Marco normativo, acuerdos y manuales operativos.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Spotlight Search and Navigation -->
+      <div class="apple-card p-6 space-y-4">
+        <div class="flex items-center justify-between">
+          <h3 class="text-base font-bold text-[#1d1d1f] dark:text-white">3.1 Navegación Jerárquica y Búsqueda Spotlight</h3>
+          <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#f5f5f7] dark:bg-[#2c2c2e] font-mono text-xs text-[#515154] dark:text-[#a1a1a6] border border-black/5 dark:border-white/10">
+            <span>⌘</span>
+            <span>K</span>
+          </div>
+        </div>
+
+        <p class="text-xs sm:text-sm text-[#515154] dark:text-[#a1a1a6] leading-relaxed">
+          Para localizar un documento sin tener que explorar manualmente las carpetas, pulse el atajo de teclado <strong>Ctrl + K</strong> (en Windows) o <strong>⌘ + K</strong> (en macOS). Escriba términos clave como <em>"Geometría"</em>, <em>"Formato de acta"</em> o <em>"PEI"</em> para previsualizar y abrir el documento inmediatamente en el visor integrado.
+        </p>
+      </div>
+
+      <!-- Security and Permissions Matrix -->
+      <div class="apple-card p-6 space-y-4">
+        <h3 class="text-base font-bold text-[#1d1d1f] dark:text-white">3.2 Matriz de Seguridad y Políticas de Edición / Eliminación</h3>
+        <p class="text-xs sm:text-sm text-[#515154] dark:text-[#a1a1a6] leading-relaxed">
+          Para garantizar la custodia del material curricular y prevenir pérdidas accidentales de información, el sistema implementa una estricta política de autoría y roles:
+        </p>
+
+        <div class="overflow-x-auto rounded-2xl border border-black/5 dark:border-white/10">
+          <table class="w-full text-xs text-left">
+            <thead class="bg-[#f5f5f7] dark:bg-[#2c2c2e] text-[#1d1d1f] dark:text-white font-bold border-b border-black/5 dark:border-white/10">
+              <tr>
+                <th class="px-4 py-3">Acción en el Portal</th>
+                <th class="px-4 py-3 text-center">Docente Autor</th>
+                <th class="px-4 py-3 text-center">Docente No Autor</th>
+                <th class="px-4 py-3 text-center">Coordinador / Admin</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-black/5 dark:divide-white/5">
+              <tr class="hover:bg-black/2 dark:hover:bg-white/2">
+                <td class="px-4 py-3 font-medium text-[#1d1d1f] dark:text-white">Consultar y leer documentos publicados</td>
+                <td class="px-4 py-3 text-center text-emerald-600 font-bold">✓ Sí</td>
+                <td class="px-4 py-3 text-center text-emerald-600 font-bold">✓ Sí</td>
+                <td class="px-4 py-3 text-center text-emerald-600 font-bold">✓ Sí</td>
+              </tr>
+              <tr class="hover:bg-black/2 dark:hover:bg-white/2">
+                <td class="px-4 py-3 font-medium text-[#1d1d1f] dark:text-white">Descargar archivos originales (PDF/Drive)</td>
+                <td class="px-4 py-3 text-center text-emerald-600 font-bold">✓ Sí</td>
+                <td class="px-4 py-3 text-center text-emerald-600 font-bold">✓ Sí</td>
+                <td class="px-4 py-3 text-center text-emerald-600 font-bold">✓ Sí</td>
+              </tr>
+              <tr class="hover:bg-black/2 dark:hover:bg-white/2">
+                <td class="px-4 py-3 font-medium text-[#1d1d1f] dark:text-white">Crear nuevas carpetas y subir recursos</td>
+                <td class="px-4 py-3 text-center text-emerald-600 font-bold">✓ Sí</td>
+                <td class="px-4 py-3 text-center text-emerald-600 font-bold">✓ Sí</td>
+                <td class="px-4 py-3 text-center text-emerald-600 font-bold">✓ Sí</td>
+              </tr>
+              <tr class="hover:bg-black/2 dark:hover:bg-white/2 bg-blue-50/30 dark:bg-blue-950/20">
+                <td class="px-4 py-3 font-bold text-apple-blue">Editar Nombre o Descripción de Carpeta</td>
+                <td class="px-4 py-3 text-center text-emerald-600 font-bold">✓ Solo sus carpetas</td>
+                <td class="px-4 py-3 text-center text-red-500 font-bold">✗ Bloqueado</td>
+                <td class="px-4 py-3 text-center text-emerald-600 font-bold">✓ Control Total</td>
+              </tr>
+              <tr class="hover:bg-black/2 dark:hover:bg-white/2 bg-red-50/30 dark:bg-red-950/20">
+                <td class="px-4 py-3 font-bold text-apple-red">Eliminar Carpeta o Archivo</td>
+                <td class="px-4 py-3 text-center text-emerald-600 font-bold">✓ Solo sus recursos</td>
+                <td class="px-4 py-3 text-center text-red-500 font-bold">✗ Bloqueado</td>
+                <td class="px-4 py-3 text-center text-emerald-600 font-bold">✓ Control Total</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════════════════════════ -->
+    <!-- SECCIÓN 4: PREGUNTAS FRECUENTES (FAQ) -->
+    <!-- ══════════════════════════════════════════════════════════════════════════ -->
+    <section id="faq" class="space-y-6 pt-6">
+      <div class="flex items-center gap-3 border-b border-black/5 dark:border-white/10 pb-4">
+        <div class="w-9 h-9 rounded-xl bg-amber-500/10 text-apple-amber flex items-center justify-center font-bold text-sm">
+          04
+        </div>
+        <div>
+          <span class="text-xs font-bold text-apple-amber uppercase tracking-wider">Resolución de Dudas</span>
+          <h2 class="text-2xl font-bold text-[#1d1d1f] dark:text-white tracking-tight">Preguntas Frecuentes (FAQ)</h2>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="apple-card p-5 space-y-2">
+          <strong class="text-xs font-bold text-[#1d1d1f] dark:text-white block">¿Puedo radicar un permiso el mismo día?</strong>
+          <p class="text-xs text-[#86868b] dark:text-[#a1a1a6] leading-relaxed">
+            Solo en casos de fuerza mayor, urgencia médica sobreviniente o calamidad doméstica súbita. Para ausencias programadas debe mediar un tiempo de anticipación de mínimo 2 a 3 días hábiles.
+          </p>
+        </div>
+
+        <div class="apple-card p-5 space-y-2">
+          <strong class="text-xs font-bold text-[#1d1d1f] dark:text-white block">¿La firma en pantalla es legalmente válida?</strong>
+          <p class="text-xs text-[#86868b] dark:text-[#a1a1a6] leading-relaxed">
+            Sí. Cumple los estándares de constancia y debido proceso exigidos por la Ley 1620 y el Código de Infancia y Adolescencia, registrándose con fecha, hora e identidad del docente actuante.
+          </p>
+        </div>
+
+        <div class="apple-card p-5 space-y-2">
+          <strong class="text-xs font-bold text-[#1d1d1f] dark:text-white block">¿Por qué no veo el botón de eliminar en una carpeta?</strong>
+          <p class="text-xs text-[#86868b] dark:text-[#a1a1a6] leading-relaxed">
+            Porque dicha carpeta fue creada por otro colega o por la directiva institucional. Por política de seguridad, únicamente el autor o un administrador pueden eliminarla.
+          </p>
+        </div>
+
+        <div class="apple-card p-5 space-y-2">
+          <strong class="text-xs font-bold text-[#1d1d1f] dark:text-white block">¿Cómo edito la descripción de una carpeta pedagógica?</strong>
+          <p class="text-xs text-[#86868b] dark:text-[#a1a1a6] leading-relaxed">
+            Pase el cursor sobre la tarjeta de la carpeta de la cual usted sea autor y presione el botón con ícono de lápiz ("Editar Carpeta"). Podrá actualizar tanto el nombre como el detalle descriptivo.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 5. INSTITUTIONAL FOOTER ── -->
+    <footer class="pt-12 border-t border-black/5 dark:border-white/10 text-center space-y-2 text-xs text-[#86868b] dark:text-[#a1a1a6]">
+      <p class="font-semibold text-[#1d1d1f] dark:text-white">Escuela Normal Superior del Nordeste • Aula ENSUNY</p>
+      <p>Yolombó, Antioquia • República de Colombia • Formando maestros para el Nordeste y el país</p>
+      <p class="text-[11px] text-[#a1a1a6]">Documento Oficial registrado en el Portal de Conocimiento Escolar.</p>
+    </footer>
+
+  </main>
+</body>
+</html>
