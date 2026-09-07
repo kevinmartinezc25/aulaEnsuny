@@ -16,7 +16,12 @@ export function OfflineScreen() {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col justify-between p-4 sm:p-6 text-slate-800 dark:text-slate-100">
       {/* Top institutional header */}
       <header className="flex items-center justify-between max-w-4xl mx-auto w-full py-4 border-b border-slate-200 dark:border-slate-800">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
+          <img
+            src="/escudo_ensuny.png"
+            alt="Escudo ENSUNY"
+            className="w-9 h-9 object-contain shrink-0"
+          />
           <div className="relative w-9 h-9 rounded-xl overflow-hidden bg-blue-900/10 p-1 flex items-center justify-center">
             <Image
               src="/icons/icon-192x192.png"

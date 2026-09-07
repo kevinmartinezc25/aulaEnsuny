@@ -70,12 +70,18 @@ export function CupertinoHeader({
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-14 flex items-center justify-between gap-2 sm:gap-4">
         {/* Left: Institution Branding & Return Control */}
         <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-          {/* Official aulaEnsuny Icon */}
+          {/* Official aulaEnsuny Icon and Institutional Shield */}
           <Link
             href={getHomeHref()}
-            className="flex items-center active:scale-[0.98] transition-transform duration-100 ease-out group shrink-0"
+            className="flex items-center gap-1.5 sm:gap-2 active:scale-[0.98] transition-transform duration-100 ease-out group shrink-0"
             title={getHomeTitle()}
           >
+            {/* Escudo Institucional ENSUNY */}
+            <img
+              src="/escudo_ensuny.png"
+              alt="Escudo ENSUNY"
+              className="w-8 h-8 sm:w-9 sm:h-9 object-contain shrink-0"
+            />
             {/* Official aulaEnsuny Icon (Green squircle with book) */}
             <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-[10px] sm:rounded-[11px] bg-gradient-to-br from-[#10B981] to-[#1F4E31] flex items-center justify-center text-white shadow-sm shadow-[#10B981]/20 shrink-0">
               <BookOpen className="w-4 h-4 sm:w-5 sm:h-5 text-white shrink-0" />

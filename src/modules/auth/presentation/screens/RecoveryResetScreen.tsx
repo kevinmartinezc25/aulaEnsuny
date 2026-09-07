@@ -117,8 +117,15 @@ export function RecoveryResetScreen() {
             transition={{ delay: 0.1, type: 'spring' }}
             className="mb-8 sm:mb-10 flex justify-center w-full px-2 sm:px-0"
           >
-            <div className="relative w-full max-w-[416px] aspect-[416/145]">
-              <img src="/logo.svg?v=2" alt="aulaEnsuny Logo" className="object-contain w-full h-full" />
+            <div className="flex items-center justify-center gap-3 w-full max-w-[340px] sm:max-w-[420px]">
+              <img
+                src="/escudo_ensuny.png"
+                alt="Escudo ENSUNY"
+                className="h-[50px] sm:h-[62px] w-auto object-contain shrink-0 drop-shadow-xs"
+              />
+              <div className="relative w-full max-w-[240px] sm:max-w-[300px] aspect-[416/145]">
+                <img src="/logo.svg?v=2" alt="aulaEnsuny Logo" className="object-contain w-full h-full" />
+              </div>
             </div>
           </motion.div>
 

@@ -124,11 +124,17 @@ export default function LandingPage() {
           {/* Reflejo especular superior */}
           <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-white dark:via-white/20 to-transparent" />
 
-          {/* Logotipo oficial con escala responsiva */}
+          {/* Logotipo oficial con escala responsiva y escudo institucional */}
           <Link
             href="/"
-            className="group flex items-center justify-start active:scale-95 duration-100 ease-out cursor-pointer shrink-0"
+            className="group flex items-center justify-start gap-2 sm:gap-3 active:scale-95 duration-100 ease-out cursor-pointer shrink-0"
           >
+            {/* Escudo Institucional ENSUNY */}
+            <img
+              src="/escudo_ensuny.png"
+              alt="Escudo ENSUNY"
+              className="h-[26px] xs:h-[28px] sm:h-[46px] w-auto object-contain shrink-0 drop-shadow-xs"
+            />
             <div className="relative w-[135px] xs:w-[155px] sm:w-[310px] md:w-[340px] h-9 sm:h-[66px] flex items-center justify-start">
               <img
                 src="/logo.svg?v=2"

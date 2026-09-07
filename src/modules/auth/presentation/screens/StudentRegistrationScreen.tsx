@@ -229,9 +229,16 @@ export function StudentRegistrationScreen() {
             transition={{ delay: 0.05, type: 'spring', damping: 22, stiffness: 200 }}
             className="mb-5 w-full flex justify-center px-6"
           >
-            <div className="relative w-full max-w-[210px] sm:max-w-[260px] aspect-[416/145] drop-shadow-sm">
-              <img src="/logo.svg?v=2" alt="aulaEnsuny Logo" className="object-contain w-full h-full dark:hidden" />
-              <img src="/logo_dark.svg?v=2" alt="aulaEnsuny Logo Dark" className="object-contain w-full h-full hidden dark:block" />
+            <div className="flex items-center justify-center gap-3 w-full max-w-[280px] sm:max-w-[340px]">
+              <img
+                src="/escudo_ensuny.png"
+                alt="Escudo ENSUNY"
+                className="h-[50px] sm:h-[62px] w-auto object-contain shrink-0 drop-shadow-xs"
+              />
+              <div className="relative w-full max-w-[210px] sm:max-w-[260px] aspect-[416/145] drop-shadow-sm">
+                <img src="/logo.svg?v=2" alt="aulaEnsuny Logo" className="object-contain w-full h-full dark:hidden" />
+                <img src="/logo_dark.svg?v=2" alt="aulaEnsuny Logo Dark" className="object-contain w-full h-full hidden dark:block" />
+              </div>
             </div>
           </motion.div>
 
