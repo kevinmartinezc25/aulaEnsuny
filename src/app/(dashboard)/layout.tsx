@@ -172,11 +172,12 @@ function AdminSidebar({ onClose, user, enabledModules = [], isCollapsed = false 
   return (
     <div className="flex h-full flex-col bg-white dark:bg-slate-900 border-r border-slate-100 dark:border-slate-800/60">
       {/* Logo */}
-      <div className={`flex h-16 shrink-0 items-center border-b border-slate-100 dark:border-slate-800/60 ${isCollapsed ? 'justify-center px-2' : 'gap-3 px-5'}`}>
-        <img src="/logo_1.svg" alt="aulaEnsuny" className="h-8 object-contain" />
+      <div className={`flex h-16 shrink-0 items-center border-b border-slate-100 dark:border-slate-800/60 ${isCollapsed ? 'justify-center px-1 gap-1.5' : 'gap-2 px-4'}`}>
+        <img src="/escudo_ensuny.png" alt="Escudo ENSUNY" className={`${isCollapsed ? 'h-6 w-6' : 'h-8 w-8'} shrink-0 object-contain`} />
+        <img src="/logo_1.svg" alt="aulaEnsuny" className={`${isCollapsed ? 'h-6 w-6' : 'h-8 w-8'} shrink-0 object-contain`} />
         {!isCollapsed && (
           <div>
-            <p className="text-sm font-bold text-slate-900 dark:text-white tracking-tight">aulaEnsuny</p>
+            <p className="text-sm font-bold text-slate-900 dark:text-white tracking-tight whitespace-nowrap">aulaEnsuny</p>
             <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
               {user?.role === 'superadmin' ? 'SuperAdmin' : 'Admin'}
@@ -454,17 +455,30 @@ function SidebarContent({ onClose, isCollapsed = false, user }: SidebarProps) {
   }
 
   return (
-    <div className={`flex h-full flex-col justify-between ${isCollapsed ? 'p-4' : 'p-6'}`}>
-      <div className="space-y-8 flex-1 overflow-y-auto pr-1 -mr-1 no-scrollbar">
-        {/* Logo */}
-        <Link href="/" className={`flex items-center gap-2.5 ${isCollapsed ? 'justify-center' : 'px-2'}`} onClick={onClose}>
-          <img src="/logo_1.svg" alt="aulaEnsuny Logo" className="h-10 shrink-0 object-contain" />
+    <div className="flex h-full flex-col justify-between">
+      {/* Brand Header */}
+      <div className={`h-16 shrink-0 flex items-center border-b border-slate-100 dark:border-slate-800/60 ${isCollapsed ? 'justify-center px-1' : 'px-4 pr-10'}`}>
+        <Link href="/" className={`flex items-center ${isCollapsed ? 'justify-center gap-1.5' : 'gap-2'}`} onClick={onClose}>
+          <img
+            src="/escudo_ensuny.png"
+            alt="Escudo ENSUNY"
+            className={`${isCollapsed ? 'h-6 w-6' : 'h-8 w-8'} shrink-0 object-contain`}
+          />
+          <img
+            src="/logo_1.svg"
+            alt="aulaEnsuny Logo"
+            className={`${isCollapsed ? 'h-6 w-6' : 'h-8 w-8'} shrink-0 object-contain`}
+          />
           {!isCollapsed && (
-            <span className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">aulaEnsuny</span>
+            <span className="text-base font-bold tracking-tight text-slate-900 dark:text-white whitespace-nowrap">
+              aulaEnsuny
+            </span>
           )}
         </Link>
+      </div>
 
-        {/* Menu */}
+      {/* Menu scrollable */}
+      <div className={`flex-1 overflow-y-auto ${isCollapsed ? 'p-3' : 'p-4'} space-y-6 custom-scrollbar`}>
         <nav className="space-y-5">
           {menuGroups.map((group, groupIdx) => (
             <div key={groupIdx} className="space-y-1">
@@ -503,7 +517,7 @@ function SidebarContent({ onClose, isCollapsed = false, user }: SidebarProps) {
       </div>
 
       {/* Profile Card Bottom */}
-      <div className="border-t border-slate-100 pt-4 dark:border-slate-800/60 relative">
+      <div className={`border-t border-slate-100 dark:border-slate-800/60 relative ${isCollapsed ? 'p-2' : 'p-3'}`}>
         <AnimatePresence>
           {isProfileOpen && !isCollapsed && (
             <motion.div
@@ -1063,7 +1077,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <aside className={`fixed inset-y-0 left-0 z-20 hidden border-r border-slate-100 bg-white/70 backdrop-blur-md dark:border-slate-800/60 dark:bg-slate-900/70 md:block transition-all duration-300 ${isSidebarCollapsed ? 'w-20' : 'w-64'}`}>
           <SidebarContent user={user} isCollapsed={isSidebarCollapsed} />
           <button onClick={toggleSidebar}
-            className="absolute -right-3 top-6 flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-900 shadow-sm transition-all dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:text-white z-30"
+            className="absolute -right-3 top-16 -translate-y-1/2 flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-900 shadow-sm transition-all dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:text-white z-30"
             title={isSidebarCollapsed ? 'Expandir menú' : 'Ocultar menú'}>
             {isSidebarCollapsed ? <PanelLeftOpen className="h-3.5 w-3.5 ml-0.5" /> : <PanelLeftClose className="h-3.5 w-3.5" />}
           </button>
@@ -1081,7 +1095,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </button>
             {isCourseSection && (
               <Link href={pathname.includes('/student') ? '/student/dashboard' : '/teacher/dashboard'} className="hidden md:flex items-center gap-2 px-2 hover:opacity-80 transition-opacity">
-                <img src="/logo_1.svg" alt="aulaEnsuny Logo" className="h-8 shrink-0 object-contain" />
+                <img src="/escudo_ensuny.png" alt="Escudo ENSUNY" className="h-8 w-8 shrink-0 object-contain" />
+                <img src="/logo_1.svg" alt="aulaEnsuny Logo" className="h-8 w-8 shrink-0 object-contain" />
                 <span className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">aulaEnsuny</span>
               </Link>
             )}
