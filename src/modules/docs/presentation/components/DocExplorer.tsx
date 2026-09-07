@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ChevronRight, ChevronDown, ChevronUp, Folder, FolderOpen, FileText,
-  Plus, MoreHorizontal, Pencil, Trash2, FolderPlus, FilePlus, Palette, X, Lock
+  Plus, MoreHorizontal, Pencil, Trash2, FolderPlus, FilePlus, Palette, X, Lock, ExternalLink
 } from 'lucide-react'
 import type { Document, DocFolder } from '@/modules/docs/domain/entities/Document'
 import { DocStatusBadge } from './DocStatusBadge'
@@ -116,8 +116,10 @@ function FolderNode({
   const canAddContent = userRole !== 'student' && userRole !== 'guest'
   const isAuthor = currentUserId ? folder.createdBy === currentUserId : false
   const isAdmin = userRole === 'admin' || userRole === 'superadmin'
+  const isTeacher = userRole === 'teacher'
   const canModifyFolder = isAuthor || isAdmin
-  const isReadOnlyFolder = !canModifyFolder && userRole === 'teacher'
+  const canViewDriveLink = isAdmin || (isTeacher && isAuthor)
+  const isReadOnlyFolder = !canModifyFolder && isTeacher
   const isSelected = selectedFolderId === folder.id
   const docCount = getRecursiveDocCount(folder)
   const folderColor = folder.color ?? '#94a3b8' // default slate-400
@@ -299,6 +301,18 @@ function FolderNode({
               >
                 <FolderPlus className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" /> Nueva subcarpeta
               </button>
+
+              {canViewDriveLink && (folder.driveFolderUrl || folder.driveFolderId) && (
+                <a
+                  href={folder.driveFolderUrl || `https://drive.google.com/drive/folders/${folder.driveFolderId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setMenuOpen(false)}
+                  className="flex w-full items-center gap-2 px-3.5 py-2 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
+                >
+                  <ExternalLink className="h-3.5 w-3.5 text-blue-500" /> Abrir en Drive
+                </a>
+              )}
 
               {canModifyFolder && (
                 <>

@@ -61,6 +61,8 @@ function mapFolder(row: Record<string, unknown>): DocFolder {
     description: (row.description as string | null) ?? null,
     parentId: (row.parent_id as string | null) ?? null,
     color: (row.color as string | null) ?? null,
+    driveFolderId: (row.drive_folder_id as string | null) ?? null,
+    driveFolderUrl: (row.drive_folder_url as string | null) ?? null,
     createdBy: row.created_by as string,
     sortOrder: (row.sort_order as number) ?? 0,
     createdAt: row.created_at as string,
@@ -168,11 +170,58 @@ export async function createFolder(
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { data: null, error: 'No autenticado' }
 
-    const { data, error } = await supabase
+    let parentDriveFolderId: string | undefined = undefined
+    if (parentId) {
+      const { data: parentFolder } = await supabase
+        .from('doc_folders')
+        .select('drive_folder_id')
+        .eq('id', parentId)
+        .single()
+      if (parentFolder?.drive_folder_id) {
+        parentDriveFolderId = parentFolder.drive_folder_id
+      }
+    }
+
+    // 1. Crear la carpeta física en Google Drive dentro del Portal de Conocimiento
+    let driveFolderId: string | null = null
+    let driveFolderUrl: string | null = null
+    try {
+      const driveService = new GoogleDriveGasService()
+      const driveResult = await driveService.createFolder(name.trim(), parentDriveFolderId, 'docs')
+      driveFolderId = driveResult.folderId
+      driveFolderUrl = driveResult.folderUrl
+    } catch (driveErr) {
+      console.warn('[createFolder] Advertencia al crear carpeta en Drive:', driveErr)
+      // No bloqueamos la creación en BD si hay un fallo temporal en el proxy de Drive
+    }
+
+    // 2. Insertar en doc_folders
+    const insertPayload: Record<string, any> = {
+      name: name.trim(),
+      parent_id: parentId,
+      created_by: user.id,
+      drive_folder_id: driveFolderId,
+      drive_folder_url: driveFolderUrl
+    }
+
+    let { data, error } = await supabase
       .from('doc_folders')
-      .insert({ name: name.trim(), parent_id: parentId, created_by: user.id })
+      .insert(insertPayload)
       .select()
       .single()
+
+    // Resiliencia si las columnas drive_folder_id o drive_folder_url aún no existen en la BD
+    if (error && (error.message?.includes('drive_folder_id') || error.message?.includes('drive_folder_url'))) {
+      delete insertPayload.drive_folder_id
+      delete insertPayload.drive_folder_url
+      const retry = await supabase
+        .from('doc_folders')
+        .insert(insertPayload)
+        .select()
+        .single()
+      data = retry.data
+      error = retry.error
+    }
 
     if (error) return { data: null, error: error.message }
 
@@ -201,7 +250,11 @@ export async function updateFolder(
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { data: null, error: 'No autenticado' }
 
-    const { data: oldFolder } = await supabase.from('doc_folders').select('name, created_by').eq('id', id).single()
+    const { data: oldFolder } = await supabase
+      .from('doc_folders')
+      .select('name, created_by, drive_folder_id')
+      .eq('id', id)
+      .single()
     if (!oldFolder) return { data: null, error: 'Carpeta no encontrada' }
 
     const canEdit = await checkCanEditResource(supabase, user, oldFolder.created_by)
@@ -238,6 +291,16 @@ export async function updateFolder(
     }
 
     if (error) return { data: null, error: error.message }
+
+    // Sincronizar cambio de nombre en Google Drive si está vinculada
+    if (oldFolder.drive_folder_id && name.trim() !== oldFolder.name) {
+      try {
+        const driveService = new GoogleDriveGasService()
+        await driveService.renameFolder(oldFolder.drive_folder_id, name.trim())
+      } catch (driveErr) {
+        console.warn('[updateFolder] Error al renombrar en Google Drive:', driveErr)
+      }
+    }
 
     // Registrar actividad
     const profile = await supabase.from('profiles').select('first_name, last_name').eq('id', user.id).single()
@@ -300,7 +363,11 @@ export async function deleteFolder(id: string): Promise<{ error: string | null }
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'No autenticado' }
 
-    const { data: folder } = await supabase.from('doc_folders').select('name, created_by').eq('id', id).single()
+    const { data: folder } = await supabase
+      .from('doc_folders')
+      .select('name, created_by, drive_folder_id')
+      .eq('id', id)
+      .single()
     if (!folder) return { error: 'Carpeta no encontrada' }
 
     const canEdit = await checkCanEditResource(supabase, user, folder.created_by)
@@ -310,6 +377,16 @@ export async function deleteFolder(id: string): Promise<{ error: string | null }
 
     const { error } = await supabase.from('doc_folders').delete().eq('id', id)
     if (error) return { error: error.message }
+
+    // Sincronizar eliminación en Google Drive (enviar a papelera)
+    if (folder.drive_folder_id) {
+      try {
+        const driveService = new GoogleDriveGasService()
+        await driveService.deleteFolder(folder.drive_folder_id)
+      } catch (driveErr) {
+        console.warn('[deleteFolder] Error al eliminar carpeta de Google Drive:', driveErr)
+      }
+    }
 
     // Registrar actividad
     const profile = await supabase.from('profiles').select('first_name, last_name').eq('id', user.id).single()
@@ -406,13 +483,20 @@ export async function createDocument(input: {
 
     if (input.base64File && input.fileName && input.mimeType) {
       let categoryName = 'General'
+      let targetDriveFolderId: string | undefined = undefined
+
       if (input.folderId) {
         const { data: folder } = await supabase
           .from('doc_folders')
-          .select('name')
+          .select('name, drive_folder_id')
           .eq('id', input.folderId)
           .single()
-        if (folder) categoryName = folder.name
+        if (folder) {
+          categoryName = folder.name
+          if (folder.drive_folder_id) {
+            targetDriveFolderId = folder.drive_folder_id
+          }
+        }
       }
 
       const buffer = Buffer.from(input.base64File, 'base64')
@@ -424,7 +508,9 @@ export async function createDocument(input: {
         mimeType: input.mimeType,
         fileBuffer: fileBuffer,
         courseName: 'Portal de Conocimiento Escolar',
-        moduleName: categoryName
+        moduleName: categoryName,
+        targetFolderId: targetDriveFolderId,
+        context: 'docs'
       })
 
       driveFileId = uploadResult.fileId
@@ -533,14 +619,20 @@ export async function updateDocument(
 
     if (input.base64File && input.fileName && input.mimeType) {
       let categoryName = 'General'
+      let targetDriveFolderId: string | undefined = undefined
       const targetFolderId = input.folderId !== undefined ? input.folderId : oldDoc.folder_id
       if (targetFolderId) {
         const { data: folder } = await supabase
           .from('doc_folders')
-          .select('name')
+          .select('name, drive_folder_id')
           .eq('id', targetFolderId)
           .single()
-        if (folder) categoryName = folder.name
+        if (folder) {
+          categoryName = folder.name
+          if (folder.drive_folder_id) {
+            targetDriveFolderId = folder.drive_folder_id
+          }
+        }
       }
 
       const buffer = Buffer.from(input.base64File, 'base64')
@@ -552,7 +644,9 @@ export async function updateDocument(
         mimeType: input.mimeType,
         fileBuffer: fileBuffer,
         courseName: 'Portal de Conocimiento Escolar',
-        moduleName: categoryName
+        moduleName: categoryName,
+        targetFolderId: targetDriveFolderId,
+        context: 'docs'
       })
 
       newDriveFileId = uploadResult.fileId
@@ -945,4 +1039,82 @@ export async function reorderFolder(
     return { success: false, error: 'Error al reordenar la carpeta' }
   }
 }
+
+// ─── Sincronizar Carpetas Existentes a Google Drive ───────────────────────────
+export async function syncExistingFoldersToDrive(): Promise<{ syncedCount: number; error: string | null }> {
+  try {
+    const supabase = await createServerClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { syncedCount: 0, error: 'No autenticado' }
+
+    const { data: folders, error } = await supabase
+      .from('doc_folders')
+      .select('*')
+      .order('created_at', { ascending: true })
+
+    if (error || !folders) return { syncedCount: 0, error: error?.message || 'Error al obtener carpetas' }
+
+    const driveService = new GoogleDriveGasService()
+    let syncedCount = 0
+
+    // Mapa para rastrear los drive_folder_id de cada carpeta
+    const driveFolderMap = new Map<string, string>()
+    folders.forEach(f => {
+      if (f.drive_folder_id) driveFolderMap.set(f.id, f.drive_folder_id)
+    })
+
+    // Procesar carpetas pendientes respetando jerarquía
+    let pending = folders.filter(f => !f.drive_folder_id)
+    let iterations = 0
+
+    while (pending.length > 0 && iterations < 10) {
+      iterations++
+      const readyToProcess: typeof pending = []
+      const stillPending: typeof pending = []
+
+      for (const folder of pending) {
+        if (!folder.parent_id || driveFolderMap.has(folder.parent_id)) {
+          readyToProcess.push(folder)
+        } else {
+          stillPending.push(folder)
+        }
+      }
+
+      if (readyToProcess.length === 0) {
+        readyToProcess.push(...stillPending)
+        stillPending.length = 0
+      }
+
+      for (const folder of readyToProcess) {
+        try {
+          const parentDriveId = folder.parent_id ? driveFolderMap.get(folder.parent_id) : undefined
+          const result = await driveService.createFolder(folder.name, parentDriveId, 'docs')
+          
+          await supabase
+            .from('doc_folders')
+            .update({
+              drive_folder_id: result.folderId,
+              drive_folder_url: result.folderUrl
+            })
+            .eq('id', folder.id)
+
+          driveFolderMap.set(folder.id, result.folderId)
+          syncedCount++
+        } catch (e) {
+          console.warn(`[syncExistingFoldersToDrive] No se pudo sincronizar carpeta ${folder.name}:`, e)
+        }
+      }
+
+      pending = stillPending
+    }
+
+    revalidatePath('/admin/docs')
+    revalidatePath('/teacher/docs')
+    revalidatePath('/student/docs')
+    return { syncedCount, error: null }
+  } catch (err: any) {
+    return { syncedCount: 0, error: err?.message || 'Error durante la sincronización' }
+  }
+}
+
 

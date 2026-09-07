@@ -21,4 +21,30 @@ export class MockGoogleDriveService implements IDriveService {
     console.log(`[MockGoogleDrive] Deleting file: ${fileId}`)
     await new Promise(resolve => setTimeout(resolve, 500))
   }
+
+  async createFolder(folderName: string, parentFolderId?: string, context?: 'courses' | 'docs') {
+    console.log(`[MockGoogleDrive] Creating folder: ${folderName} in parent: ${parentFolderId} (context: ${context})`)
+    await new Promise(resolve => setTimeout(resolve, 500))
+    const folderId = `mock_folder_${Date.now()}`
+    return {
+      folderId,
+      folderUrl: `https://drive.google.com/drive/folders/${folderId}`
+    }
+  }
+
+  async renameFolder(folderId: string, newName: string): Promise<void> {
+    console.log(`[MockGoogleDrive] Renaming folder ${folderId} to: ${newName}`)
+    await new Promise(resolve => setTimeout(resolve, 300))
+  }
+
+  async deleteFolder(folderId: string): Promise<void> {
+    console.log(`[MockGoogleDrive] Deleting folder: ${folderId}`)
+    await new Promise(resolve => setTimeout(resolve, 300))
+  }
+
+  async moveFile(fileId: string, targetFolderId: string): Promise<void> {
+    console.log(`[MockGoogleDrive] Moving file ${fileId} to folder ${targetFolderId}`)
+    await new Promise(resolve => setTimeout(resolve, 300))
+  }
 }
+
