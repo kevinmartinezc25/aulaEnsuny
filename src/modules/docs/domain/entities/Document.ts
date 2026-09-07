@@ -43,6 +43,8 @@ export interface DocFolder {
   parentId: string | null
   parent_id?: string | null
   color: string | null
+  driveFolderId?: string | null
+  driveFolderUrl?: string | null
   createdBy: string
   sortOrder: number
   createdAt: string

@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { Folder, ChevronRight, FileText, Trash2, Pencil } from 'lucide-react'
+import { Folder, ChevronRight, FileText, Trash2, Pencil, ExternalLink } from 'lucide-react'
 import type { DocFolder } from '../../domain/entities/Document'
 import { getSubtleCardStyle } from '../../domain/constants/knowledgeCatalog'
 
@@ -25,9 +25,11 @@ export function FolderCard({
   onDelete,
 }: FolderCardProps) {
   const subtleStyle = getSubtleCardStyle(folder.id || folder.name)
-  const isPrivileged = userRole === 'admin' || userRole === 'superadmin'
+  const isAdmin = userRole === 'admin' || userRole === 'superadmin'
+  const isTeacher = userRole === 'teacher'
   const isAuthor = !!(currentUserId && folder.createdBy && currentUserId === folder.createdBy)
-  const canManage = isPrivileged || isAuthor
+  const canViewDriveLink = isAdmin || (isTeacher && isAuthor)
+  const canManage = isAdmin || (isTeacher && isAuthor)
 
   return (
     <div
@@ -42,6 +44,19 @@ export function FolderCard({
           </div>
 
           <div className="flex items-center gap-1.5">
+            {canViewDriveLink && (folder.driveFolderUrl || folder.driveFolderId) && (
+              <a
+                href={folder.driveFolderUrl || `https://drive.google.com/drive/folders/${folder.driveFolderId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                title="Abrir carpeta en Google Drive"
+                className="w-6 h-6 rounded-md bg-white/80 dark:bg-slate-800/80 text-[#0071e3] hover:bg-blue-50 dark:hover:bg-blue-950/50 flex items-center justify-center transition-all cursor-pointer border border-black/5 dark:border-white/5"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            )}
+
             {canManage && onEdit && (
               <button
                 type="button"
