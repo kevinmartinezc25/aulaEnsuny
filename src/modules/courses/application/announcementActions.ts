@@ -20,44 +20,10 @@ export interface CourseAnnouncement {
 }
 
 // In-memory store for demo mode
-let mockAnnouncements: CourseAnnouncement[] = [
-  {
-    id: 'ann-1',
-    courseId: 'demo-physics',
-    authorId: 'docente-id',
-    authorName: 'Carlos Docente',
-    authorRole: 'teacher',
-    title: '📢 Quiz de Leyes de Newton',
-    content: '<p>Recuerden estudiar los temas vistos en clase. El quiz se realizará el próximo martes.</p>',
-    type: 'announcement',
-    isPinned: true,
-    publishAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-    attachments: [
-      { name: 'Guía_Leyes_Newton.pdf', url: '#', type: 'pdf' }
-    ],
-    createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-    updatedAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-  },
-  {
-    id: 'ann-2',
-    courseId: 'demo-physics',
-    authorId: 'docente-id',
-    authorName: 'Carlos Docente',
-    authorRole: 'teacher',
-    title: '⏰ Recordatorio: Entrega de Taller 01',
-    content: '<p>El plazo máximo para subir el Taller 01 es el viernes a medianoche. No se aceptarán entregas extemporáneas.</p>',
-    type: 'reminder',
-    isPinned: false,
-    publishAt: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
-    attachments: [
-      { name: 'Taller_01.pdf', url: '#', type: 'pdf' }
-    ],
-    createdAt: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
-    updatedAt: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString()
-  }
-]
+let mockAnnouncements: CourseAnnouncement[] = []
 
 let mockReads: { announcementId: string; studentId: string; readAt: string }[] = []
+
 
 function checkDemoMode(): boolean {
   return !process.env.NEXT_PUBLIC_SUPABASE_URL ||
@@ -436,13 +402,17 @@ export async function getAnnouncementReadStats(
 
 // 6. Get student latest announcements (for main dashboard)
 export async function getStudentLatestAnnouncements(
-  studentId: string
+  studentId: string,
+  enrolledCourseIds?: string[]
 ): Promise<(CourseAnnouncement & { courseTitle: string })[]> {
   const isDemo = checkDemoMode()
   if (isDemo) {
     const now = new Date().getTime()
     return mockAnnouncements
-      .filter(a => new Date(a.publishAt).getTime() <= now)
+      .filter(a => {
+        const isEnrolled = enrolledCourseIds ? enrolledCourseIds.includes(a.courseId) : true
+        return isEnrolled && new Date(a.publishAt).getTime() <= now
+      })
       .slice(0, 3)
       .map(a => ({
         ...a,
@@ -453,10 +423,25 @@ export async function getStudentLatestAnnouncements(
 
   try {
     const supabase = createAdminClient()
+
+    let courseIds = enrolledCourseIds
+    if (!courseIds) {
+      const { data: enrollments } = await supabase
+        .from('student_courses')
+        .select('course_id')
+        .eq('student_id', studentId)
+      courseIds = enrollments?.map(e => e.course_id) || []
+    }
+
+    // If student has no enrolled courses, return empty immediately
+    if (courseIds.length === 0) {
+      return []
+    }
     
     const { data, error } = await supabase
       .from('course_announcements')
       .select('*, courses(title), profiles(first_name, last_name, roles(name))')
+      .in('course_id', courseIds)
       .lte('publish_at', new Date().toISOString())
       .order('publish_at', { ascending: false })
       .limit(3)

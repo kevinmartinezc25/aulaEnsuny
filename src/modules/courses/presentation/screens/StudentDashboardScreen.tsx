@@ -286,7 +286,7 @@ export function StudentDashboardScreen() {
         ])
         // Fetch latest mock announcements
         try {
-          const mockLatest = await getStudentLatestAnnouncements('stu-demo-id')
+          const mockLatest = await getStudentLatestAnnouncements('stu-demo-id', activeCoursesMock.map(c => c.id))
           setLatestAnnouncements(mockLatest)
         } catch (e) {
           console.error(e)
@@ -650,9 +650,9 @@ export function StudentDashboardScreen() {
             { title: 'Progreso general', value: `${progressPercentage}%`, linkText: 'Ver progreso', href: '/student/dashboard', icon: TrendingUp, color: 'text-indigo-500 bg-indigo-50 dark:bg-indigo-950/30' },
           ])
 
-          // Fetch latest announcements
+          // Fetch latest announcements (only for enrolled courses)
           try {
-            const latest = await getStudentLatestAnnouncements(user.id)
+            const latest = await getStudentLatestAnnouncements(user.id, courseIds)
             setLatestAnnouncements(latest || [])
           } catch (e) {
             console.error('Error fetching student dashboard announcements:', e)
