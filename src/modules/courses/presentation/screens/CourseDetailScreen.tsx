@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowLeft, BookOpen, Video, FileText, CheckCircle2, ChevronRight, ChevronDown, Menu, X, ArrowRight, Play, Download, Award, BrainCircuit, Eye, Clock, AlertCircle, CheckCircle, BarChart3, LineChart as LineChartIcon, Activity, Target, Timer, ClipboardList, UploadCloud, Loader2, MessageSquare, Pin, Lock, Unlock, CornerDownRight, CheckSquare, Undo2, Plus, Edit, Megaphone, Paperclip, AlertTriangle, Bell, Trophy, Calendar, User } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, BookOpen, Video, FileText, CheckCircle2, ChevronRight, ChevronDown, Menu, X, ArrowRight, Play, Download, Award, BrainCircuit, Eye, Clock, AlertCircle, CheckCircle, BarChart3, LineChart as LineChartIcon, Activity, Target, Timer, ClipboardList, UploadCloud, Loader2, MessageSquare, Pin, Lock, Unlock, CornerDownRight, CheckSquare, Undo2, Plus, Edit, Megaphone, Paperclip, AlertTriangle, Bell, Trophy, Calendar, User } from 'lucide-react'
 import Link from 'next/link'
 import { PdfViewer } from '@/modules/resources/presentation/components/PdfViewer'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts'
@@ -601,55 +601,25 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
       setUserId('stu-demo-id')
       setUserRole('student')
 
-      const mockGradesList = [
-        { lesson_id: 'l3', grade: 4.2, max_grade: 5.0, feedback: 'Excelente trabajo aplicando las leyes de Newton.' },
-        { lesson_id: 'l-forum-1', grade: 4.5, max_grade: 5.0, feedback: 'Muy buenas intervenciones en el foro de debate.' }
-      ]
-
-      const mappedMockModules = mockCourseDetails.modules.map(m => ({
-        ...m,
-        lessons: m.lessons.map(l => {
-          const gradeEntry = mockGradesList.find(lg => lg.lesson_id === l.id)
-          let status = l.status
-          if (gradeEntry) {
-            status = 'graded'
-          }
-          return {
-            ...l,
-            status,
-            grade: gradeEntry ? {
-              score: gradeEntry.grade,
-              maxGrade: gradeEntry.max_grade,
-              feedback: gradeEntry.feedback
-            } : null
-          }
-        })
-      }))
-
-      const updatedMockCourseDetails = {
-        ...mockCourseDetails,
-        modules: mappedMockModules
-      }
-
-      setCourseData(updatedMockCourseDetails)
-      
-      // Keep the active lesson synced with the mapped one
-      const defaultActive = mappedMockModules[1].lessons[0]
-      setActiveLesson(defaultActive)
-
-      setGrades([
-        { id: 'l3', activityName: 'Taller de Aplicación de Dinámica', moduleName: 'Módulo 2', score: 4.2, feedback: 'Excelente trabajo aplicando las leyes de Newton.', gradeType: 'task' },
-        { id: 'l4', activityName: 'Evaluación del Módulo: Leyes de Newton', moduleName: 'Módulo 2', score: 4.8, feedback: 'Examen aprobado.', gradeType: 'quiz' },
-        { id: 'l-forum-1', activityName: 'Foro: Impacto de la Gravedad en el Espacio', moduleName: 'Módulo 1', score: 4.5, feedback: 'Muy buenas intervenciones en el foro de debate.', gradeType: 'workshop' }
-      ])
-      setPerformanceData(mockPerformanceData)
-      setTimeData(mockTimeData)
+      setCourseData({
+        id: courseId,
+        title: 'Física 11°-1',
+        subject: 'Ciencias',
+        progress: 0,
+        modules: [],
+        teacherName: 'Asignado',
+        period: '3.er periodo'
+      })
+      setActiveLesson(null)
+      setGrades([])
+      setPerformanceData([])
+      setTimeData([])
       setStats({
-        progress: mockCourseDetails.progress,
-        averageGrade: 4.5,
-        timeSpent: '40h',
-        lessonsCompleted: 5,
-        totalLessons: 7
+        progress: 0,
+        averageGrade: 0,
+        timeSpent: '0h',
+        lessonsCompleted: 0,
+        totalLessons: 0
       })
       setLoading(false)
       return
@@ -670,8 +640,25 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
         .select('*, roles(name)')
         .eq('id', user.id)
         .maybeSingle()
+      const roleName = profile?.roles?.name || 'student'
       if (profile && profile.roles) {
-        setUserRole(profile.roles.name)
+        setUserRole(roleName)
+      }
+
+      // Validar si el estudiante está matriculado en este curso
+      if (roleName === 'student') {
+        const { data: enrollment, error: enrollErr } = await supabase
+          .from('student_courses')
+          .select('id')
+          .eq('student_id', user.id)
+          .eq('course_id', courseId)
+          .maybeSingle()
+
+        if (enrollErr || !enrollment) {
+          setError('No estás matriculado en este curso. Si consideras que se trata de un error, solicita acceso o contacta a tu docente.')
+          setLoading(false)
+          return
+        }
       }
 
       // 1. Fetch course details
@@ -1084,7 +1071,7 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
       setStats({
         progress: progressPercentage,
         averageGrade: avg,
-        timeSpent: `${completedItems * 2 + 1}h`,
+        timeSpent: `${completedItems * 2}h`,
         lessonsCompleted: completedItems,
         totalLessons: totalItems
       })
@@ -1094,16 +1081,14 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
         name: g.activityName?.length > 14 ? g.activityName.substring(0, 14) + '…' : (g.activityName || `Nota ${idx + 1}`),
         nota: g.score
       }))
-      setPerformanceData(performanceChart.length > 0 ? performanceChart : [
-        { name: 'Inicio', nota: 0.0 }
-      ])
+      setPerformanceData(performanceChart)
 
       // Set study hours per module data
       const hoursChart = mappedModules.map((m) => {
         const completedCount = m.lessons.filter(l => l.status === 'completed' || l.status === 'graded').length
         return {
           name: m.title.length > 10 ? `${m.title.substring(0, 10)}...` : m.title,
-          horas: completedCount * 2 + 1
+          horas: completedCount * 2
         }
       })
       setTimeData(hoursChart)
@@ -1487,216 +1472,265 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
   const isForumClosedForStudent = userRole !== 'teacher' && userRole !== 'admin' && forumConfig?.dueDate && new Date() > new Date(forumConfig.dueDate);
 
   return (
-    <div className="bg-[#f9fafb] dark:bg-slate-950 text-left flex flex-col">
-      {/* Barra superior de navegación interna - sticky top-0 porque main es el scroll container */}
-      <div className="sticky top-0 z-30 flex flex-col bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800 shadow-sm">
-        <div className="flex flex-col md:flex-row md:items-center justify-start gap-4 md:gap-8 py-4 px-4 sm:px-6 relative">
-          <div className="flex items-start gap-3 sm:gap-4 pr-12 md:pr-0">
-            <Link
-              href="/student/dashboard"
-              className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors shadow-sm"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-            <div className="text-left min-w-0">
-              <span className="text-[10px] sm:text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider block mb-0.5 truncate">
-                {courseData.subject}
-              </span>
-              <h2 className="text-base sm:text-lg md:text-xl font-bold text-slate-900 dark:text-white leading-tight truncate">
-                {courseData.title}
-              </h2>
-              <div className="flex items-center gap-2 mt-1.5 text-[10px] sm:text-xs font-medium text-slate-500 dark:text-slate-400 flex-wrap">
-                <span className="flex items-center gap-1.5">
-                  <div className="h-4 w-4 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden flex items-center justify-center">
-                    <span className="text-[8px]">{courseData.teacherName ? courseData.teacherName.charAt(0) : 'D'}</span>
-                  </div>
-                  Docente: {courseData.teacherName || 'Asignado'}
+    <div className="bg-[#f5f5f7] dark:bg-slate-950 text-left flex flex-col min-h-screen">
+      {/* Barra superior de navegación interna con estética macOS / Apple */}
+      <div className="sticky top-0 z-30 flex flex-col bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-b border-black/[0.05] dark:border-slate-800 shadow-xs">
+        <div className="max-w-[1360px] w-full mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-4 relative">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-5">
+            {/* Left Header: Back button, Category Pill, Title, Docente */}
+            <div className="flex items-start gap-3 sm:gap-4 pr-10 md:pr-0">
+              <Link
+                href="/student/dashboard"
+                aria-label="Volver a los cursos"
+                className="w-9 h-9 sm:w-10 sm:h-10 rounded-full border border-neutral-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-neutral-50 dark:hover:bg-slate-700/80 active:scale-95 flex items-center justify-center shadow-xs text-neutral-700 dark:text-slate-200 transition-all shrink-0 mt-0.5"
+              >
+                <ChevronLeft className="w-5 h-5 -translate-x-0.5" />
+              </Link>
+              <div className="space-y-0.5 sm:space-y-1 min-w-0">
+                <span className="inline-block px-2 sm:px-2.5 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/50 text-[#0071e3] dark:text-blue-400 text-[10px] sm:text-[11px] font-bold tracking-wider uppercase">
+                  {courseData.subject || 'Ciencias'}
                 </span>
-                <span className="hidden sm:inline">•</span>
-                <span>{courseData.period || '3.er periodo'}</span>
+                <h1 className="text-lg sm:text-2xl lg:text-3xl font-bold tracking-tight text-neutral-900 dark:text-white leading-snug truncate">
+                  {courseData.title}
+                </h1>
+                <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-sm text-neutral-500 dark:text-slate-400 font-normal flex-wrap">
+                  <span className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full bg-neutral-200 dark:bg-slate-700 text-neutral-600 dark:text-slate-300 font-semibold text-[9px] sm:text-[10px] flex items-center justify-center">
+                    {courseData.teacherName ? courseData.teacherName.charAt(0) : 'D'}
+                  </span>
+                  <span className="truncate max-w-[140px] sm:max-w-none">Docente: {courseData.teacherName || 'Asignado'}</span>
+                  <span className="text-neutral-300 dark:text-slate-600 font-bold">•</span>
+                  <span>{courseData.period || '3.er periodo'}</span>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Separador vertical */}
-          <div className="hidden md:block w-px h-12 bg-slate-200 dark:bg-slate-800" />
-
-          {/* Progress bar on Desktop Header */}
-          <div className="hidden md:flex flex-col w-64 shrink-0">
-            <div className="flex items-center justify-between text-xs mb-1.5">
-              <span className="text-slate-600 dark:text-slate-300 font-bold">Progreso del curso</span>
-              <span className="text-slate-500 dark:text-slate-400 text-[10px]">{stats.lessonsCompleted} de {stats.totalLessons} completadas</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-xl font-black text-slate-900 dark:text-white leading-none">{courseData.progress}%</span>
-              <div className="h-2 flex-1 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                <div style={{ width: `${courseData.progress}%` }} className="h-full rounded-full bg-blue-600 transition-all duration-500" />
+            {/* Right Header: Course Progress (Compact on mobile, expanded on desktop) */}
+            <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center border-t md:border-t-0 md:border-l border-neutral-200/60 dark:border-slate-800 pt-2.5 md:pt-0 md:pl-8 min-w-0 sm:min-w-[210px]">
+              <div className="flex items-center gap-1.5 text-[11px] sm:text-xs text-neutral-500 dark:text-slate-400">
+                <span className="font-medium text-neutral-700 dark:text-slate-300">Progreso</span>
+                <span className="text-neutral-400 dark:text-slate-500">({stats.lessonsCompleted}/{stats.totalLessons})</span>
+              </div>
+              <div className="flex items-center gap-2.5 sm:gap-3 sm:mt-1.5">
+                <span className="text-sm sm:text-base font-bold text-neutral-900 dark:text-white tracking-tight">{courseData.progress}%</span>
+                <div aria-valuemax={100} aria-valuemin={0} aria-valuenow={courseData.progress} className="w-24 sm:w-36 h-1.5 sm:h-2 rounded-full bg-neutral-200/80 dark:bg-slate-800 overflow-hidden" role="progressbar">
+                  <div style={{ width: `${courseData.progress}%` }} className="h-full bg-[#0071e3] dark:bg-blue-500 rounded-full transition-all duration-300" />
+                </div>
               </div>
             </div>
+
+            {/* Mobile Menu toggle button */}
+            <button
+              onClick={() => setIsMobileNavOpen(true)}
+              className="absolute top-3.5 right-3 sm:top-4 sm:right-4 flex h-8 w-8 items-center justify-center rounded-xl border border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 md:hidden shadow-xs transition-colors"
+              aria-label="Menú"
+            >
+              <Menu className="h-4 w-4" />
+            </button>
           </div>
 
-          <button
-            onClick={() => setIsMobileNavOpen(true)}
-            className="absolute top-4 right-4 flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 md:hidden shadow-sm transition-colors"
-            aria-label="Menú"
-          >
-            <Menu className="h-4 w-4" />
-          </button>
-        </div>
-
-        {/* Tab Navigation Banner */}
-        <div className="px-4 sm:px-6 flex gap-2 sm:gap-6 overflow-x-auto hide-scrollbar border-t border-slate-100 dark:border-slate-800/60 pt-2">
-          <button 
-            onClick={() => setActiveTab('announcements')}
-            className={`pb-2.5 px-2 text-[10px] sm:text-sm font-bold whitespace-nowrap transition-colors border-b-2 flex flex-col sm:flex-row items-center gap-1.5 ${activeTab === 'announcements' ? 'border-blue-600 text-blue-700 dark:border-blue-500 dark:text-blue-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-          >
-            <Megaphone className="h-5 w-5 sm:h-4 sm:w-4" /> Novedades
-          </button>
-          <button 
-            onClick={() => setActiveTab('content')}
-            className={`pb-2.5 px-2 text-[10px] sm:text-sm font-bold whitespace-nowrap transition-colors border-b-2 flex flex-col sm:flex-row items-center gap-1.5 ${activeTab === 'content' ? 'border-blue-600 text-blue-700 dark:border-blue-500 dark:text-blue-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-          >
-            <BookOpen className="h-5 w-5 sm:h-4 sm:w-4" /> Contenido
-          </button>
-          <button 
-            onClick={() => setActiveTab('grades')}
-            className={`pb-2.5 px-2 text-[10px] sm:text-sm font-bold whitespace-nowrap transition-colors border-b-2 flex flex-col sm:flex-row items-center gap-1.5 ${activeTab === 'grades' ? 'border-blue-600 text-blue-700 dark:border-blue-500 dark:text-blue-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-          >
-            <Award className="h-5 w-5 sm:h-4 sm:w-4" /> Calificaciones
-          </button>
-          <button 
-            onClick={() => setActiveTab('reports')}
-            className={`pb-2.5 px-2 text-[10px] sm:text-sm font-bold whitespace-nowrap transition-colors border-b-2 flex flex-col sm:flex-row items-center gap-1.5 ${activeTab === 'reports' ? 'border-blue-600 text-blue-700 dark:border-blue-500 dark:text-blue-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-          >
-            <BarChart3 className="h-5 w-5 sm:h-4 sm:w-4" /> Reporte General
-          </button>
+          {/* Apple Native Segmented Control */}
+          <div className="mt-3 sm:mt-4 flex items-center overflow-x-auto hide-scrollbar pb-0.5 -mx-1 px-1">
+            <div aria-label="Pestañas de la materia" className="inline-flex p-1 rounded-2xl bg-[#e9e9ee]/90 dark:bg-slate-800/90 border border-black/[0.04] dark:border-white/[0.06] text-xs sm:text-sm shrink-0 min-w-full sm:min-w-0 justify-between sm:justify-start" role="tablist">
+              {([
+                { id: 'announcements', label: 'Novedades', shortLabel: 'Novedades' },
+                { id: 'content', label: 'Contenido', shortLabel: 'Contenido' },
+                { id: 'grades', label: 'Calificaciones', shortLabel: 'Notas' },
+                { id: 'reports', label: 'Reporte General', shortLabel: 'Reporte' },
+              ] as const).map((tab) => {
+                const isSelected = activeTab === tab.id
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    role="tab"
+                    aria-selected={isSelected}
+                    className={`relative px-3 sm:px-5 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 select-none flex items-center justify-center whitespace-nowrap active:scale-[0.98] flex-1 sm:flex-initial ${
+                      isSelected
+                        ? 'text-neutral-900 dark:text-white cursor-default'
+                        : 'text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white hover:bg-white/40 dark:hover:bg-slate-700/40'
+                    }`}
+                    type="button"
+                  >
+                    {isSelected && (
+                      <motion.div
+                        layoutId="courseActiveSegment"
+                        className="absolute inset-0 rounded-xl bg-white dark:bg-slate-900 shadow-[0_2px_6px_rgba(0,0,0,0.08),0_1px_2px_rgba(0,0,0,0.04)] dark:shadow-[0_2px_6px_rgba(0,0,0,0.4)]"
+                        transition={{ type: 'spring', bounce: 0, duration: 0.3 }}
+                      />
+                    )}
+                    <span className="relative z-10 hidden sm:inline">{tab.label}</span>
+                    <span className="relative z-10 sm:hidden">{tab.shortLabel}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
         </div>
       </div>
 
       {activeTab === 'announcements' ? (
-        <div className="flex-1 px-4 sm:px-6 md:px-8 py-4 max-w-4xl mx-auto space-y-6 w-full animate-in fade-in duration-300">
-          <div className="space-y-1">
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
-              <Megaphone className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-              Novedades del Curso
-            </h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Canal oficial de comunicación del docente para anuncios, recordatorios y alertas académicas.
-            </p>
-          </div>
-
-          <div className="space-y-6">
+        <main className="flex-1 p-2 sm:p-6 lg:p-8 overflow-y-auto bg-[#ebebf0]/50 dark:bg-slate-950 flex flex-col items-center">
+          {/* Apple Pure White Floating Card Canvas */}
+          <section className="w-full max-w-[1360px] bg-white dark:bg-slate-900 rounded-[20px] sm:rounded-[26px] shadow-[0_10px_30px_-5px_rgba(0,0,0,0.05),0_4px_12px_-2px_rgba(0,0,0,0.025)] dark:shadow-none border border-black/[0.04] dark:border-slate-800/80 p-4 sm:p-9 lg:p-12 min-h-[520px] sm:min-h-[660px] flex flex-col justify-between animate-in fade-in duration-300">
             {announcementsLoading ? (
-              <div className="flex h-40 items-center justify-center">
-                <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+              <div className="my-auto py-20 sm:py-24 flex flex-col items-center justify-center">
+                <Loader2 className="h-7 w-7 sm:h-8 sm:w-8 animate-spin text-[#0071e3] dark:text-blue-400" />
+                <p className="mt-3 text-xs sm:text-sm text-neutral-400 dark:text-slate-500">Cargando novedades...</p>
               </div>
             ) : announcements.length === 0 ? (
-              <div className="text-center py-16 bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800/60 shadow-sm max-w-lg mx-auto">
-                <CheckCircle2 className="h-12 w-12 mx-auto mb-4 text-emerald-400 dark:text-emerald-500/80" />
-                <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">Todo está al día</h3>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 max-w-sm mx-auto leading-relaxed">
-                  Tu docente aún no ha publicado novedades para este curso. En este espacio aparecerán anuncios, recordatorios, cambios de actividades y comunicaciones importantes.
-                </p>
+              /* BEGIN: Course News Center Content - Empty State */
+              <div className="my-auto py-6 sm:py-12 flex flex-col items-center justify-center text-center w-full">
+                {/* Announcement Title & Subtitle */}
+                <div className="mb-6 sm:mb-10 max-w-xl text-center px-1">
+                  <h2 className="text-xl sm:text-[28px] font-bold tracking-tight text-neutral-900 dark:text-white">
+                    Novedades del Curso
+                  </h2>
+                  <p className="text-xs sm:text-base text-neutral-500 dark:text-slate-400 mt-1 sm:mt-1.5 font-normal leading-relaxed">
+                    Canal oficial de comunicación del docente para anuncios, recordatorios y alertas académicas.
+                  </p>
+                </div>
+                {/* Soft Elevated Inner Card (Empty State) */}
+                <div className="w-full max-w-xl bg-white dark:bg-slate-900/90 rounded-2xl sm:rounded-3xl p-6 sm:p-12 shadow-[0_6px_20px_-4px_rgba(0,0,0,0.04),0_2px_8px_-2px_rgba(0,0,0,0.02)] sm:shadow-[0_10px_30px_-5px_rgba(0,0,0,0.05),0_4px_12px_-2px_rgba(0,0,0,0.025)] dark:shadow-none border border-neutral-100/90 dark:border-slate-800 flex flex-col items-center mx-auto">
+                  {/* Apple Style Checkmark Circle Icon */}
+                  <div className="w-13 h-13 sm:w-16 sm:h-16 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border-2 border-[#34c759]/40 flex items-center justify-center mb-4 sm:mb-6 text-[#34c759] transition-transform hover:scale-105 duration-300">
+                    <svg className="w-7 h-7 sm:w-9 sm:h-9" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.6" viewBox="0 0 24 24">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  </div>
+                  {/* Empty State Heading */}
+                  <h3 className="text-lg sm:text-2xl font-bold tracking-tight text-neutral-900 dark:text-white mb-2 sm:mb-3">
+                    Todo está al día
+                  </h3>
+                  {/* Multiline Message */}
+                  <p className="text-xs sm:text-[15px] text-neutral-500 dark:text-slate-400 leading-relaxed max-w-md">
+                    Tu docente aún no ha publicado novedades para este curso.<br className="hidden sm:inline" />
+                    En este espacio aparecerán anuncios, recordatorios,<br className="hidden sm:inline" />
+                    cambios de actividades y comunicaciones importantes.
+                  </p>
+                </div>
               </div>
             ) : (
-              announcements.map((ann) => {
-                let typeLabel = 'Anuncio'
-                let TypeIcon = Megaphone
-                let typeClass = 'bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400'
-                
-                switch (ann.type) {
-                  case 'urgent':
-                    typeLabel = 'Urgente'
-                    TypeIcon = AlertTriangle
-                    typeClass = 'bg-red-500/10 text-red-600 dark:bg-red-500/20 dark:text-red-400'
-                    break
-                  case 'reminder':
-                    typeLabel = 'Recordatorio'
-                    TypeIcon = Bell
-                    typeClass = 'bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400'
-                    break
-                  case 'new_material':
-                    typeLabel = 'Material Nuevo'
-                    TypeIcon = BookOpen
-                    typeClass = 'bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400'
-                    break
-                  case 'date_change':
-                    typeLabel = 'Cambio de Fecha'
-                    TypeIcon = Calendar
-                    typeClass = 'bg-orange-500/10 text-orange-600 dark:bg-orange-500/20 dark:text-orange-400'
-                    break
-                  case 'congratulation':
-                    typeLabel = 'Felicitación'
-                    TypeIcon = Trophy
-                    typeClass = 'bg-purple-500/10 text-purple-600 dark:bg-purple-500/20 dark:text-purple-400'
-                    break
-                }
+              /* BEGIN: Course News Center Content - List of Announcements */
+              <div className="max-w-4xl mx-auto w-full py-2 sm:py-6 space-y-6 sm:space-y-8">
+                <div className="text-center sm:text-left space-y-1 sm:space-y-1.5 border-b border-black/[0.04] dark:border-slate-800 pb-3 sm:pb-4">
+                  <h2 className="text-xl sm:text-[28px] font-bold tracking-tight text-neutral-900 dark:text-white flex items-center justify-center sm:justify-start gap-2 sm:gap-2.5">
+                    <Megaphone className="h-5 w-5 sm:h-6 sm:w-6 text-[#0071e3] dark:text-blue-400" />
+                    Novedades del Curso
+                  </h2>
+                  <p className="text-xs sm:text-base text-neutral-500 dark:text-slate-400 font-normal">
+                    Canal oficial de comunicación del docente para anuncios, recordatorios y alertas académicas.
+                  </p>
+                </div>
 
-                return (
-                  <div 
-                    key={ann.id} 
-                    className={`relative rounded-3xl border border-slate-100 bg-white p-6 shadow-[0_4px_25px_rgb(0,0,0,0.01)] transition-all hover:shadow-[0_8px_30px_rgb(0,0,0,0.02)] dark:border-slate-800/60 dark:bg-slate-900/50 ${ann.isPinned ? 'ring-2 ring-blue-500/20 dark:ring-blue-400/20' : ''}`}
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex items-start gap-3">
-                        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${typeClass}`}>
-                          <TypeIcon className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="font-extrabold text-slate-900 dark:text-white text-sm sm:text-base leading-snug">
-                              {ann.title}
-                            </h3>
-                            {ann.isPinned && (
-                              <span className="inline-flex items-center gap-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider">
-                                <Pin className="h-2.5 w-2.5 fill-current" /> Fijado
-                              </span>
-                            )}
-                            {!ann.isReadByMe && (
-                              <span className="inline-flex items-center gap-0.5 rounded-full bg-pink-500 text-white px-2 py-0.5 text-[9px] font-black uppercase tracking-wider animate-pulse">
-                                Nuevo
-                              </span>
-                            )}
+                <div className="space-y-4 sm:space-y-5">
+                  {announcements.map((ann) => {
+                    let typeLabel = 'Anuncio'
+                    let TypeIcon = Megaphone
+                    let typeClass = 'bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400 border border-blue-500/20'
+                    
+                    switch (ann.type) {
+                      case 'urgent':
+                        typeLabel = 'Urgente'
+                        TypeIcon = AlertTriangle
+                        typeClass = 'bg-red-500/10 text-red-600 dark:bg-red-500/20 dark:text-red-400 border border-red-500/20'
+                        break
+                      case 'reminder':
+                        typeLabel = 'Recordatorio'
+                        TypeIcon = Bell
+                        typeClass = 'bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400 border border-amber-500/20'
+                        break
+                      case 'new_material':
+                        typeLabel = 'Material Nuevo'
+                        TypeIcon = BookOpen
+                        typeClass = 'bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 border border-emerald-500/20'
+                        break
+                      case 'date_change':
+                        typeLabel = 'Cambio de Fecha'
+                        TypeIcon = Calendar
+                        typeClass = 'bg-orange-500/10 text-orange-600 dark:bg-orange-500/20 dark:text-orange-400 border border-orange-500/20'
+                        break
+                      case 'congratulation':
+                        typeLabel = 'Felicitación'
+                        TypeIcon = Trophy
+                        typeClass = 'bg-purple-500/10 text-purple-600 dark:bg-purple-500/20 dark:text-purple-400 border border-purple-500/20'
+                        break
+                    }
+
+                    return (
+                      <motion.div 
+                        key={ann.id} 
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ type: 'spring', bounce: 0, duration: 0.35 }}
+                        className={`relative rounded-2xl sm:rounded-3xl border border-neutral-200/80 bg-white p-4 sm:p-7 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.03)] hover:shadow-[0_10px_30px_-6px_rgba(0,0,0,0.06)] dark:border-slate-800 dark:bg-slate-800/90 dark:hover:border-slate-700/80 transition-all duration-300 ${ann.isPinned ? 'ring-2 ring-blue-500/25 dark:ring-blue-400/25' : ''}`}
+                      >
+                        <div className="flex items-start justify-between gap-3 sm:gap-4">
+                          <div className="flex items-start gap-3 sm:gap-3.5">
+                            <div className={`flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-xl sm:rounded-2xl ${typeClass} shadow-xs mt-0.5`}>
+                              <TypeIcon className="h-4.5 w-4.5 sm:h-5 sm:w-5" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[9px] sm:text-[10px] font-bold tracking-wider uppercase ${typeClass}`}>
+                                  {typeLabel}
+                                </span>
+                                <h3 className="font-bold text-slate-900 dark:text-white text-sm sm:text-lg leading-snug">
+                                  {ann.title}
+                                </h3>
+                                {ann.isPinned && (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 px-2 py-0.5 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider">
+                                    <Pin className="h-2.5 w-2.5 fill-current" /> Fijado
+                                  </span>
+                                )}
+                                {!ann.isReadByMe && (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-rose-500 text-white px-2 py-0.5 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider shadow-xs animate-pulse">
+                                    Nuevo
+                                  </span>
+                                )}
+                              </div>
+                              <div className="mt-1 flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs text-neutral-500 dark:text-slate-400 flex-wrap">
+                                <span className="font-semibold text-neutral-700 dark:text-slate-300">{ann.authorName}</span>
+                                <span>•</span>
+                                <span>
+                                  {new Date(ann.publishAt).toLocaleDateString('es-ES', { 
+                                    day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                                  })}
+                                </span>
+                              </div>
+                            </div>
                           </div>
-                          <div className="mt-1 flex items-center gap-2 text-xs text-slate-450 dark:text-slate-500 flex-wrap">
-                            <span className="font-semibold">{ann.authorName}</span>
-                            <span>•</span>
-                            <span>
-                              {new Date(ann.publishAt).toLocaleDateString('es-ES', { 
-                                day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
-                              })}
-                            </span>
-                          </div>
                         </div>
-                      </div>
-                    </div>
 
-                    <div className="mt-4 pl-0 sm:pl-13 text-sm leading-relaxed max-w-3xl prose prose-sm prose-slate max-w-none dark:prose-invert overflow-x-auto">
-                      <div dangerouslySetInnerHTML={{ __html: ann.content }} />
-                    </div>
+                        <div className="mt-3 sm:mt-4 pl-0 sm:pl-14 text-xs sm:text-[15px] leading-relaxed text-neutral-700 dark:text-slate-300 prose prose-sm prose-slate dark:prose-invert max-w-none overflow-x-auto">
+                          <div dangerouslySetInnerHTML={{ __html: ann.content }} />
+                        </div>
 
-                    {ann.attachments && ann.attachments.length > 0 && (
-                      <div className="mt-4 pl-0 sm:pl-13 flex flex-wrap gap-2">
-                        {ann.attachments.map((att: any, attIdx: number) => (
-                          <a 
-                            key={attIdx}
-                            href={att.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-100 bg-slate-50 hover:bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors decoration-none"
-                          >
-                            <Paperclip className="h-3.5 w-3.5" />
-                            <span className="truncate max-w-[150px]">{att.name}</span>
-                          </a>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )
-              })
+                        {ann.attachments && ann.attachments.length > 0 && (
+                          <div className="mt-3 sm:mt-4 pl-0 sm:pl-14 flex flex-wrap gap-2">
+                            {ann.attachments.map((att: any, attIdx: number) => (
+                              <a 
+                                key={attIdx}
+                                href={att.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 sm:gap-2 rounded-lg sm:rounded-xl border border-neutral-200 dark:border-slate-800 bg-neutral-50 hover:bg-neutral-100 active:bg-neutral-200/80 px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-[11px] sm:text-xs font-semibold text-neutral-700 dark:border-slate-800 dark:bg-slate-800/80 dark:text-slate-200 dark:hover:bg-slate-800 transition-colors decoration-none shadow-xs"
+                              >
+                                <Paperclip className="h-3.5 w-3.5 text-neutral-500 dark:text-slate-400" />
+                                <span className="truncate max-w-[140px] sm:max-w-[180px]">{att.name}</span>
+                              </a>
+                            ))}
+                          </div>
+                        )}
+                      </motion.div>
+                    )
+                  })}
+                </div>
+              </div>
             )}
-          </div>
-        </div>
+            {/* Bottom spacer to anchor visual balance */}
+            <div className="h-2"></div>
+          </section>
+        </main>
       ) : activeTab === 'content' ? (
         <div className="relative flex flex-1 flex-col md:flex-row">
           {/* Sidebar Izquierdo (Fijo en desktop, Oculto en móvil si hay lección seleccionada) */}
@@ -2985,89 +3019,3 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
   )
 }
 
-// Fallback Mock Data for Demo Mode
-const mockCourseDetails: CourseDetails = {
-  id: 'fisica-1',
-  title: 'Física Avanzada',
-  subject: 'Ciencias Exactas',
-  progress: 70,
-  modules: [
-    {
-      id: 'm1',
-      title: 'Módulo 1: Introducción a la Dinámica',
-      lessons: [
-        {
-          id: 'l1',
-          title: 'Concepto de Fuerza',
-          type: 'reading',
-          duration: '10 min',
-          status: 'completed',
-          content: 'La fuerza es una magnitud vectorial que mide la intensidad del intercambio de momento lineal entre dos cuerpos...',
-        },
-        {
-          id: 'l2',
-          title: 'Las Leyes de Newton',
-          type: 'video',
-          duration: '15 min',
-          status: 'completed',
-          videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
-          content: 'Video explicativo sobre las tres leyes fundamentales del movimiento según Sir Isaac Newton.',
-        },
-        {
-          id: 'l-forum-1',
-          title: 'Foro: Impacto de la Gravedad en el Espacio',
-          type: 'forum',
-          duration: 'Foro',
-          status: 'pending',
-          content: 'En este foro debatiremos sobre cómo la relatividad de Einstein cambió nuestra comprensión de la gravedad y del espacio-tiempo. Participen con al menos 2 aportaciones bien fundamentadas.',
-        }
-      ]
-    },
-    {
-      id: 'm2',
-      title: 'Módulo 2: Aplicaciones Prácticas',
-      lessons: [
-        {
-          id: 'l3',
-          title: 'Taller de Aplicación de Dinámica',
-          type: 'task',
-          duration: '45 min',
-          status: 'pending',
-          submissionType: 'file',
-          content: 'Descarga el taller, resuelve los ejercicios propuestos y sube la solución en formato PDF.',
-        },
-        {
-          id: 'l4',
-          title: 'Evaluación del Módulo: Leyes de Newton',
-          type: 'quiz',
-          duration: '20 min',
-          status: 'pending',
-          content: 'Examen de opción múltiple para evaluar la comprensión de las Leyes de Newton.',
-        },
-        {
-          id: 'l-forum-2',
-          title: 'Dudas y Consultas: Módulo Cinemática',
-          type: 'forum',
-          duration: 'Foro',
-          status: 'pending',
-          content: 'Espacio para publicar dudas referentes a las leyes del movimiento rectilíneo uniforme (MRU) y uniformemente acelerado (MRUA).',
-        }
-      ]
-    }
-  ]
-}
-
-const mockPerformanceData = [
-  { name: 'Actividad 1', nota: 4.2 },
-  { name: 'Actividad 2', nota: 4.8 },
-  { name: 'Actividad 3', nota: 1.0 }
-]
-
-const mockTimeData = [
-  { name: 'Módulo 1', horas: 5 },
-  { name: 'Módulo 2', horas: 8 }
-]
-
-
-
-// Force hot reload
