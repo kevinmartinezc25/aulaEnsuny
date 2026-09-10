@@ -187,18 +187,95 @@ export function StudentCalendarScreen() {
             .eq('id', user.id)
             .single()
 
-          // 2. Obtener cursos del grado del estudiante
+          // 2. Obtener cursos matriculados del estudiante
           let dbCourses: any[] = []
-          if (profile?.grade_level) {
-            const { data } = await supabase
-              .from('courses')
-              .select('*')
-              .eq('grade_level', profile.grade_level)
-              .eq('status', 'active')
-            dbCourses = data || []
+          try {
+            const { data: enrolledData } = await supabase
+              .from('student_courses')
+              .select('course_id')
+              .eq('student_id', user.id)
+
+            if (enrolledData && enrolledData.length > 0) {
+              const courseIds = enrolledData.map(e => e.course_id)
+              const { data: coursesData } = await supabase
+                .from('courses')
+                .select('*')
+                .in('id', courseIds)
+                .eq('status', 'active')
+              dbCourses = coursesData || []
+            } else if (profile?.grade_level) {
+              const { data: gradeCourses } = await supabase
+                .from('courses')
+                .select('*')
+                .eq('grade_level', profile.grade_level)
+                .eq('status', 'active')
+              dbCourses = gradeCourses || []
+            }
+          } catch (e) {
+            console.warn('Error loading student courses:', e)
           }
 
           const courseIds = dbCourses.map(c => c.id)
+          let dbModules: any[] = []
+          let dbLessons: any[] = []
+          let completedLessonIds = new Set<string>()
+
+          if (courseIds.length > 0) {
+            const { data: modulesData } = await supabase
+              .from('course_modules')
+              .select('id, course_id')
+              .in('course_id', courseIds)
+            dbModules = modulesData || []
+
+            const moduleIds = dbModules.map(m => m.id)
+            if (moduleIds.length > 0) {
+              const { data: lessonsData } = await supabase
+                .from('lessons')
+                .select('id, module_id, title, type, content, due_date')
+                .in('module_id', moduleIds)
+              dbLessons = lessonsData || []
+
+              const { data: progData } = await supabase
+                .from('student_progress')
+                .select('lesson_id')
+                .eq('student_id', user.id)
+                .eq('completed', true)
+                .in('lesson_id', dbLessons.map(l => l.id))
+              completedLessonIds = new Set((progData || []).map(p => p.lesson_id))
+
+              // Check forum participation
+              const lessonIds = dbLessons.map(l => l.id)
+              if (lessonIds.length > 0) {
+                const { data: forumsData } = await supabase
+                  .from('forums')
+                  .select('id, lesson_id')
+                  .in('lesson_id', lessonIds)
+                const courseForums = forumsData || []
+                const forumIds = courseForums.map(f => f.id)
+                if (forumIds.length > 0) {
+                  const { data: threads } = await supabase
+                    .from('forum_threads')
+                    .select('id, forum_id')
+                    .in('forum_id', forumIds)
+                  const threadIds = (threads || []).map(t => t.id)
+                  if (threadIds.length > 0) {
+                    const { data: replies } = await supabase
+                      .from('forum_replies')
+                      .select('thread_id')
+                      .eq('author_id', user.id)
+                      .in('thread_id', threadIds)
+                    if (replies) {
+                      replies.forEach(r => {
+                        const th = threads?.find(t => t.id === r.thread_id)
+                        const fo = courseForums.find(f => f.id === th?.forum_id)
+                        if (fo) completedLessonIds.add(fo.lesson_id)
+                      })
+                    }
+                  }
+                }
+              }
+            }
+          }
 
           // 3. Obtener eventos de calendario
           let query = supabase
@@ -232,13 +309,86 @@ export function StudentCalendarScreen() {
           }
 
           const mappedEvents = (dbEvents || []).map(mapDbEvent)
-          setEvents(mappedEvents)
 
-          // 4. Mapear tareas a partir de los eventos
-          const mappedTasks: Task[] = mappedEvents
-            .filter(e => e.eventType === 'homework' || e.eventType === 'exam')
-            .map(e => {
-              const due = e.dueDate
+          // Agregar lecciones con fecha límite a los eventos de calendario
+          const lessonEvents: CalendarEvent[] = dbLessons
+            .filter(l => l.due_date)
+            .map(l => {
+              const mod = dbModules.find(m => m.id === l.module_id)
+              const crs = dbCourses.find(c => c.id === mod?.course_id)
+              const subject = (crs?.subject || 'general').toLowerCase()
+              let color = 'bg-blue-500 text-blue-600 dark:text-blue-400'
+              if (subject.includes('matem')) color = 'bg-purple-500 text-purple-600 dark:text-purple-400'
+              else if (subject.includes('tec') || subject.includes('prog')) color = 'bg-emerald-500 text-emerald-600 dark:text-emerald-400'
+              else if (subject.includes('ingl')) color = 'bg-amber-500 text-amber-600 dark:text-amber-400'
+
+              return {
+                id: l.id,
+                title: l.title,
+                description: l.content ? l.content.replace(/<[^>]*>/g, '').trim().substring(0, 150) : '',
+                dueDate: new Date(l.due_date),
+                courseName: crs?.title || 'Curso',
+                eventType: l.type === 'quiz' ? 'exam' : 'homework',
+                courseColor: color
+              }
+            })
+
+          setEvents([...mappedEvents, ...lessonEvents])
+
+          // 4. Mapear tareas a partir de las lecciones del curso y los eventos de calendario
+          const ACTIONABLE_TYPES = new Set(['task', 'quiz', 'forum', 'assignment', 'homework'])
+          const courseTasks: Task[] = []
+
+          for (const l of dbLessons) {
+            if (ACTIONABLE_TYPES.has(l.type)) {
+              const mod = dbModules.find(m => m.id === l.module_id)
+              const crs = dbCourses.find(c => c.id === mod?.course_id)
+              const isCompleted = completedLessonIds.has(l.id)
+
+              let formattedDate = 'Sin fecha límite'
+              let urgency: 'Urgente' | 'Próximo' | 'Pendiente' = 'Pendiente'
+
+              if (l.due_date) {
+                const dueObj = new Date(l.due_date)
+                formattedDate = dueObj.toLocaleDateString('es-ES', {
+                  weekday: 'short',
+                  month: 'short',
+                  day: 'numeric',
+                  hour: 'numeric',
+                  minute: '2-digit'
+                })
+
+                const timeLeftMs = dueObj.getTime() - Date.now()
+                const hoursLeft = timeLeftMs / (1000 * 60 * 60)
+                if (hoursLeft < 24) {
+                  urgency = 'Urgente'
+                } else if (hoursLeft < 72) {
+                  urgency = 'Próximo'
+                }
+              }
+
+              let desc = 'Actividad del curso'
+              if (l.content) {
+                desc = l.content.replace(/<[^>]*>/g, '').trim().substring(0, 150)
+              }
+
+              courseTasks.push({
+                id: l.id,
+                title: l.title,
+                course: crs?.title || 'Curso',
+                dueDate: formattedDate,
+                urgency,
+                description: desc,
+                completed: isCompleted
+              })
+            }
+          }
+
+          const existingIds = new Set(courseTasks.map(t => t.id))
+          const calendarTasks: Task[] = (dbEvents || [])
+            .filter((e: any) => !existingIds.has(e.id) && (e.event_type === 'homework' || e.event_type === 'exam'))
+            .map((e: any) => {
+              const due = new Date(e.due_date)
               const now = new Date()
               const hoursDiff = (due.getTime() - now.getTime()) / (1000 * 60 * 60)
               let urgency: 'Urgente' | 'Próximo' | 'Pendiente' = 'Pendiente'
@@ -256,14 +406,22 @@ export function StudentCalendarScreen() {
               return {
                 id: e.id,
                 title: e.title,
-                course: e.courseName,
+                course: e.courses?.title || 'Evento General',
                 dueDate: formattedDate,
                 urgency,
-                description: e.description,
+                description: e.description || '',
                 completed: false
               }
             })
-          setTasks(mappedTasks)
+
+          const allTasks = [...courseTasks, ...calendarTasks]
+          allTasks.sort((a, b) => {
+            if (a.completed !== b.completed) return a.completed ? 1 : -1
+            const urgencyWeight = { 'Urgente': 0, 'Próximo': 1, 'Pendiente': 2 }
+            return (urgencyWeight[a.urgency] ?? 2) - (urgencyWeight[b.urgency] ?? 2)
+          })
+
+          setTasks(allTasks)
         }
       } catch (error) {
         console.error('Error al cargar datos de calendario:', error)

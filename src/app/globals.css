@@ -184,4 +184,54 @@
 .hide-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+/* Forum debate quote block matching design reference */
+.forum-debate-quote,
+.forum-reply-body blockquote {
+  background-color: #f8fafc;
+  border-left: 4px solid #3b82f6;
+  border-top-right-radius: 0.75rem;
+  border-bottom-right-radius: 0.75rem;
+  padding: 0.875rem 1.125rem;
+  margin: 0.75rem 0;
+  font-size: 0.845rem;
+  line-height: 1.6;
+  color: #475569;
+}
+
+.dark .forum-debate-quote,
+.dark .forum-reply-body blockquote {
+  background-color: rgba(30, 41, 59, 0.5);
+  border-left-color: #60a5fa;
+  color: #cbd5e1;
+}
+
+/* Links inside forum replies, discussions and rich text content */
+.forum-reply-body a,
+.ql-editor a {
+  color: #2563eb !important;
+  text-decoration: underline !important;
+  text-underline-offset: 3px !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  transition: color 0.15s ease !important;
+  word-break: break-word !important;
+}
+
+.forum-reply-body a:hover,
+.ql-editor a:hover {
+  color: #1d4ed8 !important;
+  text-decoration-thickness: 2px !important;
+}
+
+.dark .forum-reply-body a,
+.dark .ql-editor a {
+  color: #60a5fa !important;
+}
+
+.dark .forum-reply-body a:hover,
+.dark .ql-editor a:hover {
+  color: #93c5fd !important;
+}
+
 

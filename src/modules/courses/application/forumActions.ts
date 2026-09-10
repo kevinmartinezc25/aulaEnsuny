@@ -43,6 +43,8 @@ export interface ForumReply {
   isTeacherVerified: boolean
   createdAt: string
   updatedAt: string
+  likesCount?: number
+  hasLiked?: boolean
 }
 
 // In-Memory Mock Store for Demo Mode
@@ -447,7 +449,7 @@ export async function createForumThread(threadData: {
 }
 
 // 5. Get thread replies
-export async function getThreadReplies(threadId: string): Promise<ForumReply[]> {
+export async function getThreadReplies(threadId: string, currentUserId?: string): Promise<ForumReply[]> {
   const isDemo = checkDemoMode()
   if (isDemo) {
     return mockReplies
@@ -465,6 +467,22 @@ export async function getThreadReplies(threadId: string): Promise<ForumReply[]> 
 
     if (error || !data) return []
 
+    // Query likes for current user if userId is provided and table exists
+    const userLikesSet = new Set<string>()
+    if (currentUserId) {
+      try {
+        const { data: userLikes, error: ulErr } = await supabase
+          .from('forum_reply_likes')
+          .select('reply_id')
+          .eq('user_id', currentUserId)
+        if (!ulErr && userLikes) {
+          userLikes.forEach((ul: any) => userLikesSet.add(ul.reply_id))
+        }
+      } catch {
+        // Table optional
+      }
+    }
+
     return data.map(r => ({
       id: r.id,
       threadId: r.thread_id,
@@ -476,6 +494,8 @@ export async function getThreadReplies(threadId: string): Promise<ForumReply[]> 
       content: r.content,
       isHelpful: r.is_helpful,
       isTeacherVerified: r.is_teacher_verified,
+      likesCount: (r as any).likes_count ?? 0,
+      hasLiked: userLikesSet.has(r.id),
       createdAt: r.created_at,
       updatedAt: r.updated_at
     }))
@@ -963,4 +983,125 @@ export async function updateForumReply(replyId: string, content: string): Promis
     return { error: err.message || 'Error al actualizar la respuesta' }
   }
 }
+
+// 18. Toggle Like on a reply
+export async function toggleLikeReply(
+  replyId: string,
+  userId?: string,
+  currentLikedState?: boolean
+): Promise<{ likesCount: number; hasLiked: boolean }> {
+  const isDemo = checkDemoMode()
+  if (isDemo) {
+    let newLikes = 0
+    let newLiked = false
+    mockReplies = mockReplies.map(r => {
+      if (r.id === replyId) {
+        const currentlyLiked = currentLikedState !== undefined ? currentLikedState : !!r.hasLiked
+        newLiked = !currentlyLiked
+        newLikes = Math.max(0, (r.likesCount || 0) + (newLiked ? 1 : -1))
+        return {
+          ...r,
+          likesCount: newLikes,
+          hasLiked: newLiked
+        }
+      }
+      return r
+    })
+    return { likesCount: newLikes, hasLiked: newLiked }
+  }
+
+  try {
+    const supabase = createAdminClient()
+
+    // 1. Try checking per-user like from forum_reply_likes if table exists
+    let hasExistingUserLike: boolean | null = null
+    let tableLikesExists = true
+    try {
+      const { data: userLike, error: ulErr } = await supabase
+        .from('forum_reply_likes')
+        .select('id')
+        .eq('reply_id', replyId)
+        .eq('user_id', userId || '00000000-0000-0000-0000-000000000000')
+        .maybeSingle()
+      if (ulErr) {
+        tableLikesExists = false
+      } else if (userLike) {
+        hasExistingUserLike = true
+      } else {
+        hasExistingUserLike = false
+      }
+    } catch {
+      tableLikesExists = false
+    }
+
+    // If DB check wasn't decisive (e.g. table doesn't exist), use currentLikedState
+    if (hasExistingUserLike === null) {
+      hasExistingUserLike = currentLikedState ?? false
+    }
+
+    const nextLiked = !hasExistingUserLike
+
+    // 2. Query forum_replies likes_count
+    const { data: reply, error: fetchErr } = await supabase
+      .from('forum_replies')
+      .select('likes_count')
+      .eq('id', replyId)
+      .maybeSingle()
+
+    if (!fetchErr && reply && typeof reply.likes_count === 'number') {
+      const currentLikes = reply.likes_count || 0
+      const newLikes = Math.max(0, currentLikes + (nextLiked ? 1 : -1))
+
+      await supabase
+        .from('forum_replies')
+        .update({ likes_count: newLikes })
+        .eq('id', replyId)
+
+      if (userId && tableLikesExists) {
+        try {
+          if (nextLiked) {
+            await supabase.from('forum_reply_likes').insert({ reply_id: replyId, user_id: userId })
+          } else {
+            await supabase.from('forum_reply_likes').delete().eq('reply_id', replyId).eq('user_id', userId)
+          }
+        } catch {
+          // Table optional
+        }
+      }
+
+      return { likesCount: newLikes, hasLiked: nextLiked }
+    }
+
+    // Fallback if column does not exist yet in DB: return success with toggle
+    return { likesCount: nextLiked ? 1 : 0, hasLiked: nextLiked }
+  } catch (err) {
+    console.error('Error toggling like:', err)
+    const nextLiked = currentLikedState !== undefined ? !currentLikedState : true
+    return { likesCount: nextLiked ? 1 : 0, hasLiked: nextLiked }
+  }
+}
+
+// 19. Delete Forum Reply
+export async function deleteForumReply(replyId: string): Promise<boolean> {
+  const isDemo = checkDemoMode()
+  if (isDemo) {
+    mockReplies = mockReplies.filter(r => r.id !== replyId && r.parentId !== replyId)
+    return true
+  }
+
+  try {
+    const supabase = createAdminClient()
+    const { error } = await supabase
+      .from('forum_replies')
+      .delete()
+      .eq('id', replyId)
+
+    if (error) throw error
+    return true
+  } catch (err) {
+    console.error('Error deleting reply:', err)
+    return false
+  }
+}
+
 

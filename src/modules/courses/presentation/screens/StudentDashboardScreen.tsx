@@ -27,6 +27,7 @@ interface Task {
   dueDate: string
   urgency: 'Urgente' | 'Próximo' | 'Pendiente'
   type?: string
+  href?: string
 }
 
 interface Achievement {
@@ -269,8 +270,8 @@ export function StudentDashboardScreen() {
         setTasks(pendingTasksMock)
         setAchievements(recentAchievementsMock)
         setStatsData([
-          { title: 'Cursos activos', value: '4', linkText: 'Ver todos', href: '/student/dashboard', icon: BookOpen, color: 'text-blue-500 bg-blue-50 dark:bg-blue-950/30' },
-          { title: 'Actividades pendientes', value: '4', linkText: 'Ver tareas', href: '/student/calendar', icon: CheckCircle, color: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-950/30' },
+          { title: 'Cursos activos', value: String(activeCoursesMock.length), linkText: 'Ver todos', href: '/student/dashboard', icon: BookOpen, color: 'text-blue-500 bg-blue-50 dark:bg-blue-950/30' },
+          { title: 'Actividades pendientes', value: String(pendingTasksMock.length), linkText: 'Ver tareas', href: '/student/calendar', icon: CheckCircle, color: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-950/30' },
           { title: 'Progreso general', value: '54%', linkText: 'Ver progreso', href: '/student/dashboard', icon: TrendingUp, color: 'text-indigo-500 bg-indigo-50 dark:bg-indigo-950/30' },
         ])
         // Demo calendar events: use dates relative to today
@@ -339,6 +340,8 @@ export function StudentDashboardScreen() {
           let dbModules: any[] = []
           let dbLessons: any[] = []
           let dbResources: any[] = []
+          let courseForums: any[] = []
+          let courseQuizzes: any[] = []
           let completedLessonIds = new Set<string>()
           let completedResourceIds = new Set<string>()
 
@@ -353,7 +356,7 @@ export function StudentDashboardScreen() {
             if (moduleIds.length > 0) {
               const { data: lessonsData } = await supabase
                 .from('lessons')
-                .select('id, module_id')
+                .select('id, module_id, title, type, due_date, created_at')
                 .in('module_id', moduleIds)
               dbLessons = lessonsData || []
 
@@ -394,9 +397,19 @@ export function StudentDashboardScreen() {
               if (lessonIds.length > 0) {
                 const { data: forumsData } = await supabase
                   .from('forums')
-                  .select('id, lesson_id')
+                  .select('id, lesson_id, due_date, is_graded')
                   .in('lesson_id', lessonIds)
-                const courseForums = forumsData || []
+                courseForums = forumsData || []
+
+                try {
+                  const { data: quizzesData } = await supabase
+                    .from('quizzes')
+                    .select('id, lesson_id, title, end_date')
+                    .in('lesson_id', lessonIds)
+                  courseQuizzes = quizzesData || []
+                } catch (e) {
+                  console.warn('Could not select quizzes:', e)
+                }
 
                 const forumIds = courseForums.map(f => f.id)
                 if (forumIds.length > 0) {
@@ -495,7 +508,60 @@ export function StudentDashboardScreen() {
           const mappedCourses = dbCourses.map(mapDbCourse)
           setCourses(mappedCourses)
 
-          // Fetch pending tasks from calendars table
+          // 1. Build real pending activities from enrolled courses
+          const ACTIONABLE_TYPES = new Set(['task', 'quiz', 'forum', 'assignment', 'homework'])
+          const coursePendingTasks: Task[] = []
+
+          for (const l of dbLessons) {
+            if (ACTIONABLE_TYPES.has(l.type) && !completedLessonIds.has(l.id)) {
+              const mod = dbModules.find(m => m.id === l.module_id)
+              const crs = dbCourses.find(c => c.id === mod?.course_id)
+
+              let rawDueDate: string | null = l.due_date || null
+              if (!rawDueDate && l.type === 'forum') {
+                const f = courseForums.find((forum: any) => forum.lesson_id === l.id)
+                if (f?.due_date) rawDueDate = f.due_date
+              }
+              if (!rawDueDate && l.type === 'quiz') {
+                const q = courseQuizzes.find((quiz: any) => quiz.lesson_id === l.id)
+                if (q?.end_date) rawDueDate = q.end_date
+              }
+
+              let formattedDate = 'Sin fecha límite'
+              let urgency: 'Urgente' | 'Próximo' | 'Pendiente' = 'Pendiente'
+
+              if (rawDueDate) {
+                const dueDateObj = new Date(rawDueDate)
+                formattedDate = dueDateObj.toLocaleDateString('es-ES', {
+                  weekday: 'short',
+                  month: 'short',
+                  day: 'numeric',
+                  hour: 'numeric',
+                  minute: '2-digit'
+                })
+
+                const timeLeftMs = dueDateObj.getTime() - Date.now()
+                const hoursLeft = timeLeftMs / (1000 * 60 * 60)
+                if (hoursLeft < 24) {
+                  urgency = 'Urgente'
+                } else if (hoursLeft < 72) {
+                  urgency = 'Próximo'
+                }
+              }
+
+              coursePendingTasks.push({
+                id: l.id,
+                title: l.title,
+                course: crs?.title || 'Curso',
+                dueDate: formattedDate,
+                urgency,
+                type: l.type,
+                href: crs?.slug ? `/student/courses/${crs.slug}?lessonId=${l.id}` : undefined
+              })
+            }
+          }
+
+          // 2. Fetch pending tasks from calendars table
           let tasksQuery = supabase
             .from('calendars')
             .select('*, courses(title)')
@@ -535,11 +601,22 @@ export function StudentDashboardScreen() {
               course: t.courses?.title || 'Evento General',
               dueDate: formattedDate,
               urgency,
-              type: t.event_type || 'homework'
+              type: t.event_type || 'homework',
+              href: '/student/calendar'
             }
           }
 
-          const mappedTasks = (dbTasks || []).map(mapDbTask)
+          const existingTaskIds = new Set(coursePendingTasks.map(t => t.id))
+          const calendarPendingTasks = (dbTasks || [])
+            .filter((t: any) => !existingTaskIds.has(t.id))
+            .map(mapDbTask)
+
+          const mappedTasks = [...coursePendingTasks, ...calendarPendingTasks]
+          mappedTasks.sort((a, b) => {
+            const urgencyWeight = { 'Urgente': 0, 'Próximo': 1, 'Pendiente': 2 }
+            return (urgencyWeight[a.urgency] ?? 2) - (urgencyWeight[b.urgency] ?? 2)
+          })
+
           setTasks(mappedTasks)
 
           // ── Calendar events: from calendars table + quiz end dates + forum deadlines ──
@@ -984,25 +1061,25 @@ export function StudentDashboardScreen() {
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ duration: 0.3, delay: idx * 0.05 }}
-                      className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-2xl border border-slate-100 bg-white hover:border-slate-200/80 transition-all dark:border-slate-800/60 dark:bg-slate-900"
+                      className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-2xl border border-slate-100 bg-white hover:border-slate-200/80 hover:shadow-sm transition-all dark:border-slate-800/60 dark:bg-slate-900 group"
                     >
-                      <div className="flex items-start gap-3.5 text-left">
-                        <div className="mt-1 flex h-7.5 w-7.5 items-center justify-center rounded-lg bg-blue-500/5 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400">
+                      <Link href={task.href || '/student/calendar'} className="flex items-start gap-3.5 text-left flex-1 min-w-0">
+                        <div className="mt-1 flex h-7.5 w-7.5 items-center justify-center rounded-lg bg-blue-500/5 text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors dark:bg-blue-500/10 dark:text-blue-400 shrink-0">
                           <BookOpen className="h-4.5 w-4.5" />
                         </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-semibold text-slate-900 dark:text-white text-sm sm:text-base">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h4 className="font-semibold text-slate-900 dark:text-white text-sm sm:text-base group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate">
                               {task.title}
                             </h4>
-                            <span className={`rounded-lg border px-1.5 py-0.2 text-[9px] font-bold ${typeBadge.color}`}>
+                            <span className={`rounded-lg border px-1.5 py-0.2 text-[9px] font-bold shrink-0 ${typeBadge.color}`}>
                               {typeBadge.label}
                             </span>
                           </div>
-                          <p className="text-xs text-slate-400 dark:text-slate-500">{task.course}</p>
+                          <p className="text-xs text-slate-400 dark:text-slate-500 truncate">{task.course}</p>
                         </div>
-                      </div>
-                      <div className="mt-3 sm:mt-0 flex items-center justify-between sm:justify-end gap-4 pl-11 sm:pl-0">
+                      </Link>
+                      <div className="mt-3 sm:mt-0 flex items-center justify-between sm:justify-end gap-4 pl-11 sm:pl-0 shrink-0">
                         <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
                           {task.dueDate}
                         </span>

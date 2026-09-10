@@ -54,7 +54,7 @@ export default function WorkloadPage() {
       // 4. Fetch curriculum and constraints to identify multi-teacher subjects accurately
       const { data: curriculumRows } = await supabase
         .from('sch_curriculum')
-        .select('group_id, subject_id, teacher_id, hours_per_week, sch_groups(id, name, level), sch_subjects(id, name)')
+        .select('group_id, subject_id, teacher_id, hours_per_week, sch_groups(id, name, level), sch_subjects(*)')
       
       setRawCurriculum(curriculumRows || [])
 
@@ -107,8 +107,10 @@ export default function WorkloadPage() {
           const key = `${row.group_id}-${row.subject_id}`
           const isNonGroupOrSpecialGroup = !row.group_id || (row.sch_groups && !isOfficialGradeGroup(row.sch_groups.name))
           const isMultiTeacherGroup = isNonGroupOrSpecialGroup || multiTeacherGroupSubjectKeys.has(key) || (row.subject_id && explicitMultiTeacherSubjIds.has(row.subject_id))
-          // Una materia multi-docente es exenta/especial SOLO SI NO está marcada en Reglas/Configuración como Carga Académica Normal
-          const isSpecial = isMultiTeacherGroup && (!row.subject_id || !normalWorkloadSubjectIds.has(row.subject_id))
+          
+          // Una materia es exenta/especial si está marcada en el catálogo como no-carga lectiva, o si es multi-docente no catalogada como carga normal
+          const isExplicitNonWorkload = (row.sch_subjects as any)?.is_academic_workload === false
+          const isSpecial = isExplicitNonWorkload || (isMultiTeacherGroup && (!row.subject_id || !normalWorkloadSubjectIds.has(row.subject_id)))
 
           current.count += hours
           if (isSpecial) {
