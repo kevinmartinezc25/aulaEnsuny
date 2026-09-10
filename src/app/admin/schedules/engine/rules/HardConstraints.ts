@@ -1,4 +1,5 @@
 import { ClassSession, IScheduleRule, RuleContext, RuleResult } from '../types';
+import { isOfficialGradeGroup } from '../../utils/groupFilters';
 
 export class TeacherOverlapRule implements IScheduleRule {
   readonly code = 'TEACHER_OVERLAP';
@@ -9,20 +10,15 @@ export class TeacherOverlapRule implements IScheduleRule {
     // Agrupar por teacher -> day -> period
     const map = new Map<string, string[]>();
 
-    // Las materias en normalWorkloadSubjectIds son materias "extra" como Comité de Investigación
-    // que se asignan a docentes adicionales sin bloquear su horario regular.
-    const normalWorkloadSubjectIds = new Set<string>(context.normalWorkloadSubjectIds || []);
-
     for (const session of schedule) {
       if (!session.teacherId) continue;
-      // Las sesiones de materias extra (Comité, Núcleo) no bloquean el horario del docente
-      if (normalWorkloadSubjectIds.has(session.subjectId)) continue;
       
       // Si la duración es 2, ocupa periodId y periodId + 1
       for (let i = 0; i < session.duration; i++) {
         const key = `${session.teacherId}-${session.dayOfWeek}-${session.periodId + i}`;
         if (map.has(key)) {
           conflicts.push(session.id || '');
+          conflicts.push(...map.get(key)!);
         } else {
           map.set(key, [session.id || '']);
         }
@@ -58,6 +54,9 @@ export class GroupOverlapRule implements IScheduleRule {
 
     for (const [_, sessions] of map.entries()) {
       if (sessions.length > 1) {
+        // En grupos no oficiales (como DOCENTES_INSTITUCIONAL), múltiples docentes pueden tener actividades simultáneas
+        if (sessions[0].groupId && !isOfficialGradeGroup(sessions[0].groupId)) continue;
+
         // Permitir múltiples docentes en el mismo grupo y periodo SOLO SI es la misma materia (co-teaching / multi-docente)
         const firstSubj = sessions[0].subjectId;
         const hasDifferentSubject = sessions.some(s => s.subjectId !== firstSubj);
@@ -221,16 +220,21 @@ export class SubjectMaxHoursPerDayRule implements IScheduleRule {
 
   validate(schedule: ClassSession[], context: RuleContext): RuleResult {
     const conflicts: string[] = [];
+    const multiTeacherSubjectIdsSet = new Set<string>(context.multiTeacherSubjectIds || []);
     const subjectDailyHours = new Map<string, Map<string, Map<string, { periods: Set<number>, ids: string[] }>>>();
 
     for (const session of schedule) {
       if (!session.groupId || !session.subjectId) continue;
 
-      if (!subjectDailyHours.has(session.groupId)) {
-        subjectDailyHours.set(session.groupId, new Map());
+      // Para materias multi-docente o grupos institucionales no oficiales, evaluamos el límite de 2h por docente individual
+      const isMultiTeacher = multiTeacherSubjectIdsSet.has(session.subjectId) || !isOfficialGradeGroup(session.groupId);
+      const entityKey = isMultiTeacher ? `${session.groupId}-${session.teacherId}` : session.groupId;
+
+      if (!subjectDailyHours.has(entityKey)) {
+        subjectDailyHours.set(entityKey, new Map());
       }
       
-      const dayMap = subjectDailyHours.get(session.groupId)!;
+      const dayMap = subjectDailyHours.get(entityKey)!;
       if (!dayMap.has(session.dayOfWeek)) {
         dayMap.set(session.dayOfWeek, new Map());
       }
@@ -247,7 +251,7 @@ export class SubjectMaxHoursPerDayRule implements IScheduleRule {
       if (session.id) stats.ids.push(session.id);
     }
 
-    for (const [groupId, dayMap] of subjectDailyHours.entries()) {
+    for (const [entityKey, dayMap] of subjectDailyHours.entries()) {
       for (const [day, subjectMap] of dayMap.entries()) {
         for (const [subjectId, stats] of subjectMap.entries()) {
           if (stats.periods.size > 2) {
@@ -255,7 +259,7 @@ export class SubjectMaxHoursPerDayRule implements IScheduleRule {
             return {
               isValid: false,
               scorePenalty: 100,
-              message: 'Una materia excede las 2 horas máximas permitidas por día en un grupo',
+              message: 'Una materia excede las 2 horas máximas permitidas por día en un grupo o docente',
               conflictingSessionIds: conflicts
             };
           }
@@ -266,7 +270,6 @@ export class SubjectMaxHoursPerDayRule implements IScheduleRule {
     return { isValid: true, scorePenalty: 0 };
   }
 }
-
 
 export class TeacherRequiredRule implements IScheduleRule {
   readonly code = 'TEACHER_REQUIRED';
@@ -297,16 +300,21 @@ export class SubjectOncePerDayRule implements IScheduleRule {
 
   validate(schedule: ClassSession[], context: RuleContext): RuleResult {
     const conflicts: string[] = [];
+    const multiTeacherSubjectIdsSet = new Set<string>(context.multiTeacherSubjectIds || []);
     const subjectDailyPeriods = new Map<string, Map<string, Map<string, Set<number>>>>();
 
     for (const session of schedule) {
       if (!session.groupId || !session.subjectId) continue;
 
-      if (!subjectDailyPeriods.has(session.groupId)) {
-        subjectDailyPeriods.set(session.groupId, new Map());
+      // Para materias multi-docente o grupos institucionales no oficiales, evaluamos la continuidad por docente
+      const isMultiTeacher = multiTeacherSubjectIdsSet.has(session.subjectId) || !isOfficialGradeGroup(session.groupId);
+      const entityKey = isMultiTeacher ? `${session.groupId}-${session.teacherId}` : session.groupId;
+
+      if (!subjectDailyPeriods.has(entityKey)) {
+        subjectDailyPeriods.set(entityKey, new Map());
       }
       
-      const dayMap = subjectDailyPeriods.get(session.groupId)!;
+      const dayMap = subjectDailyPeriods.get(entityKey)!;
       if (!dayMap.has(session.dayOfWeek)) {
         dayMap.set(session.dayOfWeek, new Map());
       }
@@ -322,7 +330,7 @@ export class SubjectOncePerDayRule implements IScheduleRule {
       }
     }
 
-    for (const [groupId, dayMap] of subjectDailyPeriods.entries()) {
+    for (const [entityKey, dayMap] of subjectDailyPeriods.entries()) {
       for (const [day, subjectMap] of dayMap.entries()) {
         for (const [subjectId, periodsSet] of subjectMap.entries()) {
           const periods = Array.from(periodsSet).sort((a, b) => a - b);
@@ -356,15 +364,19 @@ export class BlockSubjectSeparateDaysRule implements IScheduleRule {
 
   validate(schedule: ClassSession[], context: RuleContext): RuleResult {
     const conflicts: string[] = [];
+    const multiTeacherSubjectIdsSet = new Set<string>(context.multiTeacherSubjectIds || []);
     const subjectDailySessions = new Map<string, Map<string, Map<string, ClassSession[]>>>();
 
     for (const session of schedule) {
       if (!session.groupId || !session.subjectId) continue;
 
-      if (!subjectDailySessions.has(session.groupId)) {
-        subjectDailySessions.set(session.groupId, new Map());
+      const isMultiTeacher = multiTeacherSubjectIdsSet.has(session.subjectId) || !isOfficialGradeGroup(session.groupId);
+      const entityKey = isMultiTeacher ? `${session.groupId}-${session.teacherId}` : session.groupId;
+
+      if (!subjectDailySessions.has(entityKey)) {
+        subjectDailySessions.set(entityKey, new Map());
       }
-      const dayMap = subjectDailySessions.get(session.groupId)!;
+      const dayMap = subjectDailySessions.get(entityKey)!;
       if (!dayMap.has(session.dayOfWeek)) {
         dayMap.set(session.dayOfWeek, new Map());
       }
@@ -375,7 +387,7 @@ export class BlockSubjectSeparateDaysRule implements IScheduleRule {
       subjectMap.get(session.subjectId)!.push(session);
     }
 
-    for (const [groupId, dayMap] of subjectDailySessions.entries()) {
+    for (const [entityKey, dayMap] of subjectDailySessions.entries()) {
       for (const [day, subjectMap] of dayMap.entries()) {
         for (const [subjectId, sessions] of subjectMap.entries()) {
           const uniquePeriods = new Set<number>();
@@ -402,7 +414,6 @@ export class BlockSubjectSeparateDaysRule implements IScheduleRule {
   }
 }
 
-
 export class SubjectRulesRule implements IScheduleRule {
   readonly code = 'SUBJECT_RULES_VIOLATION';
   readonly isMandatory = true;
@@ -427,7 +438,8 @@ export class SubjectRulesRule implements IScheduleRule {
       });
     }
 
-    // Track daily hours per subject per group using a Set of unique periods to avoid double counting co-teachers
+    const multiTeacherSubjectIdsSet = new Set<string>(context.multiTeacherSubjectIds || []);
+    // Track daily hours per subject per group/teacher using a Set of unique periods to avoid double counting co-teachers
     const groupSubjectDailyHours = new Map<string, Map<string, Map<string, { periods: Set<number>, ids: string[] }>>>();
 
     for (const session of schedule) {
@@ -456,10 +468,13 @@ export class SubjectRulesRule implements IScheduleRule {
 
       // 2. Track daily hours for maxHoursPerDay validation
       if (rule.maxHoursPerDay !== undefined && session.groupId) {
-        if (!groupSubjectDailyHours.has(session.groupId)) {
-          groupSubjectDailyHours.set(session.groupId, new Map());
+        const isMultiTeacher = multiTeacherSubjectIdsSet.has(session.subjectId) || !isOfficialGradeGroup(session.groupId);
+        const entityKey = isMultiTeacher ? `${session.groupId}-${session.teacherId}` : session.groupId;
+
+        if (!groupSubjectDailyHours.has(entityKey)) {
+          groupSubjectDailyHours.set(entityKey, new Map());
         }
-        const dayMap = groupSubjectDailyHours.get(session.groupId)!;
+        const dayMap = groupSubjectDailyHours.get(entityKey)!;
         if (!dayMap.has(session.dayOfWeek)) {
           dayMap.set(session.dayOfWeek, new Map());
         }
@@ -478,7 +493,7 @@ export class SubjectRulesRule implements IScheduleRule {
     }
 
     // Validate Max Hours Per Day
-    for (const [groupId, dayMap] of groupSubjectDailyHours.entries()) {
+    for (const [entityKey, dayMap] of groupSubjectDailyHours.entries()) {
       for (const [day, subjectMap] of dayMap.entries()) {
         for (const [subjectId, stats] of subjectMap.entries()) {
           const rule = subjectRulesMap.get(subjectId);
@@ -506,95 +521,71 @@ export class MultiTeacherSameSlotRule implements IScheduleRule {
   validate(schedule: ClassSession[], context: RuleContext): RuleResult {
     const conflicts: string[] = [];
 
-    // Buscar la restricción activa MULTI_TEACHER_SAME_SLOT
-    const rule = context.constraints.find(
+    // 1. Obtener todas las restricciones activas MULTI_TEACHER_SAME_SLOT
+    const activeRules = (context.constraints || []).filter(
       c => c.ruleType === 'MULTI_TEACHER_SAME_SLOT' && c.isActive !== false
     );
-    if (!rule) {
+    if (activeRules.length === 0) {
       return { isValid: true, scorePenalty: 0 };
     }
 
-    // Extraer lista de reglas (soporta múltiples reglas o regla única legacy)
-    const ruleEntries: Array<{ subject_id?: string; fixed_day?: string; fixed_period?: number }> = 
-      Array.isArray(rule.parameters?.rules) && rule.parameters.rules.length > 0
+    // 2. Extraer lista de reglas indexadas por subject_id
+    const rulesBySubject = new Map<string, Array<{ fixed_day?: string; fixed_period?: number }>>();
+    for (const rule of activeRules) {
+      const entries = Array.isArray(rule.parameters?.rules) && rule.parameters.rules.length > 0
         ? rule.parameters.rules
         : [{
-            subject_id: rule.parameters?.subject_id || rule.targetEntityId,
+            subject_id: rule.parameters?.subject_id || rule.targetEntityId || 'ALL',
             fixed_day: rule.parameters?.fixed_day,
             fixed_period: rule.parameters?.fixed_period ? Number(rule.parameters.fixed_period) : undefined
           }];
 
-    const multiTeacherSubjectIdsSet = new Set<string>(context.multiTeacherSubjectIds || []);
+      for (const entry of entries) {
+        const subId = entry.subject_id || 'ALL';
+        if (!rulesBySubject.has(subId)) rulesBySubject.set(subId, []);
+        rulesBySubject.get(subId)!.push({
+          fixed_day: entry.fixed_day,
+          fixed_period: entry.fixed_period ? Number(entry.fixed_period) : undefined
+        });
+      }
+    }
 
-    for (const entry of ruleEntries) {
-      const fixedDay = entry.fixed_day;
-      const fixedPeriod = entry.fixed_period ? Number(entry.fixed_period) : undefined;
-      const selectedSubjectId = entry.subject_id;
+    // 3. Validar únicamente las sesiones de encuentro sincrónico (slotIndex < reglas configuradas)
+    for (const session of schedule) {
+      if (!session.subjectId) continue;
 
-      // Agrupar sesiones por (groupId, subjectId)
-      const groupSubjectMap = new Map<string, ClassSession[]>();
-      for (const session of schedule) {
-        if (!session.subjectId || !session.groupId) continue;
-        if (selectedSubjectId && selectedSubjectId !== 'ALL' && session.subjectId !== selectedSubjectId) {
-          continue;
-        }
-        const key = `${session.groupId}-${session.subjectId}`;
-        if (!groupSubjectMap.has(key)) {
-          groupSubjectMap.set(key, []);
-        }
-        groupSubjectMap.get(key)!.push(session);
+      const subjRules = rulesBySubject.get(session.subjectId) || rulesBySubject.get('ALL');
+      if (!subjRules || subjRules.length === 0) continue;
+
+      const slotIdx = session.slotIndex || 0;
+      // Las horas autónomas / individuales (que exceden el número de horas fijas de reunión configuradas)
+      // son de libre programación para el docente según su disponibilidad.
+      if (slotIdx >= subjRules.length) {
+        continue;
       }
 
-      for (const [_, sessions] of groupSubjectMap.entries()) {
-        if (sessions.length === 0) continue;
+      const targetRule = subjRules[slotIdx];
+      const fixedDay = targetRule.fixed_day;
+      const fixedPeriod = targetRule.fixed_period;
 
-        const allTeachers = Array.from(new Set(sessions.map(s => s.teacherId).filter(Boolean)));
-        const subjectId = sessions[0].subjectId;
-        const isMultiTeacher = allTeachers.length > 1 || multiTeacherSubjectIdsSet.has(subjectId);
+      const normDay = (d?: string) => (d || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+      const isDayMismatch = fixedDay && fixedDay !== 'ANY' && normDay(session.dayOfWeek) !== normDay(fixedDay);
+      const isPeriodMismatch = fixedPeriod && fixedPeriod > 0 && session.periodId !== fixedPeriod;
 
-        if (isMultiTeacher && allTeachers.length > 1) {
-          // Agrupar las sesiones por slot (dayOfWeek - periodId)
-          const slotMap = new Map<string, Set<string>>();
-          for (const session of sessions) {
-            const slotKey = `${session.dayOfWeek}-${session.periodId}`;
-            if (!slotMap.has(slotKey)) {
-              slotMap.set(slotKey, new Set());
-            }
-            if (session.teacherId) {
-              slotMap.get(slotKey)!.add(session.teacherId);
-            }
-          }
-
-          // CoGroup handles synchronizing the 1st shared meeting hour (slot0)
-          // Individual slots (slotIndex > 0) are scheduled independently per teacher
-          // without incurring penalties for asynchronous teacher presence.
+      if (isDayMismatch || isPeriodMismatch) {
+        if (session.id && !session.id.startsWith('existing-')) conflicts.push(session.id);
+        let msg = `La materia / comité multi-docente debe programarse en el día o periodo configurado.`;
+        if (isDayMismatch) {
+          msg = `La reunión multi-docente debe programarse el día ${fixedDay}.`;
+        } else if (isPeriodMismatch) {
+          msg = `La reunión multi-docente debe programarse en la ${fixedPeriod}ª Hora.`;
         }
-
-        // Validar fixedDay y fixedPeriod si están definidos en los parámetros de la regla
-        if (fixedDay || fixedPeriod) {
-          for (const session of sessions) {
-            const isDayMismatch = fixedDay && fixedDay !== 'ANY' && session.dayOfWeek !== fixedDay;
-            const expectedPeriod = fixedPeriod ? (fixedPeriod + (session.slotIndex || 0)) : undefined;
-            const isPeriodMismatch = fixedPeriod && fixedPeriod > 0 && session.periodId !== fixedPeriod && session.periodId !== expectedPeriod;
-
-            if (isDayMismatch || isPeriodMismatch) {
-              if (session.id && !session.id.startsWith('existing-')) conflicts.push(session.id);
-              let msg = `La materia / comité multi-docente debe programarse en el día o periodo configurado.`;
-              if (isDayMismatch) {
-                msg = `La materia / comité debe programarse el día ${fixedDay}.`;
-              } else if (isPeriodMismatch) {
-                const hourLabel = `${fixedPeriod}ª Hora`;
-                msg = `La materia / comité debe programarse en la ${hourLabel}.`;
-              }
-              return {
-                isValid: false,
-                scorePenalty: 100,
-                message: msg,
-                conflictingSessionIds: conflicts
-              };
-            }
-          }
-        }
+        return {
+          isValid: false,
+          scorePenalty: 100,
+          message: msg,
+          conflictingSessionIds: conflicts
+        };
       }
     }
 
@@ -666,7 +657,7 @@ export class MultiTeacherAtLeastOneSharedHourRule implements IScheduleRule {
 
 export class TeacherMaxFullDaysRule implements IScheduleRule {
   readonly code = 'TEACHER_MAX_FULL_DAYS';
-  readonly isMandatory = true;
+  readonly isMandatory = false; // Restricción suave: penaliza el score para evitar abortar la generación en docentes con alta carga
 
   validate(schedule: ClassSession[], context: RuleContext): RuleResult {
     const ruleConfig = context.constraints.find(c => c.ruleType === 'TEACHER_MAX_FULL_DAYS');
@@ -674,7 +665,7 @@ export class TeacherMaxFullDaysRule implements IScheduleRule {
       return { isValid: true, scorePenalty: 0 };
     }
 
-    const targetFullDays = ruleConfig?.parameters?.max_full_days ?? 2; // Exactamente 2 días objetivo
+    const baseTargetFullDays = ruleConfig?.parameters?.max_full_days ?? 2;
     const fullDayThreshold = ruleConfig?.parameters?.full_day_hours ?? 6; // Jornada completa de 6 horas
     const weightMultiplier = ruleConfig?.weight === 'STRICT' ? 100 : ruleConfig?.weight === 'HIGH' ? 50 : 25;
 
@@ -726,7 +717,14 @@ export class TeacherMaxFullDaysRule implements IScheduleRule {
         }
       }
 
-      // Si sobrepasa el máximo permitido de 2 días con 6 horas
+      // Escalar matemáticamente el objetivo de días completos según la carga semanal real del docente:
+      // Docentes con >= 24h requieren hasta 4 días completos; >= 20h requieren hasta 3 días.
+      const targetFullDays = Math.max(
+        baseTargetFullDays,
+        totalWeeklyHours >= 24 ? 4 : totalWeeklyHours >= 20 ? 3 : baseTargetFullDays
+      );
+
+      // Si sobrepasa el límite objetivo calculado
       if (fullDaysCount > targetFullDays) {
         hasFailure = true;
         totalPenalty += (fullDaysCount - targetFullDays) * weightMultiplier * 2;
@@ -735,16 +733,16 @@ export class TeacherMaxFullDaysRule implements IScheduleRule {
           failureMsg = `Un docente supera el límite máximo de ${targetFullDays} días con 6 horas completas (encontrados: ${fullDaysCount} días).`;
         }
       }
-      // Si tiene suficiente carga lectiva (>= 12h) pero no completa los 2 días de 6 horas
+      // Si tiene suficiente carga lectiva (>= 12h) pero no completa los días requeridos
       else if (totalWeeklyHours >= targetFullDays * fullDayThreshold && fullDaysCount < targetFullDays) {
         totalPenalty += (targetFullDays - fullDaysCount) * weightMultiplier;
       }
     }
 
-    if (hasFailure) {
-      const isStrict = !ruleConfig || ruleConfig.weight === 'STRICT';
+    // Solo se invalida estrictamente si el usuario configuró explícitamente peso STRICT en base de datos
+    if (hasFailure && ruleConfig?.weight === 'STRICT') {
       return {
-        isValid: !isStrict,
+        isValid: false,
         scorePenalty: totalPenalty > 0 ? totalPenalty : 100,
         message: failureMsg,
         conflictingSessionIds

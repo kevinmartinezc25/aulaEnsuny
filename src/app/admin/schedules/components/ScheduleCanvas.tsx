@@ -15,7 +15,7 @@ import { RuleContext, ClassSession } from '../engine/types'
 import SlotEditorModal from './SlotEditorModal'
 import PrintableSchedule from './PrintableSchedule'
 import UnassignedBlocksModal from './UnassignedBlocksModal'
-import { isOfficialGradeGroup } from '../utils/groupFilters'
+import { isOfficialGradeGroup, isMeetingSubject } from '../utils/groupFilters'
 
 const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes']
 
@@ -290,25 +290,49 @@ export default function ScheduleCanvas({
     toast.info('Análisis heurístico ejecutado: No se encontraron choques duros en el grupo actual.')
   }
 
-  const handleManualAssign = async (block: any, day: string, period: number) => {
-    const { error } = await supabase.from('sch_schedule_slots').insert({
+  const handleManualAssign = async (blockOrBlocks: any, day: string, period: number) => {
+    const blocksList: any[] = Array.isArray(blockOrBlocks) ? blockOrBlocks : [blockOrBlocks]
+    
+    let allRelatedBlocks = [...blocksList]
+    if (blocksList.length === 1) {
+      const single = blocksList[0]
+      const isMeeting = isMeetingSubject(single.subject_name, single.group_name, single.group_id, single.is_academic_workload)
+      if (isMeeting) {
+        const coBlocks = unassignedBlocks.filter(b => 
+          b !== single && 
+          b.group_id === single.group_id && 
+          b.subject_id === single.subject_id &&
+          (single.slotIndex === undefined || b.slotIndex === single.slotIndex)
+        )
+        allRelatedBlocks.push(...coBlocks)
+      }
+    }
+
+    const toInsert = allRelatedBlocks.map(b => ({
       day_of_week: day,
       period_id: period,
-      group_id: block.group_id,
-      subject_id: block.subject_id,
-      teacher_id: block.teacher_id && block.teacher_id.trim() !== '' ? block.teacher_id : null,
-      duration: block.duration || 1
-    })
+      group_id: b.group_id,
+      subject_id: b.subject_id,
+      teacher_id: b.teacher_id && b.teacher_id.trim() !== '' ? b.teacher_id : null,
+      duration: b.duration || 1
+    }))
+
+    const { error } = await supabase.from('sch_schedule_slots').insert(toInsert)
 
     if (error) {
       console.error(error)
-      toast.error(`Error al asignar el bloque: ${error.message || 'Error desconocido'}`)
+      toast.error(`Error al asignar bloque(s): ${error.message || 'Error desconocido'}`)
       throw error
     }
 
-    toast.success('Bloque asignado manualmente.')
+    if (allRelatedBlocks.length > 1) {
+      toast.success(`👥 Reunión sincronizada: ${allRelatedBlocks.length} docentes asignados a ${day} ${period}ª hora.`)
+    } else {
+      toast.success('Bloque asignado manualmente.')
+    }
     
-    const newUnassigned = unassignedBlocks.filter(b => b !== block)
+    const assignedSet = new Set(allRelatedBlocks)
+    const newUnassigned = unassignedBlocks.filter(b => !assignedSet.has(b))
     setUnassignedBlocks(newUnassigned)
     localStorage.setItem(`sch_local_unassigned_${entityId}`, JSON.stringify(newUnassigned))
     fetchSchedule()
@@ -333,7 +357,10 @@ export default function ScheduleCanvas({
       return
     }
 
-    const { data: currData } = await supabase.from('sch_curriculum').select('*').eq('group_id', entityId)
+    const { data: currData } = await supabase
+      .from('sch_curriculum')
+      .select('*, subject:sch_subjects(name, is_academic_workload), teacher:sch_teachers(name)')
+      .eq('group_id', entityId)
 
     if (!currData || currData.length === 0) {
       toast.error('Malla Curricular no configurada.')
@@ -347,32 +374,35 @@ export default function ScheduleCanvas({
 
     // Identificar materias multi-docente por grupo o por regla explícita
     const { data: allCurriculumData } = await supabase.from('sch_curriculum').select('group_id, subject_id, teacher_id')
-    const groupSubjectTeachers = new Map<string, Set<string>>()
+    const groupSubjectTeachers = new Map<string, { subjectId: string; teachers: Set<string> }>()
     const multiTeacherSubjSet = new Set<string>()
 
     if (allCurriculumData) {
       allCurriculumData.forEach((row: any) => {
         if (!row.group_id || !row.subject_id || !row.teacher_id) return
-        const key = `${row.group_id}-${row.subject_id}`
-        if (!groupSubjectTeachers.has(key)) groupSubjectTeachers.set(key, new Set())
-        groupSubjectTeachers.get(key)!.add(row.teacher_id)
+        const key = `${row.group_id}___${row.subject_id}`
+        if (!groupSubjectTeachers.has(key)) {
+          groupSubjectTeachers.set(key, { subjectId: row.subject_id, teachers: new Set() })
+        }
+        groupSubjectTeachers.get(key)!.teachers.add(row.teacher_id)
       })
-      for (const [key, tSet] of groupSubjectTeachers.entries()) {
-        if (tSet.size > 1) {
-          const subjectId = key.split('-')[1]
-          if (subjectId) multiTeacherSubjSet.add(subjectId)
+      for (const info of groupSubjectTeachers.values()) {
+        if (info.teachers.size > 1) {
+          multiTeacherSubjSet.add(info.subjectId)
         }
       }
     }
 
     // Agregar materias explícitamente configuradas en la regla MULTI_TEACHER_SAME_SLOT
-    const explicitRules = (constraintsData || []).find((c: any) => c.rule_type === 'MULTI_TEACHER_SAME_SLOT' && c.is_active !== false)
-    if (explicitRules?.parameters?.rules && Array.isArray(explicitRules.parameters.rules)) {
-      explicitRules.parameters.rules.forEach((r: any) => {
-        if (r.subject_id && r.subject_id !== 'ALL') multiTeacherSubjSet.add(r.subject_id)
-      })
-    } else if (explicitRules?.parameters?.subject_id && explicitRules.parameters.subject_id !== 'ALL') {
-      multiTeacherSubjSet.add(explicitRules.parameters.subject_id)
+    const explicitRulesList = (constraintsData || []).filter((c: any) => c.rule_type === 'MULTI_TEACHER_SAME_SLOT' && c.is_active !== false)
+    for (const explicitRules of explicitRulesList) {
+      if (explicitRules?.parameters?.rules && Array.isArray(explicitRules.parameters.rules)) {
+        explicitRules.parameters.rules.forEach((r: any) => {
+          if (r.subject_id && r.subject_id !== 'ALL') multiTeacherSubjSet.add(r.subject_id)
+        })
+      } else if (explicitRules?.parameters?.subject_id && explicitRules.parameters.subject_id !== 'ALL') {
+        multiTeacherSubjSet.add(explicitRules.parameters.subject_id)
+      }
     }
 
     const multiTeacherSubjectIds = Array.from(multiTeacherSubjSet)
@@ -450,12 +480,32 @@ export default function ScheduleCanvas({
       let slotIdx = slotCounters.get(counterKey) || 0
       if (isBlockSubject) {
         while (hoursLeft >= 2) {
-          blocksToAssign.push({ subject_id: c.subject_id, teacher_id: c.teacher_id, group_id: c.group_id, duration: 2, slotIndex: slotIdx++ })
+          blocksToAssign.push({
+            subject_id: c.subject_id,
+            subject_name: c.subject?.name,
+            teacher_id: c.teacher_id,
+            teacher_name: c.teacher?.name,
+            group_id: c.group_id,
+            group_name: entityType === 'group' ? entityName : undefined,
+            duration: 2,
+            slotIndex: slotIdx++,
+            is_academic_workload: c.subject?.is_academic_workload
+          })
           hoursLeft -= 2
         }
       }
       while (hoursLeft > 0) {
-        blocksToAssign.push({ subject_id: c.subject_id, teacher_id: c.teacher_id, group_id: c.group_id, duration: 1, slotIndex: slotIdx++ })
+        blocksToAssign.push({
+          subject_id: c.subject_id,
+          subject_name: c.subject?.name,
+          teacher_id: c.teacher_id,
+          teacher_name: c.teacher?.name,
+          group_id: c.group_id,
+          group_name: entityType === 'group' ? entityName : undefined,
+          duration: 1,
+          slotIndex: slotIdx++,
+          is_academic_workload: c.subject?.is_academic_workload
+        })
         hoursLeft -= 1
       }
       slotCounters.set(counterKey, slotIdx)
@@ -669,57 +719,92 @@ export default function ScheduleCanvas({
                     </div>
                   )
                 })}
-                {classes.filter(c => c.day === day).map(cls => {
-                  const startCol = displayTimeSlots.findIndex(s => s.id === cls.period) + 2
-                  const endCol = startCol + (cls.duration || 1)
-                  return (
-                  <div key={cls.id} className="h-full relative z-10" style={{ gridColumnStart: startCol, gridColumnEnd: endCol, gridRow: 1 }}>
-                    <motion.div
-                      drag={!readOnly}
-                      dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
-                    dragElastic={1}
-                    onDragStart={() => setActiveDragId(cls.id)}
-                    onDragEnd={(event, info) => {
-                      setActiveDragId(null)
-                      const el = event.target as HTMLElement;
-                      const originalPointerEvents = el.style.pointerEvents;
-                      el.style.pointerEvents = 'none';
-                      const elementsUnderCursor = document.elementsFromPoint(info.point.x, info.point.y);
-                      el.style.pointerEvents = originalPointerEvents;
-                      const dropZone = elementsUnderCursor.find(e => e.getAttribute('data-drop-day'));
-                      if (dropZone) {
-                        const targetDay = dropZone.getAttribute('data-drop-day');
-                        const targetPeriod = parseInt(dropZone.getAttribute('data-drop-period') || '0', 10);
-                        if (targetDay && targetPeriod && (targetDay !== cls.day || targetPeriod !== cls.period)) {
-                          updateSlot(cls.id, targetDay, targetPeriod);
-                        }
-                      }
-                    }}
-                    whileHover={!readOnly ? { scale: 1.01, y: -2 } : {}}
-                    whileDrag={!readOnly ? { scale: 1.03, zIndex: 50, rotate: 1 } : {}}
-                    className={`absolute inset-0 m-1 rounded-xl shadow-sm border overflow-hidden bg-white dark:bg-slate-800 flex flex-col ${!readOnly ? 'cursor-grab active:cursor-grabbing group/card' : ''} ${activeDragId === cls.id ? 'opacity-80 shadow-2xl' : ''}`}
-                  >
-                        <div className="h-1 w-full shrink-0" style={{ backgroundColor: cls.color === '#ffffff' ? '#94a3b8' : cls.color }} />
-                        {!readOnly && (
-                          <button onClick={(e) => { e.stopPropagation(); deleteSlot(cls.id); }} className="absolute top-1.5 right-1.5 p-1 rounded-md bg-white/80 hover:bg-red-100 text-slate-400 hover:text-red-600 transition-colors opacity-0 group-hover/card:opacity-100 z-20">
-                            <Trash2 className="h-3 w-3" />
-                          </button>
-                        )}
-                        <div className="p-2 flex-1 flex flex-col justify-between relative">
-                          <div>
-                            <h4 className="text-[13px] leading-tight font-extrabold text-slate-800 pr-2 line-clamp-2" title={cls.subject}>{cls.subject}</h4>
-                            {entityType !== 'teacher' && (
-                              <p className="text-[10px] font-medium text-slate-500 flex items-center gap-1 mt-0.5 truncate" title={cls.teacher}><User className="h-2.5 w-2.5 shrink-0" /> <span className="truncate">{cls.teacher}</span></p>
+                {(() => {
+                  const dayClasses = classes.filter(c => c.day === day)
+                  return dayClasses.map(cls => {
+                    const startCol = displayTimeSlots.findIndex(s => s.id === cls.period) + 2
+                    const endCol = startCol + (cls.duration || 1)
+
+                    // Detectar cruces/colisiones en el mismo horario
+                    const clsStart = cls.period
+                    const clsEnd = cls.period + (cls.duration || 1)
+                    const overlapping = dayClasses.filter(other => {
+                      const oStart = other.period
+                      const oEnd = other.period + (other.duration || 1)
+                      return Math.max(clsStart, oStart) < Math.min(clsEnd, oEnd)
+                    })
+
+                    overlapping.sort((a, b) => a.period - b.period || a.id.localeCompare(b.id))
+                    const totalOverlaps = overlapping.length
+                    const overlapIndex = overlapping.findIndex(c => c.id === cls.id)
+                    const hasConflict = totalOverlaps > 1
+
+                    // Posicionamiento horizontal dinámico cuando hay colisión para que no se monten una encima de otra
+                    const widthStyle = hasConflict ? `calc(${100 / totalOverlaps}% - 4px)` : 'calc(100% - 8px)'
+                    const leftStyle = hasConflict ? `calc(${(100 / totalOverlaps) * overlapIndex}% + 2px)` : '4px'
+
+                    return (
+                      <div key={cls.id} className="h-full relative z-10 pointer-events-none" style={{ gridColumnStart: startCol, gridColumnEnd: endCol, gridRow: 1 }}>
+                        <motion.div
+                          drag={!readOnly}
+                          dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
+                          dragElastic={1}
+                          onDragStart={() => setActiveDragId(cls.id)}
+                          onDragEnd={(event, info) => {
+                            setActiveDragId(null)
+                            const el = event.target as HTMLElement;
+                            const originalPointerEvents = el.style.pointerEvents;
+                            el.style.pointerEvents = 'none';
+                            const elementsUnderCursor = document.elementsFromPoint(info.point.x, info.point.y);
+                            el.style.pointerEvents = originalPointerEvents;
+                            const dropZone = elementsUnderCursor.find(e => e.getAttribute('data-drop-day'));
+                            if (dropZone) {
+                              const targetDay = dropZone.getAttribute('data-drop-day');
+                              const targetPeriod = parseInt(dropZone.getAttribute('data-drop-period') || '0', 10);
+                              if (targetDay && targetPeriod && (targetDay !== cls.day || targetPeriod !== cls.period)) {
+                                updateSlot(cls.id, targetDay, targetPeriod);
+                              }
+                            }
+                          }}
+                          whileHover={!readOnly ? { scale: 1.01, y: -2 } : {}}
+                          whileDrag={!readOnly ? { scale: 1.03, zIndex: 50, rotate: 1 } : {}}
+                          style={{
+                            width: widthStyle,
+                            left: leftStyle,
+                            top: '4px',
+                            bottom: '4px'
+                          }}
+                          className={`absolute rounded-xl shadow-sm border overflow-hidden bg-white dark:bg-slate-800 flex flex-col pointer-events-auto ${hasConflict ? 'border-rose-500 ring-2 ring-rose-400/40 dark:ring-rose-500/30' : ''} ${!readOnly ? 'cursor-grab active:cursor-grabbing group/card' : ''} ${activeDragId === cls.id ? 'opacity-80 shadow-2xl z-50' : ''}`}
+                        >
+                          <div className="h-1.5 w-full shrink-0 flex items-center justify-between" style={{ backgroundColor: cls.color === '#ffffff' ? '#94a3b8' : cls.color }}>
+                            {hasConflict && (
+                              <span className="bg-rose-600 text-white text-[8px] font-black px-1 rounded-br uppercase tracking-tight flex items-center gap-0.5 shadow-sm">
+                                <AlertTriangle className="h-2 w-2" /> Cruce ({overlapIndex + 1}/{totalOverlaps})
+                              </span>
                             )}
                           </div>
-                          <div className="flex items-center justify-between mt-1 pt-0.5 border-t border-slate-100">
-                            <p className="text-[10px] font-bold text-slate-600 flex items-center gap-0.5"><MapPin className="h-2.5 w-2.5 text-slate-400" /> {cls.room}</p>
-                            <span className="text-[11px] px-1 py-[1px] bg-slate-200/60 dark:bg-slate-700/60 rounded text-slate-800 dark:text-slate-100 font-black uppercase tracking-wider shadow-sm">{cls.group}</span>
+                          {!readOnly && (
+                            <button onClick={(e) => { e.stopPropagation(); deleteSlot(cls.id); }} className="absolute top-1.5 right-1.5 p-1 rounded-md bg-white/80 hover:bg-red-100 text-slate-400 hover:text-red-600 transition-colors opacity-0 group-hover/card:opacity-100 z-20" title="Eliminar clase">
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          )}
+                          <div className="p-2 flex-1 flex flex-col justify-between relative overflow-hidden">
+                            <div>
+                              <h4 className="text-[12px] leading-tight font-extrabold text-slate-800 dark:text-slate-100 pr-2 line-clamp-2" title={cls.subject}>{cls.subject}</h4>
+                              {entityType !== 'teacher' && (
+                                <p className="text-[9px] font-medium text-slate-500 flex items-center gap-1 mt-0.5 truncate" title={cls.teacher}><User className="h-2.5 w-2.5 shrink-0" /> <span className="truncate">{cls.teacher}</span></p>
+                              )}
+                            </div>
+                            <div className="flex items-center justify-between mt-1 pt-0.5 border-t border-slate-100 dark:border-slate-700">
+                              <p className="text-[9px] font-bold text-slate-600 dark:text-slate-400 flex items-center gap-0.5 truncate"><MapPin className="h-2.5 w-2.5 text-slate-400 shrink-0" /> <span className="truncate">{cls.room || 'Aula'}</span></p>
+                              <span className="text-[10px] px-1 py-[1px] bg-slate-200/60 dark:bg-slate-700/60 rounded text-slate-800 dark:text-slate-100 font-black uppercase tracking-wider shadow-sm truncate max-w-[65px]" title={cls.group}>{cls.group}</span>
+                            </div>
                           </div>
-                        </div>
-                  </motion.div>
-                </div>
-              )})}
+                        </motion.div>
+                      </div>
+                    )
+                  })
+                })()}
             </div>
             {idx !== DAYS.length - 1 && <div className="border-b border-slate-200 dark:border-slate-700" />}
           </React.Fragment>

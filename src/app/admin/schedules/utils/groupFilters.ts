@@ -26,3 +26,34 @@ export const isOfficialGradeGroup = (groupName: string): boolean => {
   // All student grade groups and user-created cohort groups are valid
   return true
 }
+
+/**
+ * Utility function to identify if a subject/block is of type "Horas Reunión"
+ * (e.g. Comités, Núcleos de Área, Reuniones Institucionales, or non-academic workload subjects).
+ * In all meeting subjects, all assigned teachers must coincide at the exact same hour.
+ */
+export const isMeetingSubject = (
+  subjectName?: string,
+  groupName?: string,
+  groupId?: string,
+  isAcademicWorkload?: boolean
+): boolean => {
+  if (isAcademicWorkload === false) return true
+  if (groupName && !isOfficialGradeGroup(groupName)) return true
+  if (groupId && !isOfficialGradeGroup(groupId)) return true
+  if (!subjectName) return false
+  const upper = subjectName.trim().toUpperCase()
+  return (
+    upper.includes('NÚCLEO') ||
+    upper.includes('NUCLEO') ||
+    upper.includes('COMITÉ') ||
+    upper.includes('COMITE') ||
+    upper.includes('REUNIÓN') ||
+    upper.includes('REUNION') ||
+    upper.includes('CONSEJO') ||
+    upper.includes('COORDINAC') ||
+    upper.includes('DOCENTES') ||
+    upper.includes('INSTITUCIONAL')
+  )
+}
+

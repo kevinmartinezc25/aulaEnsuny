@@ -202,8 +202,9 @@ export default function WorkloadMatrixView({
         const key = `${row.group_id}-${row.subject_id}`
         const isMultiTeacherGroup = multiTeacherKeys.has(key) || (row.subject_id && explicitMultiTeacherSubjIds?.has(row.subject_id))
         
-        // Excluir ÚNICAMENTE las materias que tienen la leyenda "Multi-docente / Exenta" (isSpecial === true)
-        const isSpecial = isMultiTeacherGroup && (!row.subject_id || !normalWorkloadSubjectIds?.has(row.subject_id))
+        const isExplicitNonWorkload = (row.sch_subjects as any)?.is_academic_workload === false
+        // Excluir materias que no son objeto de carga académica lectiva o que son multi-docente exentas
+        const isSpecial = isExplicitNonWorkload || (isMultiTeacherGroup && (!row.subject_id || !normalWorkloadSubjectIds?.has(row.subject_id)))
 
         if (isSpecial) {
           return

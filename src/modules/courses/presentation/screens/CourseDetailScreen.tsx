@@ -2,13 +2,14 @@
 
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowLeft, ChevronLeft, BookOpen, Video, FileText, CheckCircle2, ChevronRight, ChevronDown, Menu, X, ArrowRight, Play, Download, Award, BrainCircuit, Eye, Clock, AlertCircle, CheckCircle, BarChart3, LineChart as LineChartIcon, Activity, Target, Timer, ClipboardList, UploadCloud, Loader2, MessageSquare, Pin, Lock, Unlock, CornerDownRight, CheckSquare, Undo2, Plus, Edit, Megaphone, Paperclip, AlertTriangle, Bell, Trophy, Calendar, User } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, BookOpen, Video, FileText, CheckCircle2, ChevronRight, ChevronDown, Menu, X, ArrowRight, Play, Download, Award, BrainCircuit, Eye, Clock, AlertCircle, CheckCircle, BarChart3, LineChart as LineChartIcon, Activity, Target, Timer, ClipboardList, UploadCloud, Loader2, MessageSquare, Pin, Lock, Unlock, CornerDownRight, CheckSquare, Undo2, Plus, Edit, Megaphone, Paperclip, AlertTriangle, Bell, Trophy, Calendar, User, RotateCw } from 'lucide-react'
 import Link from 'next/link'
 import { PdfViewer } from '@/modules/resources/presentation/components/PdfViewer'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts'
 import { createClient } from '@/core/config/supabase/client'
 import { toast } from 'sonner'
 import { MiniForumEditor } from '@/core/components/MiniForumEditor'
+import { ForumReplyCard } from '../components/ForumReplyCard'
 import { getAnnouncementsByCourse, markAnnouncementAsRead } from '../../application/announcementActions'
 import { uploadPdfAction } from '@/modules/resources/presentation/actions/resourceActions'
 
@@ -84,6 +85,7 @@ export function fixHtmlSpaces(html: string): string {
     .replace(/&nbsp;/gi, ' ')
     .replace(/(<\/(?:span|strong|b|em|i|u|p|div|h[1-6]|li|a)>)([A-Za-z0-9áéíóúÁÉÍÓÚñÑ])/g, '$1 $2')
     .replace(/([a-zA-ZáéíóúÁÉÍÓÚñÑ]):([a-zA-ZáéíóúÁÉÍÓÚñÑ])/g, '$1: $2')
+    .replace(/<a(?![^>]*target=)([^>]+)>/gi, '<a$1 target="_blank" rel="noopener noreferrer">')
 }
 
 function cleanHtmlPreview(html: string, maxLength: number = 0): string {
@@ -164,7 +166,6 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
   const [editingReplyId, setEditingReplyId] = useState<string | null>(null)
   const [editReplyContent, setEditReplyContent] = useState('')
   const [replyingToParentId, setReplyingToParentId] = useState<string | null>(null)
-  const [inlineReplyContent, setInlineReplyContent] = useState('')
 
   const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({})
 
@@ -232,8 +233,25 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
     const loadReplies = async () => {
       try {
         const { getThreadReplies } = await import('../../application/forumActions')
-        const replies = await getThreadReplies(activeThread.id)
-        setThreadReplies(replies)
+        const replies = await getThreadReplies(activeThread.id, userId || undefined)
+
+        // Merge with local likes cache so likes persist reliably
+        const storageKey = `forum_likes_${userId || 'anon'}`
+        let localLikes: Record<string, boolean> = {}
+        try {
+          localLikes = JSON.parse(localStorage.getItem(storageKey) || '{}')
+        } catch {}
+
+        const merged = replies.map(r => {
+          const isLikedLocally = !!localLikes[r.id]
+          const hasLiked = r.hasLiked || isLikedLocally
+          return {
+            ...r,
+            hasLiked,
+            likesCount: Math.max(r.likesCount || 0, isLikedLocally && !r.hasLiked ? (r.likesCount || 0) + 1 : (r.likesCount || 0))
+          }
+        })
+        setThreadReplies(merged)
       } catch (err) {
         console.error('Error loading replies:', err)
       }
@@ -337,45 +355,7 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
     }
   }
 
-  const handleCreateInlineReply = async (e: React.FormEvent, parentId: string) => {
-    e.preventDefault()
-    if (isContentEmpty(inlineReplyContent) || !activeThread) {
-      toast.error('El contenido de la respuesta es requerido')
-      return
-    }
 
-    try {
-      const { createForumReply } = await import('../../application/forumActions')
-      const authorIdToUse = userId || 'stu1'
-      const result = await createForumReply({
-        threadId: activeThread.id,
-        parentId,
-        authorId: authorIdToUse,
-        content: inlineReplyContent.trim()
-      })
-
-      if (result.error) {
-        toast.error(result.error)
-      } else if (result.data) {
-        setThreadReplies(prev => [...prev, result.data!])
-        setInlineReplyContent('')
-        setReplyingToParentId(null)
-        toast.success('Respuesta agregada exitosamente')
-        
-        setForumThreads(prev => prev.map(t => t.id === activeThread.id ? { ...t, repliesCount: t.repliesCount + 1 } : t))
-        if (userId && activeThread) {
-          localStorage.setItem(`forum_thread_read_${userId}_${activeThread.id}`, (activeThread.repliesCount + 1).toString())
-        }
-
-        if (userRole === 'student' && activeLesson && activeLesson.status !== 'completed' && activeLesson.status !== 'graded') {
-          await handleMarkAsCompleted(activeLesson.id)
-        }
-      }
-    } catch (err) {
-      console.error('Error creating inline reply:', err)
-      toast.error('Error al agregar respuesta')
-    }
-  }
 
   const canEditStudent = (createdAt: string) => {
     const elapsed = Date.now() - new Date(createdAt).getTime()
@@ -418,16 +398,16 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
     setEditReplyContent(reply.content)
   }
 
-  const handleSaveEditReply = async (e: React.FormEvent, replyId: string) => {
-    e.preventDefault()
-    if (isContentEmpty(editReplyContent)) {
+  const handleSaveEditReply = async (replyId: string, contentToSave?: string) => {
+    const text = (contentToSave !== undefined ? contentToSave : editReplyContent).trim()
+    if (isContentEmpty(text)) {
       toast.error('El contenido de la respuesta es requerido')
       return
     }
 
     try {
       const { updateForumReply } = await import('../../application/forumActions')
-      const result = await updateForumReply(replyId, editReplyContent.trim())
+      const result = await updateForumReply(replyId, text)
 
       if (result.error) {
         toast.error(result.error)
@@ -439,6 +419,100 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
     } catch (err) {
       console.error('Error updating reply:', err)
       toast.error('Error al actualizar la respuesta')
+    }
+  }
+
+  const handleLikeReply = async (replyId: string) => {
+    try {
+      const storageKey = `forum_likes_${userId || 'anon'}`
+      let localLikes: Record<string, boolean> = {}
+      try {
+        localLikes = JSON.parse(localStorage.getItem(storageKey) || '{}')
+      } catch {}
+
+      const currentReply = threadReplies.find(r => r.id === replyId)
+      const wasLiked = currentReply?.hasLiked ?? (!!localLikes[replyId])
+      const nextLiked = !wasLiked
+
+      if (nextLiked) {
+        localLikes[replyId] = true
+      } else {
+        delete localLikes[replyId]
+      }
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(localLikes))
+      } catch {}
+
+      const { toggleLikeReply } = await import('../../application/forumActions')
+      const res = await toggleLikeReply(replyId, userId || undefined, wasLiked)
+
+      setThreadReplies(prev => prev.map(r => {
+        if (r.id !== replyId) return r
+        return {
+          ...r,
+          likesCount: res.likesCount,
+          hasLiked: res.hasLiked
+        }
+      }))
+    } catch (err) {
+      console.error('Error toggling like:', err)
+    }
+  }
+
+  const handleDeleteReply = async (replyId: string) => {
+    try {
+      const { deleteForumReply } = await import('../../application/forumActions')
+      const success = await deleteForumReply(replyId)
+      if (success) {
+        setThreadReplies(prev => prev.filter(r => r.id !== replyId && r.parentId !== replyId))
+        toast.success('Aportación eliminada exitosamente')
+        if (activeThread) {
+          setForumThreads(prev => prev.map(t => t.id === activeThread.id ? { ...t, repliesCount: Math.max(0, t.repliesCount - 1) } : t))
+        }
+      } else {
+        toast.error('Error al eliminar la aportación')
+      }
+    } catch (err) {
+      console.error('Error deleting reply:', err)
+      toast.error('Error al eliminar la aportación')
+    }
+  }
+
+  const handleCreateInlineReplySubmit = async (parentId: string, content: string) => {
+    if (isContentEmpty(content) || !activeThread) {
+      toast.error('El contenido de la respuesta es requerido')
+      return
+    }
+
+    try {
+      const { createForumReply } = await import('../../application/forumActions')
+      const authorIdToUse = userId || 'stu1'
+      const result = await createForumReply({
+        threadId: activeThread.id,
+        parentId,
+        authorId: authorIdToUse,
+        content: content.trim()
+      })
+
+      if (result.error) {
+        toast.error(result.error)
+      } else if (result.data) {
+        setThreadReplies(prev => [...prev, result.data!])
+        setReplyingToParentId(null)
+        toast.success('Respuesta agregada exitosamente')
+        
+        setForumThreads(prev => prev.map(t => t.id === activeThread.id ? { ...t, repliesCount: t.repliesCount + 1 } : t))
+        if (userId && activeThread) {
+          localStorage.setItem(`forum_thread_read_${userId}_${activeThread.id}`, (activeThread.repliesCount + 1).toString())
+        }
+
+        if (userRole === 'student' && activeLesson && activeLesson.status !== 'completed' && activeLesson.status !== 'graded') {
+          await handleMarkAsCompleted(activeLesson.id)
+        }
+      }
+    } catch (err) {
+      console.error('Error creating inline reply:', err)
+      toast.error('Error al agregar respuesta')
     }
   }
 
@@ -1398,8 +1472,22 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
 
       {/* Módulos */}
       <div className="flex-1 overflow-y-auto py-5 space-y-6">
-        {courseData.modules.map((mod) => {
+        {courseData.modules.map((mod, modIdx) => {
           const isExpanded = !!expandedModules[mod.id]
+          const hasColon = mod.title.includes(':')
+          const isPrefixed = /^(m[oó]dulo|unidad|secci[oó]n|cap[ií]tulo)\s+\d+/i.test(mod.title.trim())
+          
+          let eyebrow: string | null = null
+          let mainTitle: string = mod.title.trim()
+
+          if (hasColon) {
+            eyebrow = mod.title.split(':')[0].trim()
+            mainTitle = mod.title.substring(mod.title.indexOf(':') + 1).trim()
+          } else if (!isPrefixed) {
+            eyebrow = `Módulo ${modIdx + 1}`
+            mainTitle = mod.title.trim()
+          }
+
           return (
             <div key={mod.id} className="space-y-2.5 text-left">
               <button
@@ -1407,8 +1495,14 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
                 className="flex w-full items-start justify-between text-left transition-colors py-3 px-3 cursor-pointer bg-transparent border-none outline-none mb-1 group"
               >
                 <div className="flex-1 min-w-0 pr-2">
-                  <p className="text-[10px] font-bold text-slate-900 dark:text-white mb-0.5">{mod.title.includes(':') ? mod.title.split(':')[0] : mod.title}</p>
-                  <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{mod.title.includes(':') ? mod.title.substring(mod.title.indexOf(':') + 1).trim() : mod.title}</p>
+                  {eyebrow && (
+                    <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-0.5">
+                      {eyebrow}
+                    </p>
+                  )}
+                  <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                    {mainTitle}
+                  </p>
                   {(() => {
                     const totalL = mod.lessons.length;
                     const compL = mod.lessons.filter(l => l.status === 'completed' || l.status === 'graded').length;
@@ -2302,17 +2396,41 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
                     ) : activeThread ? (
                       /* Thread Details View */
                       <div className="space-y-6">
-                        <button
-                          onClick={() => setActiveThread(null)}
-                          className="flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors border-none"
-                        >
-                          <Undo2 size={12} /> Volver a los temas
-                        </button>
+                        {/* Top Header matching reference design */}
+                        <div className="flex items-center justify-between gap-4 py-1">
+                          <div className="flex items-center gap-3">
+                            <button 
+                              onClick={() => setActiveThread(null)}
+                              className="p-2 text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors border-none bg-transparent cursor-pointer"
+                              title="Volver a los temas"
+                            >
+                              <ArrowLeft className="h-5 w-5" />
+                            </button>
+                            <div>
+                              <h3 className="text-base sm:text-lg font-bold text-slate-800 dark:text-slate-100 tracking-tight">
+                                {forumConfig?.title ? (forumConfig.title.toLowerCase().startsWith('foro:') ? forumConfig.title : `Foro: ${forumConfig.title}`) : (activeThread.title.toLowerCase().startsWith('foro:') ? activeThread.title : `Foro: ${activeThread.title}`)}
+                              </h3>
+                              <div className="mt-0.5">
+                                <span className="inline-flex items-center bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-xs font-semibold px-3 py-0.5 rounded-full">
+                                  {threadReplies.length} {threadReplies.length === 1 ? 'respuesta' : 'respuestas'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <button
+                            onClick={() => setActiveThread(null)}
+                            className="border border-blue-200 dark:border-blue-800/80 text-blue-600 dark:text-blue-400 bg-white dark:bg-slate-900 hover:bg-blue-50 dark:hover:bg-blue-950/40 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 shadow-sm transition-all cursor-pointer"
+                          >
+                            <RotateCw className="h-4 w-4" />
+                            <span>Volver al foro</span>
+                          </button>
+                        </div>
 
                         <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950/60 space-y-4">
                           <div className="flex items-start justify-between gap-4">
                             <div className="flex items-center gap-3">
-                              <div className="h-10 w-10 rounded-full bg-gradient-to-tr from-pink-500 to-indigo-500 flex items-center justify-center font-bold text-white text-sm">
+                              <div className="h-10 w-10 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center font-bold text-white text-sm">
                                 {activeThread.authorName.charAt(0)}
                               </div>
                               <div>
@@ -2409,189 +2527,70 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
                           )}
                         </div>
 
-                        {/* Replies List */}
+                        {/* Replies Section */}
                         <div className="space-y-4">
-                          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Respuestas ({threadReplies.length})</h4>
-                          <div className="space-y-3">
-                            {(() => {
-                              const renderReply = (reply: any, level: number = 0) => {
-                                const children = threadReplies.filter(r => r.parentId === reply.id).sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-                                return (
-                                  <div key={reply.id} className={level > 0 ? 'ml-6 sm:ml-12 mt-3 border-l-2 border-slate-100 dark:border-slate-800 pl-4' : ''}>
-                                    <div className={`rounded-xl border p-4 shadow-sm transition-all ${
-                                      reply.authorRole === 'teacher' 
-                                        ? 'bg-blue-50/20 border-blue-100/40 dark:bg-blue-950/5 dark:border-blue-900/10' 
-                                        : 'bg-white border-slate-100 dark:bg-slate-950/30 dark:border-slate-800'
-                                    }`}>
-                                <div className="flex items-start justify-between gap-4">
-                                  <div className="flex items-center gap-2.5">
-                                    <div className={`h-8 w-8 rounded-full flex items-center justify-center font-bold text-xs text-white ${
-                                      reply.authorRole === 'teacher' ? 'bg-blue-600' : 'bg-slate-450'
-                                    }`}>
-                                      {reply.authorName.charAt(0)}
-                                    </div>
-                                    <div>
-                                      <h5 className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                                        {reply.authorName}
-                                        {reply.authorRole === 'teacher' && (
-                                          <span className="text-[9px] font-bold uppercase bg-blue-100 text-blue-700 px-1 py-0.2 rounded dark:bg-blue-900/30 dark:text-blue-400">Docente</span>
-                                        )}
-                                      </h5>
-                                      <span className="text-[9px] text-slate-400">{new Date(reply.createdAt).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-1">
-                                    {reply.isTeacherVerified && (
-                                      <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/20 px-2 py-0.5 rounded-full flex items-center gap-1">
-                                        <CheckSquare size={10} /> Respuesta Verificada
-                                      </span>
-                                    )}
-                                    
-                                    {/* Verification action for Teacher */}
-                                    {userRole === 'teacher' && reply.authorRole !== 'teacher' && (
-                                      <button
-                                        onClick={() => handleVerifyReply(reply.id, !reply.isTeacherVerified)}
-                                        className={`text-[10px] font-semibold px-2 py-0.5 rounded transition-colors border-none bg-transparent ${
-                                          reply.isTeacherVerified
-                                            ? 'text-red-600 hover:bg-red-50 dark:hover:bg-red-950/10'
-                                            : 'text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/10'
-                                        }`}
-                                      >
-                                        {reply.isTeacherVerified ? 'Quitar verificación' : 'Verificar respuesta'}
-                                      </button>
-                                    )}
+                          <div className="flex items-center justify-between pl-1">
+                            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Aportaciones ({threadReplies.length})</h4>
+                          </div>
 
-                                    {/* Edit Action for reply author */}
-                                    {userId === reply.authorId && (userRole !== 'student' || canEditStudent(reply.createdAt)) && editingReplyId !== reply.id && (
-                                      <button
-                                        onClick={() => handleStartEditReply(reply)}
-                                        className="text-[10px] font-semibold text-blue-650 hover:text-blue-750 bg-blue-50 dark:bg-blue-950/35 px-2 py-0.5 rounded border-none cursor-pointer flex items-center gap-0.5"
-                                        title="Editar Comentario"
-                                      >
-                                        <Edit size={10} /> Editar
-                                      </button>
-                                    )}
+                          <div className="space-y-4">
+                            {threadReplies
+                              .filter(r => !r.parentId)
+                              .map(reply => (
+                                <ForumReplyCard
+                                  key={reply.id}
+                                  reply={reply}
+                                  currentUserId={userId}
+                                  currentUserRole={userRole}
+                                  allReplies={threadReplies}
+                                  level={0}
+                                  onLike={handleLikeReply}
+                                  onStartEdit={handleStartEditReply}
+                                  onSaveEdit={handleSaveEditReply}
+                                  onCancelEdit={() => setEditingReplyId(null)}
+                                  isEditing={editingReplyId === reply.id}
+                                  editContent={editReplyContent}
+                                  setEditContent={setEditReplyContent}
+                                  onDelete={handleDeleteReply}
+                                  onVerify={handleVerifyReply}
+                                  replyingToId={replyingToParentId}
+                                  setReplyingToId={setReplyingToParentId}
+                                  onSubmitReply={handleCreateInlineReplySubmit}
+                                  allowNestedReplies={forumConfig?.allowNestedReplies !== false}
+                                  isThreadLocked={activeThread.isLocked}
+                                />
+                              ))}
 
-                                    {/* Reply Action when allowNestedReplies is true */}
-                                    {forumConfig?.allowNestedReplies !== false && !activeThread.isLocked && (
-                                      <button
-                                        onClick={() => {
-                                          if (replyingToParentId === reply.id) {
-                                            setReplyingToParentId(null)
-                                          } else {
-                                            setReplyingToParentId(reply.id)
-                                            setInlineReplyContent('')
-                                          }
-                                        }}
-                                        className="text-[10px] font-bold text-blue-600 hover:text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 rounded border-none cursor-pointer flex items-center gap-1 transition-all"
-                                        title="Responder a este comentario"
-                                      >
-                                        <CornerDownRight size={10} /> Responder
-                                      </button>
-                                    )}
-                                  </div>
-                                </div>
-                                
-                                {editingReplyId === reply.id ? (
-                                  <form onSubmit={(e) => handleSaveEditReply(e, reply.id)} className="space-y-3 pl-10 mt-3">
-                                    <MiniForumEditor
-                                      value={editReplyContent}
-                                      onChange={setEditReplyContent}
-                                      placeholder="Edita tu respuesta..."
-                                      minHeight="100px"
-                                    />
-                                    <div className="flex justify-end gap-2">
-                                      <button
-                                        type="button"
-                                        onClick={() => setEditingReplyId(null)}
-                                        className="rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800"
-                                      >
-                                        Cancelar
-                                      </button>
-                                      <button
-                                        type="submit"
-                                        className="rounded-xl bg-pink-600 hover:bg-pink-700 px-3 py-1 text-xs font-bold text-white shadow border-none cursor-pointer"
-                                      >
-                                        Guardar
-                                      </button>
-                                    </div>
-                                  </form>
-                                ) : (
-                                  <>
-                                    <div 
-                                      className="mt-3 pl-10 text-xs text-slate-700 dark:text-slate-350 leading-relaxed ql-editor !p-0 prose prose-sm prose-slate max-w-none dark:prose-invert overflow-x-auto"
-                                      dangerouslySetInnerHTML={{ __html: fixHtmlSpaces(reply.content) }}
-                                    />
-                                    
-                                    {/* Inline Reply Form */}
-                                    {replyingToParentId === reply.id && (
-                                      <form onSubmit={(e) => handleCreateInlineReply(e, reply.id)} className="space-y-3 pl-4 sm:pl-10 mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 animate-in fade-in duration-200">
-                                        <div className="flex items-center justify-between text-xs font-semibold text-blue-600 dark:text-blue-400">
-                                          <span>Respondiendo a {reply.authorName}</span>
-                                          <button type="button" onClick={() => setReplyingToParentId(null)} className="text-slate-400 hover:text-slate-600 text-[10px] border-none bg-transparent cursor-pointer">Cancelar</button>
-                                        </div>
-                                        <MiniForumEditor
-                                          value={inlineReplyContent}
-                                          onChange={setInlineReplyContent}
-                                          placeholder={`Escribe tu respuesta a ${reply.authorName}...`}
-                                          minHeight="90px"
-                                        />
-                                        <div className="flex justify-end gap-2">
-                                          <button
-                                            type="button"
-                                            onClick={() => setReplyingToParentId(null)}
-                                            className="rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-900 dark:border-slate-800"
-                                          >
-                                            Cancelar
-                                          </button>
-                                          <button
-                                            type="submit"
-                                            className="rounded-xl bg-pink-600 hover:bg-pink-700 px-3 py-1 text-xs font-bold text-white shadow border-none cursor-pointer"
-                                          >
-                                            Publicar Respuesta
-                                          </button>
-                                        </div>
-                                      </form>
-                                    )}
-                                  </>
-                                )}
-                                    </div>
-                                    {children.length > 0 && (
-                                      <div className="space-y-3 mt-3">
-                                        {children.map(child => renderReply(child, level + 1))}
-                                      </div>
-                                    )}
-                                  </div>
-                                )
-                              }
-                              return threadReplies.filter(r => !r.parentId).map(r => renderReply(r, 0))
-                            })()}
                             {threadReplies.length === 0 && (
-                              <div className="text-center py-6 text-xs text-slate-400">No hay respuestas en este tema. ¡Sé el primero en responder!</div>
+                              <div className="text-center py-10 px-4 text-xs text-slate-400 bg-white dark:bg-slate-900 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
+                                Aún no hay aportaciones en este tema. Escribe un comentario para iniciar la conversación.
+                              </div>
                             )}
                           </div>
                         </div>
 
                         {/* Reply Form */}
                         {activeThread.isLocked || isForumClosedForStudent ? (
-                          <div className="rounded-xl bg-slate-50 dark:bg-slate-900/50 p-4 border border-dashed text-center text-xs text-slate-550">
+                          <div className="rounded-2xl bg-slate-50 dark:bg-slate-900/50 p-5 border border-dashed text-center text-xs text-slate-500">
                             {isForumClosedForStudent ? 'La fecha límite ha expirado y no se admiten nuevas participaciones.' : 'Este tema de discusión ha sido bloqueado por el docente y no admite nuevas respuestas.'}
                           </div>
                         ) : (
-                          <form onSubmit={(e) => handleCreateReply(e)} className="space-y-3">
-                            <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Escribe tu aportación</label>
+                          <form onSubmit={(e) => handleCreateReply(e)} className="space-y-3 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800/80 p-5 sm:p-6 shadow-sm">
+                            <label className="text-xs font-bold text-slate-800 dark:text-slate-200 pl-0.5">Escribir aportación en el tema</label>
                             <MiniForumEditor
                               value={newReplyContent}
                               onChange={setNewReplyContent}
                               placeholder="Escribe tu comentario o respuesta al tema..."
                               minHeight="100px"
                             />
-                            <button
-                              type="submit"
-                              className="rounded-xl bg-pink-600 hover:bg-pink-700 px-4 py-2 text-xs font-bold text-white shadow transition-all active:scale-[0.98] border-none cursor-pointer"
-                            >
-                              Publicar respuesta
-                            </button>
+                            <div className="flex justify-end">
+                              <button
+                                type="submit"
+                                className="rounded-xl bg-blue-600 hover:bg-blue-700 px-4 py-2 text-xs font-bold text-white shadow transition-all active:scale-[0.98] border-none cursor-pointer"
+                              >
+                                Publicar aportación
+                              </button>
+                            </div>
                           </form>
                         )}
                       </div>

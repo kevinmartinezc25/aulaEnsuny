@@ -14,7 +14,7 @@ import PrintableSchedule from './PrintableSchedule'
 import UnassignedBlocksModal from './UnassignedBlocksModal'
 import SavedConflictsModal from './SavedConflictsModal'
 
-import { isOfficialGradeGroup } from '../utils/groupFilters'
+import { isOfficialGradeGroup, isMeetingSubject } from '../utils/groupFilters'
 
 const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes']
 
@@ -287,25 +287,49 @@ export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterSched
     toast.success('Análisis global completado: Todos los bloques agendados están libres de cruces.')
   }
 
-  const handleManualAssign = async (block: any, day: string, period: number) => {
-    const { error } = await supabase.from('sch_schedule_slots').insert({
+  const handleManualAssign = async (blockOrBlocks: any, day: string, period: number) => {
+    const blocksList: any[] = Array.isArray(blockOrBlocks) ? blockOrBlocks : [blockOrBlocks]
+    
+    // Si es un bloque individual pero pertenece a una reunión con otros docentes en unassignedBlocks, agruparlos
+    let allRelatedBlocks = [...blocksList]
+    if (blocksList.length === 1) {
+      const single = blocksList[0]
+      const isMeeting = isMeetingSubject(single.subject_name, single.group_name, single.group_id, single.is_academic_workload)
+      if (isMeeting) {
+        const coBlocks = unassignedBlocks.filter(b => 
+          b !== single && 
+          b.group_id === single.group_id && 
+          b.subject_id === single.subject_id &&
+          (single.slotIndex === undefined || b.slotIndex === single.slotIndex)
+        )
+        allRelatedBlocks.push(...coBlocks)
+      }
+    }
+
+    const toInsert = allRelatedBlocks.map(b => ({
       day_of_week: day,
       period_id: period,
-      group_id: block.group_id,
-      subject_id: block.subject_id,
-      teacher_id: block.teacher_id && block.teacher_id.trim() !== '' ? block.teacher_id : null,
-      duration: block.duration || 1
-    })
+      group_id: b.group_id,
+      subject_id: b.subject_id,
+      teacher_id: b.teacher_id && b.teacher_id.trim() !== '' ? b.teacher_id : null,
+      duration: b.duration || 1
+    }))
 
+    const { error } = await supabase.from('sch_schedule_slots').insert(toInsert)
     if (error) {
       console.error(error)
-      toast.error(`Error al asignar el bloque: ${error.message || 'Error desconocido'}`)
+      toast.error(`Error al asignar bloque(s): ${error.message || 'Error desconocido'}`)
       throw error
     }
 
-    toast.success('Bloque asignado manualmente.')
+    if (allRelatedBlocks.length > 1) {
+      toast.success(`👥 Reunión sincronizada: ${allRelatedBlocks.length} docentes asignados a ${day} ${period}ª hora.`)
+    } else {
+      toast.success('Bloque asignado manualmente.')
+    }
     
-    const newUnassigned = unassignedBlocks.filter(b => b !== block)
+    const assignedSet = new Set(allRelatedBlocks)
+    const newUnassigned = unassignedBlocks.filter(b => !assignedSet.has(b))
     setUnassignedBlocks(newUnassigned)
     localStorage.setItem('sch_global_unassigned', JSON.stringify(newUnassigned))
     fetchGlobalData()
@@ -320,7 +344,9 @@ export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterSched
     localStorage.removeItem('sch_global_unassigned')
     
     // 1. Obtener mallas de todos los grupos con su grupo asignado
-    const { data: currData } = await supabase.from('sch_curriculum').select('*, group:sch_groups(name)')
+    const { data: currData } = await supabase
+      .from('sch_curriculum')
+      .select('*, group:sch_groups(name), subject:sch_subjects(name, is_academic_workload), teacher:sch_teachers(name)')
     if (!currData || currData.length === 0) {
       toast.error('No hay mallas curriculares configuradas.')
       setGenerating(false)
@@ -348,32 +374,35 @@ export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterSched
       : JSON.parse(localStorage.getItem('sch_block_subjects') || '[]')
     
     // Identificar materias multi-docente por grupo o por regla explícita
-    const groupSubjectTeachers = new Map<string, Set<string>>()
+    const groupSubjectTeachers = new Map<string, { subjectId: string; teachers: Set<string> }>()
     const multiTeacherSubjSet = new Set<string>()
 
     if (currData) {
       currData.forEach((row: any) => {
         if (!row.group_id || !row.subject_id || !row.teacher_id) return
-        const key = `${row.group_id}-${row.subject_id}`
-        if (!groupSubjectTeachers.has(key)) groupSubjectTeachers.set(key, new Set())
-        groupSubjectTeachers.get(key)!.add(row.teacher_id)
+        const key = `${row.group_id}___${row.subject_id}`
+        if (!groupSubjectTeachers.has(key)) {
+          groupSubjectTeachers.set(key, { subjectId: row.subject_id, teachers: new Set() })
+        }
+        groupSubjectTeachers.get(key)!.teachers.add(row.teacher_id)
       })
-      for (const [key, tSet] of groupSubjectTeachers.entries()) {
-        if (tSet.size > 1) {
-          const subjectId = key.split('-')[1]
-          if (subjectId) multiTeacherSubjSet.add(subjectId)
+      for (const info of groupSubjectTeachers.values()) {
+        if (info.teachers.size > 1) {
+          multiTeacherSubjSet.add(info.subjectId)
         }
       }
     }
 
     // Agregar materias explícitamente configuradas en la regla MULTI_TEACHER_SAME_SLOT
-    const explicitRules = (constraintsData || []).find((c: any) => c.rule_type === 'MULTI_TEACHER_SAME_SLOT' && c.is_active !== false)
-    if (explicitRules?.parameters?.rules && Array.isArray(explicitRules.parameters.rules)) {
-      explicitRules.parameters.rules.forEach((r: any) => {
-        if (r.subject_id && r.subject_id !== 'ALL') multiTeacherSubjSet.add(r.subject_id)
-      })
-    } else if (explicitRules?.parameters?.subject_id && explicitRules.parameters.subject_id !== 'ALL') {
-      multiTeacherSubjSet.add(explicitRules.parameters.subject_id)
+    const explicitRulesList = (constraintsData || []).filter((c: any) => c.rule_type === 'MULTI_TEACHER_SAME_SLOT' && c.is_active !== false)
+    for (const explicitRules of explicitRulesList) {
+      if (explicitRules?.parameters?.rules && Array.isArray(explicitRules.parameters.rules)) {
+        explicitRules.parameters.rules.forEach((r: any) => {
+          if (r.subject_id && r.subject_id !== 'ALL') multiTeacherSubjSet.add(r.subject_id)
+        })
+      } else if (explicitRules?.parameters?.subject_id && explicitRules.parameters.subject_id !== 'ALL') {
+        multiTeacherSubjSet.add(explicitRules.parameters.subject_id)
+      }
     }
 
     const multiTeacherSubjectIds = Array.from(multiTeacherSubjSet)
@@ -434,13 +463,33 @@ export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterSched
       if (isBlockSubject) {
         // Materias en bloque: agrupar de a 2 horas continuas
         while (hoursLeft >= 2) {
-          blocksToAssign.push({ subject_id: c.subject_id, teacher_id: c.teacher_id, group_id: c.group_id, duration: 2, slotIndex: slotIdx++ })
+          blocksToAssign.push({
+            subject_id: c.subject_id,
+            subject_name: c.subject?.name || subjects[c.subject_id]?.name,
+            teacher_id: c.teacher_id,
+            teacher_name: c.teacher?.name || teachers[c.teacher_id]?.name,
+            group_id: c.group_id,
+            group_name: c.group?.name || groups.find(g => g.id === c.group_id)?.name,
+            duration: 2,
+            slotIndex: slotIdx++,
+            is_academic_workload: c.subject?.is_academic_workload ?? subjects[c.subject_id]?.is_academic_workload
+          })
           hoursLeft -= 2
         }
       }
       // Hora restante o materias sin bloque: agregar de 1 en 1
       while (hoursLeft > 0) {
-        blocksToAssign.push({ subject_id: c.subject_id, teacher_id: c.teacher_id, group_id: c.group_id, duration: 1, slotIndex: slotIdx++ })
+        blocksToAssign.push({
+          subject_id: c.subject_id,
+          subject_name: c.subject?.name || subjects[c.subject_id]?.name,
+          teacher_id: c.teacher_id,
+          teacher_name: c.teacher?.name || teachers[c.teacher_id]?.name,
+          group_id: c.group_id,
+          group_name: c.group?.name || groups.find(g => g.id === c.group_id)?.name,
+          duration: 1,
+          slotIndex: slotIdx++,
+          is_academic_workload: c.subject?.is_academic_workload ?? subjects[c.subject_id]?.is_academic_workload
+        })
         hoursLeft -= 1
       }
       
@@ -708,15 +757,28 @@ export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterSched
 
                           return (
                             <td key={`${entity.id}-${day}-${p}`} colSpan={finalColSpan} className={`border-b border-slate-200 dark:border-slate-700 p-1 h-[50px] relative hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors ${borderClasses}`}>
-                              {slot && subject ? (
-                                <div className="w-full h-full rounded flex flex-col justify-center px-1 overflow-hidden" style={{ backgroundColor: `${subject.color}20`, borderLeft: `3px solid ${subject.color}` }}>
-                                  <span className="font-bold text-[10px] text-slate-800 dark:text-slate-200 truncate leading-tight" title={subject.name}>
-                                    {subject.name}
-                                  </span>
-                                  {secondaryText && (
-                                    <span className="text-[8px] font-medium text-slate-500 dark:text-slate-400 truncate mt-0.5" title={secondaryText}>
-                                      {secondaryText}
-                                    </span>
+                              {matchingSlots.length > 0 ? (
+                                <div className={`w-full h-full rounded flex flex-col justify-center px-1 overflow-hidden ${matchingSlots.length > 1 ? 'border-2 border-rose-500 bg-rose-500/10' : ''}`} style={{ backgroundColor: matchingSlots.length === 1 && subject ? `${subject.color}20` : undefined, borderLeft: matchingSlots.length === 1 && subject ? `3px solid ${subject.color}` : undefined }}>
+                                  {matchingSlots.length > 1 ? (
+                                    <>
+                                      <span className="font-black text-[9px] text-rose-600 dark:text-rose-400 truncate leading-tight flex items-center gap-0.5" title={matchingSlots.map(s => subjects[s.subject_id]?.name || 'Materia').join(' / ')}>
+                                        ⚠️ Cruce ({matchingSlots.map(s => subjects[s.subject_id]?.name || 'Materia').join(' / ')})
+                                      </span>
+                                      <span className="text-[8px] font-bold text-slate-600 dark:text-slate-300 truncate mt-0.5" title={secondaryText}>
+                                        {secondaryText}
+                                      </span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span className="font-bold text-[10px] text-slate-800 dark:text-slate-200 truncate leading-tight" title={subject?.name}>
+                                        {subject?.name}
+                                      </span>
+                                      {secondaryText && (
+                                        <span className="text-[8px] font-medium text-slate-500 dark:text-slate-400 truncate mt-0.5" title={secondaryText}>
+                                          {secondaryText}
+                                        </span>
+                                      )}
+                                    </>
                                   )}
                                 </div>
                               ) : (

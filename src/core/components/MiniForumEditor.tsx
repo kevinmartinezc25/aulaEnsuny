@@ -39,6 +39,43 @@ export function MiniForumEditor({ value, onChange, placeholder, minHeight = '140
           } else {
             toast.info('Selecciona un texto primero para convertirlo a mayúsculas')
           }
+        },
+        link: function (this: any) {
+          const range = this.quill.getSelection()
+          const hasSelection = range && range.length > 0
+          const currentIndex = range ? range.index : Math.max(0, this.quill.getLength() - 1)
+          const currentFormat = this.quill.getFormat(range || { index: currentIndex, length: 0 })
+          const existingUrl = currentFormat.link || ''
+
+          const inputUrl = window.prompt(
+            'Ingresa la dirección web (ej: https://ejemplo.com):',
+            existingUrl || 'https://'
+          )
+          if (inputUrl === null) return // usuario canceló
+
+          const trimmed = inputUrl.trim()
+          if (!trimmed || trimmed === 'https://' || trimmed === 'http://') {
+            // Si se dejó vacío, elimina el formato de enlace
+            if (hasSelection) {
+              this.quill.format('link', false)
+              toast.success('Enlace removido')
+            }
+            return
+          }
+
+          // Asegurar protocolo http:// o https:// para evitar enlaces relativos
+          const finalUrl = (/^(https?:\/\/|mailto:|tel:)/i.test(trimmed)) ? trimmed : `https://${trimmed}`
+
+          if (hasSelection) {
+            this.quill.format('link', finalUrl)
+            toast.success('Enlace aplicado al texto seleccionado')
+          } else {
+            // Si no había texto seleccionado, solicitar el texto a mostrar o usar la URL
+            const displayText = window.prompt('Texto a mostrar en el enlace (opcional):', finalUrl) || finalUrl
+            this.quill.insertText(currentIndex, displayText, 'link', finalUrl)
+            this.quill.setSelection(currentIndex + displayText.length, 0)
+            toast.success('Enlace insertado correctamente')
+          }
         }
       }
     }
@@ -65,6 +102,31 @@ export function MiniForumEditor({ value, onChange, placeholder, minHeight = '140
         }
         .ql-snow .ql-toolbar button.ql-uppercase::after {
           content: "MAYÚS";
+        }
+        .ql-snow .ql-editor a {
+          color: #2563eb !important;
+          text-decoration: underline !important;
+          cursor: pointer !important;
+        }
+        .dark .ql-snow .ql-editor a {
+          color: #60a5fa !important;
+        }
+        .ql-snow .ql-tooltip {
+          z-index: 50 !important;
+          border-radius: 8px !important;
+          box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+          border: 1px solid #e2e8f0 !important;
+          background-color: #ffffff !important;
+        }
+        .dark .ql-snow .ql-tooltip {
+          background-color: #1e293b !important;
+          border-color: #334155 !important;
+          color: #f1f5f9 !important;
+        }
+        .dark .ql-snow .ql-tooltip input[type="text"] {
+          background-color: #0f172a !important;
+          border-color: #475569 !important;
+          color: #ffffff !important;
         }
       ` }} />
       <div 
