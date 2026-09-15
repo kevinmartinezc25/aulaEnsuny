@@ -413,6 +413,7 @@ function SidebarContent({ onClose, isCollapsed = false, user }: SidebarProps) {
           { name: 'Mis Estudiantes', href: '/teacher/students', icon: TrendingUp },
           { name: 'Horario (Docente)', href: '/teacher/schedule', icon: CalendarDays },
           { name: 'Calificaciones', href: '/teacher/grades', icon: ClipboardList },
+          { name: 'Planilla Asistida', href: '/teacher/planilla-asistida', icon: FileSpreadsheet },
         ]
       },
       {
@@ -1077,9 +1078,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <aside className={`fixed inset-y-0 left-0 z-20 hidden border-r border-slate-100 bg-white/70 backdrop-blur-md dark:border-slate-800/60 dark:bg-slate-900/70 md:block transition-all duration-300 ${isSidebarCollapsed ? 'w-20' : 'w-64'}`}>
           <SidebarContent user={user} isCollapsed={isSidebarCollapsed} />
           <button onClick={toggleSidebar}
-            className="absolute -right-3 top-16 -translate-y-1/2 flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-900 shadow-sm transition-all dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:text-white z-30"
+            className="absolute -right-4 top-8 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-900 shadow-md hover:shadow-lg transition-all dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:text-white z-50"
             title={isSidebarCollapsed ? 'Expandir menú' : 'Ocultar menú'}>
-            {isSidebarCollapsed ? <PanelLeftOpen className="h-3.5 w-3.5 ml-0.5" /> : <PanelLeftClose className="h-3.5 w-3.5" />}
+            {isSidebarCollapsed ? <PanelLeftOpen className="h-4 w-4 ml-0.5" /> : <PanelLeftClose className="h-4 w-4" />}
           </button>
         </aside>
       )}
