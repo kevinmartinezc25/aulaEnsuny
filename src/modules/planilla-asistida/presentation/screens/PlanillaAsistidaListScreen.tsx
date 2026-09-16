@@ -127,7 +127,7 @@ export function PlanillaAsistidaListScreen() {
           {uniquePeriods.map(p => (
             <button
               key={p}
-              onClick={() => setSelectedPeriod(p)}
+              onClick={() => setSelectedPeriod(p as string)}
               className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors whitespace-nowrap ${selectedPeriod === p ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800' : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-400 dark:hover:bg-slate-800'}`}
             >
               Periodo {p}
