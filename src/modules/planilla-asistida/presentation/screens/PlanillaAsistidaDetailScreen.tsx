@@ -12,6 +12,9 @@ import { CreateAchievementModal } from '../components/CreateAchievementModal'
 import { CreateActivityModal } from '../components/CreateActivityModal'
 import { usePlanillaStore } from '@/store/usePlanillaStore'
 import { SpreadsheetTable } from '@/components/planilla-asistida/SpreadsheetTable'
+import { AttendanceTable } from '@/components/planilla-asistida/AttendanceTable'
+import { AttendanceDashboard } from '@/components/planilla-asistida/AttendanceDashboard'
+import { getAssistedSessions, getAssistedAttendance } from '../../application/attendanceActions'
 import { exportPlanillaToExcel } from '../../application/exportUtils'
 
 interface PlanillaAsistidaDetailScreenProps {
@@ -19,7 +22,7 @@ interface PlanillaAsistidaDetailScreenProps {
 }
 
 export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDetailScreenProps) {
-  const [activeTab, setActiveTab] = useState<'planilla' | 'actividades' | 'estudiantes' | 'configuracion'>('planilla')
+  const [activeTab, setActiveTab] = useState<'planilla' | 'actividades' | 'estudiantes' | 'asistencia' | 'configuracion'>('planilla')
   const [pastedData, setPastedData] = useState<string>('')
   const [students, setStudents] = useState<{ id: string, number: number, fullName: string }[]>([])
   const [isSaving, setIsSaving] = useState(false)
@@ -44,11 +47,13 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
   const loadEvaluationStructure = useCallback(async () => {
     try {
       setIsLoadingPlanilla(true)
-      const [subject, data, studs, grad] = await Promise.all([
+      const [subject, data, studs, grad, sessionsData, attendanceData] = await Promise.all([
         getAssistedSubjectById(subjectId),
         getAssistedAchievementsAndActivities(subjectId),
         getAssistedStudents(subjectId),
-        getAssistedGrades(subjectId)
+        getAssistedGrades(subjectId),
+        getAssistedSessions(subjectId),
+        getAssistedAttendance(subjectId)
       ])
 
       setSubjectData(subject)
@@ -59,7 +64,9 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
         students: studs,
         achievements: data.achievements,
         activities: data.activities,
-        grades: grad
+        grades: grad,
+        sessions: sessionsData,
+        attendance: attendanceData
       })
     } catch (error: any) {
       toast.error('Error al cargar la estructura de evaluación')
@@ -144,7 +151,9 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
       storeState.students,
       storeState.achievements,
       storeState.activities,
-      storeState.grades
+      storeState.grades,
+      storeState.sessions,
+      storeState.attendance
     )
     toast.success('Descargando archivo Excel...')
   }
@@ -224,6 +233,12 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
             className={`pb-3 text-sm font-semibold border-b-2 transition-colors ${activeTab === 'planilla' ? 'border-emerald-600 text-emerald-700 dark:text-emerald-500' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
           >
             Planilla
+          </button>
+          <button 
+            onClick={() => setActiveTab('asistencia')}
+            className={`pb-3 text-sm font-semibold border-b-2 transition-colors ${activeTab === 'asistencia' ? 'border-emerald-600 text-emerald-700 dark:text-emerald-500' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+          >
+            Asistencia
           </button>
           <button 
             onClick={() => setActiveTab('estudiantes')}
@@ -443,6 +458,24 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
               </div>
             ) : (
               <SpreadsheetTable subjectId={subjectId} />
+            )}
+          </div>
+        )}
+
+        {activeTab === 'asistencia' && (
+          <div className="h-full relative min-h-[500px] flex flex-col">
+            {isLoadingPlanilla ? (
+              <div className="flex flex-col items-center justify-center h-full text-slate-500">
+                <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mb-4" />
+                <p>Cargando asistencia...</p>
+              </div>
+            ) : (
+              <>
+                <AttendanceDashboard />
+                <div className="flex-1">
+                  <AttendanceTable subjectId={subjectId} />
+                </div>
+              </>
             )}
           </div>
         )}

@@ -1,13 +1,16 @@
-import * as XLSX from 'xlsx'
+import * as XLSX from 'xlsx-js-style'
 import { AssistedAchievement, AssistedActivity } from './actions'
-import { GradeMap } from '@/store/usePlanillaStore'
+import { AssistedSession } from './attendanceActions'
+import { GradeMap, AttendanceMap } from '@/store/usePlanillaStore'
 
 export function exportPlanillaToExcel(
   subjectName: string,
   students: { id: string, number: number, full_name: string }[],
   achievements: AssistedAchievement[],
   activities: AssistedActivity[],
-  grades: GradeMap
+  grades: GradeMap,
+  sessions?: AssistedSession[],
+  attendance?: AttendanceMap
 ) {
   // Helpers para cálculos iguales a los de SpreadsheetTable
   const calcComponentAverage = (studentId: string, achievementId: string, component: 'hacer' | 'saber' | 'ser') => {
@@ -42,7 +45,7 @@ export function exportPlanillaToExcel(
   }
 
   const formatGrade = (grade: number | null) => {
-    return grade === null ? '' : Number(grade.toFixed(1))
+    return grade === null ? '' : grade.toFixed(1)
   }
 
   // --- Construcción de la matriz para Excel ---
@@ -121,7 +124,7 @@ export function exportPlanillaToExcel(
         } else {
           compActivities.forEach(act => {
             const val = grades[student.id]?.[act.id]
-            sRow.push(val !== undefined ? val : '')
+            sRow.push(val !== undefined ? val.toFixed(1) : '')
           })
         }
       })
@@ -145,8 +148,97 @@ export function exportPlanillaToExcel(
   ]
   ws['!cols'] = colWidths
 
+  // Generar estilos
+  const pastelFill = { fgColor: { rgb: "FFE0F2FE" } } // Azul pastel claro
+  const thinBorder = { style: "thin", color: { rgb: "FF94A3B8" } } // Slate 400
+  const headerStyle = {
+    fill: pastelFill,
+    font: { bold: true, color: { rgb: "FF1E293B" } }, // Color oscuro para contraste
+    alignment: { horizontal: "center", vertical: "center", wrapText: true },
+    border: {
+      top: thinBorder,
+      bottom: thinBorder,
+      left: thinBorder,
+      right: thinBorder
+    }
+  }
+  const centerStyle = {
+    alignment: { horizontal: "center", vertical: "center" }
+  }
+
+  // Aplicar estilos a Planilla
+  Object.keys(ws).forEach(key => {
+    if (key.startsWith('!')) return
+    const cell = ws[key]
+    const { c, r } = XLSX.utils.decode_cell(key)
+    if (r < 3) {
+      cell.s = headerStyle
+    } else if (c > 1) {
+      cell.s = centerStyle
+    }
+  })
+
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, 'Planilla Asistida')
+
+  // --- Construcción de la hoja de Asistencia ---
+  if (sessions && attendance) {
+    const wsAsistenciaData: any[][] = []
+    
+    // Encabezados
+    const header1: any[] = ['N°', 'Estudiante']
+    const header2: any[] = ['', ''] // Fila para el tema (topic)
+    
+    sessions.forEach(session => {
+      const [year, month, day] = session.date.split('-')
+      const localDate = new Date(Number(year), Number(month) - 1, Number(day))
+      header1.push(localDate.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }))
+      header2.push(session.topic || '')
+    })
+    
+    header1.push('A', 'I', 'E', '% Asistencia')
+    header2.push('', '', '', '')
+    
+    wsAsistenciaData.push(header1, header2)
+    
+    // Datos de asistencia por estudiante
+    students.forEach(student => {
+      const row: any[] = [student.number, student.full_name]
+      let aCount = 0, iCount = 0, eCount = 0
+      
+      sessions.forEach(session => {
+        const status = attendance[student.id]?.[session.id]
+        if (status === 'A') aCount++
+        if (status === 'I') iCount++
+        if (status === 'E') eCount++
+        row.push(status || '')
+      })
+      
+      const total = aCount + iCount + eCount
+      const aPercentage = total > 0 ? Math.round((aCount / total) * 100) : 0
+      
+      row.push(aCount, iCount, eCount, `${aPercentage}%`)
+      wsAsistenciaData.push(row)
+    })
+    
+    const wsAsist = XLSX.utils.aoa_to_sheet(wsAsistenciaData)
+    // Congelar paneles (fila 2, col 2) si se desea, por ahora ajustamos el ancho
+    wsAsist['!cols'] = [{ wch: 5 }, { wch: 35 }]
+    
+    // Aplicar estilos a Asistencia
+    Object.keys(wsAsist).forEach(key => {
+      if (key.startsWith('!')) return
+      const cell = wsAsist[key]
+      const { c, r } = XLSX.utils.decode_cell(key)
+      if (r < 2) {
+        cell.s = headerStyle
+      } else if (c > 1) {
+        cell.s = centerStyle
+      }
+    })
+
+    XLSX.utils.book_append_sheet(wb, wsAsist, 'Asistencia')
+  }
 
   // Generar nombre de archivo
   const safeName = subjectName.replace(/[^a-z0-9]/gi, '_').toLowerCase()

@@ -17,6 +17,7 @@ export function PlanillaAsistidaListScreen() {
   const [selectedGrade, setSelectedGrade] = useState<string>('all')
   const [selectedGroup, setSelectedGroup] = useState<string>('all')
   const [selectedSubject, setSelectedSubject] = useState<string>('all')
+  const [selectedPeriod, setSelectedPeriod] = useState<string>('all')
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [editingSubject, setEditingSubject] = useState<AssistedSubject | null>(null)
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null)
@@ -82,6 +83,7 @@ export function PlanillaAsistidaListScreen() {
   const uniqueGrades = Array.from(new Set(subjects.map(s => s.grade?.toString()).filter(Boolean))).sort()
   const uniqueGroups = Array.from(new Set(subjects.map(s => s.group_number?.toString()).filter(Boolean))).sort()
   const uniqueSubjects = Array.from(new Set(subjects.map(s => s.name).filter(Boolean))).sort()
+  const uniquePeriods = Array.from(new Set(subjects.map(s => s.period?.toString()).filter(Boolean))).sort()
 
   const filteredSubjects = subjects.filter(subject => {
     const matchesSearch = subject.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -91,8 +93,9 @@ export function PlanillaAsistidaListScreen() {
     const matchesGrade = selectedGrade === 'all' || subject.grade?.toString() === selectedGrade
     const matchesGroup = selectedGroup === 'all' || subject.group_number?.toString() === selectedGroup
     const matchesSubject = selectedSubject === 'all' || subject.name === selectedSubject
+    const matchesPeriod = selectedPeriod === 'all' || subject.period?.toString() === selectedPeriod
 
-    return matchesSearch && matchesGrade && matchesGroup && matchesSubject
+    return matchesSearch && matchesGrade && matchesGroup && matchesSubject && matchesPeriod
   })
 
   return (
@@ -112,6 +115,26 @@ export function PlanillaAsistidaListScreen() {
           Crear materia
         </Button>
       </div>
+
+      {uniquePeriods.length > 0 && (
+        <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-2">
+          <button
+            onClick={() => setSelectedPeriod('all')}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors whitespace-nowrap ${selectedPeriod === 'all' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800' : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-400 dark:hover:bg-slate-800'}`}
+          >
+            Todos los periodos
+          </button>
+          {uniquePeriods.map(p => (
+            <button
+              key={p}
+              onClick={() => setSelectedPeriod(p)}
+              className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors whitespace-nowrap ${selectedPeriod === p ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800' : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-400 dark:hover:bg-slate-800'}`}
+            >
+              Periodo {p}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="flex flex-col gap-5 bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between w-full">
@@ -235,7 +258,7 @@ export function PlanillaAsistidaListScreen() {
                   <div className="flex flex-col gap-1.5 shrink-0 pt-0.5">
                     {subject.period && (
                       <span className="inline-flex items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 px-2.5 py-0.5 text-[11px] font-semibold tracking-wide">
-                        {subject.period}
+                        Periodo {subject.period}
                       </span>
                     )}
                     <span className="inline-flex items-center justify-center rounded-full bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 px-2.5 py-0.5 text-[11px] font-semibold tracking-wide">
