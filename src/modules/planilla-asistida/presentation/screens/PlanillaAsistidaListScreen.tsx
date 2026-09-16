@@ -14,6 +14,9 @@ export function PlanillaAsistidaListScreen() {
   const [subjects, setSubjects] = useState<AssistedSubject[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
+  const [selectedGrade, setSelectedGrade] = useState<string>('all')
+  const [selectedGroup, setSelectedGroup] = useState<string>('all')
+  const [selectedSubject, setSelectedSubject] = useState<string>('all')
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [editingSubject, setEditingSubject] = useState<AssistedSubject | null>(null)
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null)
@@ -76,11 +79,21 @@ export function PlanillaAsistidaListScreen() {
     })
   }
 
-  const filteredSubjects = subjects.filter(subject => 
-    subject.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (subject.grade && subject.grade.toString().includes(searchQuery)) ||
-    subject.period?.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const uniqueGrades = Array.from(new Set(subjects.map(s => s.grade?.toString()).filter(Boolean))).sort()
+  const uniqueGroups = Array.from(new Set(subjects.map(s => s.group_number?.toString()).filter(Boolean))).sort()
+  const uniqueSubjects = Array.from(new Set(subjects.map(s => s.name).filter(Boolean))).sort()
+
+  const filteredSubjects = subjects.filter(subject => {
+    const matchesSearch = subject.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (subject.grade && subject.grade.toString().includes(searchQuery)) ||
+      subject.period?.toLowerCase().includes(searchQuery.toLowerCase())
+      
+    const matchesGrade = selectedGrade === 'all' || subject.grade?.toString() === selectedGrade
+    const matchesGroup = selectedGroup === 'all' || subject.group_number?.toString() === selectedGroup
+    const matchesSubject = selectedSubject === 'all' || subject.name === selectedSubject
+
+    return matchesSearch && matchesGrade && matchesGroup && matchesSubject
+  })
 
   return (
     <div className="flex-1 space-y-6 p-6 lg:p-8">
@@ -100,18 +113,58 @@ export function PlanillaAsistidaListScreen() {
         </Button>
       </div>
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
-        <div className="relative w-full sm:max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <Input
-            placeholder="Buscar materia..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 h-10 rounded-xl"
-          />
+      <div className="flex flex-col gap-5 bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
+        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between w-full">
+          <div className="relative w-full sm:max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input
+              placeholder="Buscar por nombre, grado o periodo..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 h-11 rounded-xl w-full"
+            />
+          </div>
+          <div className="text-sm font-medium text-slate-500 dark:text-slate-400 shrink-0 bg-slate-50 dark:bg-slate-800/50 px-3 py-1.5 rounded-lg border border-slate-100 dark:border-slate-700/50">
+            {filteredSubjects.length} {filteredSubjects.length === 1 ? 'materia' : 'materias'}
+          </div>
         </div>
-        <div className="text-sm font-medium text-slate-500 dark:text-slate-400">
-          {filteredSubjects.length} {filteredSubjects.length === 1 ? 'materia' : 'materias'}
+        
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full pt-2 border-t border-slate-100 dark:border-slate-800">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1">Materia</label>
+            <select
+              value={selectedSubject}
+              onChange={(e) => setSelectedSubject(e.target.value)}
+              className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 h-10 rounded-xl px-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-slate-700 dark:text-slate-300 w-full"
+            >
+              <option value="all">Todas las materias</option>
+              {uniqueSubjects.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1">Grado</label>
+            <select
+              value={selectedGrade}
+              onChange={(e) => setSelectedGrade(e.target.value)}
+              className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 h-10 rounded-xl px-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-slate-700 dark:text-slate-300 w-full"
+            >
+              <option value="all">Todos los grados</option>
+              {uniqueGrades.map(g => <option key={g} value={g}>Grado {g}</option>)}
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1">Grupo</label>
+            <select
+              value={selectedGroup}
+              onChange={(e) => setSelectedGroup(e.target.value)}
+              className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 h-10 rounded-xl px-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-slate-700 dark:text-slate-300 w-full"
+            >
+              <option value="all">Todos los grupos</option>
+              {uniqueGroups.map(g => <option key={g} value={g}>Grupo {g}</option>)}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -129,73 +182,79 @@ export function PlanillaAsistidaListScreen() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05 }}
-              className="group flex flex-col justify-between overflow-hidden rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm hover:shadow-md hover:border-emerald-200 dark:hover:border-emerald-900/50 transition-all duration-200 relative"
+              className="group flex flex-col justify-between overflow-hidden rounded-[22px] border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-[18px] shadow-sm hover:shadow-md transition-all duration-200 relative"
             >
-              <div className="space-y-4">
-                <div className="flex items-start justify-between">
-                  <div className="space-y-1">
-                    <h3 className="font-bold text-slate-900 dark:text-white line-clamp-1 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                      {subject.name}
-                    </h3>
-                    <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
-                      {subject.grade && (
-                        <span className="inline-flex items-center rounded-md bg-slate-100 dark:bg-slate-800 px-2 py-0.5">
-                          Grado: {subject.grade}{subject.group_number ? ` - Grupo: ${subject.group_number}` : ''}
-                        </span>
-                      )}
-                      {subject.period && (
-                        <span className="inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 px-2 py-0.5">
-                          {subject.period}
-                        </span>
-                      )}
-                      <span className="inline-flex items-center rounded-md bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 px-2 py-0.5">
-                        {subject.students_count || 0} estudiante{(subject.students_count || 0) !== 1 ? 's' : ''}
-                      </span>
-                    </div>
-                  </div>
+              <div className="space-y-3">
+                <div className="flex items-start justify-between gap-2.5">
+                  <h3 className="font-bold text-[19px] text-emerald-950 dark:text-emerald-400 line-clamp-2 leading-tight">
+                    {subject.name}
+                  </h3>
                   
-                  <div className="relative">
+                  <div className="relative shrink-0">
                     <button 
                       onClick={(e) => toggleDropdown(subject.id, e)}
                       disabled={deletingId === subject.id}
                       className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 p-1 -mr-2 rounded-lg transition-colors"
                     >
-                      {deletingId === subject.id ? <Loader2 className="h-5 w-5 animate-spin" /> : <MoreVertical className="h-5 w-5" />}
+                      {deletingId === subject.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreVertical className="h-4 w-4" />}
                     </button>
                     {openDropdownId === subject.id && (
-                      <div className="absolute right-0 top-full mt-1 w-36 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg z-20 py-1 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                      <div className="absolute right-0 top-full mt-1 w-32 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg z-20 py-1 overflow-hidden" onClick={(e) => e.stopPropagation()}>
                         <button 
                           onClick={(e) => { 
                             e.preventDefault()
                             setOpenDropdownId(null)
                             setEditingSubject(subject)
                           }}
-                          className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/50 flex items-center gap-2"
+                          className="w-full text-left px-3 py-1.5 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/50 flex items-center gap-2"
                         >
-                          <Edit2 className="h-3.5 w-3.5" /> Editar
+                          <Edit2 className="h-3 w-3" /> Editar
                         </button>
                         <button 
                           onClick={(e) => handleDelete(subject.id, e)}
-                          className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 flex items-center gap-2"
+                          className="w-full text-left px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 flex items-center gap-2"
                         >
-                          <Trash2 className="h-3.5 w-3.5" /> Eliminar
+                          <Trash2 className="h-3 w-3" /> Eliminar
                         </button>
                       </div>
                     )}
                   </div>
                 </div>
+
+                <div className="flex justify-between items-start">
+                  <div className="flex flex-col">
+                    <div className="flex gap-5 text-xs font-bold text-teal-800 dark:text-teal-500 mb-0.5">
+                      <span>Grado:</span>
+                      <span>Grupo:</span>
+                    </div>
+                    <div className="text-[34px] leading-none font-extrabold text-teal-700 dark:text-teal-400 tracking-tighter">
+                      {subject.grade || '-'}{subject.group_number ? <span className="text-teal-600/50 mx-2.5 font-light">-</span> : ''}{subject.group_number || ''}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5 shrink-0 pt-0.5">
+                    {subject.period && (
+                      <span className="inline-flex items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 px-2.5 py-0.5 text-[11px] font-semibold tracking-wide">
+                        {subject.period}
+                      </span>
+                    )}
+                    <span className="inline-flex items-center justify-center rounded-full bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 px-2.5 py-0.5 text-[11px] font-semibold tracking-wide">
+                      {subject.students_count || 0} estudiante{(subject.students_count || 0) !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                </div>
                 
                 {subject.description && (
-                  <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2">
+                  <p className="text-[13px] font-medium text-slate-800 dark:text-slate-300 line-clamp-2 mt-1.5">
                     {subject.description}
                   </p>
                 )}
               </div>
 
-              <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800">
+              <div className="mt-3.5 pt-3.5 border-t border-slate-200 dark:border-slate-800">
                 <Link
                   href={`/teacher/planilla-asistida/${subject.id}`}
-                  className="flex w-full items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-colors"
+                  className="flex w-full items-center justify-center rounded-full bg-emerald-500 px-3.5 py-2 text-[13px] font-bold text-white hover:bg-emerald-600 transition-colors shadow-sm"
                 >
                   Abrir Planilla
                 </Link>
