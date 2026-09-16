@@ -50,14 +50,8 @@ export function TeacherStudentProfileScreen({ courseId, studentId }: { courseId:
     )
   }
 
-  // Mocks para Actividad
-  const recentActivities = [
-    { id: 1, title: 'Taller 1: Cinemática', date: 'Ayer, 18:30', status: 'graded', score: 4.5, type: 'Taller' },
-    { id: 2, title: 'Ensayo Final', date: 'Hace 5 horas', status: 'pending', type: 'Ensayo' },
-    { id: 3, title: 'Práctica Laboratorio', date: 'Hace 2 días', status: 'late', type: 'Laboratorio' },
-    { id: 4, title: 'Examen de Medio Término', date: 'Hace 1 semana', status: 'graded', score: 3.8, type: 'Examen' },
-    { id: 5, title: 'Quiz 1: Leyes de Newton', date: 'Hace 2 semanas', status: 'graded', score: 5.0, type: 'Quiz' },
-  ]
+  // TODO: Fetch real activities from backend
+  const recentActivities: { id: number, title: string, date: string, status: string, score?: number, type: string }[] = []
 
   // Mocks para Asistencia
   const attendanceData = [
@@ -93,36 +87,36 @@ export function TeacherStudentProfileScreen({ courseId, studentId }: { courseId:
             Volver a Calificaciones
           </Link>
           
-          <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-100 dark:border-slate-800/60 shadow-sm">
-            <div className="flex items-center gap-6">
+          <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 bg-white dark:bg-slate-900 p-5 sm:p-8 rounded-3xl border border-slate-100 dark:border-slate-800/60 shadow-sm">
+            <div className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-4 sm:gap-6 w-full md:w-auto">
               {student.studentAvatar ? (
                 <img 
                   src={student.studentAvatar} 
                   alt={student.studentName} 
-                  className="h-24 w-24 rounded-full object-cover shadow-md border-4 border-slate-50 dark:border-slate-800"
+                  className="h-20 w-20 sm:h-24 sm:w-24 rounded-full object-cover shadow-md border-4 border-slate-50 dark:border-slate-800 mx-auto sm:mx-0"
                 />
               ) : (
-                <div className="flex h-24 w-24 items-center justify-center rounded-full bg-indigo-50 text-2xl font-bold text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 border-4 border-slate-50 dark:border-slate-800 shadow-md">
+                <div className="flex h-20 w-20 sm:h-24 sm:w-24 items-center justify-center rounded-full bg-indigo-50 text-2xl font-bold text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 border-4 border-slate-50 dark:border-slate-800 shadow-md mx-auto sm:mx-0 shrink-0">
                   {student.studentName.charAt(0).toUpperCase()}
                 </div>
               )}
-              <div>
-                <h1 className="text-3xl font-black text-slate-900 dark:text-white mb-2">{student.studentName}</h1>
-                <div className="flex items-center gap-3 text-sm text-slate-500 dark:text-slate-400 font-medium">
-                  <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full dark:bg-emerald-500/10 dark:text-emerald-400 flex items-center gap-1.5">
+              <div className="min-w-0 w-full flex flex-col items-center sm:items-start">
+                <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white mb-2 truncate w-full">{student.studentName}</h1>
+                <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3 text-sm text-slate-500 dark:text-slate-400 font-medium w-full">
+                  <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full dark:bg-emerald-500/10 dark:text-emerald-400 flex items-center gap-1.5 w-fit shrink-0">
                     <div className="h-2 w-2 rounded-full bg-emerald-500"></div>
                     Estudiante Activo
                   </span>
-                  <span>•</span>
-                  <span>{`${student.studentName.replace(/\s+/g, '').toLowerCase()}@colegio.edu`}</span>
+                  <span className="hidden sm:inline">•</span>
+                  <span className="truncate w-full">{`${student.studentName.replace(/\s+/g, '').toLowerCase()}@colegio.edu`}</span>
                 </div>
               </div>
             </div>
 
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row w-full md:w-auto gap-3">
               <button 
                 onClick={() => setIsMessageModalOpen(true)}
-                className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-colors shadow-sm"
+                className="flex flex-1 sm:flex-none items-center justify-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-colors shadow-sm"
               >
                 <MessageSquare className="h-4 w-4" />
                 Enviar Mensaje
@@ -132,7 +126,7 @@ export function TeacherStudentProfileScreen({ courseId, studentId }: { courseId:
                   toast.success('Generando PDF... Selecciona "Guardar como PDF" en el diálogo.')
                   setTimeout(() => window.print(), 500)
                 }}
-                className="flex items-center gap-2 px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                className="flex flex-1 sm:flex-none items-center justify-center gap-2 px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
               >
                 <FileOutput className="h-4 w-4" />
                 Reporte PDF
@@ -272,39 +266,47 @@ export function TeacherStudentProfileScreen({ courseId, studentId }: { courseId:
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                      {recentActivities.map((act) => (
-                        <tr key={act.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
-                          <td className="px-6 py-4">
-                            <p className="font-bold text-slate-900 dark:text-white">{act.title}</p>
-                            <p className="text-xs text-slate-500 mt-0.5">{act.type}</p>
-                          </td>
-                          <td className="px-6 py-4 text-slate-600 dark:text-slate-300">
-                            {act.date}
-                          </td>
-                          <td className="px-6 py-4">
-                            {act.status === 'graded' ? (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 text-xs font-bold dark:bg-emerald-500/10 dark:text-emerald-400">
-                                <CheckCircle2 className="h-3.5 w-3.5" /> Calificada
-                              </span>
-                            ) : act.status === 'late' ? (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-red-50 text-red-700 text-xs font-bold dark:bg-red-500/10 dark:text-red-400">
-                                <AlertTriangle className="h-3.5 w-3.5" /> Atrasada
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-50 text-amber-700 text-xs font-bold dark:bg-amber-500/10 dark:text-amber-400">
-                                <Clock className="h-3.5 w-3.5" /> Pendiente
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                            {act.score ? (
-                              <span className="font-black text-slate-900 dark:text-white text-base">{act.score.toFixed(1)} <span className="text-slate-400 text-xs font-semibold">/ 5.0</span></span>
-                            ) : (
-                              <span className="text-slate-400 font-medium">-</span>
-                            )}
+                      {recentActivities.length > 0 ? (
+                        recentActivities.map((act) => (
+                          <tr key={act.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
+                            <td className="px-6 py-4">
+                              <p className="font-bold text-slate-900 dark:text-white">{act.title}</p>
+                              <p className="text-xs text-slate-500 mt-0.5">{act.type}</p>
+                            </td>
+                            <td className="px-6 py-4 text-slate-600 dark:text-slate-300">
+                              {act.date}
+                            </td>
+                            <td className="px-6 py-4">
+                              {act.status === 'graded' ? (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 text-xs font-bold dark:bg-emerald-500/10 dark:text-emerald-400">
+                                  <CheckCircle2 className="h-3.5 w-3.5" /> Calificada
+                                </span>
+                              ) : act.status === 'late' ? (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-red-50 text-red-700 text-xs font-bold dark:bg-red-500/10 dark:text-red-400">
+                                  <AlertTriangle className="h-3.5 w-3.5" /> Atrasada
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-50 text-amber-700 text-xs font-bold dark:bg-amber-500/10 dark:text-amber-400">
+                                  <Clock className="h-3.5 w-3.5" /> Pendiente
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              {act.score ? (
+                                <span className="font-black text-slate-900 dark:text-white text-base">{act.score.toFixed(1)} <span className="text-slate-400 text-xs font-semibold">/ 5.0</span></span>
+                              ) : (
+                                <span className="text-slate-400 font-medium">-</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={4} className="px-6 py-12 text-center text-slate-500">
+                            No hay entregas recientes registradas.
                           </td>
                         </tr>
-                      ))}
+                      )}
                     </tbody>
                   </table>
                 </div>
