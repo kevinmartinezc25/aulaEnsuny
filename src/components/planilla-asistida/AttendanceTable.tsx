@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { usePlanillaStore } from '@/store/usePlanillaStore'
 import { Plus, Trash2, Edit2, CalendarDays } from 'lucide-react'
 import { CreateSessionModal } from '@/modules/planilla-asistida/presentation/components/CreateSessionModal'
@@ -13,7 +13,7 @@ interface AttendanceTableProps {
 }
 
 export function AttendanceTable({ subjectId }: AttendanceTableProps) {
-  const { students, sessions, attendance, setAttendance, removeSession } = usePlanillaStore()
+  const { students, sessions, attendance, setAttendance, removeSession, hasUnsavedChanges, saveChanges, isSaving } = usePlanillaStore()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [sessionToEdit, setSessionToEdit] = useState<AssistedSession | null>(null)
 
@@ -22,6 +22,20 @@ export function AttendanceTable({ subjectId }: AttendanceTableProps) {
     setSessionToEdit(session)
     setIsModalOpen(true)
   }
+
+  // Auto-save logic (debounce)
+  const saveTimeout = useRef<NodeJS.Timeout | null>(null)
+  useEffect(() => {
+    if (hasUnsavedChanges) {
+      if (saveTimeout.current) clearTimeout(saveTimeout.current)
+      saveTimeout.current = setTimeout(() => {
+        saveChanges()
+      }, 1500)
+    }
+    return () => {
+      if (saveTimeout.current) clearTimeout(saveTimeout.current)
+    }
+  }, [attendance, hasUnsavedChanges, saveChanges])
 
   const handleOpenCreate = () => {
     setSessionToEdit(null)
@@ -65,9 +79,9 @@ export function AttendanceTable({ subjectId }: AttendanceTableProps) {
   // Estilos y labels para los estados
   const getStatusDisplay = (status?: 'A' | 'I' | 'E') => {
     switch (status) {
-      case 'A': return <span className="text-emerald-600 font-bold bg-emerald-50 px-2 py-1 rounded w-full h-full flex items-center justify-center">A</span>
-      case 'I': return <span className="text-red-600 font-bold bg-red-50 px-2 py-1 rounded w-full h-full flex items-center justify-center">I</span>
-      case 'E': return <span className="text-amber-600 font-bold bg-amber-50 px-2 py-1 rounded w-full h-full flex items-center justify-center">E</span>
+      case 'A': return <span className="text-emerald-600 font-bold bg-emerald-50 px-1 py-1 rounded w-full h-full flex items-center justify-center text-[11px]" title="Asiste">Asiste</span>
+      case 'I': return <span className="text-red-600 font-bold bg-red-50 px-1 py-1 rounded w-full h-full flex items-center justify-center text-[11px]" title="Inasistencia">Inasistencia</span>
+      case 'E': return <span className="text-amber-600 font-bold bg-amber-50 px-1 py-1 rounded w-full h-full flex items-center justify-center text-[11px]" title="Excusa">Excusa</span>
       default: return <span className="text-slate-300 w-full h-full flex items-center justify-center">-</span>
     }
   }
@@ -80,6 +94,13 @@ export function AttendanceTable({ subjectId }: AttendanceTableProps) {
         <h3 className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
           <CalendarDays className="h-5 w-5 text-emerald-600" />
           Registro de Asistencia
+          {isSaving ? (
+            <span className="text-xs font-normal text-amber-600 ml-4 flex items-center"><span className="h-2 w-2 bg-amber-500 rounded-full animate-pulse mr-1"></span> Guardando...</span>
+          ) : hasUnsavedChanges ? (
+            <span className="text-xs font-normal text-slate-400 ml-4">Cambios sin guardar</span>
+          ) : (
+            <span className="text-xs font-normal text-emerald-600 ml-4 flex items-center"><span className="h-2 w-2 bg-emerald-500 rounded-full mr-1"></span> Guardado</span>
+          )}
         </h3>
         <Button onClick={handleOpenCreate} size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white h-8">
           <Plus className="h-4 w-4 mr-1" />
@@ -99,7 +120,7 @@ export function AttendanceTable({ subjectId }: AttendanceTableProps) {
                 Estudiante
               </th>
               {sessions.map(session => (
-                <th key={session.id} className="relative px-2 py-2 font-semibold border-b border-r border-slate-200 dark:border-slate-800 text-center min-w-[80px] max-w-[120px] group">
+                <th key={session.id} className="relative px-1 py-2 font-semibold border-b border-r border-slate-200 dark:border-slate-800 text-center w-[85px] min-w-[85px] max-w-[85px] group overflow-hidden">
                   <div className="flex flex-col items-center justify-center">
                     <span className="text-slate-900 dark:text-white mb-1">
                       {(() => {
@@ -150,6 +171,8 @@ export function AttendanceTable({ subjectId }: AttendanceTableProps) {
               })
               const totalMarcadas = aCount + iCount + eCount
               const aPercentage = totalMarcadas > 0 ? Math.round((aCount / totalMarcadas) * 100) : 0
+              const iPercentage = totalMarcadas > 0 ? Math.round((iCount / totalMarcadas) * 100) : 0
+              const ePercentage = totalMarcadas > 0 ? Math.round((eCount / totalMarcadas) * 100) : 0
 
               return (
                 <tr key={student.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 group/row transition-colors">
@@ -163,7 +186,7 @@ export function AttendanceTable({ subjectId }: AttendanceTableProps) {
                   {sessions.map(session => (
                     <td 
                       key={session.id} 
-                      className="border-r border-slate-100 dark:border-slate-800 p-0 text-center cursor-pointer select-none transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
+                      className="border-r border-slate-100 dark:border-slate-800 p-0 text-center cursor-pointer select-none transition-colors hover:bg-slate-100 dark:hover:bg-slate-800 w-[85px] min-w-[85px] max-w-[85px] overflow-hidden"
                       onClick={() => handleToggleAttendance(student.id, session.id)}
                     >
                       <div className="w-full h-10 flex items-center justify-center p-1">
@@ -172,18 +195,13 @@ export function AttendanceTable({ subjectId }: AttendanceTableProps) {
                     </td>
                   ))}
 
-                  <td className="px-2 py-2 text-center text-xs font-medium border-l-2 border-slate-100 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-900/30">
+                  <td className="px-2 py-2 text-center text-[11px] font-medium border-l-2 border-slate-100 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-900/30">
                      <div className="flex flex-col items-center justify-center gap-1">
                        <div className="flex gap-2">
-                         <span className="text-emerald-600" title="Asistencias">{aCount}A</span>
-                         <span className="text-red-600" title="Inasistencias">{iCount}I</span>
-                         <span className="text-amber-600" title="Excusas">{eCount}E</span>
+                         <span className="text-emerald-600" title="Asistencias">{aCount}A {totalMarcadas > 0 ? `${aPercentage}%` : ''}</span>
+                         <span className="text-red-600" title="Inasistencias">{iCount}I {totalMarcadas > 0 ? `${iPercentage}%` : ''}</span>
+                         <span className="text-amber-600" title="Excusas">{eCount}E {totalMarcadas > 0 ? `${ePercentage}%` : ''}</span>
                        </div>
-                       {totalMarcadas > 0 && (
-                         <span className={`text-[10px] px-1.5 py-0.5 rounded ${aPercentage < 75 ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                           {aPercentage}% Asist.
-                         </span>
-                       )}
                      </div>
                   </td>
                 </tr>
