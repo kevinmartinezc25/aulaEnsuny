@@ -55,12 +55,12 @@ export function CreateAchievementModal({ isOpen, onClose, onSuccess, subjectId, 
       setIsSubmitting(true)
       const codeConfig: AchievementCodeConfig = {
         type: codeType,
-        singleCode: codeType === 'single' ? singleCode.trim() : undefined,
+        singleCode: codeType === 'single' ? String(singleCode).trim() : undefined,
         rangeCodes: codeType === 'by_range' ? {
-          bajo: rangeCodes.bajo.trim(),
-          basico: rangeCodes.basico.trim(),
-          alto: rangeCodes.alto.trim(),
-          superior: rangeCodes.superior.trim(),
+          bajo: String(rangeCodes.bajo).trim(),
+          basico: String(rangeCodes.basico).trim(),
+          alto: String(rangeCodes.alto).trim(),
+          superior: String(rangeCodes.superior).trim(),
         } : undefined
       }
 
@@ -143,6 +143,7 @@ export function CreateAchievementModal({ isOpen, onClose, onSuccess, subjectId, 
                 <Label htmlFor="singleCode" className="text-xs text-slate-500">Código del Logro</Label>
                 <Input
                   id="singleCode"
+                  type="text"
                   className="mt-1"
                   placeholder="Ej: L1-ALL"
                   value={singleCode}
@@ -156,19 +157,19 @@ export function CreateAchievementModal({ isOpen, onClose, onSuccess, subjectId, 
               <div className="pl-6 pt-2 grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label className="text-xs text-slate-500">1.0 a 2.9 (Bajo)</Label>
-                  <Input placeholder="Código..." value={rangeCodes.bajo} onChange={e => setRangeCodes(prev => ({...prev, bajo: e.target.value}))} required />
+                  <Input type="text" placeholder="Código..." value={rangeCodes.bajo} onChange={e => setRangeCodes(prev => ({...prev, bajo: e.target.value}))} required />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-slate-500">3.0 a 3.9 (Básico)</Label>
-                  <Input placeholder="Código..." value={rangeCodes.basico} onChange={e => setRangeCodes(prev => ({...prev, basico: e.target.value}))} required />
+                  <Input type="text" placeholder="Código..." value={rangeCodes.basico} onChange={e => setRangeCodes(prev => ({...prev, basico: e.target.value}))} required />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-slate-500">4.0 a 4.59 (Alto)</Label>
-                  <Input placeholder="Código..." value={rangeCodes.alto} onChange={e => setRangeCodes(prev => ({...prev, alto: e.target.value}))} required />
+                  <Input type="text" placeholder="Código..." value={rangeCodes.alto} onChange={e => setRangeCodes(prev => ({...prev, alto: e.target.value}))} required />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-slate-500">4.6 a 5.0 (Superior)</Label>
-                  <Input placeholder="Código..." value={rangeCodes.superior} onChange={e => setRangeCodes(prev => ({...prev, superior: e.target.value}))} required />
+                  <Input type="text" placeholder="Código..." value={rangeCodes.superior} onChange={e => setRangeCodes(prev => ({...prev, superior: e.target.value}))} required />
                 </div>
               </div>
             )}

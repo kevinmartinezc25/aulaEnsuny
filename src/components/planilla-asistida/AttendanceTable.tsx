@@ -90,9 +90,9 @@ export function AttendanceTable({ subjectId }: AttendanceTableProps) {
     <div className="flex flex-col h-full bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
       
       {/* Header Actions */}
-      <div className="flex justify-between items-center px-4 py-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-        <h3 className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
-          <CalendarDays className="h-5 w-5 text-emerald-600" />
+      <div className="flex flex-col sm:flex-row gap-3 sm:justify-between sm:items-center px-4 py-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
+        <h3 className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2 text-sm sm:text-base">
+          <CalendarDays className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600" />
           Registro de Asistencia
           {isSaving ? (
             <span className="text-xs font-normal text-amber-600 ml-4 flex items-center"><span className="h-2 w-2 bg-amber-500 rounded-full animate-pulse mr-1"></span> Guardando...</span>
@@ -102,7 +102,7 @@ export function AttendanceTable({ subjectId }: AttendanceTableProps) {
             <span className="text-xs font-normal text-emerald-600 ml-4 flex items-center"><span className="h-2 w-2 bg-emerald-500 rounded-full mr-1"></span> Guardado</span>
           )}
         </h3>
-        <Button onClick={handleOpenCreate} size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white h-8">
+        <Button onClick={handleOpenCreate} size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white h-8 w-full sm:w-auto">
           <Plus className="h-4 w-4 mr-1" />
           Nueva Clase
         </Button>
@@ -113,10 +113,10 @@ export function AttendanceTable({ subjectId }: AttendanceTableProps) {
         <table className="w-full text-sm text-left border-collapse min-w-max">
           <thead className="text-xs text-slate-500 bg-slate-50 dark:bg-slate-900 sticky top-0 z-20 shadow-sm">
             <tr>
-              <th className="px-4 py-3 font-bold border-b border-r border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 sticky left-0 z-30 w-[50px]">
+              <th className="hidden md:table-cell px-4 py-3 font-bold border-b border-r border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 sticky left-0 z-30 w-[50px]">
                 N°
               </th>
-              <th className="px-4 py-3 font-bold border-b border-r border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 sticky left-[50px] z-30 min-w-[250px]">
+              <th className="px-2 md:px-4 py-3 font-bold border-b border-r border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 sticky left-0 md:left-[50px] z-30 w-32 min-w-[128px] max-w-[128px] md:w-auto md:min-w-[250px] shadow-[4px_0_10px_rgba(0,0,0,0.05)]">
                 Estudiante
               </th>
               {sessions.map(session => (
@@ -176,10 +176,10 @@ export function AttendanceTable({ subjectId }: AttendanceTableProps) {
 
               return (
                 <tr key={student.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 group/row transition-colors">
-                  <td className="px-4 py-2 border-r border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-950 sticky left-0 z-10 text-center text-slate-400 group-hover/row:bg-slate-50/50 dark:group-hover/row:bg-slate-800/30">
+                  <td className="hidden md:table-cell px-4 py-2 border-r border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-950 sticky left-0 z-10 text-center text-slate-400 group-hover/row:bg-slate-50/50 dark:group-hover/row:bg-slate-800/30">
                     {student.number}
                   </td>
-                  <td className="px-4 py-2 border-r border-slate-100 dark:border-slate-800 font-medium text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-950 sticky left-[50px] z-10 truncate max-w-[250px] group-hover/row:bg-slate-50/50 dark:group-hover/row:bg-slate-800/30">
+                  <td className="px-2 md:px-4 py-2 border-r border-slate-100 dark:border-slate-800 font-medium text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-950 sticky left-0 md:left-[50px] z-10 truncate w-32 min-w-[128px] max-w-[128px] md:w-auto md:max-w-[250px] md:min-w-[250px] group-hover/row:bg-slate-50/50 dark:group-hover/row:bg-slate-800/30 shadow-[4px_0_10px_rgba(0,0,0,0.05)]">
                     {student.full_name}
                   </td>
                   

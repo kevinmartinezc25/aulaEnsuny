@@ -512,8 +512,8 @@ export function SpreadsheetTable({ subjectId }: SpreadsheetTableProps) {
             {/* Fila 1: Logros */}
             <tr>
               <th className="sticky left-0 z-50 w-8 min-w-[32px] max-w-[32px] bg-white dark:bg-slate-900 border-b border-r border-slate-200 dark:border-slate-700"></th>
-              <th className="sticky left-8 z-50 w-12 min-w-[48px] max-w-[48px] bg-white dark:bg-slate-900 border-b border-r border-slate-200 dark:border-slate-700"></th>
-              <th className="sticky left-20 z-50 w-64 min-w-[256px] max-w-[256px] bg-white dark:bg-slate-900 border-b border-r border-slate-200 dark:border-slate-700"></th>
+              <th className="hidden md:table-cell sticky left-8 z-50 w-12 min-w-[48px] max-w-[48px] bg-white dark:bg-slate-900 border-b border-r border-slate-200 dark:border-slate-700"></th>
+              <th className="sticky left-8 md:left-20 z-50 w-32 min-w-[128px] max-w-[128px] md:w-64 md:min-w-[256px] md:max-w-[256px] bg-white dark:bg-slate-900 border-b border-r border-slate-200 dark:border-slate-700"></th>
               
               {achievements.map((ach, i) => {
                 const color = LOGRO_COLORS[i % LOGRO_COLORS.length]
@@ -542,8 +542,8 @@ export function SpreadsheetTable({ subjectId }: SpreadsheetTableProps) {
             {/* Header Fila 2: Componentes */}
             <tr>
               <th rowSpan={2} className="border-b border-r border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-2 w-8 min-w-[32px] max-w-[32px] sticky left-0 z-50"></th>
-              <th rowSpan={2} className="border-b border-r border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-2 w-12 min-w-[48px] max-w-[48px] text-center font-semibold text-slate-500 sticky left-8 z-50">N°</th>
-              <th rowSpan={2} className="border-b border-r border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-2 w-64 min-w-[256px] max-w-[256px] text-left font-semibold text-slate-500 sticky left-20 z-50 shadow-[4px_0_10px_rgba(0,0,0,0.05)]">Apellidos y Nombres</th>
+              <th rowSpan={2} className="hidden md:table-cell border-b border-r border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-2 w-12 min-w-[48px] max-w-[48px] text-center font-semibold text-slate-500 sticky left-8 z-50">N°</th>
+              <th rowSpan={2} className="border-b border-r border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-2 w-32 min-w-[128px] max-w-[128px] md:w-64 md:min-w-[256px] md:max-w-[256px] text-left font-semibold text-slate-500 sticky left-8 md:left-20 z-50 shadow-[4px_0_10px_rgba(0,0,0,0.05)]">Apellidos y Nombres</th>
               
               {achievements.map((ach, i) => {
                 const color = LOGRO_COLORS[i % LOGRO_COLORS.length]
@@ -622,10 +622,10 @@ export function SpreadsheetTable({ subjectId }: SpreadsheetTableProps) {
                       {deletingStudentId === student.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
                     </button>
                   </td>
-                  <td className="sticky left-8 z-20 w-12 min-w-[48px] max-w-[48px] bg-white dark:bg-slate-900 border-r border-b border-slate-200 dark:border-slate-700 text-center text-slate-500 font-medium">
+                  <td className="hidden md:table-cell sticky left-8 z-20 w-12 min-w-[48px] max-w-[48px] bg-white dark:bg-slate-900 border-r border-b border-slate-200 dark:border-slate-700 text-center text-slate-500 font-medium">
                     {rowIdx + 1}
                   </td>
-                  <td className="sticky left-20 z-20 w-64 min-w-[256px] max-w-[256px] bg-white dark:bg-slate-900 border-r border-b border-slate-200 dark:border-slate-700 text-left font-semibold text-slate-700 dark:text-slate-200 px-2 uppercase text-xs truncate shadow-[4px_0_10px_rgba(0,0,0,0.05)]" title={student.full_name}>
+                  <td className="sticky left-8 md:left-20 z-20 w-32 min-w-[128px] max-w-[128px] md:w-64 md:min-w-[256px] md:max-w-[256px] bg-white dark:bg-slate-900 border-r border-b border-slate-200 dark:border-slate-700 text-left font-semibold text-slate-700 dark:text-slate-200 px-2 uppercase text-xs truncate shadow-[4px_0_10px_rgba(0,0,0,0.05)]" title={student.full_name}>
                     {student.full_name}
                   </td>
 
@@ -756,10 +756,10 @@ export function SpreadsheetTable({ subjectId }: SpreadsheetTableProps) {
               <td className="sticky left-0 z-20 w-8 min-w-[32px] max-w-[32px] bg-slate-50/90 dark:bg-slate-800/90 border-r border-b border-slate-200 dark:border-slate-700 text-center text-slate-400">
                 {isAddingStudent ? <Loader2 className="h-3 w-3 animate-spin mx-auto" /> : <Plus className="h-3 w-3 mx-auto" />}
               </td>
-              <td className="sticky left-8 z-20 w-12 min-w-[48px] max-w-[48px] bg-slate-50/90 dark:bg-slate-800/90 border-r border-b border-slate-200 dark:border-slate-700 text-center text-slate-400 font-medium text-xs">
+              <td className="hidden md:table-cell sticky left-8 z-20 w-12 min-w-[48px] max-w-[48px] bg-slate-50/90 dark:bg-slate-800/90 border-r border-b border-slate-200 dark:border-slate-700 text-center text-slate-400 font-medium text-xs">
                 {filteredAndSortedStudents.length + 1}
               </td>
-              <td className="sticky left-20 z-20 w-64 min-w-[256px] max-w-[256px] bg-slate-50/90 dark:bg-slate-800/90 border-r border-b border-slate-200 dark:border-slate-700 text-left px-1 shadow-[4px_0_10px_rgba(0,0,0,0.05)]">
+              <td className="sticky left-8 md:left-20 z-20 w-32 min-w-[128px] max-w-[128px] md:w-64 md:min-w-[256px] md:max-w-[256px] bg-slate-50/90 dark:bg-slate-800/90 border-r border-b border-slate-200 dark:border-slate-700 text-left px-1 shadow-[4px_0_10px_rgba(0,0,0,0.05)]">
                 <input 
                   type="text" 
                   value={newStudentName}
