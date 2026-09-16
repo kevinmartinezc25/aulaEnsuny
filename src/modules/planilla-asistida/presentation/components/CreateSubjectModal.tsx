@@ -55,11 +55,12 @@ export function CreateSubjectModal({ isOpen, onClose, onSuccess, initialData, ex
     const newGrade = formData.grade ? parseInt(formData.grade) : undefined
     const newGroup = formData.group_number ? parseInt(formData.group_number) : undefined
 
-    const isDuplicate = existingSubjects.some(sub => 
-      sub.id !== initialData?.id &&
-      sub.name.toLowerCase().trim() === formData.name.trim().toLowerCase() &&
-      sub.grade === newGrade &&
-      sub.group_number === newGroup
+    const isDuplicate = existingSubjects.some(s => 
+      s.name.toLowerCase() === formData.name.toLowerCase() && 
+      s.grade?.toString() === formData.grade &&
+      s.group_number?.toString() === formData.group_number &&
+      s.period?.toString() === formData.period &&
+      s.id !== initialData?.id
     )
 
     if (isDuplicate) {
@@ -153,7 +154,10 @@ export function CreateSubjectModal({ isOpen, onClose, onSuccess, initialData, ex
                 <Label htmlFor="period">Período</Label>
                 <Input
                   id="period"
-                  placeholder="Ej: Segundo período"
+                  type="number"
+                  min="1"
+                  max="10"
+                  placeholder="Ej: 1"
                   value={formData.period}
                   onChange={(e) => setFormData(prev => ({ ...prev, period: e.target.value }))}
                 />

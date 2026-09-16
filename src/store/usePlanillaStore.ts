@@ -1,32 +1,44 @@
 import { create } from 'zustand'
 import { AssistedAchievement, AssistedActivity, AssistedGrade } from '@/modules/planilla-asistida/application/actions'
 import { saveAssistedGrades } from '@/modules/planilla-asistida/application/actions'
+import { AssistedSession, AssistedAttendance, saveAssistedAttendance } from '@/modules/planilla-asistida/application/attendanceActions'
 import { toast } from 'sonner'
 
 export type GradeMap = Record<string, Record<string, number>> // student_id -> activity_id -> grade_value
-
+export type AttendanceMap = Record<string, Record<string, 'A' | 'I' | 'E'>> // student_id -> session_id -> status
 interface PlanillaState {
   subjectId: string | null
   students: { id: string, number: number, full_name: string }[]
   achievements: AssistedAchievement[]
   activities: AssistedActivity[]
   grades: GradeMap
+  sessions: AssistedSession[]
+  attendance: AttendanceMap
   
   // Save State
   isSaving: boolean
   hasUnsavedChanges: boolean
   dirtyGrades: { student_id: string, activity_id: string, grade_value: number }[]
+  dirtyAttendance: { session_id: string, student_id: string, status: 'A' | 'I' | 'E' }[]
 
   // Setters
   initialize: (subjectId: string, data: {
     students: { id: string, number: number, full_name: string }[],
     achievements: AssistedAchievement[],
     activities: AssistedActivity[],
-    grades: AssistedGrade[]
+    grades: AssistedGrade[],
+    sessions?: AssistedSession[],
+    attendance?: AssistedAttendance[]
   }) => void
   
   setGrade: (studentId: string, activityId: string, value: number | null) => void
+  setAttendance: (studentId: string, sessionId: string, status: 'A' | 'I' | 'E' | null) => void
   saveChanges: () => Promise<void>
+  
+  setSessions: (sessions: AssistedSession[]) => void
+  addSession: (session: AssistedSession) => void
+  updateSession: (session: AssistedSession) => void
+  removeSession: (sessionId: string) => void
   
   // CRUD de estudiantes en memoria
   addStudent: (student: { id: string, number: number, full_name: string }) => void
@@ -47,9 +59,12 @@ export const usePlanillaStore = create<PlanillaState>((set, get) => ({
   achievements: [],
   activities: [],
   grades: {},
+  sessions: [],
+  attendance: {},
   isSaving: false,
   hasUnsavedChanges: false,
   dirtyGrades: [],
+  dirtyAttendance: [],
 
   initialize: (subjectId, data) => {
     const gradesMap: GradeMap = {}
@@ -59,14 +74,26 @@ export const usePlanillaStore = create<PlanillaState>((set, get) => ({
       gradesMap[g.student_id][g.activity_id] = g.grade_value
     })
 
+    const attendanceMap: AttendanceMap = {}
+    data.students.forEach(s => { attendanceMap[s.id] = {} })
+    if (data.attendance) {
+      data.attendance.forEach(a => {
+        if (!attendanceMap[a.student_id]) attendanceMap[a.student_id] = {}
+        attendanceMap[a.student_id][a.session_id] = a.status
+      })
+    }
+
     set({
       subjectId,
       students: data.students,
       achievements: data.achievements,
       activities: data.activities,
       grades: gradesMap,
+      sessions: data.sessions || [],
+      attendance: attendanceMap,
       hasUnsavedChanges: false,
-      dirtyGrades: []
+      dirtyGrades: [],
+      dirtyAttendance: []
     })
   },
 
@@ -128,17 +155,70 @@ export const usePlanillaStore = create<PlanillaState>((set, get) => ({
 
   saveChanges: async () => {
     const state = get()
-    if (state.dirtyGrades.length === 0) return
+    if (state.dirtyGrades.length === 0 && state.dirtyAttendance.length === 0) return
 
     set({ isSaving: true })
     try {
-      await saveAssistedGrades(state.dirtyGrades)
-      set({ hasUnsavedChanges: false, dirtyGrades: [], isSaving: false })
+      if (state.dirtyGrades.length > 0) {
+        await saveAssistedGrades(state.dirtyGrades)
+      }
+      if (state.dirtyAttendance.length > 0) {
+        await saveAssistedAttendance(state.dirtyAttendance)
+      }
+      set({ hasUnsavedChanges: false, dirtyGrades: [], dirtyAttendance: [], isSaving: false })
     } catch (error) {
       set({ isSaving: false })
-      toast.error('Error al guardar las notas. Intenta de nuevo.')
+      toast.error('Error al guardar los cambios. Intenta de nuevo.')
     }
   },
+
+  setAttendance: (studentId, sessionId, status) => {
+    set(state => {
+      const newAttendance = { ...state.attendance }
+      
+      // Es vital clonar el objeto anidado para que React detecte el cambio de referencia
+      if (newAttendance[studentId]) {
+        newAttendance[studentId] = { ...newAttendance[studentId] }
+      } else {
+        newAttendance[studentId] = {}
+      }
+      
+      const newDirty = [...state.dirtyAttendance]
+      const existingDirtyIndex = newDirty.findIndex(d => d.student_id === studentId && d.session_id === sessionId)
+      
+      if (status === null) {
+        delete newAttendance[studentId][sessionId]
+      } else {
+        newAttendance[studentId][sessionId] = status
+        
+        if (existingDirtyIndex >= 0) {
+          newDirty[existingDirtyIndex] = { ...newDirty[existingDirtyIndex], status }
+        } else {
+          newDirty.push({ student_id: studentId, session_id: sessionId, status })
+        }
+      }
+
+      return {
+        attendance: newAttendance,
+        hasUnsavedChanges: newDirty.length > 0 || state.dirtyGrades.length > 0,
+        dirtyAttendance: newDirty
+      }
+    })
+  },
+
+  setSessions: (sessions) => set({ sessions }),
+
+  addSession: (session) => set(state => ({
+    sessions: [...state.sessions, session].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+  })),
+
+  updateSession: (session) => set(state => ({
+    sessions: state.sessions.map(s => s.id === session.id ? session : s).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+  })),
+
+  removeSession: (sessionId) => set(state => ({
+    sessions: state.sessions.filter(s => s.id !== sessionId)
+  })),
 
   updateAchievement: (id, name, description, codeConfig) => {
     set(state => ({
