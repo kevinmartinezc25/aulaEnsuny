@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/core/config/supabase/server'
+import { createClient, createAdminClient } from '@/core/config/supabase/server'
 
 export interface AssistedSubject {
   id: string
@@ -57,7 +57,7 @@ export async function createAssistedSubject(data: { name: string, description?: 
   return subject as AssistedSubject
 }
 
-export async function createAssistedStudents(subjectId: string, students: { number: number, fullName: string }[]): Promise<boolean> {
+export async function createAssistedStudents(subjectId: string, students: { number: number, fullName: string, directoryId?: string }[]): Promise<boolean> {
   const supabase = await createClient()
   
   const { data: userData, error: authError } = await supabase.auth.getUser()
@@ -77,19 +77,81 @@ export async function createAssistedStudents(subjectId: string, students: { numb
     throw new Error('Materia no encontrada o acceso denegado')
   }
 
-  const payload = students.map(student => ({
-    subject_id: subjectId,
-    number: student.number,
-    full_name: student.fullName
-  }))
-
-  const { error } = await supabase
+  // 1. Obtener estudiantes existentes en la materia
+  const { data: existingStudents, error: existingError } = await supabase
     .from('assisted_students')
-    .insert(payload)
+    .select('id, full_name, directory_id, number')
+    .eq('subject_id', subjectId)
 
-  if (error) {
-    console.error('Error creating assisted students:', error)
-    throw new Error('Error al guardar los estudiantes')
+  if (existingError) throw new Error('Error al verificar estudiantes existentes')
+
+  const toInsert = []
+  const updates: any[] = []
+
+  // Mapas para búsqueda rápida
+  const existingByDirId = new Map(
+    (existingStudents || []).filter(s => s.directory_id).map(s => [s.directory_id, s])
+  )
+  const existingByName = new Map(
+    (existingStudents || []).map(s => [s.full_name.trim().toLowerCase(), s])
+  )
+
+  for (const student of students) {
+    const uppercaseName = student.fullName.toUpperCase().trim()
+    let matchedExisting = null
+
+    // Intentar emparejar por directoryId si existe
+    if (student.directoryId && existingByDirId.has(student.directoryId)) {
+      matchedExisting = existingByDirId.get(student.directoryId)
+    } 
+    // Si no tiene directoryId o no hizo match, intentar emparejar por nombre
+    else if (existingByName.has(student.fullName.trim().toLowerCase())) {
+      matchedExisting = existingByName.get(student.fullName.trim().toLowerCase())
+    }
+
+    if (matchedExisting) {
+      // Si existe, preparamos la actualización si algo cambió
+      if (
+        matchedExisting.full_name !== uppercaseName || 
+        matchedExisting.number !== student.number ||
+        (student.directoryId && matchedExisting.directory_id !== student.directoryId)
+      ) {
+        updates.push(
+          supabase
+            .from('assisted_students')
+            .update({ 
+              full_name: uppercaseName, 
+              number: student.number,
+              directory_id: student.directoryId || matchedExisting.directory_id 
+            })
+            .eq('id', matchedExisting.id)
+        )
+      }
+    } else {
+      // Si no existe, preparamos para insertar
+      toInsert.push({
+        subject_id: subjectId,
+        number: student.number,
+        full_name: uppercaseName,
+        directory_id: student.directoryId || null
+      })
+    }
+  }
+
+  // Ejecutar inserciones
+  if (toInsert.length > 0) {
+    const { error: insertError } = await supabase
+      .from('assisted_students')
+      .insert(toInsert)
+    if (insertError) {
+      console.error('Error inserting students:', insertError)
+      throw new Error('Error al insertar nuevos estudiantes')
+    }
+  }
+
+  // Ejecutar actualizaciones
+  if (updates.length > 0) {
+    await Promise.all(updates)
   }
 
   return true
@@ -413,3 +475,69 @@ export async function deleteAssistedStudent(studentId: string): Promise<void> {
   if (error) throw new Error('Error al eliminar al estudiante')
 }
 
+export async function deleteAllAssistedStudents(subjectId: string): Promise<void> {
+  const supabase = await createClient()
+  const { data: userData, error: authError } = await supabase.auth.getUser()
+  if (authError || !userData?.user) throw new Error('No autorizado')
+
+  const { error } = await supabase
+    .from('assisted_students')
+    .delete()
+    .eq('subject_id', subjectId)
+    
+  if (error) throw new Error('Error al vaciar la planilla')
+}
+
+export async function getStudentsFromDirectory(grade: number | string, groupNumber: number | string) {
+  const supabase = await createClient()
+  const { data: userData, error: authError } = await supabase.auth.getUser()
+  if (authError || !userData?.user) throw new Error('No autorizado')
+
+  const adminClient = createAdminClient()
+
+  const grades = [String(grade), `${grade}°`, `${grade} °`]
+  const groups = [String(groupNumber), `0${groupNumber}`]
+
+  // 1. Obtener de perfiles (estudiantes ya registrados)
+  const { data: profiles, error: pError } = await adminClient
+    .from('profiles')
+    .select('id, first_name, last_name, roles!inner(name)')
+    .eq('roles.name', 'student')
+    .in('grade_level', grades)
+    .in('group_name', groups)
+    .eq('status', 'active')
+
+  // 2. Obtener del directorio (estudiantes sin cuenta)
+  const { data: directory, error: dError } = await adminClient
+    .from('student_directory')
+    .select('id, first_name, last_name')
+    .in('grade_level', grades)
+    .in('group_name', groups)
+    .is('profile_id', null)
+    .eq('status', 'active')
+
+  if (pError || dError) {
+    console.error('Error fetching students:', pError, dError)
+    throw new Error('Error al obtener estudiantes del directorio')
+  }
+
+  // Combinar ambos
+  const combined = [
+    ...(profiles || []).map(p => ({ id: `prof-${p.id}`, first_name: p.first_name, last_name: p.last_name })),
+    ...(directory || []).map(d => ({ id: `dir-${d.id}`, first_name: d.first_name, last_name: d.last_name }))
+  ]
+
+  // Ordenar alfabéticamente
+  combined.sort((a, b) => {
+    const nameA = `${a.last_name} ${a.first_name}`.toUpperCase()
+    const nameB = `${b.last_name} ${b.first_name}`.toUpperCase()
+    return nameA.localeCompare(nameB)
+  })
+
+  // Mapear al formato esperado
+  return combined.map((student, index) => ({
+    id: student.id,
+    number: index + 1,
+    fullName: `${student.last_name} ${student.first_name}`.trim()
+  }))
+}

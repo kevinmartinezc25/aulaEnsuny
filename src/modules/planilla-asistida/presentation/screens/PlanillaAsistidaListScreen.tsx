@@ -99,8 +99,8 @@ export function PlanillaAsistidaListScreen() {
   })
 
   return (
-    <div className="flex-1 space-y-6 p-6 lg:p-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex-1 space-y-2 p-2 lg:px-4 lg:py-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
             <FileSpreadsheet className="h-6 w-6 text-emerald-600 dark:text-emerald-500" />
