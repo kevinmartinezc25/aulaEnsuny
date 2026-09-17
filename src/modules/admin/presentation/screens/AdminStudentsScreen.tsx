@@ -174,29 +174,29 @@ export function AdminStudentsScreen() {
             Matricula alumnos, asigna grados escolares y controla sus estados académicos.
           </p>
         </div>
-        <div className="flex items-center gap-2 self-start sm:self-center flex-wrap">
+        <div className="flex items-center gap-2 self-start sm:self-center">
           <button
             onClick={copyRegistrationLink}
-            className="flex items-center gap-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 px-4 py-3 text-sm font-semibold active:scale-[0.98] transition-all cursor-pointer"
+            className="flex items-center gap-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 px-4 py-2 text-sm font-semibold active:scale-[0.98] transition-all cursor-pointer"
             title="Copiar enlace público de registro"
           >
             <LinkIcon className="h-4 w-4" />
-            <span className="hidden sm:inline">Copiar Enlace</span>
+            <span className="hidden sm:inline whitespace-nowrap">Copiar Enlace</span>
           </button>
           <Link
             href="/admin/students/import"
-            className="flex items-center gap-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 px-4 py-3 text-sm font-semibold active:scale-[0.98] transition-all"
+            className="flex items-center gap-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 px-4 py-2 text-sm font-semibold active:scale-[0.98] transition-all"
             title="Importar estudiantes desde Excel o CSV"
           >
             <FileSpreadsheet className="h-4 w-4" />
-            <span className="hidden sm:inline">Importar</span>
+            <span className="hidden sm:inline whitespace-nowrap">Importar</span>
           </Link>
           <button
             onClick={openCreate}
-            className="flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 text-sm font-semibold active:scale-[0.98] transition-all cursor-pointer"
+            className="flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-sm font-semibold active:scale-[0.98] transition-all cursor-pointer"
           >
             <UserPlus className="h-4 w-4" />
-            <span>Matricular Alumno</span>
+            <span className="whitespace-nowrap">Matricular Alumno</span>
           </button>
         </div>
       </div>
@@ -309,7 +309,7 @@ export function AdminStudentsScreen() {
                   <td className="px-6 py-4 font-semibold text-slate-900 dark:text-white">
                     {toTitleCase(s.lastName ? `${s.lastName} ${s.firstName}` : s.name)}
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4 whitespace-nowrap">
                     <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400 border border-purple-100/30">
                       Grado {s.gradeLevel} - {s.groupName || '1'}
                     </span>

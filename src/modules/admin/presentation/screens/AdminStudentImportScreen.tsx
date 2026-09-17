@@ -31,9 +31,8 @@ type ImportStep = 'upload' | 'preview' | 'importing' | 'done'
 // CONSTANTES
 // ─────────────────────────────────────────────────────────────────────────────
 
-const COLUMN_MAP: Record<string, keyof StudentImportRow> = {
-  'apellidos': 'lastName',
-  'nombres': 'firstName',
+const COLUMN_MAP: Record<string, string> = {
+  'apellidos y nombres': 'fullName',
   'documento': 'documentId',
   'grado': 'gradeLevel',
   'grupo': 'groupName',
@@ -68,7 +67,7 @@ function parseFileToRows(file: File): Promise<StudentImportRow[]> {
         )
 
         // Verificar columnas requeridas
-        const required = ['apellidos', 'nombres', 'grado', 'grupo']
+        const required = ['apellidos y nombres', 'grado', 'grupo']
         const missing = required.filter(col => !headers.includes(col))
         if (missing.length > 0) {
           reject(new Error(`Columnas faltantes: ${missing.join(', ')}. Descarga la plantilla para ver el formato correcto.`))
@@ -79,14 +78,32 @@ function parseFileToRows(file: File): Promise<StudentImportRow[]> {
         const rows: StudentImportRow[] = []
         for (let i = 1; i < raw.length && rows.length < MAX_ROWS; i++) {
           const row = raw[i] as string[]
-          const obj: Partial<StudentImportRow> = {}
+          const rawObj: Record<string, string> = {}
 
           headers.forEach((header, idx) => {
             const field = COLUMN_MAP[header]
             if (field) {
-              obj[field] = String(row[idx] || '').trim()
+              rawObj[field] = String(row[idx] || '').trim()
             }
           })
+
+          const obj: Partial<StudentImportRow> = {
+            documentId: rawObj.documentId,
+            gradeLevel: rawObj.gradeLevel,
+            groupName: rawObj.groupName,
+            email: rawObj.email,
+          }
+
+          if (rawObj.fullName) {
+            const parts = rawObj.fullName.split(' ').filter(Boolean)
+            if (parts.length > 2) {
+              obj.lastName = parts.slice(0, 2).join(' ')
+              obj.firstName = parts.slice(2).join(' ')
+            } else if (parts.length > 0) {
+              obj.lastName = parts[0]
+              obj.firstName = parts.slice(1).join(' ') || parts[0]
+            }
+          }
 
           // Omitir filas completamente vacías
           if (!obj.lastName && !obj.firstName && !obj.gradeLevel && !obj.groupName) {
@@ -424,7 +441,7 @@ export function AdminStudentImportScreen() {
                 <Info className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
                 <p className="text-sm text-blue-700 dark:text-blue-400">
                   Sube un archivo <strong>.xlsx</strong> o <strong>.csv</strong> con las columnas:
-                  {' '}<strong>Apellidos</strong>, <strong>Nombres</strong>, <strong>Grado</strong>, <strong>Grupo</strong> (requeridas)
+                  {' '}<strong>APELLIDOS Y NOMBRES</strong>, <strong>Grado</strong>, <strong>Grupo</strong> (requeridas)
                   {' '}y <strong>Documento</strong>, <strong>Email</strong> (opcionales). Límite: {MAX_ROWS} estudiantes por importación.
                 </p>
               </div>
@@ -532,7 +549,7 @@ export function AdminStudentImportScreen() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50 dark:divide-slate-800/60">
-                      {rows.map((row) => {
+                      {rows.map((row, index) => {
                         const isExcluded = excluded.has(row.rowIndex)
                         const hasIssue = row.errors.length > 0 || row.isDuplicate
 
@@ -549,25 +566,28 @@ export function AdminStudentImportScreen() {
                                 : 'hover:bg-slate-50 dark:hover:bg-slate-800/30'
                             }`}
                           >
-                            <td className="px-4 py-2.5 text-xs text-slate-400">{row.rowIndex}</td>
+                            <td className="px-4 py-2.5 text-xs text-slate-400">{index + 1}</td>
 
-                            {(['lastName', 'firstName', 'documentId', 'gradeLevel', 'groupName'] as const).map(field => (
-                              <td key={field} className="px-4 py-2">
-                                <input
-                                  type="text"
-                                  value={row[field] || ''}
-                                  onChange={e => handleCellEdit(row.rowIndex, field, e.target.value)}
-                                  disabled={isExcluded}
-                                  className={`w-full min-w-[80px] text-sm rounded-lg px-2 py-1 border transition-colors bg-transparent
-                                    ${hasIssue && !isExcluded
-                                      ? 'border-amber-200 dark:border-amber-700 focus:border-amber-400'
-                                      : 'border-transparent hover:border-slate-200 dark:hover:border-slate-700 focus:border-blue-400 dark:focus:border-blue-500'
-                                    }
-                                    text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-0
-                                    disabled:cursor-not-allowed`}
-                                />
-                              </td>
-                            ))}
+                            {(['lastName', 'firstName', 'documentId', 'gradeLevel', 'groupName'] as const).map(field => {
+                              const minWidth = field === 'lastName' || field === 'firstName' ? 'min-w-[180px]' : 'min-w-[80px]'
+                              return (
+                                <td key={field} className="px-4 py-2">
+                                  <input
+                                    type="text"
+                                    value={row[field] || ''}
+                                    onChange={e => handleCellEdit(row.rowIndex, field, e.target.value)}
+                                    disabled={isExcluded}
+                                    className={`w-full ${minWidth} text-sm rounded-lg px-2 py-1 border transition-colors bg-transparent
+                                      ${hasIssue && !isExcluded
+                                        ? 'border-amber-200 dark:border-amber-700 focus:border-amber-400'
+                                        : 'border-transparent hover:border-slate-200 dark:hover:border-slate-700 focus:border-blue-400 dark:focus:border-blue-500'
+                                      }
+                                      text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-0
+                                      disabled:cursor-not-allowed`}
+                                  />
+                                </td>
+                              )
+                            })}
 
                             <td className="px-4 py-2.5">
                               {!isExcluded && <StatusBadge row={row} />}

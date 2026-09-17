@@ -135,14 +135,18 @@ export function AttendanceTable({ subjectId }: AttendanceTableProps) {
       description: 'Se perderán todos los registros de asistencia de esta fecha.',
       action: {
         label: 'Eliminar',
-        onClick: async () => {
-          try {
-            await deleteAssistedSession(sessionId)
-            removeSession(sessionId)
-            toast.success('Sesión eliminada')
-          } catch (error: any) {
-            toast.error(error.message || 'Error al eliminar')
-          }
+        onClick: () => {
+          // Actualización optimista: removemos la sesión de la UI inmediatamente
+          removeSession(sessionId)
+          
+          toast.promise(
+            deleteAssistedSession(sessionId),
+            {
+              loading: 'Eliminando clase...',
+              success: 'Clase eliminada exitosamente',
+              error: 'Error al eliminar la clase. Recarga la página.'
+            }
+          )
         }
       },
       cancel: { label: 'Cancelar', onClick: () => {} }
@@ -197,7 +201,7 @@ export function AttendanceTable({ subjectId }: AttendanceTableProps) {
               <th className="hidden md:table-cell px-4 py-3 font-bold border-b border-r border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 sticky left-0 z-30 w-[50px]">
                 N°
               </th>
-              <th className="px-2 md:px-4 py-3 font-bold border-b border-r border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 sticky left-0 md:left-[50px] z-30 w-32 min-w-[128px] max-w-[128px] md:w-auto md:min-w-[250px] shadow-[4px_0_10px_rgba(0,0,0,0.05)]">
+              <th className="px-2 md:px-4 py-3 font-bold border-b border-r border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 sticky left-0 md:left-[50px] z-30 w-40 min-w-[160px] md:w-auto md:min-w-[250px] shadow-[4px_0_10px_rgba(0,0,0,0.05)]">
                 Estudiante
               </th>
               {sessions.map(session => {
@@ -271,7 +275,10 @@ export function AttendanceTable({ subjectId }: AttendanceTableProps) {
                   <td className="hidden md:table-cell px-4 py-2 border-r border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-950 sticky left-0 z-10 text-center text-slate-400 group-hover/row:bg-slate-50/50 dark:group-hover/row:bg-slate-800/30">
                     {student.number}
                   </td>
-                  <td className="px-2 md:px-4 py-2 border-r border-slate-100 dark:border-slate-800 font-medium text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-950 sticky left-0 md:left-[50px] z-10 truncate w-32 min-w-[128px] max-w-[128px] md:w-auto md:max-w-[250px] md:min-w-[250px] group-hover/row:bg-slate-50/50 dark:group-hover/row:bg-slate-800/30 shadow-[4px_0_10px_rgba(0,0,0,0.05)] uppercase">
+                  <td 
+                    title={student.full_name}
+                    className="px-2 md:px-4 py-2 border-r border-slate-100 dark:border-slate-800 font-medium text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-950 sticky left-0 md:left-[50px] z-10 w-40 min-w-[160px] md:w-auto md:min-w-[250px] group-hover/row:bg-slate-50/50 dark:group-hover/row:bg-slate-800/30 shadow-[4px_0_10px_rgba(0,0,0,0.05)] uppercase whitespace-normal break-words text-[11px] md:text-sm leading-tight"
+                  >
                     {student.full_name}
                   </td>
                   

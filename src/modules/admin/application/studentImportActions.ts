@@ -356,17 +356,16 @@ export async function generateImportTemplate(): Promise<string> {
 
     // Hoja de datos
     const templateData = [
-      ['Apellidos', 'Nombres', 'Documento', 'Grado', 'Grupo'],
-      ['Martínez López', 'Juan Carlos', '1001234567', '10°', '2'],
-      ['Torres García', 'Ana María', '', '11°', '1'],
+      ['APELLIDOS Y NOMBRES', 'Documento', 'Grado', 'Grupo'],
+      ['MARTÍNEZ LÓPEZ JUAN CARLOS', '1001234567', '10°', '2'],
+      ['TORRES GARCÍA ANA MARÍA', '', '11°', '1'],
     ]
 
     const ws = XLSX.utils.aoa_to_sheet(templateData)
 
     // Anchos de columna
     ws['!cols'] = [
-      { wch: 25 }, // Apellidos
-      { wch: 25 }, // Nombres
+      { wch: 50 }, // APELLIDOS Y NOMBRES
       { wch: 15 }, // Documento
       { wch: 10 }, // Grado
       { wch: 10 }, // Grupo
@@ -378,11 +377,11 @@ export async function generateImportTemplate(): Promise<string> {
     const instrData = [
       ['INSTRUCCIONES DE IMPORTACIÓN'],
       [''],
-      ['Columnas requeridas: Apellidos, Nombres, Grado, Grupo'],
+      ['Columnas requeridas: APELLIDOS Y NOMBRES, Grado, Grupo'],
       ['Columnas opcionales: Documento, Email'],
       [''],
-      ['Apellidos: Requerido. Ej: Martínez López'],
-      ['Nombres: Requerido. Ej: Juan Carlos'],
+      ['APELLIDOS Y NOMBRES: Requerido. Ej: MARTÍNEZ LÓPEZ JUAN CARLOS'],
+      ['(El sistema asignará las dos primeras palabras como apellidos y el resto como nombres)'],
       ['Documento: Opcional. Número de cédula o TI. Debe ser único.'],
       ['Grado: Requerido. Ej: 10°, 11°, 9°'],
       ['Grupo: Requerido. Ej: 1, 2, A, B'],
