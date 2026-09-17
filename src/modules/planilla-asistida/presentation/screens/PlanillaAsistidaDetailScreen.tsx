@@ -4,6 +4,14 @@ import React, { useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { FileSpreadsheet, ArrowLeft, Users, Save, Download, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { createAssistedStudents, getAssistedAchievementsAndActivities, getAssistedStudents, getAssistedGrades, getAssistedSubjectById, AssistedAchievement, AssistedActivity, AssistedSubject } from '../../application/actions'
@@ -23,10 +31,12 @@ interface PlanillaAsistidaDetailScreenProps {
 
 export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDetailScreenProps) {
   const [activeTab, setActiveTab] = useState<'planilla' | 'actividades' | 'estudiantes' | 'asistencia' | 'configuracion'>('planilla')
-  const [pastedData, setPastedData] = useState<string>('')
-  const [students, setStudents] = useState<{ id: string, number: number, fullName: string }[]>([])
+  const [pastedData, setPastedData] = useState('')
+  const [students, setStudents] = useState<{ id: string, number: number, fullName: string, directoryId?: string }[]>([])
   const [isSaving, setIsSaving] = useState(false)
+  const [isLoadingFromDir, setIsLoadingFromDir] = useState(false)
   const [isLoadingPlanilla, setIsLoadingPlanilla] = useState(true)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [subjectData, setSubjectData] = useState<AssistedSubject | null>(null)
 
   // Zustand Store
@@ -131,16 +141,70 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
     
     try {
       setIsSaving(true)
-      await createAssistedStudents(subjectId, students)
+      const studentsPayload = students.map(s => ({
+        number: s.number,
+        fullName: s.fullName,
+        directoryId: s.directoryId
+      }))
+      await createAssistedStudents(subjectId, studentsPayload)
       toast.success(`${students.length} estudiantes guardados exitosamente.`)
-      // Limpiar y pasar a la pestaña de Planilla
+      // Limpiar datos temporales
       setPastedData('')
       setStudents([])
+      // Recargar la estructura para actualizar el estado global (Zustand)
+      await loadEvaluationStructure()
+      // Pasar a la pestaña de Planilla
       setActiveTab('planilla')
     } catch (error: any) {
       toast.error(error.message || 'Error al guardar los estudiantes')
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  const handleDeleteAllStudents = async () => {
+    try {
+      setIsSaving(true)
+      const { deleteAllAssistedStudents } = await import('../../application/actions')
+      await deleteAllAssistedStudents(subjectId)
+      toast.success('Planilla vaciada exitosamente. Todos los estudiantes y sus datos fueron eliminados.')
+      await loadEvaluationStructure()
+      setIsDeleteDialogOpen(false)
+    } catch (error: any) {
+      toast.error(error.message || 'Error al vaciar la planilla')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleLoadFromDirectory = async () => {
+    if (!subjectData?.grade || !subjectData?.group_number) {
+      toast.error('La materia no tiene un grado o grupo asignado válido.')
+      return
+    }
+    
+    try {
+      setIsLoadingFromDir(true)
+      const { getStudentsFromDirectory } = await import('../../application/actions')
+      const dirStudents = await getStudentsFromDirectory(subjectData.grade, subjectData.group_number)
+      
+      if (dirStudents.length === 0) {
+        toast.info('No se encontraron estudiantes para este grado y grupo en el directorio.')
+        return
+      }
+      
+      const mapped = dirStudents.map(s => ({
+        id: `temp-${Date.now()}-${s.number}`,
+        number: s.number,
+        fullName: s.fullName,
+        directoryId: s.id // El ID del directorio/perfil
+      }))
+      setStudents(mapped)
+      toast.success(`${dirStudents.length} estudiantes cargados del directorio. Por favor, confirma para guardarlos.`)
+    } catch (error: any) {
+      toast.error(error.message || 'Error al cargar desde el directorio')
+    } finally {
+      setIsLoadingFromDir(false)
     }
   }
 
@@ -201,8 +265,8 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
   return (
     <div className="flex h-full flex-col bg-slate-50 dark:bg-slate-950">
       {/* Header Fijo */}
-      <div className="shrink-0 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 sm:px-6 py-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
+      <div className="shrink-0 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 sm:px-6 py-0.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-0 gap-1">
           <div className="flex items-center gap-4">
             <Link href="/teacher/planilla-asistida" className="p-2 -ml-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-slate-300">
               <ArrowLeft className="h-5 w-5" />
@@ -265,8 +329,30 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
                 Cargar Estudiantes
               </h2>
               <p className="text-sm text-slate-500 mb-6">
-                Copia la lista de estudiantes desde Excel y pégala en el recuadro de abajo. Puedes pegar dos columnas (N° y Nombre) o solo una columna con los nombres.
+                Copia la lista de estudiantes desde Excel y pégala en el recuadro de abajo. Puedes pegar dos columnas (N° y Nombre) o solo una columna con los nombres. Alternativamente, puedes cargarlos automáticamente desde el directorio del colegio.
               </p>
+
+              <div className="flex flex-col sm:flex-row gap-4 mb-4">
+                <Button 
+                  onClick={handleLoadFromDirectory}
+                  disabled={isLoadingFromDir}
+                  variant="outline"
+                  className="w-full sm:w-auto text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border-emerald-200"
+                >
+                  {isLoadingFromDir ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Users className="h-4 w-4 mr-2" />}
+                  Cargar desde Directorio Estudiantil
+                </Button>
+                
+                <Button
+                  onClick={() => setIsDeleteDialogOpen(true)}
+                  disabled={isSaving || storeState.students.length === 0}
+                  variant="outline"
+                  className="w-full sm:w-auto text-red-700 bg-red-50 hover:bg-red-100 border-red-200"
+                >
+                  {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
+                  Vaciar toda la planilla ({storeState.students.length})
+                </Button>
+              </div>
 
               <div className="space-y-4">
                 <textarea
@@ -306,7 +392,7 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
                       {students.map((student) => (
                         <tr key={student.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30">
                           <td className="px-6 py-3 font-medium text-slate-900 dark:text-white">{student.number}</td>
-                          <td className="px-6 py-3 text-slate-700 dark:text-slate-300">{student.fullName}</td>
+                          <td className="px-6 py-3 text-slate-700 dark:text-slate-300 uppercase">{student.fullName}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -513,6 +599,34 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
           }}
         />
       )}
+      {/* Modal de confirmación para vaciar planilla */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-red-600">Vaciar toda la planilla</DialogTitle>
+            <DialogDescription>
+              ¿Estás seguro de que deseas eliminar TODOS los estudiantes de esta planilla? Se borrarán también todas las notas y asistencias asociadas. Esta acción NO se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4 flex gap-2 sm:justify-end">
+            <Button 
+              variant="outline" 
+              onClick={() => setIsDeleteDialogOpen(false)}
+              disabled={isSaving}
+            >
+              Cancelar
+            </Button>
+            <Button 
+              className="bg-red-600 hover:bg-red-700 text-white" 
+              onClick={handleDeleteAllStudents}
+              disabled={isSaving}
+            >
+              {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
+              Sí, vaciar planilla
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

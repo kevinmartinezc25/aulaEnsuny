@@ -8,6 +8,7 @@ export interface AssistedSession {
   date: string
   topic?: string
   created_at: string
+  is_locked?: boolean
 }
 
 export interface AssistedAttendance {
@@ -94,6 +95,24 @@ export async function deleteAssistedSession(sessionId: string): Promise<void> {
     console.error('Error deleting assisted session:', error)
     throw new Error('Error al eliminar la sesión')
   }
+}
+
+export async function toggleAssistedSessionLock(sessionId: string, isLocked: boolean): Promise<boolean> {
+  const supabase = await createClient()
+  const { data: userData, error: authError } = await supabase.auth.getUser()
+  if (authError || !userData?.user) throw new Error('No autorizado')
+
+  const { error } = await supabase
+    .from('assisted_sessions')
+    .update({ is_locked: isLocked })
+    .eq('id', sessionId)
+
+  if (error) {
+    console.error('Error toggling session lock:', error)
+    throw new Error('Error al cambiar el estado de bloqueo de la clase')
+  }
+
+  return true
 }
 
 export async function getAssistedAttendance(subjectId: string): Promise<AssistedAttendance[]> {

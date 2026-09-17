@@ -6,16 +6,21 @@ import { Plus, Trash2, Edit2, CalendarDays } from 'lucide-react'
 import { CreateSessionModal } from '@/modules/planilla-asistida/presentation/components/CreateSessionModal'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
-import { deleteAssistedSession, AssistedSession } from '@/modules/planilla-asistida/application/attendanceActions'
+import { deleteAssistedSession, AssistedSession, toggleAssistedSessionLock } from '@/modules/planilla-asistida/application/attendanceActions'
+import { Lock, Unlock } from 'lucide-react'
 
 interface AttendanceTableProps {
   subjectId: string
 }
 
 export function AttendanceTable({ subjectId }: AttendanceTableProps) {
-  const { students, sessions, attendance, setAttendance, removeSession, hasUnsavedChanges, saveChanges, isSaving } = usePlanillaStore()
+  const { students, sessions, attendance, setAttendance, removeSession, updateSession, hasUnsavedChanges, saveChanges, isSaving } = usePlanillaStore()
+  const [isTogglingLock, setIsTogglingLock] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [sessionToEdit, setSessionToEdit] = useState<AssistedSession | null>(null)
+  
+  // Para permitir desbloquear temporalmente clases pasadas que se auto-bloquean
+  const [unlockedPastSessions, setUnlockedPastSessions] = useState<Set<string>>(new Set())
 
   // Handlers
   const handleOpenEdit = (session: AssistedSession) => {
@@ -41,8 +46,76 @@ export function AttendanceTable({ subjectId }: AttendanceTableProps) {
     setSessionToEdit(null)
     setIsModalOpen(true)
   }
-  const handleToggleAttendance = (studentId: string, sessionId: string) => {
-    const currentStatus = attendance[studentId]?.[sessionId]
+
+  const isSessionPast = (session: AssistedSession) => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const [year, month, day] = session.date.split('-')
+    const sessionDate = new Date(Number(year), Number(month) - 1, Number(day))
+    sessionDate.setHours(0, 0, 0, 0)
+    return sessionDate < today
+  }
+
+  const handleToggleLock = async (session: AssistedSession) => {
+    try {
+      setIsTogglingLock(session.id)
+      
+      const isPast = isSessionPast(session)
+      
+      // Si es una clase pasada y no está explícitamente bloqueada en BD
+      // el bloqueo es puramente visual/automático.
+      if (isPast && !session.is_locked) {
+        if (!unlockedPastSessions.has(session.id)) {
+          setUnlockedPastSessions(prev => new Set(prev).add(session.id))
+          toast.success('Clase pasada desbloqueada temporalmente')
+        } else {
+          setUnlockedPastSessions(prev => {
+            const next = new Set(prev)
+            next.delete(session.id)
+            return next
+          })
+          toast.success('Clase bloqueada nuevamente')
+        }
+      } else {
+        // Comportamiento normal en BD
+        const newLockedState = !session.is_locked
+        await toggleAssistedSessionLock(session.id, newLockedState)
+        updateSession({ ...session, is_locked: newLockedState })
+        
+        // Si acabamos de desbloquear en BD y es pasada, la metemos a los permitidos también
+        if (!newLockedState && isPast) {
+          setUnlockedPastSessions(prev => new Set(prev).add(session.id))
+        } else if (newLockedState) {
+          setUnlockedPastSessions(prev => {
+            const next = new Set(prev)
+            next.delete(session.id)
+            return next
+          })
+        }
+        
+        toast.success(newLockedState ? 'Clase bloqueada' : 'Clase desbloqueada')
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Error al cambiar bloqueo')
+    } finally {
+      setIsTogglingLock(null)
+    }
+  }
+
+  const isSessionLocked = (session: AssistedSession) => {
+    if (unlockedPastSessions.has(session.id)) return false
+    
+    // Si el usuario lo bloqueó explícitamente, está bloqueada.
+    if (session.is_locked) return true
+    
+    // Bloqueo automático por fecha (si la fecha es menor al día actual)
+    return isSessionPast(session)
+  }
+
+  const handleToggleAttendance = (studentId: string, session: AssistedSession) => {
+    if (isSessionLocked(session)) return
+
+    const currentStatus = attendance[studentId]?.[session.id]
     
     // Ciclo: undefined -> A -> I -> E -> A
     let nextStatus: 'A' | 'I' | 'E'
@@ -54,7 +127,7 @@ export function AttendanceTable({ subjectId }: AttendanceTableProps) {
     // Si quisieramos poder dejarlo vacío:
     // else if (currentStatus === 'E') nextStatus = null
     
-    setAttendance(studentId, sessionId, nextStatus)
+    setAttendance(studentId, session.id, nextStatus)
   }
 
   const handleDeleteSession = (sessionId: string) => {
@@ -77,7 +150,15 @@ export function AttendanceTable({ subjectId }: AttendanceTableProps) {
   }
 
   // Estilos y labels para los estados
-  const getStatusDisplay = (status?: 'A' | 'I' | 'E') => {
+  const getStatusDisplay = (status?: 'A' | 'I' | 'E', locked?: boolean) => {
+    if (locked && status) {
+      let text = '-'
+      if (status === 'A') text = 'Asiste'
+      if (status === 'I') text = 'Inasistencia'
+      if (status === 'E') text = 'Excusa'
+      return <span className="text-slate-500 font-bold bg-slate-200/50 dark:bg-slate-700/50 px-1 py-1 rounded w-full h-full flex items-center justify-center text-[11px]" title={text}>{text}</span>
+    }
+
     switch (status) {
       case 'A': return <span className="text-emerald-600 font-bold bg-emerald-50 px-1 py-1 rounded w-full h-full flex items-center justify-center text-[11px]" title="Asiste">Asiste</span>
       case 'I': return <span className="text-red-600 font-bold bg-red-50 px-1 py-1 rounded w-full h-full flex items-center justify-center text-[11px]" title="Inasistencia">Inasistencia</span>
@@ -119,10 +200,12 @@ export function AttendanceTable({ subjectId }: AttendanceTableProps) {
               <th className="px-2 md:px-4 py-3 font-bold border-b border-r border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 sticky left-0 md:left-[50px] z-30 w-32 min-w-[128px] max-w-[128px] md:w-auto md:min-w-[250px] shadow-[4px_0_10px_rgba(0,0,0,0.05)]">
                 Estudiante
               </th>
-              {sessions.map(session => (
-                <th key={session.id} className="relative px-1 py-2 font-semibold border-b border-r border-slate-200 dark:border-slate-800 text-center w-[85px] min-w-[85px] max-w-[85px] group overflow-hidden">
+              {sessions.map(session => {
+                const locked = isSessionLocked(session)
+                return (
+                <th key={session.id} className={`relative px-1 py-2 font-semibold border-b border-r border-slate-200 dark:border-slate-800 text-center w-[85px] min-w-[85px] max-w-[85px] group overflow-hidden ${locked ? 'bg-slate-100 dark:bg-slate-800/60' : ''}`}>
                   <div className="flex flex-col items-center justify-center">
-                    <span className="text-slate-900 dark:text-white mb-1">
+                    <span className={`mb-1 ${locked ? 'text-slate-500 dark:text-slate-400' : 'text-slate-900 dark:text-white'}`}>
                       {(() => {
                         const [year, month, day] = session.date.split('-');
                         const localDate = new Date(Number(year), Number(month) - 1, Number(day));
@@ -134,10 +217,19 @@ export function AttendanceTable({ subjectId }: AttendanceTableProps) {
                         {session.topic}
                       </span>
                     )}
-                    <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-50 dark:bg-slate-900 rounded shadow-sm border border-slate-200 dark:border-slate-700 p-0.5">
+                    <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-50 dark:bg-slate-900 rounded shadow-sm border border-slate-200 dark:border-slate-700 p-0.5 z-10">
+                      <button 
+                        onClick={() => handleToggleLock(session)}
+                        disabled={isTogglingLock === session.id}
+                        className={`p-1 rounded bg-white/50 dark:bg-slate-800/50 ${session.is_locked ? 'text-amber-500 hover:text-amber-600' : 'text-slate-300 hover:text-emerald-500'}`}
+                        title={session.is_locked ? 'Desbloquear asistencia' : 'Bloquear asistencia'}
+                      >
+                        {session.is_locked ? <Lock className="h-3 w-3" /> : <Unlock className="h-3 w-3" />}
+                      </button>
                       <button 
                         onClick={() => handleOpenEdit(session)}
-                        className="p-1 text-slate-300 hover:text-emerald-500 rounded bg-white/50 dark:bg-slate-800/50"
+                        disabled={session.is_locked}
+                        className={`p-1 rounded bg-white/50 dark:bg-slate-800/50 ${session.is_locked ? 'text-slate-200 dark:text-slate-700 cursor-not-allowed' : 'text-slate-300 hover:text-emerald-500'}`}
                         title="Editar clase"
                       >
                         <Edit2 className="h-3 w-3" />
@@ -152,7 +244,7 @@ export function AttendanceTable({ subjectId }: AttendanceTableProps) {
                     </div>
                   </div>
                 </th>
-              ))}
+              )})}
               <th className="px-4 py-3 font-bold border-b border-slate-200 dark:border-slate-800 text-center min-w-[100px] bg-slate-50/80 dark:bg-slate-900/80">
                 Resumen
               </th>
@@ -179,21 +271,29 @@ export function AttendanceTable({ subjectId }: AttendanceTableProps) {
                   <td className="hidden md:table-cell px-4 py-2 border-r border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-950 sticky left-0 z-10 text-center text-slate-400 group-hover/row:bg-slate-50/50 dark:group-hover/row:bg-slate-800/30">
                     {student.number}
                   </td>
-                  <td className="px-2 md:px-4 py-2 border-r border-slate-100 dark:border-slate-800 font-medium text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-950 sticky left-0 md:left-[50px] z-10 truncate w-32 min-w-[128px] max-w-[128px] md:w-auto md:max-w-[250px] md:min-w-[250px] group-hover/row:bg-slate-50/50 dark:group-hover/row:bg-slate-800/30 shadow-[4px_0_10px_rgba(0,0,0,0.05)]">
+                  <td className="px-2 md:px-4 py-2 border-r border-slate-100 dark:border-slate-800 font-medium text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-950 sticky left-0 md:left-[50px] z-10 truncate w-32 min-w-[128px] max-w-[128px] md:w-auto md:max-w-[250px] md:min-w-[250px] group-hover/row:bg-slate-50/50 dark:group-hover/row:bg-slate-800/30 shadow-[4px_0_10px_rgba(0,0,0,0.05)] uppercase">
                     {student.full_name}
                   </td>
                   
-                  {sessions.map(session => (
-                    <td 
-                      key={session.id} 
-                      className="border-r border-slate-100 dark:border-slate-800 p-0 text-center cursor-pointer select-none transition-colors hover:bg-slate-100 dark:hover:bg-slate-800 w-[85px] min-w-[85px] max-w-[85px] overflow-hidden"
-                      onClick={() => handleToggleAttendance(student.id, session.id)}
-                    >
-                      <div className="w-full h-10 flex items-center justify-center p-1">
-                        {getStatusDisplay(attendance[student.id]?.[session.id])}
-                      </div>
-                    </td>
-                  ))}
+                  {sessions.map(session => {
+                    const locked = isSessionLocked(session)
+                    return (
+                      <td 
+                        key={session.id} 
+                        className={`border-r border-slate-100 dark:border-slate-800 p-0 text-center select-none transition-colors w-[85px] min-w-[85px] max-w-[85px] overflow-hidden ${locked ? 'bg-slate-100 dark:bg-slate-800/60 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                        onClick={() => handleToggleAttendance(student.id, session)}
+                      >
+                        <div className="w-full h-10 flex items-center justify-center p-1 relative">
+                          {locked && (
+                            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPjxyZWN0IHdpZHRoPSI0IiBoZWlnaHQ9IjQiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMCIvPjxwYXRoIGQ9Ik0tMSwxIGwyLC0yIE0wLDQgbDQsLTQgTTMsNSBsMiwtMiIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utb3BhY2l0eT0iMC4wNSIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9zdmc+')] z-0 pointer-events-none"></div>
+                          )}
+                          <div className="relative z-10 w-full h-full">
+                            {getStatusDisplay(attendance[student.id]?.[session.id], locked)}
+                          </div>
+                        </div>
+                      </td>
+                    )
+                  })}
 
                   <td className="px-2 py-2 text-center text-[11px] font-medium border-l-2 border-slate-100 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-900/30">
                      <div className="flex flex-col items-center justify-center gap-1">

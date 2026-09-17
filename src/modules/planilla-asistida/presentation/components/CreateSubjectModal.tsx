@@ -115,7 +115,11 @@ export function CreateSubjectModal({ isOpen, onClose, onSuccess, initialData, ex
               list="existing-subjects-list"
               placeholder="Ej: Tecnología e Informática"
               value={formData.name}
-              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+              onChange={(e) => {
+                const val = e.target.value
+                const formatted = val ? val.charAt(0).toUpperCase() + val.slice(1).toLowerCase() : ''
+                setFormData(prev => ({ ...prev, name: formatted }))
+              }}
               required
             />
             <datalist id="existing-subjects-list">

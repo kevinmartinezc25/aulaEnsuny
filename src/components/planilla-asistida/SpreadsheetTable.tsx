@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { usePlanillaStore } from '@/store/usePlanillaStore'
 import { AssistedAchievement, AssistedActivity, createAssistedStudent, deleteAssistedStudent } from '@/modules/planilla-asistida/application/actions'
-import { Search, ArrowDownAZ, ArrowDownZA, Plus, Trash2, Loader2 } from 'lucide-react'
+import { Search, ArrowDownAZ, ArrowDownZA, Plus, Trash2, Loader2, Lock, Unlock, TrendingUp, Users } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface SpreadsheetTableProps {
@@ -26,6 +26,7 @@ const GradeCell = React.memo(({
   rowIdx, 
   colIdx,
   isSelected,
+  isLocked,
   onChange, 
   onKeyDown,
   onMouseDown,
@@ -37,6 +38,7 @@ const GradeCell = React.memo(({
   rowIdx: number, 
   colIdx: number,
   isSelected: boolean,
+  isLocked: boolean,
   onChange: (studentId: string, activityId: string, val: string) => void,
   onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>, r: number, c: number) => void,
   onMouseDown: (r: number, c: number) => void,
@@ -71,21 +73,31 @@ const GradeCell = React.memo(({
       setLocalValue(initialValue !== undefined && initialValue !== null ? initialValue.toFixed(1) : '')
     }
   }
+  const isFailing = !isFocused && localValue !== '' && parseFloat(localValue) < 3.0
 
   return (
     <input
       type="text"
       data-row={rowIdx}
       data-col={colIdx}
-      className={`w-full h-full absolute inset-0 text-center text-[16px] md:text-xs outline-none focus:bg-red-50 dark:focus:bg-red-900/30 focus:ring-1 focus:ring-inset focus:ring-red-500 text-slate-800 dark:text-slate-200 transition-colors ${isSelected ? 'bg-blue-100 dark:bg-blue-900/40' : 'bg-transparent'}`}
+      readOnly={isLocked}
+      className={`w-full h-full absolute inset-0 text-center text-[16px] md:text-xs outline-none focus:bg-red-50 dark:focus:bg-red-900/30 focus:ring-1 focus:ring-inset focus:ring-red-500 transition-colors ${
+        isSelected && !isLocked ? 'bg-blue-100 dark:bg-blue-900/40' : 'bg-transparent'
+      } ${isLocked ? 'cursor-not-allowed opacity-80' : ''} ${
+        isFailing ? 'text-red-600 dark:text-red-400 font-bold' : 'text-slate-800 dark:text-slate-200'
+      }`}
       value={localValue}
       onChange={handleChange}
-      onKeyDown={(e) => onKeyDown(e, rowIdx, colIdx)}
+      onKeyDown={(e) => {
+        if (!isLocked) onKeyDown(e, rowIdx, colIdx)
+      }}
       onMouseDown={() => onMouseDown(rowIdx, colIdx)}
       onMouseEnter={() => onMouseEnter(rowIdx, colIdx)}
       onFocus={(e) => {
-        setIsFocused(true)
-        e.target.select()
+        if (!isLocked) {
+          setIsFocused(true)
+          e.target.select()
+        }
       }}
       onBlur={handleBlur}
     />
@@ -97,6 +109,9 @@ export function SpreadsheetTable({ subjectId }: SpreadsheetTableProps) {
   const { students, achievements, activities, grades, setGrade, saveChanges, isSaving, hasUnsavedChanges, addStudent, removeStudent } = usePlanillaStore()
   const tableRef = useRef<HTMLDivElement>(null)
 
+  // Modo seguro (Bloqueo)
+  const [isLocked, setIsLocked] = useState(false)
+  
   // Filtro y Orden
   const [searchQuery, setSearchQuery] = useState('')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
@@ -138,6 +153,8 @@ export function SpreadsheetTable({ subjectId }: SpreadsheetTableProps) {
       if (saveTimeout.current) clearTimeout(saveTimeout.current)
     }
   }, [grades, hasUnsavedChanges, saveChanges])
+
+  // Estadísticas rápidas se moverán abajo de calcFinalAverage
 
   // Lógica de Selección tipo Excel
   const [selectionStart, setSelectionStart] = useState<{r: number, c: number} | null>(null)
@@ -379,6 +396,29 @@ export function SpreadsheetTable({ subjectId }: SpreadsheetTableProps) {
     return grade.toFixed(1)
   }
 
+  // Estadísticas rápidas
+  const { classAverage, passingPercentage, validStudents } = useMemo(() => {
+    if (students.length === 0) return { classAverage: 0, passingPercentage: 0, validStudents: 0 }
+    
+    let totalScore = 0
+    let passedCount = 0
+    let count = 0
+
+    students.forEach(student => {
+      const avg = calcFinalAverage(student.id)
+      if (avg !== null) {
+        totalScore += avg
+        count++
+        if (avg >= 3.0) passedCount++
+      }
+    })
+
+    const average = count > 0 ? totalScore / count : 0
+    const passPct = count > 0 ? Math.round((passedCount / count) * 100) : 0
+
+    return { classAverage: average, passingPercentage: passPct, validStudents: count }
+  }, [students, grades, achievements, activities])
+
   const handleInputChange = useCallback((studentId: string, activityId: string, value: string) => {
     if (value === '') {
       setGrade(studentId, activityId, null)
@@ -486,6 +526,37 @@ export function SpreadsheetTable({ subjectId }: SpreadsheetTableProps) {
           )}
         </div>
         <div className="flex items-center gap-2">
+          {/* Estadísticas */}
+          <div className="hidden lg:flex items-center gap-4 mr-4 px-4 py-1.5 bg-slate-100 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
+            <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+              <TrendingUp className="h-4 w-4 text-blue-500" />
+              <span className="font-medium">Promedio:</span>
+              <span className={`font-bold ${classAverage > 0 && classAverage < 3.0 ? 'text-red-500' : 'text-slate-900 dark:text-white'}`}>
+                {classAverage > 0 ? classAverage.toFixed(1) : '-'}
+              </span>
+            </div>
+            <div className="w-px h-4 bg-slate-300 dark:bg-slate-600"></div>
+            <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+              <Users className="h-4 w-4 text-emerald-500" />
+              <span className="font-medium">Aprobados:</span>
+              <span className={`font-bold ${passingPercentage < 50 ? 'text-amber-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                {validStudents > 0 ? `${passingPercentage}%` : '-'}
+              </span>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setIsLocked(!isLocked)}
+            className={`flex items-center justify-center p-1.5 border rounded-lg transition-colors ${
+              isLocked 
+                ? 'border-red-200 bg-red-50 text-red-600 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400' 
+                : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400'
+            }`}
+            title={isLocked ? "Desbloquear edición" : "Bloquear edición"}
+          >
+            {isLocked ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
+          </button>
+          
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <input 
@@ -613,14 +684,16 @@ export function SpreadsheetTable({ subjectId }: SpreadsheetTableProps) {
               return (
                 <tr key={student.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 group">
                   <td className="sticky left-0 z-20 w-8 min-w-[32px] max-w-[32px] bg-white dark:bg-slate-900 border-r border-b border-slate-200 dark:border-slate-700 text-center text-slate-500">
-                    <button 
-                      onClick={() => handleDeleteStudent(student.id, student.full_name)}
-                      disabled={deletingStudentId === student.id}
-                      className="p-1 rounded-md hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
-                      title="Eliminar estudiante"
-                    >
-                      {deletingStudentId === student.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
-                    </button>
+                    {!isLocked && (
+                      <button 
+                        onClick={() => handleDeleteStudent(student.id, student.full_name)}
+                        disabled={deletingStudentId === student.id}
+                        className="p-1 rounded-md hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 mx-auto"
+                        title="Eliminar estudiante"
+                      >
+                        {deletingStudentId === student.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                      </button>
+                    )}
                   </td>
                   <td className="hidden md:table-cell sticky left-8 z-20 w-12 min-w-[48px] max-w-[48px] bg-white dark:bg-slate-900 border-r border-b border-slate-200 dark:border-slate-700 text-center text-slate-500 font-medium">
                     {rowIdx + 1}
@@ -652,14 +725,15 @@ export function SpreadsheetTable({ subjectId }: SpreadsheetTableProps) {
                                                cellColIdx <= Math.max(selectionStart.c, selectionEnd.c)
                             
                             return (
-                              <td key={act.id} className={`border-r border-b border-slate-200 dark:border-slate-700 w-12 min-w-[48px] p-0 relative transition-colors ${isSelected ? 'bg-blue-100 dark:bg-blue-900/40' : ''}`}>
+                              <td key={act.id} className={`border-r border-b border-slate-200 dark:border-slate-700 w-12 min-w-[48px] p-0 relative transition-colors ${isSelected && !isLocked ? 'bg-blue-100 dark:bg-blue-900/40' : ''}`}>
                                 <GradeCell
                                   studentId={student.id}
                                   activityId={act.id}
                                   initialValue={val}
                                   rowIdx={rowIdx}
                                   colIdx={cellColIdx}
-                                  isSelected={isSelected || false}
+                                  isSelected={!!isSelected}
+                                  isLocked={isLocked}
                                   onChange={handleInputChange}
                                   onKeyDown={handleKeyDown}
                                   onMouseDown={handleMouseDown}
@@ -670,58 +744,60 @@ export function SpreadsheetTable({ subjectId }: SpreadsheetTableProps) {
                           })
                         })}
 
-                        {/* Celda Código del Logro */}
-                        {ach.code_config && ach.code_config.type !== 'none' && (() => {
-                          const codeColIdx = colIdx++
-                          const isSelected = selectionStart && selectionEnd && 
-                                               rowIdx >= Math.min(selectionStart.r, selectionEnd.r) &&
-                                               rowIdx <= Math.max(selectionStart.r, selectionEnd.r) &&
-                                               codeColIdx >= Math.min(selectionStart.c, selectionEnd.c) &&
-                                               codeColIdx <= Math.max(selectionStart.c, selectionEnd.c)
-                          
+                        {/* Celda Código del Logro y Promedio del Logro */}
+                        {(() => {
+                          const hasCode = ach.code_config && ach.code_config.type !== 'none'
                           const avg = calcAchievementAverage(student.id, ach.id)
                           let codeStr = ''
                           if (avg !== null) {
-                            if (ach.code_config.type === 'single') {
+                            if (ach.code_config?.type === 'single') {
                               codeStr = ach.code_config.singleCode || ''
-                            } else if (ach.code_config.type === 'by_range') {
+                            } else if (ach.code_config?.type === 'by_range') {
                               if (avg >= 4.6) codeStr = ach.code_config.rangeCodes?.superior || ''
                               else if (avg >= 4.0) codeStr = ach.code_config.rangeCodes?.alto || ''
                               else if (avg >= 3.0) codeStr = ach.code_config.rangeCodes?.basico || ''
                               else codeStr = ach.code_config.rangeCodes?.bajo || ''
                             }
                           }
-                                               
-                          return (
-                            <td 
-                              key={`code-${ach.id}`} 
-                              onMouseDown={() => handleMouseDown(rowIdx, codeColIdx)}
-                              onMouseEnter={() => handleMouseEnter(rowIdx, codeColIdx)}
-                              className={`border-r border-b border-slate-200 dark:border-slate-700 font-bold text-center text-xs transition-colors cursor-cell w-14 min-w-[56px] ${isSelected ? 'bg-blue-200 dark:bg-blue-800 text-blue-900 dark:text-blue-100' : 'bg-slate-50 dark:bg-slate-800/50 text-slate-500'}`}
-                            >
-                              {codeStr}
-                            </td>
-                          )
-                        })()}
 
-                        {/* Celda Promedio del Logro */}
-                        {(() => {
-                          const avgColIdx = colIdx++
-                          const isSelected = selectionStart && selectionEnd && 
-                                               rowIdx >= Math.min(selectionStart.r, selectionEnd.r) &&
-                                               rowIdx <= Math.max(selectionStart.r, selectionEnd.r) &&
-                                               avgColIdx >= Math.min(selectionStart.c, selectionEnd.c) &&
-                                               avgColIdx <= Math.max(selectionStart.c, selectionEnd.c)
-                                               
+                          const codeColIdx = hasCode ? colIdx++ : -1
+                          const isCodeSelected = hasCode && selectionStart && selectionEnd && 
+                                             rowIdx >= Math.min(selectionStart.r, selectionEnd.r) &&
+                                             rowIdx <= Math.max(selectionStart.r, selectionEnd.r) &&
+                                             codeColIdx >= Math.min(selectionStart.c, selectionEnd.c) &&
+                                             codeColIdx <= Math.max(selectionStart.c, selectionEnd.c)
+
+                          const avgCellColIdx = colIdx++
+                          const achAvg = calcAchievementAverage(student.id, ach.id)
+                          const isAchSelected = selectionStart && selectionEnd && 
+                                             rowIdx >= Math.min(selectionStart.r, selectionEnd.r) &&
+                                             rowIdx <= Math.max(selectionStart.r, selectionEnd.r) &&
+                                             avgCellColIdx >= Math.min(selectionStart.c, selectionEnd.c) &&
+                                             avgCellColIdx <= Math.max(selectionStart.c, selectionEnd.c)
+                                             
                           return (
-                            <td 
-                              key={`avg-${ach.id}`} 
-                              onMouseDown={() => handleMouseDown(rowIdx, avgColIdx)}
-                              onMouseEnter={() => handleMouseEnter(rowIdx, avgColIdx)}
-                              className={`border-r border-b border-slate-200 dark:border-slate-700 font-bold text-center text-xs transition-colors cursor-cell w-12 min-w-[48px] ${isSelected ? 'bg-blue-200 dark:bg-blue-800 text-blue-900 dark:text-blue-100' : `${color.border} ${color.bg} ${color.text}`}`}
-                            >
-                              {formatGrade(calcAchievementAverage(student.id, ach.id))}
-                            </td>
+                            <React.Fragment key={`${ach.id}-calcs`}>
+                              {hasCode && (
+                                <td 
+                                  onMouseDown={() => handleMouseDown(rowIdx, codeColIdx)}
+                                  onMouseEnter={() => handleMouseEnter(rowIdx, codeColIdx)}
+                                  className={`border-r border-b border-slate-200 dark:border-slate-700 w-12 min-w-[48px] p-0 relative transition-colors cursor-cell ${isCodeSelected && !isLocked ? 'bg-blue-100 dark:bg-blue-900/40' : 'bg-slate-50 dark:bg-slate-800'}`}
+                                >
+                                  <div className="w-full h-full min-h-[32px] flex items-center justify-center text-[11px] font-bold text-slate-500">
+                                    {codeStr}
+                                  </div>
+                                </td>
+                              )}
+                              <td 
+                                onMouseDown={() => handleMouseDown(rowIdx, avgCellColIdx)}
+                                onMouseEnter={() => handleMouseEnter(rowIdx, avgCellColIdx)}
+                                className={`border-r border-b ${color.border} w-12 min-w-[48px] p-0 relative transition-colors cursor-cell ${isAchSelected && !isLocked ? 'bg-blue-100 dark:bg-blue-900/40' : color.bg}`}
+                              >
+                                <div className={`w-full h-full min-h-[32px] flex items-center justify-center text-xs font-bold ${achAvg !== null && achAvg < 3.0 ? 'text-red-600 dark:text-red-400' : color.text}`}>
+                                  {formatGrade(achAvg)}
+                                </div>
+                              </td>
+                            </React.Fragment>
                           )
                         })()}
                       </React.Fragment>
@@ -730,20 +806,23 @@ export function SpreadsheetTable({ subjectId }: SpreadsheetTableProps) {
 
                   {/* Celda Promedio Final */}
                   {(() => {
-                    const finalColIdx = colIdx++
-                    const isSelected = selectionStart && selectionEnd && 
+                    const finalCellColIdx = colIdx++
+                    const isFinalSelected = selectionStart && selectionEnd && 
                                          rowIdx >= Math.min(selectionStart.r, selectionEnd.r) &&
                                          rowIdx <= Math.max(selectionStart.r, selectionEnd.r) &&
-                                         finalColIdx >= Math.min(selectionStart.c, selectionEnd.c) &&
-                                         finalColIdx <= Math.max(selectionStart.c, selectionEnd.c)
-                    
+                                         finalCellColIdx >= Math.min(selectionStart.c, selectionEnd.c) &&
+                                         finalCellColIdx <= Math.max(selectionStart.c, selectionEnd.c)
+                                         
+                    const finalAvg = calcFinalAverage(student.id)
                     return (
                       <td 
-                        onMouseDown={() => handleMouseDown(rowIdx, finalColIdx)}
-                        onMouseEnter={() => handleMouseEnter(rowIdx, finalColIdx)}
-                        className={`sticky right-0 z-20 w-16 min-w-[64px] border-l border-b border-slate-200 dark:border-slate-700 font-bold text-center text-xs transition-colors cursor-cell shadow-[-4px_0_10px_rgba(0,0,0,0.05)] ${isSelected ? 'bg-blue-300 dark:bg-blue-700 text-blue-900 dark:text-blue-50' : 'bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white'}`}
+                        onMouseDown={() => handleMouseDown(rowIdx, finalCellColIdx)}
+                        onMouseEnter={() => handleMouseEnter(rowIdx, finalCellColIdx)}
+                        className={`sticky right-0 z-20 border-l border-b border-slate-200 dark:border-slate-700 w-16 min-w-[64px] p-0 shadow-[-4px_0_10px_rgba(0,0,0,0.05)] transition-colors cursor-cell ${isFinalSelected && !isLocked ? 'bg-blue-100 dark:bg-blue-900/40' : 'bg-slate-100 dark:bg-slate-800'}`}
                       >
-                        {formatGrade(calcFinalAverage(student.id))}
+                        <div className={`w-full h-full min-h-[32px] flex items-center justify-center text-sm font-black ${finalAvg !== null && finalAvg < 3.0 ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-slate-200'}`}>
+                          {formatGrade(finalAvg)}
+                        </div>
                       </td>
                     )
                   })()}
