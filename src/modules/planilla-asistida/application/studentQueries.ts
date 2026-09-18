@@ -159,7 +159,7 @@ export async function getStudentGradesView(subjectId: string) {
 
   if (achError) throw new Error('Error al cargar logros')
 
-  // 4. Obtener Actividades
+  // 4. Obtener Actividades (solo las publicadas)
   let activities: AssistedActivity[] = []
   if (achievements && achievements.length > 0) {
     const achIds = achievements.map(a => a.id)
@@ -167,6 +167,7 @@ export async function getStudentGradesView(subjectId: string) {
       .from('assisted_activities')
       .select('*')
       .in('achievement_id', achIds)
+      .eq('is_published', true)
       .order('position_order', { ascending: true })
     if (!actError && acts) activities = acts
   }

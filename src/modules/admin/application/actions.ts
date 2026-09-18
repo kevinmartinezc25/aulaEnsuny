@@ -2309,6 +2309,7 @@ export async function saveScheduleSlotsAction(slots: {
   group_id: string
   subject_id: string
   teacher_id: string | null
+  classroom_id?: string | null
   duration: number
 }[]): Promise<{ success: boolean; error?: string }> {
   try {
@@ -2317,10 +2318,18 @@ export async function saveScheduleSlotsAction(slots: {
     // 1. Deduplicate slots in memory by (group_id, subject_id, teacher_id, day_of_week, period_id)
     const uniqueMap = new Map<string, typeof slots[0]>()
     for (const slot of slots) {
-      const teacherKey = slot.teacher_id || 'null'
+      const normalizedTeacherId = slot.teacher_id && slot.teacher_id.trim() !== '' ? slot.teacher_id : null
+      const normalizedSlot = { ...slot, teacher_id: normalizedTeacherId }
+      const teacherKey = normalizedTeacherId || 'null'
       const key = `${slot.group_id}-${slot.subject_id}-${teacherKey}-${slot.day_of_week}-${slot.period_id}`
       if (!uniqueMap.has(key)) {
-        uniqueMap.set(key, slot)
+        uniqueMap.set(key, normalizedSlot)
+      } else {
+        // Si ya existe, conservar el de mayor duración o el que tenga aula asignada
+        const existing = uniqueMap.get(key)!
+        if ((slot.duration || 1) > (existing.duration || 1) || (!existing.classroom_id && slot.classroom_id)) {
+          uniqueMap.set(key, normalizedSlot)
+        }
       }
     }
     const uniqueSlots = Array.from(uniqueMap.values())
@@ -2338,15 +2347,8 @@ export async function saveScheduleSlotsAction(slots: {
       })
 
     if (error) {
-      console.error('Error saving schedule slots with upsert, falling back to insert:', error)
-      const { error: insertErr } = await adminClient
-        .from('sch_schedule_slots')
-        .insert(uniqueSlots)
-
-      if (insertErr) {
-        console.error('Error in fallback insert:', insertErr)
-        return { success: false, error: insertErr.message }
-      }
+      console.error('Error saving schedule slots with upsert:', error)
+      return { success: false, error: error.message }
     }
     return { success: true }
   } catch (err: any) {

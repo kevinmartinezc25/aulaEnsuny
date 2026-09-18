@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { createClient } from '@/core/config/supabase/client'
 import { Break, generateTimeSlots, TimeSlot } from '../utils/timeCalculator'
 import { isOfficialGradeGroup } from '../utils/groupFilters'
+import { getBlockSubjectsAction, saveBlockSubjectsAction } from '../actions'
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState({
@@ -101,21 +102,26 @@ export default function SettingsPage() {
   }
 
   const fetchBlockSubjects = async () => {
-    const { data: constraint } = await supabase
-      .from('sch_constraints')
-      .select('parameters')
-      .eq('rule_type', 'BLOCK_SUBJECTS_CONFIG')
-      .maybeSingle()
-
-    if (constraint?.parameters?.subject_ids && Array.isArray(constraint.parameters.subject_ids) && constraint.parameters.subject_ids.length > 0) {
-      setBlockSubjects(constraint.parameters.subject_ids)
-      localStorage.setItem('sch_block_subjects', JSON.stringify(constraint.parameters.subject_ids))
+    const res = await getBlockSubjectsAction()
+    if (res.success && Array.isArray(res.subjectIds) && res.subjectIds.length > 0) {
+      setBlockSubjects(res.subjectIds)
+      localStorage.setItem('sch_block_subjects', JSON.stringify(res.subjectIds))
     } else {
-      // Fallback: materias con 2+ horas en la malla curricular
+      const local = localStorage.getItem('sch_block_subjects')
+      if (local) {
+        try {
+          const parsed = JSON.parse(local)
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setBlockSubjects(parsed)
+            return
+          }
+        } catch (e) {}
+      }
+      // Fallback inicial: materias con 4+ horas en la malla curricular (bloques naturales 2h+2h)
       const { data: curr } = await supabase.from('sch_curriculum').select('subject_id, hours_per_week')
       const multiHourIds = new Set<string>()
       curr?.forEach((c: any) => {
-        if (c.hours_per_week >= 2 && c.subject_id) multiHourIds.add(c.subject_id)
+        if (c.hours_per_week >= 4 && c.subject_id) multiHourIds.add(c.subject_id)
       })
       const idsArray = Array.from(multiHourIds)
       setBlockSubjects(idsArray)
@@ -167,28 +173,8 @@ export default function SettingsPage() {
       })
     }
 
-    // Guardar en BD sch_constraints (BLOCK_SUBJECTS_CONFIG)
-    const { data: existingBlock } = await supabase
-      .from('sch_constraints')
-      .select('id')
-      .eq('rule_type', 'BLOCK_SUBJECTS_CONFIG')
-      .maybeSingle()
-
-    if (existingBlock) {
-      await supabase
-        .from('sch_constraints')
-        .update({ parameters: { subject_ids: blockSubjects }, is_active: true })
-        .eq('id', existingBlock.id)
-    } else {
-      await supabase.from('sch_constraints').insert({
-        rule_type: 'BLOCK_SUBJECTS_CONFIG',
-        target_entity_type: 'GLOBAL',
-        target_entity_id: null,
-        parameters: { subject_ids: blockSubjects },
-        weight: 'STRICT',
-        is_active: true
-      })
-    }
+    // Guardar en BD sch_constraints (BLOCK_SUBJECTS_CONFIG) mediante Server Action
+    await saveBlockSubjectsAction(blockSubjects)
 
     // Guardar en BD sch_constraints (GROUP_PERIODS_CONFIG)
     const { data: existingGroupPeriods } = await supabase

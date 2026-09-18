@@ -46,7 +46,7 @@ export default async function ConsultaCalificacionesLayout({
               </Link>
             </div>
             {session && (
-              <p className="text-[10px] sm:text-xs text-slate-500 font-medium truncate max-w-[160px] sm:max-w-md uppercase mt-0.5 pointer-events-auto">
+              <p className="text-[10px] sm:text-xs text-slate-500 dark:text-white sm:dark:text-slate-400 font-medium truncate max-w-[160px] sm:max-w-md uppercase mt-0.5 pointer-events-auto">
                 {session.fullName}
               </p>
             )}

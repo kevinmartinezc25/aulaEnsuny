@@ -1,7 +1,45 @@
 'use client'
 
 import React, { useState, useEffect, useCallback } from 'react'
-import { ShieldCheck, ToggleLeft, ToggleRight, Save, Info, Loader2, Clock, ChevronDown, ChevronUp, Users, BookOpen, Plus, Trash2 } from 'lucide-react'
+import { ShieldCheck, Save, Info, Loader2, Clock, ChevronDown, ChevronUp, Users, BookOpen, Plus, Trash2 } from 'lucide-react'
+
+// ─── Apple-style Toggle ───────────────────────────────────────────────────────
+function AppleToggle({ checked, onChange, id }: { checked: boolean; onChange: () => void; id?: string }) {
+  return (
+    <button
+      id={id}
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={onChange}
+      className="relative shrink-0 inline-flex items-center rounded-full transition-colors duration-300 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+      style={{
+        width: '43px',
+        height: '26px',
+        backgroundColor: checked ? '#34C759' : 'rgba(120,120,128,0.2)',
+        boxShadow: checked
+          ? 'inset 0 0 0 1px rgba(0,0,0,0.04)'
+          : 'inset 0 0 0 1px rgba(0,0,0,0.08)',
+      }}
+    >
+      <span
+        style={{
+          position: 'absolute',
+          top: '2px',
+          left: checked ? '19px' : '2px',
+          width: '22px',
+          height: '22px',
+          borderRadius: '50%',
+          backgroundColor: '#fff',
+          boxShadow: '0 2px 6px rgba(0,0,0,0.22), 0 1px 2px rgba(0,0,0,0.12)',
+          transition: 'left 280ms cubic-bezier(0.34,1.26,0.64,1)',
+          willChange: 'left',
+        }}
+      />
+    </button>
+  )
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 import { toast } from 'sonner'
 import { createClient } from '@/core/config/supabase/client'
@@ -9,6 +47,7 @@ import { getAdminUsers } from '@/modules/admin/application/actions'
 
 // Mapeo entre las llaves del UI y los rule_type en BD
 const RULE_MAP: Record<string, string> = {
+  globalTeacherTimeWindow: 'GLOBAL_TEACHER_TIME_WINDOW',
   preventTeacherConflict: 'TEACHER_OVERLAP',
   preventClassroomConflict: 'CLASSROOM_OVERLAP',
   enforceMaxHours: 'MAX_HOURS_DAY',
@@ -23,7 +62,9 @@ const RULE_MAP: Record<string, string> = {
   labRoomPriority: 'LAB_ROOM_PRIORITY',
   groupMovementMinimization: 'HOME_ROOM_PRIORITY',
   lunchBreakEnforcement: 'LUNCH_BREAK_ENFORCEMENT',
-  syncMultiTeacherSubjects: 'MULTI_TEACHER_SAME_SLOT'
+  syncMultiTeacherSubjects: 'MULTI_TEACHER_SAME_SLOT',
+  teacherSeventhHourFreeFirst: 'TEACHER_SEVENTH_HOUR_FREE_FIRST',
+  groupSeventhPeriodDays: 'GROUP_SEVENTH_PERIOD_DAYS'
 }
 
 interface TeacherSubject {
@@ -39,6 +80,7 @@ interface TeacherAvailability {
   subjects: TeacherSubject[]
   startTime: string
   endTime: string
+  specificDay: string
   saving: boolean
   expanded: boolean
 }
@@ -64,10 +106,13 @@ interface MultiTeacherRuleEntry {
 
 export default function RulesPage() {
   const [rules, setRules] = useState<Record<string, boolean>>({
+    globalTeacherTimeWindow: false,
     preventTeacherConflict: true,
     preventClassroomConflict: true,
     enforceMaxHours: true,
     teacherMaxFullDays: true,
+    teacherSeventhHourFreeFirst: true,
+    groupSeventhPeriodDays: true,
     minimizeGaps: true,
     maxClassesPerDay: true,
     preferredDays: false,
@@ -89,6 +134,13 @@ export default function RulesPage() {
 
   const [minGaps, setMinGaps] = useState<number>(1)
   const [maxGaps, setMaxGaps] = useState<number>(4)
+  const [maxDaysSeventhPeriod, setMaxDaysSeventhPeriod] = useState<number>(1)
+  const [maxDaysGroupSeventh, setMaxDaysGroupSeventh] = useState<number>(2)
+  const [teacherExceptions, setTeacherExceptions] = useState<{ teacherId: string; maxDays: number }[]>([])
+
+  const [globalTeacherStartTime, setGlobalTeacherStartTime] = useState('07:00')
+  const [globalTeacherEndTime, setGlobalTeacherEndTime] = useState('14:00')
+  const [globalTeacherSpecificDay, setGlobalTeacherSpecificDay] = useState('Todos los días')
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -121,6 +173,24 @@ export default function RulesPage() {
           if (row.rule_type === 'MAX_GAPS_DAY' && row.parameters) {
             if (typeof row.parameters.min_gaps === 'number') setMinGaps(row.parameters.min_gaps)
             if (typeof row.parameters.max_gaps === 'number') setMaxGaps(row.parameters.max_gaps)
+          }
+          if (row.rule_type === 'TEACHER_SEVENTH_HOUR_FREE_FIRST' && row.parameters) {
+            if (typeof row.parameters.max_days_with_seventh_period === 'number') {
+              setMaxDaysSeventhPeriod(row.parameters.max_days_with_seventh_period)
+            }
+            if (Array.isArray(row.parameters.teacher_exceptions)) {
+              setTeacherExceptions(row.parameters.teacher_exceptions)
+            }
+          }
+          if (row.rule_type === 'GROUP_SEVENTH_PERIOD_DAYS' && row.parameters) {
+            if (typeof row.parameters.default_max_days === 'number') {
+              setMaxDaysGroupSeventh(row.parameters.default_max_days)
+            }
+          }
+          if (row.rule_type === 'GLOBAL_TEACHER_TIME_WINDOW' && row.parameters) {
+            setGlobalTeacherStartTime(row.parameters.start_time || '07:00')
+            setGlobalTeacherEndTime(row.parameters.end_time || '14:00')
+            setGlobalTeacherSpecificDay(row.parameters.specific_day || 'Todos los días')
           }
           if (row.rule_type === 'MULTI_TEACHER_SAME_SLOT' && row.parameters) {
             if (Array.isArray(row.parameters.rules) && row.parameters.rules.length > 0) {
@@ -216,12 +286,13 @@ export default function RulesPage() {
         .eq('rule_type', 'TEACHER_TIME_WINDOW')
         .eq('target_entity_type', 'TEACHER')
 
-      const constraintMap = new Map<string, { start_time: string; end_time: string }>()
+      const constraintMap = new Map<string, { start_time: string; end_time: string; specific_day?: string }>()
       if (constraints) {
         constraints.forEach((c: any) => {
           constraintMap.set(c.target_entity_id, {
             start_time: c.parameters?.start_time || '07:00',
-            end_time: c.parameters?.end_time || '18:00',
+            end_time: c.parameters?.end_time || '14:00',
+            specific_day: c.parameters?.specific_day || 'Todos los días',
           })
         })
       }
@@ -248,14 +319,15 @@ export default function RulesPage() {
 
       // 5. Combine
       const availabilities: TeacherAvailability[] = teachers.map((t: any) => {
-        const constraint = constraintMap.get(t.id)
+        const c = constraintMap.get(t.id)
         return {
           teacherId: t.id,
           teacherName: t.name || `${t.first_name || ''} ${t.last_name || ''}`.trim() || t.email,
           teacherEmail: t.email || '',
           subjects: subjectMap.get(t.id) || [],
-          startTime: constraint?.start_time || '07:00',
-          endTime: constraint?.end_time || '18:00',
+          startTime: c?.start_time || '07:00',
+          endTime: c?.end_time || '14:00',
+          specificDay: c?.specific_day || 'Todos los días',
           saving: false,
           expanded: false,
         }
@@ -276,6 +348,9 @@ export default function RulesPage() {
       const toInsert = Object.entries(rules).map(([uiKey, isActive]) => {
         const isMultiTeacher = uiKey === 'syncMultiTeacherSubjects'
         const isMinimizeGaps = uiKey === 'minimizeGaps'
+        const isSeventhHourRule = uiKey === 'teacherSeventhHourFreeFirst'
+        const isGroupSeventhDays = uiKey === 'groupSeventhPeriodDays'
+        const isGlobalTeacherTime = uiKey === 'globalTeacherTimeWindow'
         return {
           rule_type: RULE_MAP[uiKey],
           target_entity_type: 'GLOBAL',
@@ -289,8 +364,20 @@ export default function RulesPage() {
           } : isMinimizeGaps ? {
             min_gaps: minGaps,
             max_gaps: maxGaps
+          } : isSeventhHourRule ? {
+            max_days_with_seventh_period: maxDaysSeventhPeriod || 1,
+            first_period: 1,
+            seventh_period: 7,
+            teacher_exceptions: teacherExceptions.filter(e => e.teacherId)
+          } : isGroupSeventhDays ? {
+            default_max_days: maxDaysGroupSeventh || 2,
+            seventh_period: 7
+          } : isGlobalTeacherTime ? {
+            start_time: globalTeacherStartTime,
+            end_time: globalTeacherEndTime,
+            specific_day: globalTeacherSpecificDay === 'Todos los días' ? undefined : globalTeacherSpecificDay
           } : {},
-          weight: 'HIGH',
+          weight: 'STRICT',
           is_active: isActive
         }
       })
@@ -325,7 +412,7 @@ export default function RulesPage() {
     setRules(prev => ({ ...prev, [key]: !prev[key] }))
   }
 
-  const updateTeacherTime = (teacherId: string, field: 'startTime' | 'endTime', value: string) => {
+  const updateTeacherTime = (teacherId: string, field: 'startTime' | 'endTime' | 'specificDay', value: string) => {
     setTeacherAvailabilities(prev =>
       prev.map(t => t.teacherId === teacherId ? { ...t, [field]: value } : t)
     )
@@ -357,6 +444,7 @@ export default function RulesPage() {
         parameters: {
           start_time: teacher.startTime,
           end_time: teacher.endTime,
+          specific_day: teacher.specificDay
         },
         weight: 'HIGH',
         is_active: true,
@@ -531,7 +619,7 @@ export default function RulesPage() {
             <button
               onClick={handleSave}
               disabled={saving}
-              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold transition-colors disabled:opacity-50 whitespace-nowrap active:scale-95"
             >
               {saving ? <Loader2 className="animate-spin h-5 w-5" /> : <Save className="h-5 w-5" />}
               Guardar Cambios
@@ -549,9 +637,7 @@ export default function RulesPage() {
                   <p className="text-sm font-bold text-slate-800 dark:text-slate-200">Choque de Docente</p>
                   <p className="text-xs text-slate-500 mt-1">Evita que un docente sea asignado a dos clases simultáneamente.</p>
                 </div>
-                <button onClick={() => toggleRule('preventTeacherConflict')} className={`transition-colors ${rules.preventTeacherConflict ? 'text-indigo-600' : 'text-slate-300 dark:text-slate-600'}`}>
-                  {rules.preventTeacherConflict ? <ToggleRight className="h-10 w-10" /> : <ToggleLeft className="h-10 w-10" />}
-                </button>
+                <AppleToggle checked={rules.preventTeacherConflict} onChange={() => toggleRule('preventTeacherConflict')} />
               </div>
 
               <div className="flex items-center justify-between p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm transition-all hover:border-indigo-200 dark:hover:border-indigo-800">
@@ -559,9 +645,7 @@ export default function RulesPage() {
                   <p className="text-sm font-bold text-slate-800 dark:text-slate-200">Choque de Aula</p>
                   <p className="text-xs text-slate-500 mt-1">Garantiza que un salón físico no tenga dos grupos distintos al mismo tiempo.</p>
                 </div>
-                <button onClick={() => toggleRule('preventClassroomConflict')} className={`transition-colors ${rules.preventClassroomConflict ? 'text-indigo-600' : 'text-slate-300 dark:text-slate-600'}`}>
-                  {rules.preventClassroomConflict ? <ToggleRight className="h-10 w-10" /> : <ToggleLeft className="h-10 w-10" />}
-                </button>
+                <AppleToggle checked={rules.preventClassroomConflict} onChange={() => toggleRule('preventClassroomConflict')} />
               </div>
             </section>
 
@@ -573,9 +657,7 @@ export default function RulesPage() {
                   <p className="text-sm font-bold text-slate-800 dark:text-slate-200">Respetar Máximo de Horas</p>
                   <p className="text-xs text-slate-500 mt-1">El motor no agendará más horas de las estipuladas en el contrato de cada docente.</p>
                 </div>
-                <button onClick={() => toggleRule('enforceMaxHours')} className={`transition-colors ${rules.enforceMaxHours ? 'text-indigo-600' : 'text-slate-300 dark:text-slate-600'}`}>
-                  {rules.enforceMaxHours ? <ToggleRight className="h-10 w-10" /> : <ToggleLeft className="h-10 w-10" />}
-                </button>
+                <AppleToggle checked={rules.enforceMaxHours} onChange={() => toggleRule('enforceMaxHours')} />
               </div>
 
               <div className="flex items-center justify-between p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm transition-all hover:border-indigo-200 dark:hover:border-indigo-800">
@@ -583,9 +665,136 @@ export default function RulesPage() {
                   <p className="text-sm font-bold text-slate-800 dark:text-slate-200">2 Días de Jornada Completa (6 Horas)</p>
                   <p className="text-xs text-slate-500 mt-1">Garantiza que un docente con carga suficiente tenga exactamente 2 días de 6 horas completas (mínimo 2 y máximo 2 días). Los demás días tendrán menor intensidad.</p>
                 </div>
-                <button onClick={() => toggleRule('teacherMaxFullDays')} className={`transition-colors ${rules.teacherMaxFullDays ? 'text-indigo-600' : 'text-slate-300 dark:text-slate-600'}`}>
-                  {rules.teacherMaxFullDays ? <ToggleRight className="h-10 w-10" /> : <ToggleLeft className="h-10 w-10" />}
-                </button>
+                <AppleToggle checked={rules.teacherMaxFullDays} onChange={() => toggleRule('teacherMaxFullDays')} />
+              </div>
+
+              {/* Nueva Regla: 7ª Hora con 1ª Libre y Máximo 1 Día de 2ª a 7ª Hora */}
+              <div className="p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm transition-all hover:border-indigo-200 dark:hover:border-indigo-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                        Jornada de 7ª Hora con 1ª Libre (2ª a 7ª Hora)
+                      </p>
+                      <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                        Condición Pedagógica
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Si un docente tiene clase en la 7ª hora, su 1ª hora debe estar siempre libre ese día. Adicionalmente, cada docente solo podrá tener como máximo un (1) día a la semana con jornada de 2ª a 7ª hora.
+                    </p>
+                  </div>
+                  <AppleToggle checked={rules.teacherSeventhHourFreeFirst} onChange={() => toggleRule('teacherSeventhHourFreeFirst')} />
+                </div>
+
+                {rules.teacherSeventhHourFreeFirst && (
+                  <div className="pt-3 border-t border-slate-100 dark:border-slate-700/60 space-y-3">
+                    <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
+                      <span className="font-medium">Máximo de días con jornada hasta la 7ª hora por docente:</span>
+                      <select
+                        value={maxDaysSeventhPeriod}
+                        onChange={(e) => setMaxDaysSeventhPeriod(parseInt(e.target.value, 10))}
+                        className="text-xs px-2.5 py-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg font-bold text-indigo-600 dark:text-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      >
+                        <option value={1}>1 solo día (Predeterminado)</option>
+                        <option value={2}>2 días</option>
+                      </select>
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-100 dark:border-slate-700/60">
+                      <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-2">
+                        Excepciones (Docentes que pueden exceder el límite general):
+                      </p>
+                      {teacherExceptions.map((exc, idx) => (
+                        <div key={idx} className="flex items-center gap-2 mb-2">
+                          <select
+                            value={exc.teacherId}
+                            onChange={(e) => {
+                              const newExc = [...teacherExceptions];
+                              newExc[idx].teacherId = e.target.value;
+                              setTeacherExceptions(newExc);
+                            }}
+                            className="flex-1 text-[11px] px-2 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300"
+                          >
+                            <option value="">Seleccione un docente...</option>
+                            {teacherAvailabilities.map(t => (
+                              <option key={t.teacherId} value={t.teacherId}>{t.teacherName}</option>
+                            ))}
+                          </select>
+                          <select
+                            value={exc.maxDays}
+                            onChange={(e) => {
+                              const newExc = [...teacherExceptions];
+                              newExc[idx].maxDays = parseInt(e.target.value, 10);
+                              setTeacherExceptions(newExc);
+                            }}
+                            className="w-24 text-[11px] px-2 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg font-bold text-indigo-600 dark:text-indigo-400"
+                          >
+                            <option value={2}>Máx 2 días</option>
+                            <option value={3}>Máx 3 días</option>
+                            <option value={4}>Máx 4 días</option>
+                            <option value={5}>Máx 5 días</option>
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTeacherExceptions(teacherExceptions.filter((_, i) => i !== idx));
+                            }}
+                            className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => setTeacherExceptions([...teacherExceptions, { teacherId: '', maxDays: 5 }])}
+                        className="flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-700 mt-1"
+                      >
+                        <Plus className="h-3 w-3" /> Agregar Excepción
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Nueva Regla: Límite de días con 7ª hora por grupo */}
+              <div className="p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm transition-all hover:border-indigo-200 dark:hover:border-indigo-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                        Días con 7ª Hora por Grupo
+                      </p>
+                      <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-violet-100 dark:bg-violet-950/60 text-violet-700 dark:text-violet-300 border border-violet-300 dark:border-violet-800">
+                        Grupos
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Limita cuántos días a la semana un grupo configurado con 7 periodos puede tener la 7ª hora realmente ocupada. Aplica solo a grupos configurados para llegar hasta la 7ª hora.
+                    </p>
+                  </div>
+                  <AppleToggle checked={rules.groupSeventhPeriodDays} onChange={() => toggleRule('groupSeventhPeriodDays')} />
+                </div>
+
+                {rules.groupSeventhPeriodDays && (
+                  <div className="pt-2 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
+                    <span className="font-medium">Máximo de días con jornada hasta la 7ª hora por grupo:</span>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={maxDaysGroupSeventh}
+                        onChange={(e) => setMaxDaysGroupSeventh(parseInt(e.target.value, 10))}
+                        className="text-xs px-2.5 py-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg font-bold text-indigo-600 dark:text-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      >
+                        <option value={1}>1 día</option>
+                        <option value={2}>2 días (Predeterminado)</option>
+                        <option value={3}>3 días</option>
+                        <option value={4}>4 días</option>
+                        <option value={5}>5 días (Sin límite práctico)</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center justify-between p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm transition-all hover:border-indigo-200 dark:hover:border-indigo-800">
@@ -593,9 +802,7 @@ export default function RulesPage() {
                   <p className="text-sm font-bold text-slate-800 dark:text-slate-200">Límite de Clases Consecutivas</p>
                   <p className="text-xs text-slate-500 mt-1">Evita agendar a un docente más de 4 bloques seguidos sin descanso.</p>
                 </div>
-                <button onClick={() => toggleRule('limitConsecutiveClasses')} className={`transition-colors ${rules.limitConsecutiveClasses ? 'text-indigo-600' : 'text-slate-300 dark:text-slate-600'}`}>
-                  {rules.limitConsecutiveClasses ? <ToggleRight className="h-10 w-10" /> : <ToggleLeft className="h-10 w-10" />}
-                </button>
+                <AppleToggle checked={rules.limitConsecutiveClasses} onChange={() => toggleRule('limitConsecutiveClasses')} />
               </div>
 
               <div className="flex items-center justify-between p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm transition-all hover:border-indigo-200 dark:hover:border-indigo-800">
@@ -603,9 +810,7 @@ export default function RulesPage() {
                   <p className="text-sm font-bold text-slate-800 dark:text-slate-200">Máximo de clases por día</p>
                   <p className="text-xs text-slate-500 mt-1">Evita que una misma materia se dicte excesivamente en un solo día.</p>
                 </div>
-                <button onClick={() => toggleRule('maxClassesPerDay')} className={`transition-colors ${rules.maxClassesPerDay ? 'text-indigo-600' : 'text-slate-300 dark:text-slate-600'}`}>
-                  {rules.maxClassesPerDay ? <ToggleRight className="h-10 w-10" /> : <ToggleLeft className="h-10 w-10" />}
-                </button>
+                <AppleToggle checked={rules.maxClassesPerDay} onChange={() => toggleRule('maxClassesPerDay')} />
               </div>
 
               <div className="flex items-center justify-between p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm transition-all hover:border-indigo-200 dark:hover:border-indigo-800">
@@ -613,9 +818,7 @@ export default function RulesPage() {
                   <p className="text-sm font-bold text-slate-800 dark:text-slate-200">Distribuir Materias Pesadas</p>
                   <p className="text-xs text-slate-500 mt-1">Evita programar materias como Matemáticas y Física en bloques consecutivos.</p>
                 </div>
-                <button onClick={() => toggleRule('distributeHardSubjects')} className={`transition-colors ${rules.distributeHardSubjects ? 'text-indigo-600' : 'text-slate-300 dark:text-slate-600'}`}>
-                  {rules.distributeHardSubjects ? <ToggleRight className="h-10 w-10" /> : <ToggleLeft className="h-10 w-10" />}
-                </button>
+                <AppleToggle checked={rules.distributeHardSubjects} onChange={() => toggleRule('distributeHardSubjects')} />
               </div>
 
               <div className="flex items-center justify-between p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm transition-all hover:border-indigo-200 dark:hover:border-indigo-800">
@@ -623,9 +826,7 @@ export default function RulesPage() {
                   <p className="text-sm font-bold text-slate-800 dark:text-slate-200">Materias Pesadas Temprano</p>
                   <p className="text-xs text-slate-500 mt-1">Prioriza agendar materias troncales en las primeras horas de la mañana.</p>
                 </div>
-                <button onClick={() => toggleRule('earlyHardSubjects')} className={`transition-colors ${rules.earlyHardSubjects ? 'text-indigo-600' : 'text-slate-300 dark:text-slate-600'}`}>
-                  {rules.earlyHardSubjects ? <ToggleRight className="h-10 w-10" /> : <ToggleLeft className="h-10 w-10" />}
-                </button>
+                <AppleToggle checked={rules.earlyHardSubjects} onChange={() => toggleRule('earlyHardSubjects')} />
               </div>
 
               {/* Regla de Sincronización Multi-Docente (Núcleo / Comité) */}
@@ -640,9 +841,7 @@ export default function RulesPage() {
                       Si una materia tiene asignados varios docentes, los agenda a todos en el mismo día y periodo de la jornada escolar.
                     </p>
                   </div>
-                  <button onClick={() => toggleRule('syncMultiTeacherSubjects')} className={`transition-colors ${rules.syncMultiTeacherSubjects ? 'text-indigo-600' : 'text-slate-300 dark:text-slate-600'}`}>
-                    {rules.syncMultiTeacherSubjects ? <ToggleRight className="h-10 w-10" /> : <ToggleLeft className="h-10 w-10" />}
-                  </button>
+                  <AppleToggle checked={rules.syncMultiTeacherSubjects} onChange={() => toggleRule('syncMultiTeacherSubjects')} />
                 </div>
 
                 {rules.syncMultiTeacherSubjects && (
@@ -798,9 +997,7 @@ export default function RulesPage() {
                       Los docentes en sus horarios personales deben tener huecos mínimos de 1 hora dentro de la jornada hasta un máximo de 4 horas.
                     </p>
                   </div>
-                  <button onClick={() => toggleRule('minimizeGaps')} className={`transition-colors ${rules.minimizeGaps ? 'text-indigo-600' : 'text-slate-300 dark:text-slate-600'}`}>
-                    {rules.minimizeGaps ? <ToggleRight className="h-10 w-10" /> : <ToggleLeft className="h-10 w-10" />}
-                  </button>
+                  <AppleToggle checked={rules.minimizeGaps} onChange={() => toggleRule('minimizeGaps')} />
                 </div>
 
                 {rules.minimizeGaps && (
@@ -855,9 +1052,7 @@ export default function RulesPage() {
                   <p className="text-sm font-bold text-slate-800 dark:text-slate-200">Garantizar Hora de Almuerzo</p>
                   <p className="text-xs text-slate-500 mt-1">Asegura que todos los docentes tengan al menos un bloque libre al mediodía.</p>
                 </div>
-                <button onClick={() => toggleRule('lunchBreakEnforcement')} className={`transition-colors ${rules.lunchBreakEnforcement ? 'text-indigo-600' : 'text-slate-300 dark:text-slate-600'}`}>
-                  {rules.lunchBreakEnforcement ? <ToggleRight className="h-10 w-10" /> : <ToggleLeft className="h-10 w-10" />}
-                </button>
+                <AppleToggle checked={rules.lunchBreakEnforcement} onChange={() => toggleRule('lunchBreakEnforcement')} />
               </div>
 
               <div className="flex items-center justify-between p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm transition-all hover:border-indigo-200 dark:hover:border-indigo-800">
@@ -865,9 +1060,7 @@ export default function RulesPage() {
                   <p className="text-sm font-bold text-slate-800 dark:text-slate-200">Respetar Días Preferidos</p>
                   <p className="text-xs text-slate-500 mt-1">Intenta agrupar las horas en los días de preferencia del docente (Part-time).</p>
                 </div>
-                <button onClick={() => toggleRule('preferredDays')} className={`transition-colors ${rules.preferredDays ? 'text-indigo-600' : 'text-slate-300 dark:text-slate-600'}`}>
-                  {rules.preferredDays ? <ToggleRight className="h-10 w-10" /> : <ToggleLeft className="h-10 w-10" />}
-                </button>
+                <AppleToggle checked={rules.preferredDays} onChange={() => toggleRule('preferredDays')} />
               </div>
 
               <div className="flex items-center justify-between p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm transition-all hover:border-indigo-200 dark:hover:border-indigo-800">
@@ -875,9 +1068,7 @@ export default function RulesPage() {
                   <p className="text-sm font-bold text-slate-800 dark:text-slate-200">Distribución en 5 Días de la Semana (Lunes a Viernes)</p>
                   <p className="text-xs text-slate-500 mt-1">Garantiza que las materias y clases asignadas a cada docente se distribuyan equitativamente en los 5 días de la semana (Lunes a Viernes), evitando la concentración de carga en pocos días.</p>
                 </div>
-                <button onClick={() => toggleRule('evenDistribution')} className={`transition-colors ${rules.evenDistribution ? 'text-indigo-600' : 'text-slate-300 dark:text-slate-600'}`}>
-                  {rules.evenDistribution ? <ToggleRight className="h-10 w-10" /> : <ToggleLeft className="h-10 w-10" />}
-                </button>
+                <AppleToggle checked={rules.evenDistribution} onChange={() => toggleRule('evenDistribution')} />
               </div>
             </section>
 
@@ -889,9 +1080,7 @@ export default function RulesPage() {
                   <p className="text-sm font-bold text-slate-800 dark:text-slate-200">Prioridad de Aulas Especiales (Labs)</p>
                   <p className="text-xs text-slate-500 mt-1">Fuerza que materias como Química se asignen únicamente a Laboratorios.</p>
                 </div>
-                <button onClick={() => toggleRule('labRoomPriority')} className={`transition-colors ${rules.labRoomPriority ? 'text-indigo-600' : 'text-slate-300 dark:text-slate-600'}`}>
-                  {rules.labRoomPriority ? <ToggleRight className="h-10 w-10" /> : <ToggleLeft className="h-10 w-10" />}
-                </button>
+                <AppleToggle checked={rules.labRoomPriority} onChange={() => toggleRule('labRoomPriority')} />
               </div>
 
               <div className="flex items-center justify-between p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm transition-all hover:border-indigo-200 dark:hover:border-indigo-800">
@@ -899,9 +1088,7 @@ export default function RulesPage() {
                   <p className="text-sm font-bold text-slate-800 dark:text-slate-200">Minimizar Movimiento de Grupos</p>
                   <p className="text-xs text-slate-500 mt-1">Mantiene a los alumnos en su "Aula Base" y hace que los docentes sean los que roten.</p>
                 </div>
-                <button onClick={() => toggleRule('groupMovementMinimization')} className={`transition-colors ${rules.groupMovementMinimization ? 'text-indigo-600' : 'text-slate-300 dark:text-slate-600'}`}>
-                  {rules.groupMovementMinimization ? <ToggleRight className="h-10 w-10" /> : <ToggleLeft className="h-10 w-10" />}
-                </button>
+                <AppleToggle checked={rules.groupMovementMinimization} onChange={() => toggleRule('groupMovementMinimization')} />
               </div>
             </section>
           </div>
@@ -930,7 +1117,69 @@ export default function RulesPage() {
             </p>
           </div>
 
-          <div className="p-6 space-y-3 max-h-[400px] overflow-y-auto pr-2 scrollbar-thin">
+          {/* Global Setting Toggle */}
+          <div className="p-6 border-b border-slate-200 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-900/30">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                  Aplicar Validador General para TODOS los docentes
+                </h3>
+                <p className="text-xs text-slate-500 mt-1 max-w-xl">
+                  Si activas esta opción, el sistema usará una única ventana de tiempo restrictiva para todo el cuerpo docente. Las disponibilidades individuales de abajo se ignorarán.
+                </p>
+              </div>
+              <AppleToggle
+                checked={rules.globalTeacherTimeWindow}
+                onChange={() => toggleRule('globalTeacherTimeWindow')}
+              />
+            </div>
+            {rules.globalTeacherTimeWindow && (
+              <div className="mt-4 flex flex-col sm:flex-row gap-4">
+                <div className="flex-1">
+                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Hora de Inicio</label>
+                  <input
+                    type="time"
+                    value={globalTeacherStartTime}
+                    onChange={(e) => setGlobalTeacherStartTime(e.target.value)}
+                    className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm font-mono text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Hora de Fin</label>
+                  <input
+                    type="time"
+                    value={globalTeacherEndTime}
+                    onChange={(e) => setGlobalTeacherEndTime(e.target.value)}
+                    className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm font-mono text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Día Específico</label>
+                  <select
+                    value={globalTeacherSpecificDay}
+                    onChange={(e) => setGlobalTeacherSpecificDay(e.target.value)}
+                    className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                  >
+                    <option value="Todos los días">Todos los días</option>
+                    <option value="Lunes">Lunes</option>
+                    <option value="Martes">Martes</option>
+                    <option value="Miércoles">Miércoles</option>
+                    <option value="Jueves">Jueves</option>
+                    <option value="Viernes">Viernes</option>
+                  </select>
+                </div>
+                <div className="flex items-end">
+                  <button onClick={handleSave} disabled={saving} className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold shadow-sm transition-colors">
+                    {saving ? <Loader2 className="animate-spin h-4 w-4" /> : <Save className="h-4 w-4" />}
+                    Guardar
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Individual Teachers section (greyed out if global is active) */}
+          <div className={`p-6 space-y-3 max-h-[400px] overflow-y-auto pr-2 scrollbar-thin transition-opacity ${rules.globalTeacherTimeWindow ? 'opacity-40 pointer-events-none' : ''}`}>
             {loadingTeachers ? (
               <div className="flex justify-center py-10">
                 <Loader2 className="animate-spin text-indigo-400 h-7 w-7" />
@@ -983,6 +1232,7 @@ export default function RulesPage() {
                       {!teacher.expanded && (
                         <div className="hidden sm:flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-700 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600">
                           <Clock className="h-3.5 w-3.5 text-emerald-500" />
+                          {teacher.specificDay && teacher.specificDay !== 'Todos los días' ? `${teacher.specificDay}: ` : ''}
                           {teacher.startTime} – {teacher.endTime}
                         </div>
                       )}
@@ -1021,6 +1271,23 @@ export default function RulesPage() {
                             onChange={e => updateTeacherTime(teacher.teacherId, 'endTime', e.target.value)}
                             className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm font-mono text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-colors"
                           />
+                        </div>
+                        <div className="flex-1">
+                          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
+                            Día Específico
+                          </label>
+                          <select
+                            value={teacher.specificDay || 'Todos los días'}
+                            onChange={e => updateTeacherTime(teacher.teacherId, 'specificDay', e.target.value)}
+                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-colors"
+                          >
+                            <option value="Todos los días">Todos los días</option>
+                            <option value="Lunes">Lunes</option>
+                            <option value="Martes">Martes</option>
+                            <option value="Miércoles">Miércoles</option>
+                            <option value="Jueves">Jueves</option>
+                            <option value="Viernes">Viernes</option>
+                          </select>
                         </div>
                         <button
                           onClick={() => handleSaveTeacherAvailability(teacher)}
@@ -1154,13 +1421,12 @@ export default function RulesPage() {
                           <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
                             Configuración de Restricciones
                           </span>
-                          <button
-                            onClick={() => toggleSubjectActive(subj.subjectId)}
-                            className={`flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all ${subj.isActive ? 'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-950/20 dark:border-indigo-850 dark:text-indigo-400' : 'bg-slate-50 border-slate-200 text-slate-600 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400'}`}
-                          >
-                            {subj.isActive ? <ToggleRight className="h-5 w-5 text-indigo-600 dark:text-indigo-400" /> : <ToggleLeft className="h-5 w-5 text-slate-400" />}
-                            {subj.isActive ? 'Habilitado' : 'Deshabilitado'}
-                          </button>
+                          <div className="flex items-center gap-3">
+                            <span className={`text-xs font-semibold ${subj.isActive ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'}`}>
+                              {subj.isActive ? 'Habilitado' : 'Deshabilitado'}
+                            </span>
+                            <AppleToggle checked={subj.isActive} onChange={() => toggleSubjectActive(subj.subjectId)} />
+                          </div>
                         </div>
 
                         {subj.isActive && (

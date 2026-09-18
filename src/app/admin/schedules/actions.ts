@@ -118,3 +118,110 @@ export async function deleteMultiTeacherCurriculumAction(rowIds: string[]) {
     return { error: e.message }
   }
 }
+
+/**
+ * Obtiene las mallas curriculares con sus relaciones hacia grupos, asignaturas y perfiles de docentes.
+ * Utiliza el adminClient para bypass de RLS y garantizar compatibilidad con public.profiles.
+ */
+export async function getCurriculumAction(groupId?: string): Promise<{
+  success: boolean
+  data: any[]
+  error?: string
+}> {
+  try {
+    const adminClient = createAdminClient()
+    let query = adminClient
+      .from('sch_curriculum')
+      .select('*, group:sch_groups(name), subject:sch_subjects(name, is_academic_workload), teacher:profiles(id, first_name, last_name)')
+
+    if (groupId) {
+      query = query.eq('group_id', groupId)
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error('Error en getCurriculumAction:', error)
+      return { success: false, data: [], error: error.message }
+    }
+
+    return { success: true, data: data || [] }
+  } catch (e: any) {
+    console.error('Excepción en getCurriculumAction:', e)
+    return { success: false, data: [], error: e.message || 'Error inesperado al consultar la malla curricular.' }
+  }
+}
+
+/**
+ * Obtiene la lista de IDs de materias configuradas en bloque (2h continuas).
+ */
+export async function getBlockSubjectsAction(): Promise<{
+  success: boolean
+  subjectIds: string[]
+  error?: string
+}> {
+  try {
+    const adminClient = createAdminClient()
+    const { data: constraint, error } = await adminClient
+      .from('sch_constraints')
+      .select('parameters')
+      .eq('rule_type', 'BLOCK_SUBJECTS_CONFIG')
+      .maybeSingle()
+
+    if (error) {
+      return { success: false, subjectIds: [], error: error.message }
+    }
+
+    if (constraint?.parameters?.subject_ids && Array.isArray(constraint.parameters.subject_ids)) {
+      return { success: true, subjectIds: constraint.parameters.subject_ids }
+    }
+
+    return { success: true, subjectIds: [] }
+  } catch (e: any) {
+    return { success: false, subjectIds: [], error: e.message }
+  }
+}
+
+/**
+ * Guarda las materias configuradas en bloque (2h continuas) en sch_constraints.
+ */
+export async function saveBlockSubjectsAction(subjectIds: string[]): Promise<{
+  success: boolean
+  error?: string
+}> {
+  try {
+    const adminClient = createAdminClient()
+    const { data: existingBlock } = await adminClient
+      .from('sch_constraints')
+      .select('id')
+      .eq('rule_type', 'BLOCK_SUBJECTS_CONFIG')
+      .maybeSingle()
+
+    if (existingBlock) {
+      const { error: updErr } = await adminClient
+        .from('sch_constraints')
+        .update({ parameters: { subject_ids: subjectIds }, is_active: true })
+        .eq('id', existingBlock.id)
+
+      if (updErr) return { success: false, error: updErr.message }
+    } else {
+      const { error: insErr } = await adminClient
+        .from('sch_constraints')
+        .insert({
+          rule_type: 'BLOCK_SUBJECTS_CONFIG',
+          target_entity_type: 'GLOBAL',
+          target_entity_id: null,
+          parameters: { subject_ids: subjectIds },
+          weight: 'STRICT',
+          is_active: true
+        })
+
+      if (insErr) return { success: false, error: insErr.message }
+    }
+
+    return { success: true }
+  } catch (e: any) {
+    return { success: false, error: e.message }
+  }
+}
+

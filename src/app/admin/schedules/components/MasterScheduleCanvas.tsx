@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { createClient } from '@/core/config/supabase/client'
 import { getAdminUsers, getScheduleSlotsAction, clearAllScheduleSlotsAction, saveScheduleSlotsAction } from '@/modules/admin/application/actions'
+import { getCurriculumAction } from '../actions'
 import { generateTimeSlots, TimeSlot } from '../utils/timeCalculator'
 import { Loader2, Download, Printer, Sparkles, Trash2, AlertTriangle, Coffee } from 'lucide-react'
 import { toast } from 'sonner'
@@ -19,10 +20,11 @@ import { isOfficialGradeGroup, isMeetingSubject } from '../utils/groupFilters'
 const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes']
 
 interface MasterScheduleCanvasProps {
-  viewMode?: 'group' | 'teacher'
+  viewMode: 'group' | 'teacher'
+  onNavigate?: (type: 'group' | 'teacher', id: string) => void
 }
 
-export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterScheduleCanvasProps) {
+export default function MasterScheduleCanvas({ viewMode, onNavigate }: MasterScheduleCanvasProps) {
   const [loading, setLoading] = useState(true)
   const [showUnassignedModal, setShowUnassignedModal] = useState(false)
   const [unassignedBlocks, setUnassignedBlocks] = useState<any[]>([])
@@ -37,6 +39,7 @@ export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterSched
   const [teachers, setTeachers] = useState<Record<string, any>>({})
   const [portalNode, setPortalNode] = useState<HTMLElement | null>(null)
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([])
+  const [constraints, setConstraints] = useState<any[]>([])
   
   // Progress UI State
   const [generating, setGenerating] = useState(false)
@@ -75,12 +78,12 @@ export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterSched
   const fetchGlobalData = async () => {
     setLoading(true)
     try {
-      const [gData, slData, subData, oldTData, adminUsers] = await Promise.all([
+      const [gData, slData, subData, adminUsers, constraintsReq] = await Promise.all([
         supabase.from('sch_groups').select('id, name'),
         getScheduleSlotsAction(),
         supabase.from('sch_subjects').select('id, name, color'),
-        supabase.from('sch_teachers').select('id, name, alias'),
-        getAdminUsers()
+        getAdminUsers(),
+        supabase.from('sch_constraints').select('*').eq('is_active', true)
       ])
 
       if (gData.data) {
@@ -94,9 +97,6 @@ export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterSched
       setSubjects(subMap)
 
       const tMap: Record<string, any> = {}
-      oldTData.data?.forEach(t => {
-        tMap[t.id] = { id: t.id, name: t.alias || t.name }
-      })
       
       const teacherRoles = ['teacher']
       const teacherUsers = (adminUsers || []).filter(u => teacherRoles.includes(u.role))
@@ -107,6 +107,9 @@ export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterSched
       
       // Filtrar a los docentes que tienen al menos un slot asignado o que vinieron explícitamente en las listas
       setTeachers(tMap)
+      if (constraintsReq && constraintsReq.data) {
+        setConstraints(constraintsReq.data)
+      }
     } catch (e) {
       toast.error('Error cargando el horario general')
     }
@@ -290,23 +293,42 @@ export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterSched
   const handleManualAssign = async (blockOrBlocks: any, day: string, period: number) => {
     const blocksList: any[] = Array.isArray(blockOrBlocks) ? blockOrBlocks : [blockOrBlocks]
     
-    // Si es un bloque individual pero pertenece a una reunión con otros docentes en unassignedBlocks, agruparlos
+    // Si es un bloque individual pero pertenece a una reunión con otros docentes en unassignedBlocks, agruparlos sin duplicar docentes
     let allRelatedBlocks = [...blocksList]
     if (blocksList.length === 1) {
       const single = blocksList[0]
       const isMeeting = isMeetingSubject(single.subject_name, single.group_name, single.group_id, single.is_academic_workload)
       if (isMeeting) {
-        const coBlocks = unassignedBlocks.filter(b => 
-          b !== single && 
-          b.group_id === single.group_id && 
-          b.subject_id === single.subject_id &&
-          (single.slotIndex === undefined || b.slotIndex === single.slotIndex)
-        )
-        allRelatedBlocks.push(...coBlocks)
+        const addedTeachers = new Set<string>()
+        if (single.teacher_id) addedTeachers.add(single.teacher_id)
+        
+        for (const b of unassignedBlocks) {
+          if (b === single) continue
+          if (b.group_id !== single.group_id || b.subject_id !== single.subject_id) continue
+          if (single.slotIndex !== undefined && b.slotIndex !== undefined && b.slotIndex !== single.slotIndex) continue
+          
+          const tId = b.teacher_id && b.teacher_id.trim() !== '' ? b.teacher_id : null
+          if (tId && addedTeachers.has(tId)) continue
+          
+          if (tId) addedTeachers.add(tId)
+          allRelatedBlocks.push(b)
+        }
       }
     }
 
-    const toInsert = allRelatedBlocks.map(b => ({
+    // Asegurar que ningún docente aparezca más de una vez en esta misma celda/franja
+    const distinctBlocks: any[] = []
+    const seenTeachers = new Set<string>()
+    for (const b of allRelatedBlocks) {
+      const tId = b.teacher_id && b.teacher_id.trim() !== '' ? b.teacher_id : null
+      const teacherKey = tId || `no_teacher_${b.subject_id}_${Math.random()}`
+      if (!seenTeachers.has(teacherKey)) {
+        seenTeachers.add(teacherKey)
+        distinctBlocks.push(b)
+      }
+    }
+
+    const toInsert = distinctBlocks.map(b => ({
       day_of_week: day,
       period_id: period,
       group_id: b.group_id,
@@ -315,20 +337,20 @@ export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterSched
       duration: b.duration || 1
     }))
 
-    const { error } = await supabase.from('sch_schedule_slots').insert(toInsert)
-    if (error) {
-      console.error(error)
-      toast.error(`Error al asignar bloque(s): ${error.message || 'Error desconocido'}`)
-      throw error
+    const saveResult = await saveScheduleSlotsAction(toInsert)
+    if (!saveResult.success) {
+      console.error('Error al guardar bloque(s) manual(es):', saveResult.error)
+      toast.error(`Error al asignar bloque(s): ${saveResult.error || 'Error desconocido'}`)
+      throw new Error(saveResult.error)
     }
 
-    if (allRelatedBlocks.length > 1) {
-      toast.success(`👥 Reunión sincronizada: ${allRelatedBlocks.length} docentes asignados a ${day} ${period}ª hora.`)
+    if (distinctBlocks.length > 1) {
+      toast.success(`👥 Reunión sincronizada: ${distinctBlocks.length} docentes asignados a ${day} ${period}ª hora.`)
     } else {
-      toast.success('Bloque asignado manualmente.')
+      toast.success('Bloque asignado correctamente.')
     }
     
-    const assignedSet = new Set(allRelatedBlocks)
+    const assignedSet = new Set(distinctBlocks)
     const newUnassigned = unassignedBlocks.filter(b => !assignedSet.has(b))
     setUnassignedBlocks(newUnassigned)
     localStorage.setItem('sch_global_unassigned', JSON.stringify(newUnassigned))
@@ -344,9 +366,25 @@ export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterSched
     localStorage.removeItem('sch_global_unassigned')
     
     // 1. Obtener mallas de todos los grupos con su grupo asignado
-    const { data: currData } = await supabase
-      .from('sch_curriculum')
-      .select('*, group:sch_groups(name), subject:sch_subjects(name, is_academic_workload), teacher:sch_teachers(name)')
+    let currData: any[] | null = null
+    const actionRes = await getCurriculumAction()
+    if (actionRes.success && actionRes.data) {
+      currData = actionRes.data
+    } else {
+      // Fallback con cliente de Supabase directo usando profiles
+      const { data: fallbackData, error: currError } = await supabase
+        .from('sch_curriculum')
+        .select('*, group:sch_groups(name), subject:sch_subjects(name, is_academic_workload), teacher:profiles(id, first_name, last_name)')
+      
+      if (currError) {
+        console.error('Error al consultar mallas curriculares:', currError)
+        toast.error(`Error al cargar la malla curricular: ${currError.message || actionRes.error}`)
+        setGenerating(false)
+        return
+      }
+      currData = fallbackData
+    }
+
     if (!currData || currData.length === 0) {
       toast.error('No hay mallas curriculares configuradas.')
       setGenerating(false)
@@ -413,15 +451,30 @@ export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterSched
       multiTeacherSubjectIds,
       normalWorkloadSubjectIds,
 
-      constraints: (constraintsData || []).map((c: any) => ({
-
-        ruleType: c.rule_type,
-        targetEntityType: c.target_entity_type,
-        targetEntityId: c.target_entity_id,
-        parameters: c.parameters,
-        weight: c.weight,
-        isActive: c.is_active
-      })),
+      constraints: (constraintsData || []).map((c: any) => {
+        if (c.rule_type === 'TEACHER_TIME_WINDOW') {
+          return {
+            ruleType: c.rule_type,
+            targetEntityType: c.target_entity_type,
+            targetEntityId: c.target_entity_id,
+            parameters: {
+              start_time: c.parameters?.start_time || '07:00',
+              end_time: c.parameters?.end_time || '14:00',
+              specific_day: c.parameters?.specific_day
+            },
+            weight: c.weight,
+            isActive: c.is_active
+          }
+        }
+        return {
+          ruleType: c.rule_type,
+          targetEntityType: c.target_entity_type,
+          targetEntityId: c.target_entity_id,
+          parameters: c.parameters,
+          weight: c.weight,
+          isActive: c.is_active
+        }
+      }),
       timeOff: (timeOffData || []).map((t: any) => ({
         id: t.id,
         entityType: t.entity_type,
@@ -432,6 +485,11 @@ export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterSched
         dayOfWeek: t.day_of_week,
         periodId: t.period_id,
         status: t.status
+      })),
+      timeSlots: timeSlots.filter(s => s.type === 'period').map(s => ({
+        id: Number(s.id),
+        startTime: s.startTime,
+        endTime: s.endTime
       })),
       maxPeriodsPerDay,
       breakPeriods
@@ -460,6 +518,10 @@ export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterSched
       const counterKey = `${c.group_id}-${c.subject_id}-${c.teacher_id}`
       let slotIdx = slotCounters.get(counterKey) || 0
 
+      const teacherName = c.teacher
+        ? `${c.teacher.first_name || ''} ${c.teacher.last_name || ''}`.trim()
+        : (teachers[c.teacher_id]?.name || 'Docente')
+
       if (isBlockSubject) {
         // Materias en bloque: agrupar de a 2 horas continuas
         while (hoursLeft >= 2) {
@@ -467,7 +529,7 @@ export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterSched
             subject_id: c.subject_id,
             subject_name: c.subject?.name || subjects[c.subject_id]?.name,
             teacher_id: c.teacher_id,
-            teacher_name: c.teacher?.name || teachers[c.teacher_id]?.name,
+            teacher_name: teacherName,
             group_id: c.group_id,
             group_name: c.group?.name || groups.find(g => g.id === c.group_id)?.name,
             duration: 2,
@@ -483,7 +545,7 @@ export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterSched
           subject_id: c.subject_id,
           subject_name: c.subject?.name || subjects[c.subject_id]?.name,
           teacher_id: c.teacher_id,
-          teacher_name: c.teacher?.name || teachers[c.teacher_id]?.name,
+          teacher_name: teacherName,
           group_id: c.group_id,
           group_name: c.group?.name || groups.find(g => g.id === c.group_id)?.name,
           duration: 1,
@@ -592,8 +654,10 @@ export default function MasterScheduleCanvas({ viewMode = 'group' }: MasterSched
         onClose={() => setShowUnassignedModal(false)}
         unassignedBlocks={unassignedBlocks}
         timeSlots={timeSlots}
+        constraints={constraints}
         currentSlots={slots}
         onAssign={handleManualAssign}
+        onNavigate={onNavigate}
       />
 
       {/* Modal de Cruces Guardados */}

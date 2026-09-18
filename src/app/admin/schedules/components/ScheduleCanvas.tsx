@@ -9,6 +9,7 @@ import { generateTimeSlots, TimeSlot } from '../utils/timeCalculator'
 import MobileTeacherSchedule from '@/app/(dashboard)/teacher/schedule/components/MobileTeacherSchedule'
 import { toast } from 'sonner'
 import { getScheduleSlotsAction, clearGroupScheduleSlotsAction, saveScheduleSlotsAction } from '@/modules/admin/application/actions'
+import { getCurriculumAction } from '../actions'
 import { ScheduleGenerator, GeneratorConfig } from '../engine/Generator'
 import { RuleContext, ClassSession } from '../engine/types'
 
@@ -25,6 +26,7 @@ interface ScheduleCanvasProps {
   entityName?: string
   directorName?: string
   readOnly?: boolean
+  onNavigate?: (type: 'group' | 'teacher', id: string) => void
 }
 
 export default function ScheduleCanvas({
@@ -32,27 +34,45 @@ export default function ScheduleCanvas({
   entityId,
   entityName = '',
   directorName = '',
-  readOnly = false
+  readOnly = false,
+  onNavigate
 }: ScheduleCanvasProps) {
   const [showUnassignedModal, setShowUnassignedModal] = useState(false)
   const [unassignedBlocks, setUnassignedBlocks] = useState<any[]>([])
 
+  const getUnassignedId = React.useCallback((b: any, idx: number) => {
+    return `unassigned-${b.group_id}-${b.subject_id}-${b.teacher_id || 'none'}-${b.slotIndex ?? idx}`
+  }, [])
+
   useEffect(() => {
     if (!entityId) return
     try {
-      const stored = localStorage.getItem(`sch_local_unassigned_${entityId}`)
-      if (stored) {
-        setUnassignedBlocks(JSON.parse(stored))
-      } else {
-        setUnassignedBlocks([])
+      const storedLocal = localStorage.getItem(`sch_local_unassigned_${entityId}`)
+      const storedGlobal = localStorage.getItem('sch_global_unassigned')
+      
+      let blocks: any[] = []
+      
+      if (storedLocal) {
+        blocks = JSON.parse(storedLocal)
+      } else if (storedGlobal) {
+        const globalBlocks = JSON.parse(storedGlobal)
+        // Filter global blocks for this entity
+        blocks = globalBlocks.filter((b: any) => 
+          entityType === 'group' ? b.group_id === entityId : b.teacher_id === entityId
+        )
       }
+      
+      setUnassignedBlocks(blocks)
     } catch (e) {
       console.error(e)
     }
-  }, [entityId])
+  }, [entityId, entityType])
 
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
   const [classes, setClasses] = useState<any[]>([])
+  const [globalSlots, setGlobalSlots] = useState<any[]>([])
+  const [constraints, setConstraints] = useState<any[]>([])
+  const [timeOffBlocks, setTimeOffBlocks] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [portalNode, setPortalNode] = useState<HTMLElement | null>(null)
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([])
@@ -139,8 +159,15 @@ export default function ScheduleCanvas({
         query.eq('group_id', entityId)
       }
 
-      const { data: resData } = await query
-      if (resData) data = resData
+      // Fetch global slots, constraints, and time_off for validation during drag
+      const [{ data: gSlots }, { data: constr }, { data: timeOffData }] = await Promise.all([
+        supabase.from('sch_schedule_slots').select('id, group_id, teacher_id, day_of_week, period_id, duration'),
+        supabase.from('sch_constraints').select('*'),
+        supabase.from('sch_time_off').select('*')
+      ])
+      if (gSlots) setGlobalSlots(gSlots)
+      if (constr) setConstraints(constr)
+      if (timeOffData) setTimeOffBlocks(timeOffData)
     }
 
     if (data) {
@@ -293,22 +320,42 @@ export default function ScheduleCanvas({
   const handleManualAssign = async (blockOrBlocks: any, day: string, period: number) => {
     const blocksList: any[] = Array.isArray(blockOrBlocks) ? blockOrBlocks : [blockOrBlocks]
     
+    // Si es un bloque individual pero pertenece a una reunión con otros docentes en unassignedBlocks, agruparlos sin duplicar docentes
     let allRelatedBlocks = [...blocksList]
     if (blocksList.length === 1) {
       const single = blocksList[0]
       const isMeeting = isMeetingSubject(single.subject_name, single.group_name, single.group_id, single.is_academic_workload)
       if (isMeeting) {
-        const coBlocks = unassignedBlocks.filter(b => 
-          b !== single && 
-          b.group_id === single.group_id && 
-          b.subject_id === single.subject_id &&
-          (single.slotIndex === undefined || b.slotIndex === single.slotIndex)
-        )
-        allRelatedBlocks.push(...coBlocks)
+        const addedTeachers = new Set<string>()
+        if (single.teacher_id) addedTeachers.add(single.teacher_id)
+        
+        for (const b of unassignedBlocks) {
+          if (b === single) continue
+          if (b.group_id !== single.group_id || b.subject_id !== single.subject_id) continue
+          if (single.slotIndex !== undefined && b.slotIndex !== undefined && b.slotIndex !== single.slotIndex) continue
+          
+          const tId = b.teacher_id && b.teacher_id.trim() !== '' ? b.teacher_id : null
+          if (tId && addedTeachers.has(tId)) continue
+          
+          if (tId) addedTeachers.add(tId)
+          allRelatedBlocks.push(b)
+        }
       }
     }
 
-    const toInsert = allRelatedBlocks.map(b => ({
+    // Asegurar que ningún docente aparezca más de una vez en esta misma celda/franja
+    const distinctBlocks: any[] = []
+    const seenTeachers = new Set<string>()
+    for (const b of allRelatedBlocks) {
+      const tId = b.teacher_id && b.teacher_id.trim() !== '' ? b.teacher_id : null
+      const teacherKey = tId || `no_teacher_${b.subject_id}_${Math.random()}`
+      if (!seenTeachers.has(teacherKey)) {
+        seenTeachers.add(teacherKey)
+        distinctBlocks.push(b)
+      }
+    }
+
+    const toInsert = distinctBlocks.map(b => ({
       day_of_week: day,
       period_id: period,
       group_id: b.group_id,
@@ -317,21 +364,20 @@ export default function ScheduleCanvas({
       duration: b.duration || 1
     }))
 
-    const { error } = await supabase.from('sch_schedule_slots').insert(toInsert)
-
-    if (error) {
-      console.error(error)
-      toast.error(`Error al asignar bloque(s): ${error.message || 'Error desconocido'}`)
-      throw error
+    const saveResult = await saveScheduleSlotsAction(toInsert)
+    if (!saveResult.success) {
+      console.error('Error al guardar bloque(s) manual(es):', saveResult.error)
+      toast.error(`Error al asignar bloque(s): ${saveResult.error || 'Error desconocido'}`)
+      throw new Error(saveResult.error)
     }
 
-    if (allRelatedBlocks.length > 1) {
-      toast.success(`👥 Reunión sincronizada: ${allRelatedBlocks.length} docentes asignados a ${day} ${period}ª hora.`)
+    if (distinctBlocks.length > 1) {
+      toast.success(`👥 Reunión sincronizada: ${distinctBlocks.length} docentes asignados a ${day} ${period}ª hora.`)
     } else {
-      toast.success('Bloque asignado manualmente.')
+      toast.success('Bloque asignado correctamente.')
     }
     
-    const assignedSet = new Set(allRelatedBlocks)
+    const assignedSet = new Set(distinctBlocks)
     const newUnassigned = unassignedBlocks.filter(b => !assignedSet.has(b))
     setUnassignedBlocks(newUnassigned)
     localStorage.setItem(`sch_local_unassigned_${entityId}`, JSON.stringify(newUnassigned))
@@ -357,10 +403,24 @@ export default function ScheduleCanvas({
       return
     }
 
-    const { data: currData } = await supabase
-      .from('sch_curriculum')
-      .select('*, subject:sch_subjects(name, is_academic_workload), teacher:sch_teachers(name)')
-      .eq('group_id', entityId)
+    let currData: any[] | null = null
+    const actionRes = await getCurriculumAction(entityId)
+    if (actionRes.success && actionRes.data) {
+      currData = actionRes.data
+    } else {
+      const { data: fallbackData, error: currError } = await supabase
+        .from('sch_curriculum')
+        .select('*, subject:sch_subjects(name, is_academic_workload), teacher:profiles(id, first_name, last_name)')
+        .eq('group_id', entityId)
+
+      if (currError) {
+        console.error('Error al consultar la malla del grupo:', currError)
+        toast.error(`Error al cargar la malla curricular: ${currError.message || actionRes.error}`)
+        setGenerating(false)
+        return
+      }
+      currData = fallbackData
+    }
 
     if (!currData || currData.length === 0) {
       toast.error('Malla Curricular no configurada.')
@@ -442,15 +502,30 @@ export default function ScheduleCanvas({
     const context: RuleContext = {
       multiTeacherSubjectIds,
       normalWorkloadSubjectIds,
-      constraints: (constraintsData || []).map((c: any) => ({
-
-        ruleType: c.rule_type,
-        targetEntityType: c.target_entity_type,
-        targetEntityId: c.target_entity_id,
-        parameters: c.parameters,
-        weight: c.weight,
-        isActive: c.is_active
-      })),
+      constraints: (constraintsData || []).map((c: any) => {
+        if (c.rule_type === 'TEACHER_TIME_WINDOW') {
+          return {
+            ruleType: c.rule_type,
+            targetEntityType: c.target_entity_type,
+            targetEntityId: c.target_entity_id,
+            parameters: {
+              start_time: c.parameters?.start_time || '07:00',
+              end_time: c.parameters?.end_time || '14:00',
+              specific_day: c.parameters?.specific_day
+            },
+            weight: c.weight,
+            isActive: c.is_active
+          }
+        }
+        return {
+          ruleType: c.rule_type,
+          targetEntityType: c.target_entity_type,
+          targetEntityId: c.target_entity_id,
+          parameters: c.parameters,
+          weight: c.weight,
+          isActive: c.is_active
+        }
+      }),
       timeOff: (timeOffData || []).map((t: any) => ({
         id: t.id,
         entityType: t.entity_type,
@@ -461,6 +536,11 @@ export default function ScheduleCanvas({
         dayOfWeek: t.day_of_week,
         periodId: t.period_id,
         status: t.status
+      })),
+      timeSlots: timeSlots.filter(s => s.type === 'period').map(s => ({
+        id: Number(s.id),
+        startTime: s.startTime,
+        endTime: s.endTime
       })),
       maxPeriodsPerDay: periodsPerDay,
       breakPeriods
@@ -478,13 +558,17 @@ export default function ScheduleCanvas({
       const isBlockSubject = blockSubjects.includes(c.subject_id)
       const counterKey = `${c.group_id}-${c.subject_id}-${c.teacher_id}`
       let slotIdx = slotCounters.get(counterKey) || 0
+      const teacherName = c.teacher
+        ? `${c.teacher.first_name || ''} ${c.teacher.last_name || ''}`.trim()
+        : undefined
+
       if (isBlockSubject) {
         while (hoursLeft >= 2) {
           blocksToAssign.push({
             subject_id: c.subject_id,
             subject_name: c.subject?.name,
             teacher_id: c.teacher_id,
-            teacher_name: c.teacher?.name,
+            teacher_name: teacherName,
             group_id: c.group_id,
             group_name: entityType === 'group' ? entityName : undefined,
             duration: 2,
@@ -499,7 +583,7 @@ export default function ScheduleCanvas({
           subject_id: c.subject_id,
           subject_name: c.subject?.name,
           teacher_id: c.teacher_id,
-          teacher_name: c.teacher?.name,
+          teacher_name: teacherName,
           group_id: c.group_id,
           group_name: entityType === 'group' ? entityName : undefined,
           duration: 1,
@@ -604,7 +688,9 @@ export default function ScheduleCanvas({
         onClose={() => setShowUnassignedModal(false)}
         unassignedBlocks={unassignedBlocks}
         timeSlots={timeSlots}
+        constraints={constraints}
         onAssign={handleManualAssign}
+        onNavigate={onNavigate}
       />
 
       <div className="block lg:hidden print:hidden h-full">
@@ -705,16 +791,120 @@ export default function ScheduleCanvas({
                   const isBlocked = p > maxP
                   const isOccupied = classes.some(c => c.day === day && p >= c.period && p < c.period + (c.duration || 1));
 
+                  const activeDragClass = activeDragId ? 
+                    (classes.find(c => c.id === activeDragId) || 
+                     unassignedBlocks.find((b, idx) => getUnassignedId(b, idx) === activeDragId)) 
+                    : null;
+                    
+                  let isDragValid = false;
+                  if (activeDragClass) {
+                    const pArr = Array.from({ length: activeDragClass.duration || 1 }, (_, idx) => p + idx);
+                    const outOfBounds = pArr.some(px => px > maxP);
+                    const otherClasses = classes.filter(c => c.id !== activeDragClass.id);
+                    const hasLocalConflict = otherClasses.some(c => {
+                      if (c.day !== day) return false;
+                      const cArr = Array.from({ length: c.duration || 1 }, (_, idx) => c.period + idx);
+                      return pArr.some(px => cArr.includes(px));
+                    });
+
+                    // Get dragging entity details
+                    const isUnassigned = activeDragId!.startsWith('unassigned-');
+                    const selfGlobalSlot = !isUnassigned ? globalSlots.find(gs => gs.id === activeDragClass.id) : null;
+                    const targetGroupId = isUnassigned ? activeDragClass.group_id : selfGlobalSlot?.group_id;
+                    const targetTeacherId = isUnassigned ? activeDragClass.teacher_id : selfGlobalSlot?.teacher_id;
+
+                    // Global Conflict Check
+                    let hasGlobalConflict = false;
+                    if (globalSlots.length > 0) {
+                      hasGlobalConflict = globalSlots.some(gs => {
+                        if (!isUnassigned && gs.id === activeDragClass.id) return false;
+                        if (gs.day_of_week !== day) return false;
+                        const gsArr = Array.from({ length: gs.duration || 1 }, (_, idx) => gs.period_id + idx);
+                        const overlaps = pArr.some(px => gsArr.includes(px));
+                        if (!overlaps) return false;
+
+                        const sameGroup = targetGroupId && gs.group_id === targetGroupId;
+                        const sameTeacher = targetTeacherId && gs.teacher_id === targetTeacherId;
+                        return sameGroup || sameTeacher;
+                      });
+                    }
+
+                    // 7ma hora Rule Check
+                    let violatesSeventhRule = false;
+                    const groupSeventhRule = constraints.find(c => c.rule_type === 'GROUP_SEVENTH_PERIOD_CONFIG' && c.is_active !== false)
+                    const groupsWithSeventh = groupSeventhRule?.parameters?.group_ids || []
+                    const exceptions = groupSeventhRule?.parameters?.exception_teacher_ids || []
+
+                    if (targetGroupId && groupsWithSeventh.includes(targetGroupId)) {
+                      if (pArr.includes(1) && (!targetTeacherId || !exceptions.includes(targetTeacherId))) {
+                        violatesSeventhRule = true;
+                      }
+                    } else if (targetGroupId && !groupsWithSeventh.includes(targetGroupId)) {
+                      if (pArr.includes(7)) {
+                        violatesSeventhRule = true;
+                      }
+                    }
+
+                    // Time Off Check
+                    let hasTimeOffConflict = false;
+                    if (timeOffBlocks.length > 0) {
+                      hasTimeOffConflict = timeOffBlocks.some(t => {
+                        if (t.day_of_week !== day) return false;
+                        if (t.status !== 'FORBIDDEN') return false; 
+                        const overlaps = pArr.includes(t.period_id);
+                        if (!overlaps) return false;
+
+                        return (t.entity_type === 'GROUP' && t.entity_id === targetGroupId) ||
+                               (t.entity_type === 'TEACHER' && t.entity_id === targetTeacherId);
+                      });
+                    }
+
+                    // Time Window Check
+                    let outOfTimeWindow = false;
+                    const globalTimeWindow = constraints.find(c => c.rule_type === 'GLOBAL_TEACHER_TIME_WINDOW' && c.is_active !== false);
+                    const teacherTimeWindow = constraints.find(c => c.rule_type === 'TEACHER_TIME_WINDOW' && c.target_entity_id === targetTeacherId && c.is_active !== false);
+                    
+                    let ruleToApply = null;
+                    if (globalTimeWindow) ruleToApply = globalTimeWindow;
+                    else if (teacherTimeWindow) ruleToApply = teacherTimeWindow;
+
+                    if (ruleToApply && targetTeacherId) {
+                      const { start_time, end_time, specific_day } = ruleToApply.parameters;
+                      if (!specific_day || specific_day === 'Todos los días' || specific_day === day) {
+                        const startPeriod = timeSlots.find(ts => Number(ts.id) === pArr[0]);
+                        const endPeriod = timeSlots.find(ts => Number(ts.id) === pArr[pArr.length - 1]);
+                        
+                        if (startPeriod && endPeriod) {
+                          if (startPeriod.startTime < (start_time || '07:00') || endPeriod.endTime > (end_time || '14:00')) {
+                            outOfTimeWindow = true;
+                          }
+                        }
+                      }
+                    }
+
+                    isDragValid = !outOfBounds && !hasLocalConflict && !hasGlobalConflict && !violatesSeventhRule && !hasTimeOffConflict && !outOfTimeWindow;
+                  }
+
+                  let cellBg = isOccupied ? 'bg-white/30 dark:bg-slate-800/30' : 'bg-white/30 dark:bg-slate-800/30 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer group';
+                  if (isBlocked) {
+                    cellBg = 'bg-slate-200/50 dark:bg-slate-800/50 cursor-not-allowed opacity-50';
+                  } else if (activeDragClass) {
+                    cellBg = isDragValid 
+                      ? 'bg-emerald-50/50 dark:bg-emerald-900/20 border-emerald-300 dark:border-emerald-800/50' 
+                      : 'bg-rose-50/50 dark:bg-rose-900/20 border-rose-300 dark:border-rose-800/50';
+                  }
+
                   return (
                     <div 
                       key={i} 
                       data-drop-day={day} 
                       data-drop-period={p} 
-                      onClick={() => { if(!readOnly && !isOccupied && !isBlocked){ setSelectedDay(day); setSelectedPeriod(p); setIsModalOpen(true) } }} 
-                      className={`h-full rounded-2xl relative transition-colors ${!readOnly ? 'border-2 border-dashed border-slate-200' : ''} ${isBlocked ? 'bg-slate-200/50 dark:bg-slate-800/50 cursor-not-allowed opacity-50' : (isOccupied ? 'bg-white/30' : 'bg-white/30 hover:bg-slate-100 cursor-pointer group')}`}
+                      data-drop-valid={activeDragClass ? (isDragValid ? 'true' : 'false') : undefined}
+                      onClick={() => { if(!readOnly && !isOccupied && !isBlocked && !activeDragId){ setSelectedDay(day); setSelectedPeriod(p); setIsModalOpen(true) } }} 
+                      className={`h-full rounded-2xl relative transition-colors ${!readOnly ? 'border-2 border-dashed border-slate-200 dark:border-slate-700' : ''} ${cellBg}`}
                       style={{ gridRow: 1, gridColumn: i + 2 }}
                     >
-                      {!readOnly && !isOccupied && !isBlocked && <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100"><Plus className="h-6 w-6 text-indigo-400" /></div>}
+                      {!readOnly && !isOccupied && !isBlocked && !activeDragId && <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100"><Plus className="h-6 w-6 text-indigo-400" /></div>}
                       {isBlocked && <div className="absolute inset-0 pattern-diagonal-lines pattern-slate-300 dark:pattern-slate-700 pattern-bg-transparent pattern-size-4 opacity-30 flex items-center justify-center"></div>}
                     </div>
                   )
@@ -750,7 +940,7 @@ export default function ScheduleCanvas({
                           dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
                           dragElastic={1}
                           onDragStart={() => setActiveDragId(cls.id)}
-                          onDragEnd={(event, info) => {
+                          onDragEnd={async (event, info) => {
                             setActiveDragId(null)
                             const el = event.target as HTMLElement;
                             const originalPointerEvents = el.style.pointerEvents;
@@ -759,6 +949,11 @@ export default function ScheduleCanvas({
                             el.style.pointerEvents = originalPointerEvents;
                             const dropZone = elementsUnderCursor.find(e => e.getAttribute('data-drop-day'));
                             if (dropZone) {
+                              const isValid = dropZone.getAttribute('data-drop-valid') !== 'false';
+                              if (!isValid) {
+                                toast.error("Movimiento inválido: Cruce de horarios o incumplimiento de reglas (ej. 7ma hora).");
+                                return;
+                              }
                               const targetDay = dropZone.getAttribute('data-drop-day');
                               const targetPeriod = parseInt(dropZone.getAttribute('data-drop-period') || '0', 10);
                               if (targetDay && targetPeriod && (targetDay !== cls.day || targetPeriod !== cls.period)) {
@@ -810,6 +1005,96 @@ export default function ScheduleCanvas({
           </React.Fragment>
           )})}
           </div>
+          
+          {/* BANDEJA DE BLOQUES NO ASIGNADOS (DRAG & DROP) */}
+          {!readOnly && unassignedBlocks.length > 0 && (
+            <div className="mt-6 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl p-4 bg-slate-50/50 dark:bg-slate-900/50">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-500" />
+                Bloques Pendientes por Asignar ({unassignedBlocks.length})
+              </h3>
+              <div className="flex flex-wrap gap-3">
+                {unassignedBlocks.map((b, idx) => {
+                  const bId = getUnassignedId(b, idx)
+                  return (
+                    <motion.div
+                      key={bId}
+                      drag
+                      dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
+                      dragElastic={1}
+                      onDragStart={() => setActiveDragId(bId)}
+                      onDragEnd={async (event, info) => {
+                        setActiveDragId(null)
+                        const el = event.target as HTMLElement;
+                        const originalPointerEvents = el.style.pointerEvents;
+                        el.style.pointerEvents = 'none';
+                        const elementsUnderCursor = document.elementsFromPoint(info.point.x, info.point.y);
+                        el.style.pointerEvents = originalPointerEvents;
+                        const dropZone = elementsUnderCursor.find(e => e.getAttribute('data-drop-day'));
+                        
+                        if (dropZone) {
+                          const isValid = dropZone.getAttribute('data-drop-valid') !== 'false';
+                          if (!isValid) {
+                            toast.error("Movimiento inválido: Cruce de horarios o incumplimiento de reglas (ej. 7ma hora).");
+                            return;
+                          }
+                          const targetDay = dropZone.getAttribute('data-drop-day');
+                          const targetPeriod = parseInt(dropZone.getAttribute('data-drop-period') || '0', 10);
+                          
+                          if (targetDay && targetPeriod) {
+                            setLoading(true)
+                            const toInsert = [{
+                              day_of_week: targetDay,
+                              period_id: targetPeriod,
+                              group_id: b.group_id,
+                              subject_id: b.subject_id,
+                              teacher_id: b.teacher_id || null,
+                              duration: b.duration || 1
+                            }]
+                            const res = await saveScheduleSlotsAction(toInsert)
+                            if (res.success) {
+                              fetchSchedule()
+                              
+                              // Remove from unassignedBlocks memory
+                              const newUnassigned = unassignedBlocks.filter((_, i) => i !== idx)
+                              setUnassignedBlocks(newUnassigned)
+                              localStorage.setItem(`sch_local_unassigned_${entityId}`, JSON.stringify(newUnassigned))
+                              
+                              // Update global memory as well to keep Master view in sync
+                              try {
+                                const storedGlobal = localStorage.getItem('sch_global_unassigned')
+                                if (storedGlobal) {
+                                  let globalBlocks = JSON.parse(storedGlobal)
+                                  globalBlocks = globalBlocks.filter((gb: any) => 
+                                    !(gb.group_id === b.group_id && gb.subject_id === b.subject_id && gb.teacher_id === b.teacher_id)
+                                  )
+                                  localStorage.setItem('sch_global_unassigned', JSON.stringify(globalBlocks))
+                                }
+                              } catch(e) {}
+                              
+                            } else {
+                              toast.error(`Error al asignar: ${res.error}`)
+                              setLoading(false)
+                            }
+                          }
+                        }
+                      }}
+                      whileHover={{ scale: 1.05, y: -2 }}
+                      whileDrag={{ scale: 1.05, zIndex: 50, rotate: 2 }}
+                      className={`relative w-32 h-16 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex flex-col pointer-events-auto cursor-grab active:cursor-grabbing overflow-hidden ${activeDragId === bId ? 'opacity-80 shadow-2xl z-50' : ''}`}
+                    >
+                      <div className="h-1 w-full bg-amber-400 shrink-0" />
+                      <div className="p-1.5 flex-1 flex flex-col justify-center text-center">
+                        <p className="text-[10px] font-bold text-slate-800 dark:text-slate-200 line-clamp-1">{b.subject_name || b.subject_id}</p>
+                        <p className="text-[9px] text-slate-500 truncate">{entityType === 'group' ? (b.teacher_name || 'Sin docente') : (b.group_name || b.group_id)}</p>
+                      </div>
+                    </motion.div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+          
         </div>
       </div>
       
