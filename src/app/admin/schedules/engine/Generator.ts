@@ -1,6 +1,7 @@
 import { ClassSession, RuleContext } from './types';
 import { RuleEngine } from './RuleEngine';
 import { isOfficialGradeGroup, isMeetingSubject } from '../utils/groupFilters';
+import { TeacherSeventhHourFreeFirstRule } from './rules/HardConstraints';
 
 export interface CurriculumBlock {
   subject_id: string;
@@ -137,6 +138,82 @@ export class ScheduleGenerator {
   }
 
   /**
+   * Asignación de último recurso: solo respeta solapamientos físicos duros (docente y grupo).
+   * Ignora restricciones pedagógicas para garantizar cobertura total del currículum.
+   */
+  private tryAssignForced(
+    cg: CoGroup,
+    currentSchedule: ClassSession[],
+    days: string[],
+    maxPeriodsAllowed: (gId: string) => number,
+    breakPeriods: number[],
+    context: RuleContext
+  ): boolean {
+    const maxP = maxPeriodsAllowed(cg.groupId);
+
+    for (const day of days) {
+      for (let p = 1; p <= maxP; p++) {
+        if (breakPeriods.includes(p)) continue;
+        if (cg.duration === 2 && (p + 1 > maxP || breakPeriods.includes(p + 1))) continue;
+
+        // Solo verificar solapamiento físico de docente
+        let teacherConflict = false;
+        for (const b of cg.blocks) {
+          if (!b.teacher_id) continue;
+          const busy = currentSchedule.some(s =>
+            s.teacherId === b.teacher_id &&
+            s.dayOfWeek === day &&
+            Array.from({ length: cg.duration }, (_, i) => p + i).some(pp =>
+              s.periodId <= pp && pp < s.periodId + (s.duration || 1)
+            )
+          );
+          if (busy) { teacherConflict = true; break; }
+        }
+        if (teacherConflict) continue;
+
+        // Solo verificar solapamiento físico del grupo (si es grupo oficial)
+        if (isOfficialGradeGroup(cg.groupId)) {
+          const groupBusy = currentSchedule.some(s =>
+            s.groupId === cg.groupId &&
+            s.dayOfWeek === day &&
+            Array.from({ length: cg.duration }, (_, i) => p + i).some(pp =>
+              s.periodId <= pp && pp < s.periodId + (s.duration || 1)
+            )
+          );
+          if (groupBusy) continue;
+        }
+
+        // Slot físicamente libre — asignar temporalmente para validación
+        for (const b of cg.blocks) {
+          currentSchedule.push({
+            id: `forced-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+            groupId: b.group_id || '',
+            teacherId: b.teacher_id || '',
+            subjectId: b.subject_id || '',
+            dayOfWeek: day,
+            periodId: p,
+            duration: cg.duration,
+            slotIndex: b.slotIndex
+          });
+        }
+
+        // Validación estricta EXCLUSIVA de la regla de la 7ma hora
+        const seventhHourRule = new TeacherSeventhHourFreeFirstRule();
+        const result = seventhHourRule.validate(currentSchedule, context);
+
+        if (!result.isValid) {
+          // Revertir y continuar buscando
+          currentSchedule.splice(-cg.blocks.length);
+          continue;
+        }
+
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
    * Operador de Búsqueda Local (1-Opt Ejection Chain Swap):
    * Si un bloque huérfano no encuentra celda vacía porque el docente está ocupado en otro grupo,
    * evalúa reubicar la clase previa del docente (víctima) en otro slot libre de ese otro grupo,
@@ -253,6 +330,138 @@ export class ScheduleGenerator {
       }
 
       if (!placedViaSwap) {
+        remaining.push(cg);
+      }
+    }
+
+    return remaining;
+  }
+
+  /**
+   * Operador de Desplazamiento de Grupo (Group Ejection Chain):
+   * Si un docente con alta densidad horaria no cabe porque el grupo ya tiene otra clase en sus huecos libres,
+   * evalúa reubicar la clase del grupo (víctima del grupo) en otro slot libre para ese grupo y su respectivo docente.
+   */
+  private executeGroupEjectionPass(
+    unassigned: CoGroup[],
+    currentSchedule: ClassSession[],
+    context: RuleContext,
+    days: string[],
+    maxPeriodsAllowed: (gId: string) => number,
+    breakPeriods: number[]
+  ): CoGroup[] {
+    const remaining: CoGroup[] = [];
+
+    for (const cg of unassigned) {
+      let placed = false;
+      const targetTeacherId = cg.blocks[0]?.teacher_id;
+      if (!targetTeacherId) {
+        remaining.push(cg);
+        continue;
+      }
+
+      const maxP = maxPeriodsAllowed(cg.groupId);
+
+      for (const day of days) {
+        if (placed) break;
+        for (let p = 1; p <= maxP; p++) {
+          if (placed) break;
+          if (breakPeriods.includes(p)) continue;
+          if (cg.duration === 2 && (p + 1 > maxP || breakPeriods.includes(p + 1))) continue;
+
+          // 1. ¿El docente titular está libre en (day, p)?
+          const teacherBusy = currentSchedule.some(s =>
+            s.teacherId === targetTeacherId &&
+            s.dayOfWeek === day &&
+            (s.periodId === p || (s.duration === 2 && s.periodId + 1 === p) || (cg.duration === 2 && s.periodId === p + 1))
+          );
+          if (teacherBusy) continue;
+
+          // 2. ¿Quién ocupa al grupo en (day, p)?
+          const victimIndex = currentSchedule.findIndex(s =>
+            s.groupId === cg.groupId &&
+            s.dayOfWeek === day &&
+            (s.periodId === p || (s.duration === 2 && s.periodId + 1 === p) || (cg.duration === 2 && s.periodId === p + 1))
+          );
+
+          if (victimIndex !== -1) {
+            const victim = currentSchedule[victimIndex];
+
+            // No desplazar reuniones multi-docente sincronizadas
+            const isCoMeeting = currentSchedule.some(s =>
+              s !== victim &&
+              s.groupId === victim.groupId &&
+              s.subjectId === victim.subjectId &&
+              s.dayOfWeek === victim.dayOfWeek &&
+              s.periodId === victim.periodId
+            );
+            if (isCoMeeting) continue;
+
+            currentSchedule.splice(victimIndex, 1);
+
+            let victimMoved = false;
+            const victimMaxP = maxPeriodsAllowed(victim.groupId);
+
+            for (const altDay of days) {
+              if (victimMoved) break;
+              for (let altP = 1; altP <= victimMaxP; altP++) {
+                if (altDay === day && altP === p) continue;
+                if (breakPeriods.includes(altP)) continue;
+                if (victim.duration === 2 && (altP + 1 > victimMaxP || breakPeriods.includes(altP + 1))) continue;
+
+                const gBusy = currentSchedule.some(s =>
+                  s.groupId === victim.groupId &&
+                  s.dayOfWeek === altDay &&
+                  (s.periodId === altP || (s.duration === 2 && s.periodId + 1 === altP))
+                );
+                if (gBusy) continue;
+
+                const tBusy = currentSchedule.some(s =>
+                  s.teacherId === victim.teacherId &&
+                  s.dayOfWeek === altDay &&
+                  (s.periodId === altP || (s.duration === 2 && s.periodId + 1 === altP))
+                );
+                if (tBusy) continue;
+
+                const testVictim: ClassSession = { ...victim, dayOfWeek: altDay, periodId: altP };
+                currentSchedule.push(testVictim);
+                const repVictim = this.engine.evaluate(currentSchedule, context);
+
+                if (repVictim.isValid) {
+                  const candidateSessions: ClassSession[] = cg.blocks.map((b, idx) => ({
+                    id: `rescued-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 7)}`,
+                    groupId: b.group_id || '',
+                    teacherId: b.teacher_id || '',
+                    subjectId: b.subject_id || '',
+                    dayOfWeek: day,
+                    periodId: p,
+                    duration: cg.duration,
+                    slotIndex: b.slotIndex
+                  }));
+
+                  currentSchedule.push(...candidateSessions);
+                  const repNew = this.engine.evaluate(currentSchedule, context);
+
+                  if (repNew.isValid) {
+                    placed = true;
+                    victimMoved = true;
+                    break;
+                  } else {
+                    currentSchedule.splice(-candidateSessions.length);
+                  }
+                }
+                currentSchedule.pop();
+              }
+            }
+
+            if (!placed) {
+              currentSchedule.splice(victimIndex, 0, victim);
+            }
+          }
+        }
+      }
+
+      if (!placed) {
         remaining.push(cg);
       }
     }
@@ -440,7 +649,7 @@ export class ScheduleGenerator {
             groupId: cg.groupId,
             subjectId: cg.subjectId,
             duration: 1,
-            blocks: cg.blocks.map(b => ({ ...b, duration: 1 }))
+            blocks: cg.blocks.map(b => ({ ...b, duration: 1, slotIndex: (b.slotIndex ?? 0) + 100 }))
           };
 
           const ok1 = this.tryAssign(part1, currentSchedule, context, days, gId => groupPeriods[gId] || periodsPerDay, breakPeriods);
@@ -490,7 +699,7 @@ export class ScheduleGenerator {
           currentSchedule,
           context,
           days,
-          () => Math.max(periodsPerDay, 7),
+          gId => groupPeriods[gId] || periodsPerDay,
           breakPeriods
         );
         if (!assigned) {
@@ -504,7 +713,7 @@ export class ScheduleGenerator {
     // FASE 5: Swaps Finales en Franja Completa si aún quedase algún residuo
     if (pendingBlocks.length > 0) {
       if (onProgress) {
-        onProgress(92, `Fase 5: Permutación final en matriz institucional completa...`);
+        onProgress(90, `Fase 5: Permutación final en matriz institucional completa...`);
       }
 
       pendingBlocks = this.executeSwapPass(
@@ -512,9 +721,49 @@ export class ScheduleGenerator {
         currentSchedule,
         context,
         days,
-        () => Math.max(periodsPerDay, 7),
+        gId => groupPeriods[gId] || periodsPerDay,
         breakPeriods
       );
+    }
+
+    // FASE 6: Rescate de Alta Densidad liberando espacios en grupos (Group Ejection Chain)
+    if (pendingBlocks.length > 0) {
+      if (onProgress) {
+        onProgress(95, `Fase 6: Rescate de alta densidad liberando espacios en grupos...`);
+      }
+
+      pendingBlocks = this.executeGroupEjectionPass(
+        pendingBlocks,
+        currentSchedule,
+        context,
+        days,
+        gId => groupPeriods[gId] || periodsPerDay,
+        breakPeriods
+      );
+    }
+
+    // FASE 7: Último Recurso - Asignación Forzada ignorando restricciones pedagógicas
+    // Garantiza que ningún docente quede sin asignar por restricciones de distribución.
+    if (pendingBlocks.length > 0) {
+      if (onProgress) {
+        onProgress(98, `Fase 7: Asignación forzada para ${pendingBlocks.length} bloques residuales...`);
+      }
+
+      const stillUnresolved: CoGroup[] = [];
+      for (const cg of pendingBlocks) {
+        const assigned = this.tryAssignForced(
+          cg,
+          currentSchedule,
+          days,
+          gId => groupPeriods[gId] || periodsPerDay,
+          breakPeriods,
+          context
+        );
+        if (!assigned) {
+          stillUnresolved.push(cg);
+        }
+      }
+      pendingBlocks = stillUnresolved;
     }
 
     // 5. Consolidar Bloques No Asignados (si alguno sobrevive) con Diagnóstico Detallado

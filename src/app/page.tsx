@@ -154,7 +154,7 @@ export default function LandingPage() {
           <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
             {/* Acceso rápido directo a Calificaciones */}
             <Link
-              href="/consulta-calificaciones/login"
+              href="/consulta-calificaciones"
               className="hidden sm:inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-emerald-700 dark:text-emerald-300 hover:text-emerald-800 dark:hover:text-emerald-200 px-3.5 py-1.5 rounded-full bg-emerald-50 hover:bg-emerald-100/80 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/60 transition-all active:scale-95 duration-100 shadow-xs"
             >
               <GraduationCap className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
@@ -226,7 +226,7 @@ export default function LandingPage() {
             {/* Botones de Acción Principales */}
             <div className="flex flex-col sm:flex-row flex-wrap items-center justify-center lg:justify-start gap-3.5 pt-2">
               {/* Botón Principal Destacado: Consultar Calificaciones */}
-              <Link href="/consulta-calificaciones/login" className="w-full sm:w-auto">
+              <Link href="/consulta-calificaciones" className="w-full sm:w-auto">
                 <Button className="w-full sm:w-auto rounded-2xl bg-gradient-to-r from-emerald-600 via-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-bold text-sm px-6 h-12 shadow-lg shadow-emerald-600/25 hover:shadow-emerald-600/35 active:scale-[0.98] duration-100 ease-out cursor-pointer flex items-center justify-center gap-2 border border-emerald-400/30">
                   <GraduationCap className="h-5 w-5 text-emerald-100" />
                   <span>Consultar Calificaciones</span>
@@ -450,7 +450,7 @@ export default function LandingPage() {
           </p>
 
           <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-xs font-medium text-slate-500 dark:text-slate-400">
-            <Link href="/consulta-calificaciones/login" className="text-emerald-700 dark:text-emerald-400 font-semibold hover:underline transition-colors">
+            <Link href="/consulta-calificaciones" className="text-emerald-700 dark:text-emerald-400 font-semibold hover:underline transition-colors">
               Consultar Calificaciones
             </Link>
             <Link href="/login" className="hover:text-[#1F4E31] dark:hover:text-emerald-400 transition-colors">

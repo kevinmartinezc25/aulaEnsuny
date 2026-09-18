@@ -43,8 +43,6 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
   const storeState = usePlanillaStore()
   
   // Fase 2: Evaluación
-  const [achievements, setAchievements] = useState<AssistedAchievement[]>([])
-  const [activities, setActivities] = useState<AssistedActivity[]>([])
   const [isAchievementModalOpen, setIsAchievementModalOpen] = useState(false)
   const [editingAchievement, setEditingAchievement] = useState<{ id: string, name: string, description: string, code_config?: any } | null>(null)
   
@@ -66,8 +64,6 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
       ])
 
       setSubjectData(subject)
-      setAchievements(data.achievements)
-      setActivities(data.activities)
 
       initializeStore(subjectId, {
         students: studs,
@@ -361,7 +357,7 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
               </Button>
             </div>
 
-            {achievements.length === 0 ? (
+            {storeState.achievements.length === 0 ? (
               <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 py-16 px-4 text-center">
                 <h3 className="mb-2 text-lg font-bold text-slate-900 dark:text-white">Sin logros</h3>
                 <p className="mb-6 max-w-sm text-sm text-slate-500">Crea tu primer logro (desempeño) para comenzar a organizar tus actividades.</p>
@@ -371,7 +367,7 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
               </div>
             ) : (
               <div className="space-y-6">
-                {achievements.map((ach) => (
+                {storeState.achievements.map((ach) => (
                   <div key={ach.id} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
                     <div className="bg-emerald-50 dark:bg-emerald-950/30 px-6 py-4 border-b border-emerald-100 dark:border-emerald-900/50 flex justify-between items-center group">
                       <div>
@@ -415,7 +411,7 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
                     </div>
                     <div className="grid grid-cols-3 divide-x divide-slate-100 dark:divide-slate-800">
                       {(['hacer', 'saber', 'ser'] as const).map((comp) => {
-                        const compActivities = activities.filter(a => a.achievement_id === ach.id && a.component_type === comp)
+                        const compActivities = storeState.activities.filter(a => a.achievement_id === ach.id && a.component_type === comp)
                         const percentage = comp === 'ser' ? '30%' : '35%'
                         return (
                           <div key={comp} className="p-4">
@@ -521,7 +517,6 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
         onSuccess={() => {
           setIsAchievementModalOpen(false)
           setEditingAchievement(null)
-          loadEvaluationStructure()
         }}
       />
 
@@ -538,7 +533,6 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
           onSuccess={() => {
             setIsActivityModalOpen(false)
             setEditingActivity(null)
-            loadEvaluationStructure()
           }}
         />
       )}

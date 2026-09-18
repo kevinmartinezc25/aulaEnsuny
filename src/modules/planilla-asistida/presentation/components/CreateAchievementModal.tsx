@@ -64,16 +64,18 @@ export function CreateAchievementModal({ isOpen, onClose, onSuccess, subjectId, 
         } : undefined
       }
 
+      const { usePlanillaStore } = await import('@/store/usePlanillaStore')
+
       if (initialData) {
         // Modo edición
         const { updateAssistedAchievement } = await import('../../application/actions')
-        const { usePlanillaStore } = await import('@/store/usePlanillaStore')
         await updateAssistedAchievement(initialData.id, name.trim(), description.trim(), codeConfig)
         usePlanillaStore.getState().updateAchievement(initialData.id, name.trim().toUpperCase(), description.trim(), codeConfig)
         toast.success('Logro actualizado exitosamente')
       } else {
         // Modo creación
-        await createAssistedAchievement(subjectId, name.trim(), description.trim(), codeConfig)
+        const newAch = await createAssistedAchievement(subjectId, name.trim(), description.trim(), codeConfig)
+        usePlanillaStore.getState().addAchievement(newAch)
         toast.success('Logro creado exitosamente')
       }
       setName('')

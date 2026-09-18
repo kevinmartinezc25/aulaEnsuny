@@ -34,14 +34,15 @@ export function CreateActivityModal({ isOpen, onClose, onSuccess, achievementId,
 
     try {
       setIsSubmitting(true)
+      const { usePlanillaStore } = await import('@/store/usePlanillaStore')
       if (initialData) {
         const { updateAssistedActivity } = await import('../../application/actions')
-        const { usePlanillaStore } = await import('@/store/usePlanillaStore')
         await updateAssistedActivity(initialData.id, name.trim())
         usePlanillaStore.getState().updateActivity(initialData.id, name.trim())
         toast.success('Actividad actualizada exitosamente')
       } else {
-        await createAssistedActivity(achievementId, componentType, name.trim())
+        const newAct = await createAssistedActivity(achievementId, componentType, name.trim())
+        usePlanillaStore.getState().addActivity(newAct)
         toast.success('Actividad agregada exitosamente')
       }
       setName('')

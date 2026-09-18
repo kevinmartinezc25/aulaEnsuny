@@ -183,6 +183,7 @@ export interface AssistedActivity {
   component_type: 'hacer' | 'saber' | 'ser'
   name: string
   position_order: number
+  is_published?: boolean
 }
 
 export async function createAssistedAchievement(subjectId: string, name: string, description?: string, codeConfig?: AchievementCodeConfig): Promise<AssistedAchievement> {
@@ -302,6 +303,17 @@ export async function deleteAssistedActivity(id: string): Promise<void> {
     .eq('id', id)
 
   if (error) throw new Error('Error al eliminar la actividad: ' + error.message)
+}
+
+export async function toggleActivityPublishStatus(id: string, isPublished: boolean): Promise<void> {
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('assisted_activities')
+    .update({ is_published: isPublished })
+    .eq('id', id)
+
+  if (error) throw new Error('Error al actualizar el estado de publicación: ' + error.message)
 }
 
 export interface AssistedGrade {

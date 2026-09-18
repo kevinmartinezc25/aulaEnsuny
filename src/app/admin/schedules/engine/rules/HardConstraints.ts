@@ -113,6 +113,62 @@ export class ClassroomOverlapRule implements IScheduleRule {
   }
 }
 
+export class TeacherTimeWindowRule implements IScheduleRule {
+  readonly code = 'TEACHER_TIME_WINDOW';
+  readonly isMandatory = true;
+
+  validate(schedule: ClassSession[], context: RuleContext): RuleResult {
+    const timeWindowRules = context.constraints.filter(c => c.ruleType === 'TEACHER_TIME_WINDOW' && c.isActive !== false);
+    const globalRule = context.constraints.find(c => c.ruleType === 'GLOBAL_TEACHER_TIME_WINDOW' && c.isActive !== false);
+
+    if (timeWindowRules.length === 0 && !globalRule) return { isValid: true, scorePenalty: 0 };
+
+    const conflicts: string[] = [];
+    const violationMessages: Set<string> = new Set();
+
+    for (const session of schedule) {
+      if (!session.teacherId) continue;
+
+      let ruleToApply = null;
+      
+      if (globalRule) {
+        ruleToApply = globalRule;
+      } else {
+        ruleToApply = timeWindowRules.find(r => r.targetEntityId === session.teacherId);
+      }
+
+      if (!ruleToApply) continue;
+
+      const { start_time, end_time, specific_day } = ruleToApply.parameters;
+      if (specific_day && specific_day !== 'Todos los días' && specific_day !== session.dayOfWeek) {
+        continue; // Aplica solo a un día específico
+      }
+
+      // Convertir periodos a tiempos usando timeCalculator
+      if (!context.timeSlots || context.timeSlots.length === 0) continue;
+
+      let outOfWindow = false;
+      const startSlot = context.timeSlots.find(ts => ts.id === session.periodId);
+      const endSlot = context.timeSlots.find(ts => ts.id === session.periodId + session.duration - 1);
+
+      if (startSlot && endSlot) {
+        if (startSlot.startTime < start_time || endSlot.endTime > end_time) {
+          outOfWindow = true;
+        }
+      }
+
+      if (outOfWindow) {
+        conflicts.push(session.id || '');
+        violationMessages.add(`Docente tiene clase fuera de la ventana horaria permitida (${start_time} - ${end_time}) el día ${session.dayOfWeek}.`);
+      }
+    }
+
+    if (conflicts.length > 0) {
+      return { isValid: false, scorePenalty: 500, message: Array.from(violationMessages).join('; '), conflictingSessionIds: conflicts };
+    }
+    return { isValid: true, scorePenalty: 0 };
+  }
+}
 
 export class TimeOffRule implements IScheduleRule {
   readonly code = 'TIME_OFF_VIOLATION';
@@ -753,6 +809,231 @@ export class TeacherMaxFullDaysRule implements IScheduleRule {
   }
 }
 
+/**
+ * Regla: Jornada de 7ª Hora con 1ª Libre y Máximo 1 Día de 2ª a 7ª Hora
+ * 1. Si un docente llega hasta la 7ª hora en un día lectivo, su 1ª hora en ese día DEBE estar libre.
+ * 2. Cada docente solo puede tener a lo sumo un (1) día en la semana con jornada hasta la 7ª hora (2ª a 7ª hora).
+ */
+export class TeacherSeventhHourFreeFirstRule implements IScheduleRule {
+  readonly code = 'TEACHER_SEVENTH_HOUR_FREE_FIRST';
+  readonly isMandatory = true;
 
+  validate(schedule: ClassSession[], context: RuleContext): RuleResult {
+    const ruleConfig = context.constraints.find(c => c.ruleType === 'TEACHER_SEVENTH_HOUR_FREE_FIRST');
+    if (ruleConfig && ruleConfig.isActive === false) {
+      return { isValid: true, scorePenalty: 0 };
+    }
 
+    const maxDaysAllowed = ruleConfig?.parameters?.max_days_with_seventh_period ?? 1;
+    const firstPeriod = ruleConfig?.parameters?.first_period ?? 1;
+    const seventhPeriod = ruleConfig?.parameters?.seventh_period ?? 7;
+    const teacherExceptions: { teacherId: string, maxDays: number }[] = ruleConfig?.parameters?.teacher_exceptions ?? [];
 
+    // Agrupar sesiones por docente y día
+    const teacherDailyMap = new Map<string, Map<string, { occupiedPeriods: Set<number>; sessions: ClassSession[] }>>();
+
+    for (const session of schedule) {
+      if (!session.teacherId) continue;
+
+      if (!teacherDailyMap.has(session.teacherId)) {
+        teacherDailyMap.set(session.teacherId, new Map());
+      }
+      const dayMap = teacherDailyMap.get(session.teacherId)!;
+      if (!dayMap.has(session.dayOfWeek)) {
+        dayMap.set(session.dayOfWeek, { occupiedPeriods: new Set(), sessions: [] });
+      }
+      const dayInfo = dayMap.get(session.dayOfWeek)!;
+      dayInfo.sessions.push(session);
+
+      const duration = session.duration || 1;
+      for (let p = session.periodId; p < session.periodId + duration; p++) {
+        dayInfo.occupiedPeriods.add(p);
+      }
+    }
+
+    const conflictingSessionIds: string[] = [];
+    let totalPenalty = 0;
+    const violationMessages: string[] = [];
+
+    for (const [teacherId, dayMap] of teacherDailyMap.entries()) {
+      let daysWithSeventhHourCount = 0;
+
+      for (const [day, dayInfo] of dayMap.entries()) {
+        const reachesSeventh = dayInfo.occupiedPeriods.has(seventhPeriod);
+        const hasFirst = dayInfo.occupiedPeriods.has(firstPeriod);
+
+        // Condición 1: Si llega hasta la 7ª hora, la 1ª hora debe estar siempre libre ese día
+        if (reachesSeventh && hasFirst) {
+          totalPenalty += 100;
+          violationMessages.push(
+            `Docente tiene clase en 7ª hora y también en 1ª hora el día ${day} (la 1ª hora debe estar libre).`
+          );
+
+          for (const s of dayInfo.sessions) {
+            const sEnd = s.periodId + (s.duration || 1) - 1;
+            if (
+              (s.periodId <= firstPeriod && sEnd >= firstPeriod) ||
+              (s.periodId <= seventhPeriod && sEnd >= seventhPeriod)
+            ) {
+              if (s.id) conflictingSessionIds.push(s.id);
+            }
+          }
+        }
+
+        if (reachesSeventh) {
+          daysWithSeventhHourCount++;
+        }
+      }
+
+      // Condición 2: Solamente puede tener a lo sumo maxDaysAllowed con jornada de 2ª a 7ª hora
+      const exception = teacherExceptions.find(e => e.teacherId === teacherId);
+      const limitForTeacher = exception ? exception.maxDays : maxDaysAllowed;
+
+      if (daysWithSeventhHourCount > limitForTeacher) {
+        totalPenalty += (daysWithSeventhHourCount - limitForTeacher) * 100;
+        violationMessages.push(
+          `Docente supera el límite permitido de días con clases hasta la 7ª hora (encontrados: ${daysWithSeventhHourCount}, permitido: ${limitForTeacher}).`
+        );
+
+        for (const [_, dayInfo] of dayMap.entries()) {
+          if (dayInfo.occupiedPeriods.has(seventhPeriod)) {
+            dayInfo.sessions.forEach(s => {
+              if (s.id) conflictingSessionIds.push(s.id);
+            });
+          }
+        }
+      }
+    }
+
+    if (conflictingSessionIds.length > 0 || totalPenalty > 0) {
+      return {
+        isValid: false,
+        scorePenalty: totalPenalty,
+        message: violationMessages.slice(0, 3).join('; '),
+        conflictingSessionIds: Array.from(new Set(conflictingSessionIds))
+      };
+    }
+
+    return { isValid: true, scorePenalty: 0 };
+  }
+}
+
+/**
+ * Regla: Límite de Días con Jornada Completa de 7 Horas por Grupo
+ *
+ * Para los grupos configurados con 7 periodos máximos (maxPeriod = 7),
+ * limita cuántos días a la semana pueden tener las 7 horas realmente
+ * ocupadas (es decir, con clase en el 7º periodo).
+ *
+ * Parámetros (en sch_constraints rule_type='GROUP_SEVENTH_PERIOD_DAYS'):
+ *   - default_max_days: número de días permitidos por defecto para todos los grupos de 7h (ej. 2)
+ *   - group_overrides: { [groupId]: maxDays } sobreescritura por grupo específico
+ *   - seventh_period: número de periodo que cuenta como 7ª hora (default 7)
+ */
+export class GroupSeventhPeriodDaysLimitRule implements IScheduleRule {
+  readonly code = 'GROUP_SEVENTH_PERIOD_DAYS';
+  readonly isMandatory = true; // El usuario solicita que si se configura, deba cumplirse obligatoriamente
+
+  validate(schedule: ClassSession[], context: RuleContext): RuleResult {
+    const ruleConfig = context.constraints.find(c => c.ruleType === 'GROUP_SEVENTH_PERIOD_DAYS');
+    if (ruleConfig && ruleConfig.isActive === false) {
+      return { isValid: true, scorePenalty: 0 };
+    }
+
+    // Obtener qué grupos están configurados para 7 periodos (desde GROUP_PERIODS_CONFIG)
+    const groupPeriodsConfig = context.constraints.find(c => c.ruleType === 'GROUP_PERIODS_CONFIG');
+    const groupPeriodsMap: Record<string, number> = groupPeriodsConfig?.parameters?.group_periods ?? {};
+
+    const defaultMaxPeriods = context.maxPeriodsPerDay ?? 7;
+    const seventhPeriod = ruleConfig?.parameters?.seventh_period ?? 7;
+    const defaultMaxDaysWithSeventh = ruleConfig?.parameters?.default_max_days ?? 2;
+    const groupOverrides: Record<string, number> = ruleConfig?.parameters?.group_overrides ?? {};
+
+    // Solo aplica a grupos que tienen 7 periodos configurados
+    const groupsWithSevenPeriods = new Set<string>();
+    for (const [groupId, maxP] of Object.entries(groupPeriodsMap)) {
+      if ((maxP as number) >= seventhPeriod) {
+        groupsWithSevenPeriods.add(groupId);
+      }
+    }
+    // También incluir grupos que no están en groupPeriodsMap pero sí el default global es 7
+    // (grupos sin override explícito)
+
+    // Agrupar sesiones por grupo y día
+    const groupDayMap = new Map<string, Map<string, { occupiedPeriods: Set<number>; sessions: ClassSession[] }>>();
+
+    for (const session of schedule) {
+      if (!session.groupId) continue;
+
+      // Determinar si este grupo está habilitado para 7 periodos (usando groupPeriodsMap)
+      const groupMaxPeriods = groupPeriodsMap[session.groupId] ?? defaultMaxPeriods;
+      if (groupMaxPeriods < seventhPeriod) continue; // Este grupo no llega a 7 horas; ignorar
+
+      if (!groupDayMap.has(session.groupId)) {
+        groupDayMap.set(session.groupId, new Map());
+      }
+      const dayMap = groupDayMap.get(session.groupId)!;
+      if (!dayMap.has(session.dayOfWeek)) {
+        dayMap.set(session.dayOfWeek, { occupiedPeriods: new Set(), sessions: [] });
+      }
+      const dayInfo = dayMap.get(session.dayOfWeek)!;
+      dayInfo.sessions.push(session);
+      const duration = session.duration || 1;
+      for (let p = session.periodId; p < session.periodId + duration; p++) {
+        dayInfo.occupiedPeriods.add(p);
+      }
+    }
+
+    const conflictingSessionIds: string[] = [];
+    let totalPenalty = 0;
+    const violationMessages: string[] = [];
+
+    for (const [groupId, dayMap] of groupDayMap.entries()) {
+      const maxDaysAllowed = groupOverrides[groupId] ?? defaultMaxDaysWithSeventh;
+      let daysWithSeventhCount = 0;
+
+      for (const [day, dayInfo] of dayMap.entries()) {
+        const reachesSeventh = dayInfo.occupiedPeriods.has(seventhPeriod);
+        const hasFirst = dayInfo.occupiedPeriods.has(1);
+
+        if (reachesSeventh) {
+          daysWithSeventhCount++;
+          
+          // REGLA OBLIGATORIA: Si un grupo tiene 7ma hora, la 1ra hora DEBE estar libre
+          if (hasFirst) {
+            totalPenalty += 1000;
+            violationMessages.push(
+              `El grupo tiene clase en 7ª y 1ª hora el día ${day} (la 1ª hora debe estar libre).`
+            );
+            dayInfo.sessions.forEach(s => { if (s.id) conflictingSessionIds.push(s.id); });
+          }
+        }
+      }
+
+      // El usuario solicita que DEBE SER OBLIGATORIO asignar hasta la 7ma hora según la configuración
+      if (daysWithSeventhCount !== maxDaysAllowed) {
+        const diff = Math.abs(daysWithSeventhCount - maxDaysAllowed);
+        totalPenalty += diff * 1000; // Penalización máxima para forzar la poda
+        violationMessages.push(
+          `El grupo debe tener obligatoriamente ${maxDaysAllowed} día(s) con jornada hasta la 7ª hora (asignados: ${daysWithSeventhCount}).`
+        );
+        
+        // Marcar sesiones del grupo como conflictivas
+        for (const [, dayInfo] of dayMap.entries()) {
+          dayInfo.sessions.forEach(s => { if (s.id) conflictingSessionIds.push(s.id); });
+        }
+      }
+    }
+
+    if (totalPenalty > 0) {
+      return {
+        isValid: true, // Debe ser suave para no bloquear ramas incompletas, pero la alta penalización forzará la asignación
+        scorePenalty: totalPenalty,
+        message: violationMessages.slice(0, 3).join('; '),
+        conflictingSessionIds: Array.from(new Set(conflictingSessionIds))
+      };
+    }
+
+    return { isValid: true, scorePenalty: 0 };
+  }
+}

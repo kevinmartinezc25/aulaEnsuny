@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { usePlanillaStore } from '@/store/usePlanillaStore'
 import { AssistedAchievement, AssistedActivity, createAssistedStudent, addDirectoryStudents, deleteAssistedStudent } from '@/modules/planilla-asistida/application/actions'
-import { Search, ArrowDownAZ, ArrowDownZA, Plus, Trash2, Loader2, Lock, Unlock, TrendingUp, Users } from 'lucide-react'
+import { Search, ArrowDownAZ, ArrowDownZA, Plus, Trash2, Loader2, Lock, Unlock, TrendingUp, Users, Eye, EyeOff } from 'lucide-react'
 import { DirectoryStudentLoader } from '@/modules/planilla-asistida/presentation/components/DirectoryStudentLoader'
 import { toast } from 'sonner'
 
@@ -161,6 +161,17 @@ export function SpreadsheetTable({ subjectId }: SpreadsheetTableProps) {
   const [selectionStart, setSelectionStart] = useState<{r: number, c: number} | null>(null)
   const [selectionEnd, setSelectionEnd] = useState<{r: number, c: number} | null>(null)
   const [isDragging, setIsDragging] = useState(false)
+
+  const handleTogglePublish = async (id: string, name: string, currentState: boolean) => {
+    try {
+      const { toggleActivityPublishStatus } = await import('@/modules/planilla-asistida/application/actions')
+      await toggleActivityPublishStatus(id, !currentState)
+      usePlanillaStore.getState().toggleActivityPublished(id)
+      toast.success(`Actividad "${name}" ${!currentState ? 'publicada' : 'ocultada'} exitosamente.`)
+    } catch (error: any) {
+      toast.error('Error al cambiar el estado de publicación: ' + error.message)
+    }
+  }
 
   // Lista plana de columnas para la selección
   const columnsData = React.useMemo(() => {
@@ -525,7 +536,7 @@ export function SpreadsheetTable({ subjectId }: SpreadsheetTableProps) {
           ) : hasUnsavedChanges ? (
             <span className="text-slate-400">Cambios sin guardar</span>
           ) : (
-            <span className="flex items-center text-emerald-600"><span className="h-1.5 w-1.5 bg-emerald-500 rounded-full mr-1.5"></span> Guardado</span>
+            <span className="flex items-center text-emerald-600"><span className="h-1.5 w-1.5 bg-emerald-500 rounded-full mr-1.5"></span> Guardado en borrador</span>
           )}
         </div>
         <div className="flex items-center gap-2">
@@ -669,8 +680,15 @@ export function SpreadsheetTable({ subjectId }: SpreadsheetTableProps) {
                   }
 
                   return compActivities.map(act => (
-                    <th key={act.id} className="px-1 pt-6 pb-2 border-b border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 w-12 min-w-[48px]">
-                      <div className="writing-vertical-rl transform rotate-180 text-[11px] font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap mx-auto h-20 text-left uppercase tracking-wide">
+                    <th key={act.id} className="px-1 pt-6 pb-2 border-b border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 w-12 min-w-[48px] relative group">
+                      <button 
+                        onClick={() => handleTogglePublish(act.id, act.name, !!act.is_published)}
+                        className={`absolute top-1 right-1 p-1 rounded-md z-10 transition-all ${act.is_published ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 shadow-sm' : 'text-slate-400 dark:text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                        title={act.is_published ? "Ocultar a estudiantes" : "Publicar a estudiantes"}
+                      >
+                        {act.is_published ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+                      </button>
+                      <div className={`writing-vertical-rl transform rotate-180 text-[11px] font-bold ${act.is_published ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-800 dark:text-slate-200'} whitespace-nowrap mx-auto h-20 text-left uppercase tracking-wide flex items-center justify-start gap-1`}>
                         {act.name}
                       </div>
                     </th>

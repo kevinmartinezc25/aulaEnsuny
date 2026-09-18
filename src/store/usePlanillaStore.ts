@@ -46,12 +46,15 @@ interface PlanillaState {
   removeStudent: (studentId: string) => void
 
   // CRUD de Logros en memoria
+  addAchievement: (achievement: AssistedAchievement) => void
   updateAchievement: (id: string, name: string, description: string, codeConfig?: any) => void
   removeAchievement: (id: string) => void
 
   // CRUD de Actividades en memoria
+  addActivity: (activity: AssistedActivity) => void
   updateActivity: (id: string, name: string) => void
   removeActivity: (id: string) => void
+  toggleActivityPublished: (id: string) => void
 }
 
 export const usePlanillaStore = create<PlanillaState>((set, get) => ({
@@ -242,6 +245,12 @@ export const usePlanillaStore = create<PlanillaState>((set, get) => ({
     sessions: state.sessions.filter(s => s.id !== sessionId)
   })),
 
+  addAchievement: (achievement) => {
+    set(state => ({
+      achievements: [...state.achievements, achievement]
+    }))
+  },
+
   updateAchievement: (id, name, description, codeConfig) => {
     set(state => ({
       achievements: state.achievements.map(ach => 
@@ -257,6 +266,12 @@ export const usePlanillaStore = create<PlanillaState>((set, get) => ({
     }))
   },
 
+  addActivity: (activity) => {
+    set(state => ({
+      activities: [...state.activities, activity]
+    }))
+  },
+
   updateActivity: (id, name) => {
     set(state => ({
       activities: state.activities.map(act => 
@@ -268,6 +283,14 @@ export const usePlanillaStore = create<PlanillaState>((set, get) => ({
   removeActivity: (id) => {
     set(state => ({
       activities: state.activities.filter(act => act.id !== id)
+    }))
+  },
+
+  toggleActivityPublished: (id) => {
+    set(state => ({
+      activities: state.activities.map(act => 
+        act.id === id ? { ...act, is_published: !act.is_published } : act
+      )
     }))
   }
 }))

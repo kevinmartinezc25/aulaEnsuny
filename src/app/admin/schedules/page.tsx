@@ -71,7 +71,13 @@ export default function SchedulesMainPage() {
       setTeachers(teachersWithGeneral)
     }
     
+    
     if (!selectedEntityId) setSelectedEntityId('general-all')
+  }
+
+  const handleNavigate = (type: 'group' | 'teacher', id: string) => {
+    setViewMode(type)
+    setSelectedEntityId(id)
   }
 
   const activeEntityName = viewMode === 'group' 
@@ -157,13 +163,14 @@ export default function SchedulesMainPage() {
       {/* --- CANVAS AREA (El horario irá aquí) --- */}
       <div className="flex-1 mt-2 w-full relative z-0 min-h-0">
         {selectedEntityId === 'general-all' ? (
-          <MasterScheduleCanvas viewMode={viewMode} />
+          <MasterScheduleCanvas viewMode={viewMode} onNavigate={handleNavigate} />
         ) : selectedEntityId ? (
           <ScheduleCanvas 
             entityType={viewMode}
             entityId={selectedEntityId} 
             entityName={activeEntityName} 
             directorName={directorName}
+            onNavigate={handleNavigate}
             key={`${viewMode}-${selectedEntityId}`}
           />
         ) : (

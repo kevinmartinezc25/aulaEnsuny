@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, Loader2, Save } from 'lucide-react'
 import { createClient } from '@/core/config/supabase/client'
 import { toast } from 'sonner'
+import { saveScheduleSlotsAction } from '@/modules/admin/application/actions'
 
 interface SlotEditorModalProps {
   isOpen: boolean
@@ -37,12 +38,19 @@ export default function SlotEditorModal({ isOpen, onClose, day, periodId, groupI
 
   const fetchCatalogs = async () => {
     const [t, s, c] = await Promise.all([
-      supabase.from('sch_teachers').select('id, name'),
+      supabase.from('profiles').select('id, first_name, last_name').eq('role', 'teacher'),
       supabase.from('sch_subjects').select('id, name, color'),
       supabase.from('sch_classrooms').select('id, name')
     ])
 
-    if (t.data) setTeachers(t.data)
+    if (t.data) {
+      setTeachers(
+        t.data.map((p: any) => ({
+          id: p.id,
+          name: `${p.first_name || ''} ${p.last_name || ''}`.trim()
+        }))
+      )
+    }
     if (s.data) setSubjects(s.data)
     if (c.data) setClassrooms(c.data)
     
@@ -53,7 +61,7 @@ export default function SlotEditorModal({ isOpen, onClose, day, periodId, groupI
     if (!selectedSubject || !groupId) return
 
     setLoading(true)
-    const { error } = await supabase.from('sch_schedule_slots').insert([{
+    const saveRes = await saveScheduleSlotsAction([{
       day_of_week: day,
       period_id: periodId,
       subject_id: selectedSubject,
@@ -62,14 +70,15 @@ export default function SlotEditorModal({ isOpen, onClose, day, periodId, groupI
       group_id: groupId,
       duration: 1
     }])
-
     setLoading(false)
-    if (!error) {
+
+    if (saveRes.success) {
+      toast.success("Bloque guardado exitosamente.")
       onSave()
       onClose()
     } else {
-      console.error(error)
-      toast.error("Error al guardar: " + error.message)
+      console.error(saveRes.error)
+      toast.error("Error al guardar: " + (saveRes.error || 'Error desconocido'))
     }
   }
 

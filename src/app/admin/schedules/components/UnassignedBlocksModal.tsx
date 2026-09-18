@@ -12,8 +12,10 @@ interface UnassignedBlocksModalProps {
   onClose: () => void
   unassignedBlocks: CurriculumBlock[]
   timeSlots?: TimeSlot[]
+  constraints?: any[]
   currentSlots?: any[]
   onAssign?: (blockOrBlocks: CurriculumBlock | CurriculumBlock[], day: string, period: number) => Promise<void>
+  onNavigate?: (type: 'group' | 'teacher', id: string) => void
 }
 
 interface GroupedBlock {
@@ -35,8 +37,10 @@ export default function UnassignedBlocksModal({
   onClose,
   unassignedBlocks,
   timeSlots,
+  constraints = [],
   currentSlots,
-  onAssign
+  onAssign,
+  onNavigate
 }: UnassignedBlocksModalProps) {
   const [assigningKey, setAssigningKey] = React.useState<string | null>(null)
   const [selectedDay, setSelectedDay] = React.useState<string>('Lunes')
@@ -49,9 +53,23 @@ export default function UnassignedBlocksModal({
 
     unassignedBlocks.forEach((b, idx) => {
       const isMeeting = isMeetingSubject(b.subject_name, b.group_name, b.group_id, b.is_academic_workload)
-      const key = isMeeting
-        ? `${b.group_id}-${b.subject_id}-slot${b.slotIndex ?? 0}`
-        : `${b.group_id}-${b.subject_id}-${b.teacher_id || 'no-teacher'}-slot${b.slotIndex ?? idx}-${idx}`
+      
+      let key = ''
+      if (isMeeting) {
+        // Asignar a una sesión donde este docente aún no esté presente para evitar horas duplicadas en el mismo bloque
+        let sIdx = b.slotIndex ?? 0
+        while (true) {
+          const candidateKey = `${b.group_id}-${b.subject_id}-slot${sIdx}`
+          const existing = map.get(candidateKey)
+          if (!existing || !b.teacher_id || !existing.blocks.some(ex => ex.teacher_id === b.teacher_id)) {
+            key = candidateKey
+            break
+          }
+          sIdx++
+        }
+      } else {
+        key = `${b.group_id}-${b.subject_id}-${b.teacher_id || 'no-teacher'}-slot${b.slotIndex ?? idx}-${idx}`
+      }
 
       if (!map.has(key)) {
         map.set(key, {
@@ -82,6 +100,34 @@ export default function UnassignedBlocksModal({
     return Array.from(map.values())
   }, [unassignedBlocks])
 
+  // Sincronizar el periodo seleccionado con la primera opción válida disponible
+  React.useEffect(() => {
+    if (!assigningKey || !currentSlots) return
+    const item = groupedBlocks.find(b => b.key === assigningKey)
+    if (!item || !timeSlots) return
+
+    // Re-evaluar periodos válidos
+    const targetPeriods = timeSlots.filter(s => s.type === 'period').map(s => Number(s.id))
+    
+    // Función auxiliar para chequear si hay cruce (lógica idéntica a getSuggestionText)
+    const isFree = (period: number) => {
+      const pArr = Array.from({ length: item.duration }, (_, i) => period + i)
+      const isOverlapping = (s: any) => {
+        const sPeriods = Array.from({ length: s.duration || 1 }, (_, i) => s.period_id + i)
+        return pArr.some(p => sPeriods.includes(p))
+      }
+      const gBusy = currentSlots.some(s => s.group_id === item.group_id && s.day_of_week === selectedDay && isOverlapping(s) && s.subject_id !== item.subject_id)
+      const tBusy = item.teachers.some(t => t.id && currentSlots.some(s => s.teacher_id === t.id && s.day_of_week === selectedDay && isOverlapping(s)))
+      return !gBusy && !tBusy
+    }
+
+    const validPeriods = targetPeriods.filter(p => isFree(p))
+    
+    if (validPeriods.length > 0 && !validPeriods.includes(selectedPeriod)) {
+      setSelectedPeriod(validPeriods[0])
+    }
+  }, [assigningKey, selectedDay, groupedBlocks, currentSlots, timeSlots])
+
   const handleAssignGroup = async (item: GroupedBlock) => {
     if (!onAssign) return
     setIsSaving(true)
@@ -96,15 +142,23 @@ export default function UnassignedBlocksModal({
   const getSuggestionText = (day: string, period: number, item: GroupedBlock) => {
     if (!currentSlots) return ''
     
+    // Calcular los periodos que ocuparía este bloque (ej. si dura 2h, ocuparía period y period+1)
+    const targetPeriods = Array.from({ length: item.duration }, (_, i) => period + i)
+    
+    const isOverlapping = (s: any) => {
+      const sPeriods = Array.from({ length: s.duration || 1 }, (_, i) => s.period_id + i)
+      return targetPeriods.some(p => sPeriods.includes(p))
+    }
+    
     // Si es un grupo oficial de estudiantes, verificar si el grupo está ocupado con otra materia
-    const groupSlots = currentSlots.filter(s => s.group_id === item.group_id && s.day_of_week === day && s.period_id === period)
+    const groupSlots = currentSlots.filter(s => s.group_id === item.group_id && s.day_of_week === day && isOverlapping(s))
     const isGroupBusyWithOtherSubject = groupSlots.length > 0 && groupSlots.some(s => s.subject_id !== item.subject_id)
 
     // Evaluar ocupación de todos los docentes convocados
     const busyTeachers: string[] = []
     for (const t of item.teachers) {
       if (!t.id) continue
-      const isBusy = currentSlots.some(s => s.teacher_id === t.id && s.day_of_week === day && s.period_id === period)
+      const isBusy = currentSlots.some(s => s.teacher_id === t.id && s.day_of_week === day && isOverlapping(s))
       if (isBusy) {
         busyTeachers.push(t.name || t.id.substring(0, 8))
       }
@@ -205,9 +259,16 @@ export default function UnassignedBlocksModal({
                           </div>
                         </td>
                         <td className="px-3.5 py-3 text-slate-600 dark:text-slate-300 font-semibold">
-                          <div className="flex items-center gap-1.5">
-                            <Users className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                            <span>{item.group_name || item.group_id}</span>
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5">
+                              <Users className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                              <span>{item.group_name || item.group_id}</span>
+                            </div>
+                            {onNavigate && item.group_id && (
+                              <button onClick={() => { onNavigate('group', item.group_id); onClose(); }} className="text-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:underline text-[10px] whitespace-nowrap font-bold bg-indigo-50 dark:bg-indigo-900/30 px-1.5 py-0.5 rounded transition-colors">
+                                Ver horario
+                              </button>
+                            )}
                           </div>
                         </td>
                         <td className="px-3.5 py-3 text-slate-600 dark:text-slate-300">
@@ -226,9 +287,16 @@ export default function UnassignedBlocksModal({
                               </div>
                             </div>
                           ) : (
-                            <div className="flex items-center gap-1.5">
-                              <Briefcase className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                              <span>{item.teachers[0]?.name || item.teachers[0]?.id?.substring(0, 8) || 'Sin asignar'}</span>
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-1.5">
+                                <Briefcase className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                                <span>{item.teachers[0]?.name || item.teachers[0]?.id?.substring(0, 8) || 'Sin asignar'}</span>
+                              </div>
+                              {onNavigate && item.teachers[0]?.id && (
+                                <button onClick={() => { onNavigate('teacher', item.teachers[0].id!); onClose(); }} className="text-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:underline text-[10px] whitespace-nowrap font-bold bg-indigo-50 dark:bg-indigo-900/30 px-1.5 py-0.5 rounded transition-colors">
+                                  Ver horario
+                                </button>
+                              )}
                             </div>
                           )}
                         </td>
@@ -259,24 +327,37 @@ export default function UnassignedBlocksModal({
                                 >
                                   {days.map(d => <option key={d} value={d}>{d}</option>)}
                                 </select>
-                                <select
-                                  value={selectedPeriod}
-                                  onChange={(e) => setSelectedPeriod(Number(e.target.value))}
-                                  className="w-full text-xs p-1.5 border rounded-lg bg-white dark:bg-slate-900 dark:border-slate-700 font-medium"
-                                >
-                                  {timeSlots?.filter(s => s.type === 'period').map(s => {
-                                    const suggestion = getSuggestionText(selectedDay, Number(s.id), item)
-                                    return (
+                                  <select
+                                    value={selectedPeriod}
+                                    onChange={(e) => setSelectedPeriod(Number(e.target.value))}
+                                    className="w-full text-xs p-1.5 border rounded-lg bg-white dark:bg-slate-900 dark:border-slate-700 font-medium"
+                                  >
+                                    {(() => {
+                                      // Get group's max periods
+                                      const groupPeriodsConfig = constraints.find(c => c.rule_type === 'GROUP_PERIODS_CONFIG');
+                                      const defaultMaxPeriods = parseInt(JSON.parse(localStorage.getItem('sch_settings') || '{}').periodsPerDay || '7', 10);
+                                      const groupMaxPeriods = groupPeriodsConfig?.parameters?.group_periods?.[item.group_id] ?? defaultMaxPeriods;
+
+                                      const validSlots = timeSlots?.filter(s => s.type === 'period' && Number(s.id) <= groupMaxPeriods).map(s => {
+                                        const suggestion = getSuggestionText(selectedDay, Number(s.id), item);
+                                        return { id: s.id, suggestion, isValid: suggestion.includes('✅') };
+                                      }).filter(s => s.isValid) || [];
+
+                                    if (validSlots.length === 0) {
+                                      return <option value="" disabled>Ningún periodo libre (Cruce)</option>;
+                                    }
+
+                                    return validSlots.map(s => (
                                       <option key={s.id} value={s.id}>
-                                        {s.id}ª {suggestion ? `- ${suggestion}` : ''}
+                                        {s.id}ª {s.suggestion ? `- ${s.suggestion}` : ''}
                                       </option>
-                                    )
-                                  })}
+                                    ));
+                                  })()}
                                 </select>
                                 <div className="flex gap-1.5 w-full mt-1">
                                   <button
                                     onClick={() => handleAssignGroup(item)}
-                                    disabled={isSaving}
+                                    disabled={isSaving || !getSuggestionText(selectedDay, selectedPeriod, item).includes('✅')}
                                     className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold py-1.5 rounded-lg disabled:opacity-50 transition-colors shadow-sm flex items-center justify-center gap-1"
                                   >
                                     <CheckCircle2 className="h-3.5 w-3.5" />
