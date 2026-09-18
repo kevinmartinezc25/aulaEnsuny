@@ -5,7 +5,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 // con fallback a la tabla profiles si no está en metadata.
 async function getUserRole(supabase: any, userId: string, userMetadata?: Record<string, any>): Promise<string> {
   // 1. Lectura rápida desde JWT (no requiere query a BD)
-  const metaRole = userMetadata?.role_name as string | undefined
+  const metaRole = (userMetadata?.role_name as string | undefined)?.toLowerCase()
   if (metaRole === 'admin' || metaRole === 'superadmin' || metaRole === 'teacher' || metaRole === 'student') {
     return metaRole
   }
@@ -25,13 +25,14 @@ async function getUserRole(supabase: any, userId: string, userMetadata?: Record<
     .eq('id', profile.role_id)
     .single()
 
-  return role?.name || 'student'
+  return (role?.name || 'student').toLowerCase()
 }
 
 // Calcula la ruta del dashboard según el rol
 function getDashboardPath(roleName: string): string {
-  if (roleName === 'admin' || roleName === 'superadmin') return '/admin/dashboard'
-  if (roleName === 'teacher') return '/teacher/dashboard'
+  const role = roleName.toLowerCase()
+  if (role === 'admin' || role === 'superadmin') return '/admin/dashboard'
+  if (role === 'teacher') return '/teacher/dashboard'
   return '/student/dashboard'
 }
 
@@ -56,13 +57,14 @@ export async function updateSession(request: NextRequest) {
   const isPublicFile = pathname.match(/\.(png|jpg|jpeg|gif|svg|ico|css|js|webmanifest|json)$/) || isPwaResource
   const isPublicDocs = pathname.startsWith('/docs')
   const isLandingPage = pathname === '/'
+  const isConsultaCalificaciones = pathname.startsWith('/consulta-calificaciones')
 
   if (isDemoMode) {
     const demoSessionCookie = request.cookies.get('aulaensuny-demo-session')
     const session = demoSessionCookie ? JSON.parse(demoSessionCookie.value) : null
 
     // 1. Caso: Invitado intentando entrar a ruta protegida
-    if (!session && !isAuthPage && !isRecoveryReset && !isAuthCallback && !isPublicFile && !isPublicDocs && !isLandingPage && !isPwaResource) {
+    if (!session && !isAuthPage && !isRecoveryReset && !isAuthCallback && !isPublicFile && !isPublicDocs && !isLandingPage && !isPwaResource && !isConsultaCalificaciones) {
       const url = request.nextUrl.clone()
       url.pathname = '/login'
       return NextResponse.redirect(url)
@@ -70,7 +72,7 @@ export async function updateSession(request: NextRequest) {
 
     // 2. Caso: Logueado en demo
     if (session) {
-      const roleName = session.role || 'student'
+      const roleName = (session.role || 'student').toLowerCase()
 
       // Si está en login o la raíz, redirigir a su dashboard correspondiente
       if (isAuthPage || pathname === '/') {
@@ -137,8 +139,15 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
+  // Las Server Actions deben continuar directamente sin redirección de middleware
+  // para no romper la respuesta Flight de Next.js (error: An unexpected response was received from the server)
+  const isServerAction = request.headers.has('next-action')
+  if (isServerAction) {
+    return response
+  }
+
   // 1. Caso: Usuario no autenticado
-  if (!user && !isAuthPage && !isRecoveryReset && !isAuthCallback && !isPublicFile && !isPublicDocs && !isLandingPage && !isPwaResource) {
+  if (!user && !isAuthPage && !isRecoveryReset && !isAuthCallback && !isPublicFile && !isPublicDocs && !isLandingPage && !isPwaResource && !isConsultaCalificaciones) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
@@ -146,15 +155,15 @@ export async function updateSession(request: NextRequest) {
 
   // 2. Caso: Usuario autenticado
   if (user) {
+    const roleName = (await getUserRole(supabase, user.id, user.user_metadata)).toLowerCase()
+
     if (isAuthPage || pathname === '/') {
-      const roleName = await getUserRole(supabase, user.id, user.user_metadata)
       const url = request.nextUrl.clone()
       url.pathname = getDashboardPath(roleName)
       return NextResponse.redirect(url)
     }
 
     if (pathname.startsWith('/student') || pathname.startsWith('/teacher') || pathname.startsWith('/admin') || pathname.startsWith('/superadmin')) {
-      const roleName = await getUserRole(supabase, user.id, user.user_metadata)
       const url = request.nextUrl.clone()
 
       if (pathname.startsWith('/student') && roleName !== 'student') {

@@ -450,6 +450,7 @@ export interface AssistedStudent {
   subject_id: string
   full_name: string
   number: number
+  directory_id?: string
 }
 
 export async function createAssistedStudent(subjectId: string, fullName: string, number: number): Promise<AssistedStudent> {
@@ -475,8 +476,47 @@ export async function createAssistedStudent(subjectId: string, fullName: string,
     id: data.id,
     subject_id: data.subject_id,
     full_name: data.full_name,
-    number: data.number
+    number: data.number,
+    directory_id: data.directory_id
   }
+}
+
+export async function addDirectoryStudents(subjectId: string, students: { full_name: string, directory_id: string }[]): Promise<AssistedStudent[]> {
+  if (students.length === 0) return []
+  
+  const supabase = await createClient()
+  
+  // Get max number
+  const { data: currentStudents } = await supabase
+    .from('assisted_students')
+    .select('number')
+    .eq('subject_id', subjectId)
+    .order('number', { ascending: false })
+    .limit(1)
+    
+  let startNum = (currentStudents && currentStudents.length > 0) ? currentStudents[0].number + 1 : 1
+  
+  const toInsert = students.map(s => ({
+    subject_id: subjectId,
+    full_name: s.full_name,
+    directory_id: s.directory_id,
+    number: startNum++
+  }))
+  
+  const { data, error } = await supabase
+    .from('assisted_students')
+    .insert(toInsert)
+    .select('*')
+    
+  if (error) throw new Error('Error al añadir estudiantes desde el directorio: ' + error.message)
+  
+  return data.map(d => ({
+    id: d.id,
+    subject_id: d.subject_id,
+    full_name: d.full_name,
+    number: d.number,
+    directory_id: d.directory_id
+  }))
 }
 
 export async function deleteAssistedStudent(studentId: string): Promise<void> {

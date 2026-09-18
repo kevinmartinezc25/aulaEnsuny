@@ -41,7 +41,8 @@ interface PlanillaState {
   removeSession: (sessionId: string) => void
   
   // CRUD de estudiantes en memoria
-  addStudent: (student: { id: string, number: number, full_name: string }) => void
+  addStudent: (student: { id: string, number: number, full_name: string, directoryId?: string }) => void
+  addStudents: (studentsToAdd: { id: string, number: number, full_name: string, directoryId?: string }[]) => void
   removeStudent: (studentId: string) => void
 
   // CRUD de Logros en memoria
@@ -103,6 +104,19 @@ export const usePlanillaStore = create<PlanillaState>((set, get) => ({
       if (!newGrades[student.id]) newGrades[student.id] = {}
       return { 
         students: [...state.students, student],
+        grades: newGrades
+      }
+    })
+  },
+
+  addStudents: (studentsToAdd) => {
+    set(state => {
+      const newGrades = { ...state.grades }
+      studentsToAdd.forEach(s => {
+        if (!newGrades[s.id]) newGrades[s.id] = {}
+      })
+      return { 
+        students: [...state.students, ...studentsToAdd],
         grades: newGrades
       }
     })
