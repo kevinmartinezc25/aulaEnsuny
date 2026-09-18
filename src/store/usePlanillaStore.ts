@@ -129,12 +129,14 @@ export const usePlanillaStore = create<PlanillaState>((set, get) => ({
       const existingDirtyIndex = newDirty.findIndex(d => d.student_id === studentId && d.activity_id === activityId)
       
       if (value === null) {
-        // En una app real podríamos querer borrar la nota de la DB, por ahora solo lo removemos del state local
-        // El requerimiento decía "celda vacía = sin calificación", el backend no permite null, lo ideal sería borrar el registro.
-        // Asumiremos que si la nota se borra, podemos actualizarlo enviando null al backend si lo permitiera, 
-        // pero la DB tiene CHECK grade_value >= 1. 
-        // Para simplificar, no mandamos a guardar, pero lo quitamos visualmente.
         delete newGrades[studentId][activityId]
+        
+        // Registrar la eliminación para mandarla al backend
+        if (existingDirtyIndex >= 0) {
+          newDirty[existingDirtyIndex].grade_value = null as any
+        } else {
+          newDirty.push({ student_id: studentId, activity_id: activityId, grade_value: null as any })
+        }
       } else {
         newGrades[studentId][activityId] = value
         
@@ -188,6 +190,12 @@ export const usePlanillaStore = create<PlanillaState>((set, get) => ({
       
       if (status === null) {
         delete newAttendance[studentId][sessionId]
+        
+        if (existingDirtyIndex >= 0) {
+          newDirty[existingDirtyIndex].status = null as any
+        } else {
+          newDirty.push({ student_id: studentId, session_id: sessionId, status: null as any })
+        }
       } else {
         newAttendance[studentId][sessionId] = status
         

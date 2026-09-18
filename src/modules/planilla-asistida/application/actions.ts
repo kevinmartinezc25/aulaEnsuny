@@ -350,20 +350,34 @@ export async function getAssistedStudents(subjectId: string) {
   return data
 }
 
-export async function saveAssistedGrades(gradesToSave: { student_id: string, activity_id: string, grade_value: number }[]) {
+export async function saveAssistedGrades(gradesToSave: { student_id: string, activity_id: string, grade_value: number | null }[]) {
   const supabase = await createClient()
   const { data: userData, error: authError } = await supabase.auth.getUser()
   if (authError || !userData?.user) throw new Error('No autorizado')
 
   if (gradesToSave.length === 0) return
 
-  const { error } = await supabase
-    .from('assisted_grades')
-    .upsert(gradesToSave, { onConflict: 'student_id, activity_id' })
+  const toUpsert = gradesToSave.filter(g => g.grade_value !== null)
+  const toDelete = gradesToSave.filter(g => g.grade_value === null)
 
-  if (error) {
-    console.error('Error al guardar notas:', error)
-    throw new Error('Error al guardar las notas')
+  if (toUpsert.length > 0) {
+    const { error } = await supabase
+      .from('assisted_grades')
+      .upsert(toUpsert, { onConflict: 'student_id, activity_id' })
+
+    if (error) {
+      console.error('Error al guardar notas:', error)
+      throw new Error('Error al guardar las notas')
+    }
+  }
+
+  if (toDelete.length > 0) {
+    await Promise.all(toDelete.map(g => 
+      supabase
+        .from('assisted_grades')
+        .delete()
+        .match({ student_id: g.student_id, activity_id: g.activity_id })
+    ))
   }
 
   return true
