@@ -31,7 +31,6 @@ interface PlanillaAsistidaDetailScreenProps {
 
 export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDetailScreenProps) {
   const [activeTab, setActiveTab] = useState<'planilla' | 'actividades' | 'estudiantes' | 'asistencia' | 'configuracion'>('planilla')
-  const [pastedData, setPastedData] = useState('')
   const [students, setStudents] = useState<{ id: string, number: number, fullName: string, directoryId?: string }[]>([])
   const [isSaving, setIsSaving] = useState(false)
   const [isLoadingFromDir, setIsLoadingFromDir] = useState(false)
@@ -89,52 +88,7 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
     loadEvaluationStructure()
   }, [loadEvaluationStructure])
 
-  // Lógica para procesar pegado desde Excel
-  const handlePaste = useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    e.preventDefault()
-    const text = e.clipboardData.getData('text/plain')
-    setPastedData(text)
-    
-    // Procesar filas
-    const rows = text.split('\n').filter(row => row.trim() !== '')
-    const newStudents: { id: string, number: number, fullName: string }[] = []
-    
-    let autoNum = 1
-    rows.forEach((row, idx) => {
-      // Excel separa las columnas por tabulación
-      const cols = row.split('\t')
-      
-      let num = autoNum
-      let name = ''
 
-      if (cols.length >= 2) {
-        // Tiene número y nombre (ej: "1 \t ALVAREZ...")
-        const parsedNum = parseInt(cols[0], 10)
-        if (!isNaN(parsedNum)) {
-          num = parsedNum
-        }
-        name = cols[1].trim()
-      } else {
-        // Solo pegaron los nombres
-        name = cols[0].trim()
-      }
-
-      // Si el nombre no está vacío y no parece ser un encabezado
-      if (name && !name.toLowerCase().includes('nombres') && !name.toLowerCase().includes('apellidos')) {
-        newStudents.push({
-          id: `temp-${idx}`,
-          number: num,
-          fullName: name
-        })
-        autoNum = num + 1
-      }
-    })
-
-    if (newStudents.length > 0) {
-      setStudents(newStudents)
-      toast.success(`${newStudents.length} estudiantes detectados`)
-    }
-  }, [])
 
   const handleSaveStudents = async () => {
     if (students.length === 0) return
@@ -149,7 +103,6 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
       await createAssistedStudents(subjectId, studentsPayload)
       toast.success(`${students.length} estudiantes guardados exitosamente.`)
       // Limpiar datos temporales
-      setPastedData('')
       setStudents([])
       // Recargar la estructura para actualizar el estado global (Zustand)
       await loadEvaluationStructure()
@@ -330,10 +283,9 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
                 Cargar Estudiantes
               </h2>
               <p className="text-sm text-slate-500 mb-6">
-                Copia la lista de estudiantes desde Excel y pégala en el recuadro de abajo. Puedes pegar dos columnas (N° y Nombre) o solo una columna con los nombres. Alternativamente, puedes cargarlos automáticamente desde el directorio del colegio.
+                Haz clic en el botón a continuación para cargar a los estudiantes desde el directorio del colegio.
               </p>
-
-              <div className="flex flex-col sm:flex-row gap-4 mb-4">
+              <div className="flex flex-col sm:flex-row gap-4">
                 <Button 
                   onClick={handleLoadFromDirectory}
                   disabled={isLoadingFromDir}
@@ -353,16 +305,6 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
                   {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
                   Vaciar toda la planilla ({storeState.students.length})
                 </Button>
-              </div>
-
-              <div className="space-y-4">
-                <textarea
-                  className="w-full h-32 p-4 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 resize-none font-mono text-sm placeholder:text-slate-400"
-                  placeholder="Ejemplo:&#10;1&#9;ALVAREZ MARIN JUAN DIEGO&#10;2&#9;BARRETO DURANGO FEDERICO..."
-                  value={pastedData}
-                  onChange={(e) => setPastedData(e.target.value)}
-                  onPaste={handlePaste}
-                />
               </div>
             </div>
 

@@ -2,8 +2,9 @@
 
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { usePlanillaStore } from '@/store/usePlanillaStore'
-import { AssistedAchievement, AssistedActivity, createAssistedStudent, deleteAssistedStudent } from '@/modules/planilla-asistida/application/actions'
+import { AssistedAchievement, AssistedActivity, createAssistedStudent, addDirectoryStudents, deleteAssistedStudent } from '@/modules/planilla-asistida/application/actions'
 import { Search, ArrowDownAZ, ArrowDownZA, Plus, Trash2, Loader2, Lock, Unlock, TrendingUp, Users } from 'lucide-react'
+import { DirectoryStudentLoader } from '@/modules/planilla-asistida/presentation/components/DirectoryStudentLoader'
 import { toast } from 'sonner'
 
 interface SpreadsheetTableProps {
@@ -106,7 +107,7 @@ const GradeCell = React.memo(({
 GradeCell.displayName = 'GradeCell'
 
 export function SpreadsheetTable({ subjectId }: SpreadsheetTableProps) {
-  const { students, achievements, activities, grades, setGrade, saveChanges, isSaving, hasUnsavedChanges, addStudent, removeStudent } = usePlanillaStore()
+  const { students, achievements, activities, grades, setGrade, saveChanges, isSaving, hasUnsavedChanges, addStudent, addStudents, removeStudent } = usePlanillaStore()
   const tableRef = useRef<HTMLDivElement>(null)
 
   // Modo seguro (Bloqueo)
@@ -117,7 +118,7 @@ export function SpreadsheetTable({ subjectId }: SpreadsheetTableProps) {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   
   // Agregar/Eliminar estudiante local
-  const [newStudentName, setNewStudentName] = useState('')
+  const [isLoaderOpen, setIsLoaderOpen] = useState(false)
   const [isAddingStudent, setIsAddingStudent] = useState(false)
   const [deletingStudentId, setDeletingStudentId] = useState<string | null>(null)
 
@@ -438,17 +439,19 @@ export function SpreadsheetTable({ subjectId }: SpreadsheetTableProps) {
     }
   }, [setGrade])
 
-  const handleAddStudent = async () => {
-    if (!newStudentName.trim() || isAddingStudent) return
+  const handleAddStudentsFromLoader = async (studentsToAdd: { full_name: string, directoryId: string }[]) => {
     try {
       setIsAddingStudent(true)
-      const nextNum = students.length > 0 ? Math.max(...students.map(s => s.number)) + 1 : 1
-      const newStudent = await createAssistedStudent(subjectId, newStudentName.trim(), nextNum)
-      addStudent(newStudent)
-      setNewStudentName('')
-      toast.success('Estudiante añadido exitosamente')
+      const addedStudents = await addDirectoryStudents(subjectId, studentsToAdd.map(s => ({ full_name: s.full_name, directory_id: s.directoryId })))
+      addStudents(addedStudents.map(s => ({
+        id: s.id,
+        number: s.number,
+        full_name: s.full_name,
+        directoryId: s.directory_id
+      })))
+      toast.success(`${addedStudents.length} estudiantes añadidos exitosamente`)
     } catch (error: any) {
-      toast.error(error.message || 'Error al añadir estudiante')
+      toast.error(error.message || 'Error al añadir estudiantes')
     } finally {
       setIsAddingStudent(false)
     }
@@ -832,23 +835,15 @@ export function SpreadsheetTable({ subjectId }: SpreadsheetTableProps) {
             
             {/* Fila para añadir estudiante */}
             <tr>
-              <td className="sticky left-0 z-20 w-8 min-w-[32px] max-w-[32px] bg-slate-50/90 dark:bg-slate-800/90 border-r border-b border-slate-200 dark:border-slate-700 text-center text-slate-400">
-                {isAddingStudent ? <Loader2 className="h-3 w-3 animate-spin mx-auto" /> : <Plus className="h-3 w-3 mx-auto" />}
-              </td>
-              <td className="hidden md:table-cell sticky left-8 z-20 w-12 min-w-[48px] max-w-[48px] bg-slate-50/90 dark:bg-slate-800/90 border-r border-b border-slate-200 dark:border-slate-700 text-center text-slate-400 font-medium text-xs">
-                {filteredAndSortedStudents.length + 1}
-              </td>
-              <td className="sticky left-8 md:left-20 z-20 w-32 min-w-[128px] max-w-[128px] md:w-64 md:min-w-[256px] md:max-w-[256px] bg-slate-50/90 dark:bg-slate-800/90 border-r border-b border-slate-200 dark:border-slate-700 text-left px-1 shadow-[4px_0_10px_rgba(0,0,0,0.05)]">
-                <input 
-                  type="text" 
-                  value={newStudentName}
-                  onChange={(e) => setNewStudentName(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleAddStudent()}
-                  onBlur={() => handleAddStudent()}
-                  disabled={isAddingStudent}
-                  placeholder="Añadir estudiante... (Escribe y presiona Enter o haz clic afuera)"
-                  className="w-full text-xs font-semibold bg-transparent border-0 focus:ring-0 focus:outline-none text-slate-700 dark:text-slate-200 placeholder:text-slate-400 placeholder:font-normal uppercase"
-                />
+              <td colSpan={3} className="sticky left-0 z-20 bg-slate-50/90 dark:bg-slate-800/90 border-r border-b border-slate-200 dark:border-slate-700 shadow-[4px_0_10px_rgba(0,0,0,0.05)]">
+                <button
+                  onClick={() => setIsLoaderOpen(true)}
+                  disabled={isAddingStudent || isLocked}
+                  className="w-full h-full min-h-[32px] flex items-center justify-center gap-2 text-sm font-semibold text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors disabled:opacity-50"
+                >
+                  {isAddingStudent ? <Loader2 className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />}
+                  Cargar desde Directorio Estudiantil
+                </button>
               </td>
               {achievements.map((ach) => {
                 const color = LOGRO_COLORS[achievements.indexOf(ach) % LOGRO_COLORS.length]
@@ -879,7 +874,17 @@ export function SpreadsheetTable({ subjectId }: SpreadsheetTableProps) {
           writing-mode: vertical-rl;
           text-orientation: mixed;
         }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background-color: rgba(156, 163, 175, 0.5);
+          border-radius: 4px;
+        }
       `}} />
+      <DirectoryStudentLoader 
+        isOpen={isLoaderOpen} 
+        onClose={() => setIsLoaderOpen(false)} 
+        onAddStudents={handleAddStudentsFromLoader} 
+        existingDirectoryIds={students.map(s => (s as any).directoryId).filter(Boolean)} 
+      />
     </div>
   )
 }

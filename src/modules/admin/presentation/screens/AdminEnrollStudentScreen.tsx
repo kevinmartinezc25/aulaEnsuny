@@ -59,9 +59,9 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
             .single()
           
           if (profile?.roles?.name) {
-            setUserRole(profile.roles.name)
+            setUserRole(profile.roles.name.toLowerCase())
           } else if (authUser.user_metadata?.role_name) {
-            setUserRole(authUser.user_metadata.role_name)
+            setUserRole(authUser.user_metadata.role_name.toLowerCase())
           }
         } else {
           // Verificar cookie de sesión demo
@@ -76,7 +76,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
             try {
               const sess = JSON.parse(decodeURIComponent(demoCookie))
               if (sess.role) {
-                setUserRole(sess.role)
+                setUserRole(sess.role.toLowerCase())
               }
             } catch (e) {}
           }
@@ -219,8 +219,14 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
   useEffect(() => {
     async function loadGroups() {
       if (!enrollment.gradeLevel || academicLevels.length === 0) return
-      const matchedLevel = academicLevels.find(l => l.name === enrollment.gradeLevel)
+      const matchedLevel = academicLevels.find(l => 
+        l.name.trim().toLowerCase() === enrollment.gradeLevel.trim().toLowerCase() ||
+        l.name.replace(/[^0-9]/g, '') === enrollment.gradeLevel.replace(/[^0-9]/g, '')
+      )
       if (matchedLevel) {
+        if (enrollment.gradeLevel !== matchedLevel.name) {
+          setEnrollment(prev => ({ ...prev, gradeLevel: matchedLevel.name }))
+        }
         try {
           const grps = await getAcademicGroups(matchedLevel.id)
           setAcademicGroups(grps)
@@ -1418,13 +1424,13 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                         value={email}
                         onChange={e => setEmail(e.target.value)}
                         placeholder="Ej: j.torres@estudiante.ensuny.edu.co"
-                        disabled={isEditMode && userRole !== 'superadmin'}
+                        disabled={isEditMode && userRole.toLowerCase() !== 'superadmin'}
                         className="w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 focus:outline-none dark:text-white text-sm disabled:opacity-50"
                       />
                       {!isEditMode && (
                         <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Este correo servirá como usuario de acceso principal.</p>
                       )}
-                      {isEditMode && userRole === 'superadmin' && (
+                      {isEditMode && userRole.toLowerCase() === 'superadmin' && (
                         <p className="text-[10px] text-amber-600 dark:text-amber-500 mt-1 font-semibold">
                           Como SuperAdmin, puedes modificar el correo institucional del estudiante.
                         </p>
@@ -1461,10 +1467,10 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                       <label className="block text-xs font-bold text-slate-450 dark:text-slate-550 uppercase mb-1">Acceso al Sistema</label>
                       <select 
                         value={enrollment.enrollmentStatus === 'active' ? 'active' : 'suspended'}
-                        disabled={userRole !== 'superadmin'}
+                        disabled={userRole.toLowerCase() !== 'superadmin'}
                         onChange={e => setEnrollment({ ...enrollment, enrollmentStatus: e.target.value as any })}
                         className={`w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-sm focus:outline-none dark:text-white transition-colors ${
-                          userRole === 'superadmin'
+                          userRole.toLowerCase() === 'superadmin'
                             ? 'bg-white dark:bg-slate-950 focus:ring-2 focus:ring-blue-500'
                             : 'bg-slate-100 dark:bg-slate-950 text-slate-450 disabled:opacity-50'
                         }`}

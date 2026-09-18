@@ -3,7 +3,24 @@
 import { createAdminClient } from '@/core/config/supabase/server'
 import { revalidatePath } from 'next/cache'
 
-import { AdminUser, AdminCourse, AcademicLevel, AcademicGroup, AdminTeacher, AdminStudent } from './types'
+import {
+  AdminUser, AdminCourse, AcademicLevel, AcademicGroup, AdminTeacher, AdminStudent,
+  StudentDetails, StudentContact, StudentGuardians, StudentMedicalInfo,
+  StudentDocument, StudentEnrollment, StudentAcademicHistory, FullStudentData
+} from './types'
+
+import {
+  ALL_ADMIN_MODULES,
+  type ModulePermission,
+  type AdminModuleDefinition,
+  type AdministratorUser
+} from '../domain/modulePermissions'
+
+export type {
+  ModulePermission,
+  AdminModuleDefinition,
+  AdministratorUser
+} from '../domain/modulePermissions'
 
 /**
  * -------------------------------------------------------------
@@ -1085,10 +1102,7 @@ export async function getAdminEvaluations(): Promise<any[]> {
  * -------------------------------------------------------------
  */
 
-import {
-  StudentDetails, StudentContact, StudentGuardians, StudentMedicalInfo,
-  StudentDocument, StudentEnrollment, StudentAcademicHistory, FullStudentData
-} from './types'
+
 
 /**
  * Obtener la ficha completa de un estudiante por su ID.
@@ -1097,194 +1111,389 @@ export async function getAdminStudentById(id: string): Promise<FullStudentData |
   try {
     const adminClient = createAdminClient()
 
-    // 1. Obtener perfil básico
-    const { data: profile, error: pError } = await adminClient
+    // 1. Intentar buscar en profiles (estudiantes registrados)
+    let { data: profile } = await adminClient
       .from('profiles')
       .select('*, roles!inner(name)')
       .eq('id', id)
       .eq('roles.name', 'student')
-      .single()
+      .maybeSingle()
 
-    if (pError) throw pError
-    if (!profile) return null
+    let dirStudent: any = null
 
-    // 2. Obtener email de Auth
-    const { data: { user: authUser }, error: uError } = await adminClient.auth.admin.getUserById(id)
-    const email = authUser?.email || (profile as any).email || 'sin-correo@ensuny.edu.co'
+    // 2. Si no está en profiles directamente, buscar en student_directory
+    if (!profile) {
+      const { data: dirData, error: dirError } = await adminClient
+        .from('student_directory')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle()
 
-    // 3. Consultar tablas relacionadas en paralelo (y tolerar que no existan filas)
-    const [
-      { data: details },
-      { data: contact },
-      { data: guardians },
-      { data: medical },
-      { data: documents },
-      { data: enrollments },
-      { data: academicHistory },
-      { data: studentCourses }
-    ] = await Promise.all([
-      adminClient.from('student_details').select('*').eq('student_id', id).maybeSingle(),
-      adminClient.from('student_contacts').select('*').eq('student_id', id).maybeSingle(),
-      adminClient.from('student_guardians').select('*').eq('student_id', id).maybeSingle(),
-      adminClient.from('student_medical_info').select('*').eq('student_id', id).maybeSingle(),
-      adminClient.from('student_documents').select('*').eq('student_id', id),
-      adminClient.from('student_enrollments').select('*').eq('student_id', id).order('academic_year', { ascending: false }),
-      adminClient.from('student_academic_history').select('*').eq('student_id', id).order('year', { ascending: false }),
-      adminClient.from('student_courses').select('course_id').eq('student_id', id)
-    ])
+      if (dirError || !dirData) return null
+      dirStudent = dirData
 
-    // Reconstruir detalles
-    let mappedDetails: StudentDetails | undefined = undefined
-    if (details) {
-      mappedDetails = {
-        documentType: details.document_type,
-        documentNumber: details.document_number,
-        expeditionDate: details.expedition_date || undefined,
-        expeditionPlace: details.expedition_place || undefined,
-        firstName: details.first_name,
-        secondName: details.second_name || undefined,
-        firstSurname: details.first_surname,
-        secondSurname: details.second_surname || undefined,
-        birthDate: details.birth_date,
-        gender: details.gender,
-        bloodType: details.blood_type || undefined,
-        rh: details.rh || undefined,
-        nationality: details.nationality,
-        birthMunicipality: details.birth_municipality || undefined,
-        birthDepartment: details.birth_department || undefined
-      }
-    }
-
-    // Reconstruir contacto
-    let mappedContact: StudentContact | undefined = undefined
-    if (contact) {
-      mappedContact = {
-        address: contact.address,
-        neighborhood: contact.neighborhood || undefined,
-        municipality: contact.municipality,
-        department: contact.department,
-        zone: contact.zone as 'Urbana' | 'Rural',
-        phone: contact.phone || undefined,
-        studentCellphone: contact.student_cellphone || undefined,
-        studentEmail: contact.student_email || undefined
-      }
-    }
-
-    // Reconstruir familiares
-    let mappedGuardians: StudentGuardians | undefined = undefined
-    if (guardians) {
-      mappedGuardians = {
-        fatherName: guardians.father_name || undefined,
-        fatherDocument: guardians.father_document || undefined,
-        fatherPhone: guardians.father_phone || undefined,
-        fatherEmail: guardians.father_email || undefined,
-        fatherOccupation: guardians.father_occupation || undefined,
-        motherName: guardians.mother_name || undefined,
-        motherDocument: guardians.mother_document || undefined,
-        motherPhone: guardians.mother_phone || undefined,
-        motherEmail: guardians.mother_email || undefined,
-        motherOccupation: guardians.mother_occupation || undefined,
-        guardianName: guardians.guardian_name,
-        guardianDocument: guardians.guardian_document,
-        guardianRelationship: guardians.guardian_relationship,
-        guardianPhone: guardians.guardian_phone,
-        guardianEmail: guardians.guardian_email || undefined,
-        guardianAddress: guardians.guardian_address || undefined,
-        guardianOccupation: guardians.guardian_occupation || undefined
-      }
-    }
-
-    // Reconstruir salud
-    let mappedMedical: StudentMedicalInfo | undefined = undefined
-    if (medical) {
-      mappedMedical = {
-        eps: medical.eps,
-        affiliationType: medical.affiliation_type || undefined,
-        ips: medical.ips || undefined,
-        allergies: medical.allergies || undefined,
-        diseases: medical.diseases || undefined,
-        medicines: medical.medicines || undefined,
-        observations: medical.observations || undefined
-      }
-    }
-
-    // Reconstruir documentos
-    const mappedDocs: StudentDocument[] = (documents || []).map(d => ({
-      id: d.id,
-      category: d.document_category as any,
-      name: d.document_name,
-      fileUrl: d.file_url,
-      fileName: d.file_name
-    }))
-
-    // Reconstruir matrícula actual (último registro)
-    let mappedEnrollment: StudentEnrollment | undefined = undefined
-    if (enrollments && enrollments.length > 0) {
-      const activeEnroll = enrollments[0]
-      mappedEnrollment = {
-        academicYear: activeEnroll.academic_year || new Date().getFullYear(),
-        enrollmentDate: activeEnroll.enrollment_date || new Date().toISOString().split('T')[0],
-        enrollmentStatus: (activeEnroll.enrollment_status || profile.status || 'active') as any,
-        sede: activeEnroll.sede || 'Principal',
-        jornada: (activeEnroll.jornada || 'Única') as any,
-        gradeLevel: activeEnroll.grade_level || profile.grade_level || '',
-        groupName: activeEnroll.group_name || profile.group_name || '',
-        enrollmentNumber: activeEnroll.enrollment_number || undefined,
-        simatBeneficiary: activeEnroll.simat_beneficiary || false,
-        estrato: activeEnroll.estrato || undefined,
-        sisben: activeEnroll.sisben || undefined,
-        conflictVictim: activeEnroll.conflict_victim || false,
-        specialPopulation: activeEnroll.special_population || undefined,
-        previousInstitution: activeEnroll.previous_institution || undefined,
-        previousMunicipality: activeEnroll.previous_municipality || undefined,
-        previousDepartment: activeEnroll.previous_department || undefined,
-        previousGrade: activeEnroll.previous_grade || undefined,
-        previousYear: activeEnroll.previous_year || undefined,
-        observations: activeEnroll.observations || undefined
+      // Si este estudiante de directorio tiene un profile_id vinculado, cargar el perfil real
+      if (dirStudent.profile_id) {
+        const { data: linkedProfile } = await adminClient
+          .from('profiles')
+          .select('*, roles!inner(name)')
+          .eq('id', dirStudent.profile_id)
+          .eq('roles.name', 'student')
+          .maybeSingle()
+        if (linkedProfile) {
+          profile = linkedProfile
+        }
       }
     } else {
-      mappedEnrollment = {
-        academicYear: new Date().getFullYear(),
-        enrollmentDate: new Date().toISOString().split('T')[0],
-        enrollmentStatus: (profile.status || 'active') as any,
-        sede: 'Principal',
-        jornada: 'Única',
-        gradeLevel: profile.grade_level || '',
-        groupName: profile.group_name || '',
-        simatBeneficiary: false,
-        conflictVictim: false
+      // Si tenemos perfil, buscar si tiene un registro asociado en student_directory
+      const { data: dirData } = await adminClient
+        .from('student_directory')
+        .select('*')
+        .eq('profile_id', profile.id)
+        .maybeSingle()
+      if (dirData) {
+        dirStudent = dirData
       }
     }
 
-    // Reconstruir historial académico
-    const mappedHist: StudentAcademicHistory[] = (academicHistory || []).map(h => ({
-      id: h.id,
-      year: h.year,
-      gradeLevel: h.grade_level,
-      groupName: h.group_name,
-      finalStatus: h.final_status,
-      finalAverage: h.final_average ? Number(h.final_average) : undefined,
-      result: h.result || undefined
-    }))
+    // Caso A: Estudiante con perfil registrado (en profiles)
+    if (profile) {
+      const targetId = profile.id
 
-    // Reconstruir cursos LMS
-    const mappedCourses: string[] = (studentCourses || []).map(c => c.course_id)
+      // Obtener email de Auth
+      const { data: { user: authUser } } = await adminClient.auth.admin.getUserById(targetId)
+      const email = authUser?.email || (profile as any).email || (dirStudent?.document_id ? `${dirStudent.document_id}@estudiante.ensuny.edu.co` : '')
 
-    return {
-      id: profile.id,
-      name: `${profile.first_name} ${profile.last_name}`,
-      email,
-      status: (profile.status || 'active') as 'active' | 'inactive',
-      joinedDate: new Date(profile.created_at).toISOString().split('T')[0],
-      details: mappedDetails,
-      contact: mappedContact,
-      guardians: mappedGuardians,
-      medical: mappedMedical,
-      documents: mappedDocs,
-      enrollment: mappedEnrollment,
-      academicHistory: mappedHist,
-      courses: mappedCourses
+      // Consultar tablas relacionadas en paralelo
+      const [
+        { data: details },
+        { data: contact },
+        { data: guardians },
+        { data: medical },
+        { data: documents },
+        { data: enrollments },
+        { data: academicHistory },
+        { data: studentCourses }
+      ] = await Promise.all([
+        adminClient.from('student_details').select('*').eq('student_id', targetId).maybeSingle(),
+        adminClient.from('student_contacts').select('*').eq('student_id', targetId).maybeSingle(),
+        adminClient.from('student_guardians').select('*').eq('student_id', targetId).maybeSingle(),
+        adminClient.from('student_medical_info').select('*').eq('student_id', targetId).maybeSingle(),
+        adminClient.from('student_documents').select('*').eq('student_id', targetId),
+        adminClient.from('student_enrollments').select('*').eq('student_id', targetId).order('academic_year', { ascending: false }),
+        adminClient.from('student_academic_history').select('*').eq('student_id', targetId).order('year', { ascending: false }),
+        adminClient.from('student_courses').select('course_id').eq('student_id', targetId)
+      ])
+
+      // Reconstruir detalles
+      let mappedDetails: StudentDetails
+      if (details) {
+        mappedDetails = {
+          documentType: details.document_type || 'TI',
+          documentNumber: details.document_number || dirStudent?.document_id || '',
+          expeditionDate: details.expedition_date || undefined,
+          expeditionPlace: details.expedition_place || undefined,
+          firstName: details.first_name || profile.first_name,
+          secondName: details.second_name || undefined,
+          firstSurname: details.first_surname || profile.last_name,
+          secondSurname: details.second_surname || undefined,
+          birthDate: details.birth_date || '',
+          gender: details.gender || 'M',
+          bloodType: details.blood_type || undefined,
+          rh: details.rh || undefined,
+          nationality: details.nationality || 'Colombiana',
+          birthMunicipality: details.birth_municipality || undefined,
+          birthDepartment: details.birth_department || undefined
+        }
+      } else {
+        const fnParts = (profile.first_name || dirStudent?.first_name || '').trim().split(/\s+/)
+        const lnParts = (profile.last_name || dirStudent?.last_name || '').trim().split(/\s+/)
+        mappedDetails = {
+          documentType: 'TI',
+          documentNumber: dirStudent?.document_id || '',
+          firstName: fnParts[0] || '',
+          secondName: fnParts.slice(1).join(' ') || undefined,
+          firstSurname: lnParts[0] || '',
+          secondSurname: lnParts.slice(1).join(' ') || undefined,
+          birthDate: '',
+          gender: 'M',
+          bloodType: 'O',
+          rh: '+',
+          nationality: 'Colombiana'
+        }
+      }
+
+      // Reconstruir contacto
+      let mappedContact: StudentContact
+      if (contact) {
+        mappedContact = {
+          address: contact.address || '',
+          neighborhood: contact.neighborhood || undefined,
+          municipality: contact.municipality || '',
+          department: contact.department || '',
+          zone: (contact.zone || 'Urbana') as 'Urbana' | 'Rural',
+          phone: contact.phone || undefined,
+          studentCellphone: contact.student_cellphone || undefined,
+          studentEmail: contact.student_email || email || undefined
+        }
+      } else {
+        mappedContact = {
+          address: '',
+          municipality: '',
+          department: '',
+          zone: 'Urbana',
+          studentEmail: email
+        }
+      }
+
+      // Reconstruir familiares
+      let mappedGuardians: StudentGuardians
+      if (guardians) {
+        mappedGuardians = {
+          fatherName: guardians.father_name || undefined,
+          fatherDocument: guardians.father_document || undefined,
+          fatherPhone: guardians.father_phone || undefined,
+          fatherEmail: guardians.father_email || undefined,
+          fatherOccupation: guardians.father_occupation || undefined,
+          motherName: guardians.mother_name || undefined,
+          motherDocument: guardians.mother_document || undefined,
+          motherPhone: guardians.mother_phone || undefined,
+          motherEmail: guardians.mother_email || undefined,
+          motherOccupation: guardians.mother_occupation || undefined,
+          guardianName: guardians.guardian_name || '',
+          guardianDocument: guardians.guardian_document || '',
+          guardianRelationship: guardians.guardian_relationship || 'Madre',
+          guardianPhone: guardians.guardian_phone || '',
+          guardianEmail: guardians.guardian_email || undefined,
+          guardianAddress: guardians.guardian_address || undefined,
+          guardianOccupation: guardians.guardian_occupation || undefined
+        }
+      } else {
+        mappedGuardians = {
+          guardianName: '',
+          guardianDocument: '',
+          guardianRelationship: 'Madre',
+          guardianPhone: ''
+        }
+      }
+
+      // Reconstruir salud
+      let mappedMedical: StudentMedicalInfo
+      if (medical) {
+        mappedMedical = {
+          eps: medical.eps || '',
+          affiliationType: medical.affiliation_type || 'Contributivo',
+          ips: medical.ips || undefined,
+          allergies: medical.allergies || undefined,
+          diseases: medical.diseases || undefined,
+          medicines: medical.medicines || undefined,
+          observations: medical.observations || undefined
+        }
+      } else {
+        mappedMedical = {
+          eps: '',
+          affiliationType: 'Contributivo',
+          ips: ''
+        }
+      }
+
+      // Reconstruir documentos
+      const mappedDocs: StudentDocument[] = (documents || []).map(d => ({
+        id: d.id,
+        category: d.document_category as any,
+        name: d.document_name,
+        fileUrl: d.file_url,
+        fileName: d.file_name
+      }))
+
+      // Reconstruir matrícula actual
+      let mappedEnrollment: StudentEnrollment
+      if (enrollments && enrollments.length > 0) {
+        const activeEnroll = enrollments[0]
+        mappedEnrollment = {
+          academicYear: activeEnroll.academic_year || new Date().getFullYear(),
+          enrollmentDate: activeEnroll.enrollment_date || new Date().toISOString().split('T')[0],
+          enrollmentStatus: (activeEnroll.enrollment_status || profile.status || 'active') as any,
+          sede: activeEnroll.sede || 'Principal',
+          jornada: (activeEnroll.jornada || 'Única') as any,
+          gradeLevel: activeEnroll.grade_level || profile.grade_level || dirStudent?.grade_level || '',
+          groupName: activeEnroll.group_name || profile.group_name || dirStudent?.group_name || '',
+          enrollmentNumber: activeEnroll.enrollment_number || dirStudent?.document_id || undefined,
+          simatBeneficiary: activeEnroll.simat_beneficiary ?? false,
+          estrato: activeEnroll.estrato || undefined,
+          sisben: activeEnroll.sisben || undefined,
+          conflictVictim: activeEnroll.conflict_victim ?? false,
+          specialPopulation: activeEnroll.special_population || undefined,
+          previousInstitution: activeEnroll.previous_institution || undefined,
+          previousMunicipality: activeEnroll.previous_municipality || undefined,
+          previousDepartment: activeEnroll.previous_department || undefined,
+          previousGrade: activeEnroll.previous_grade || undefined,
+          previousYear: activeEnroll.previous_year || undefined,
+          observations: activeEnroll.observations || undefined
+        }
+      } else {
+        mappedEnrollment = {
+          academicYear: Number(dirStudent?.academic_year) || new Date().getFullYear(),
+          enrollmentDate: new Date().toISOString().split('T')[0],
+          enrollmentStatus: (profile.status || dirStudent?.status || 'active') as any,
+          sede: 'Principal',
+          jornada: 'Única',
+          gradeLevel: profile.grade_level || dirStudent?.grade_level || '',
+          groupName: profile.group_name || dirStudent?.group_name || '',
+          enrollmentNumber: dirStudent?.document_id || undefined,
+          simatBeneficiary: false,
+          conflictVictim: false
+        }
+      }
+
+      // Reconstruir historial académico
+      const mappedHist: StudentAcademicHistory[] = (academicHistory || []).map(h => ({
+        id: h.id,
+        year: h.year,
+        gradeLevel: h.grade_level,
+        groupName: h.group_name,
+        finalStatus: h.final_status,
+        finalAverage: h.final_average ? Number(h.final_average) : undefined,
+        result: h.result || undefined
+      }))
+
+      // Reconstruir cursos LMS
+      const mappedCourses: string[] = (studentCourses || []).map(c => c.course_id)
+
+      return {
+        id: id,
+        name: `${profile.first_name} ${profile.last_name}`,
+        email,
+        status: (profile.status || 'active') as 'active' | 'inactive',
+        joinedDate: new Date(profile.created_at).toISOString().split('T')[0],
+        details: mappedDetails,
+        contact: mappedContact,
+        guardians: mappedGuardians,
+        medical: mappedMedical,
+        documents: mappedDocs,
+        enrollment: mappedEnrollment,
+        academicHistory: mappedHist,
+        courses: mappedCourses
+      }
     }
+
+    // Caso B: Estudiante proveniente de importación Excel (en student_directory sin cuenta aún)
+    if (!profile && dirStudent) {
+      const fnParts = (dirStudent.first_name || '').trim().split(/\s+/)
+      const firstName = fnParts[0] || ''
+      const secondName = fnParts.slice(1).join(' ') || ''
+
+      const lnParts = (dirStudent.last_name || '').trim().split(/\s+/)
+      const firstSurname = lnParts[0] || ''
+      const secondSurname = lnParts.slice(1).join(' ') || ''
+
+      const cleanDoc = (dirStudent.document_id || '').trim()
+      let cleanGrade = (dirStudent.grade_level || '').trim()
+      if (/^\d+$/.test(cleanGrade)) {
+        cleanGrade = `${cleanGrade}°`
+      }
+      const cleanGroup = (dirStudent.group_name || '').trim()
+
+      const cleanFirstName = firstName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '')
+      const cleanFirstSurname = firstSurname.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '')
+      const suggestedEmail = cleanFirstName && cleanFirstSurname
+        ? `${cleanFirstName}.${cleanFirstSurname}@estudiante.ensuny.edu.co`
+        : (cleanDoc ? `${cleanDoc}@estudiante.ensuny.edu.co` : '')
+
+      const mappedDetails: StudentDetails = {
+        documentType: 'TI',
+        documentNumber: cleanDoc,
+        firstName,
+        secondName: secondName || undefined,
+        firstSurname,
+        secondSurname: secondSurname || undefined,
+        birthDate: '',
+        gender: 'M',
+        bloodType: 'O',
+        rh: '+',
+        nationality: 'Colombiana',
+        birthMunicipality: '',
+        birthDepartment: ''
+      }
+
+      const mappedEnrollment: StudentEnrollment = {
+        academicYear: Number(dirStudent.academic_year) || new Date().getFullYear(),
+        enrollmentDate: dirStudent.created_at
+          ? new Date(dirStudent.created_at).toISOString().split('T')[0]
+          : new Date().toISOString().split('T')[0],
+        enrollmentStatus: (dirStudent.status || 'active') as any,
+        sede: 'Principal',
+        jornada: 'Única',
+        gradeLevel: cleanGrade,
+        groupName: cleanGroup,
+        enrollmentNumber: cleanDoc || undefined,
+        simatBeneficiary: false,
+        estrato: 1,
+        conflictVictim: false,
+        observations: dirStudent.notes || 'Estudiante importado desde Excel'
+      }
+
+      const mappedContact: StudentContact = {
+        address: '',
+        neighborhood: '',
+        municipality: '',
+        department: '',
+        zone: 'Urbana',
+        phone: '',
+        studentCellphone: '',
+        studentEmail: suggestedEmail
+      }
+
+      const mappedGuardians: StudentGuardians = {
+        fatherName: '',
+        fatherDocument: '',
+        fatherPhone: '',
+        fatherEmail: '',
+        fatherOccupation: '',
+        motherName: '',
+        motherDocument: '',
+        motherPhone: '',
+        motherEmail: '',
+        motherOccupation: '',
+        guardianName: '',
+        guardianDocument: '',
+        guardianRelationship: 'Madre',
+        guardianPhone: '',
+        guardianEmail: '',
+        guardianAddress: '',
+        guardianOccupation: ''
+      }
+
+      const mappedMedical: StudentMedicalInfo = {
+        eps: '',
+        affiliationType: 'Contributivo',
+        ips: '',
+        allergies: '',
+        diseases: '',
+        medicines: '',
+        observations: ''
+      }
+
+      return {
+        id: dirStudent.id,
+        name: `${dirStudent.first_name} ${dirStudent.last_name}`,
+        email: suggestedEmail,
+        status: (dirStudent.status || 'active') as 'active' | 'inactive',
+        joinedDate: dirStudent.created_at
+          ? new Date(dirStudent.created_at).toISOString().split('T')[0]
+          : new Date().toISOString().split('T')[0],
+        details: mappedDetails,
+        contact: mappedContact,
+        guardians: mappedGuardians,
+        medical: mappedMedical,
+        documents: [],
+        enrollment: mappedEnrollment,
+        academicHistory: [],
+        courses: []
+      }
+    }
+
+    return null
   } catch (error) {
     console.error('Error al obtener ficha de estudiante por ID:', error)
     return null
@@ -1515,219 +1724,313 @@ export async function updateStudent(id: string, data: FullStudentData) {
     const firstName = `${data.details.firstName} ${data.details.secondName || ''}`.trim()
     const lastName = `${data.details.firstSurname} ${data.details.secondSurname || ''}`.trim()
 
-    // 2. Actualizar profiles
-    const { error: profileError } = await adminClient
+    // 2. Determinar si id corresponde a profiles o a student_directory
+    let profileId: string | null = null
+    let directoryId: string | null = null
+
+    const { data: profileCheck } = await adminClient
       .from('profiles')
-      .update({
-        first_name: firstName,
-        last_name: lastName,
-        grade_level: data.enrollment.gradeLevel,
-        group_name: data.enrollment.groupName,
-        status: data.enrollment.enrollmentStatus === 'active' ? 'active' : 'inactive'
-      })
+      .select('id')
       .eq('id', id)
+      .maybeSingle()
 
-    if (profileError) throw profileError
+    if (profileCheck) {
+      profileId = profileCheck.id
+      const { data: dirData } = await adminClient
+        .from('student_directory')
+        .select('id')
+        .eq('profile_id', profileId)
+        .maybeSingle()
+      if (dirData) directoryId = dirData.id
+    } else {
+      const { data: dirData } = await adminClient
+        .from('student_directory')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle()
 
-    // 3. Actualizar Auth
-    const { error: authError } = await adminClient.auth.admin.updateUserById(id, {
-      email: data.email,
-      user_metadata: {
-        first_name: firstName,
-        last_name: lastName,
-        role_name: 'student',
-        grade_level: data.enrollment.gradeLevel
-      }
-    })
-    if (authError) {
-      console.warn('Error al actualizar correo en Supabase Auth:', authError.message)
-    }
-
-    // 3b. Actualizar contraseña si se proporcionó una nueva
-    if (data.password && data.password.trim().length > 0) {
-      const { error: passwordError } = await adminClient.auth.admin.updateUserById(id, {
-        password: data.password
-      })
-      if (passwordError) {
-        return { error: `Error actualizando contraseña: ${passwordError.message}` }
+      if (dirData) {
+        directoryId = dirData.id
+        profileId = dirData.profile_id || null
       }
     }
 
-    // 4. Actualizar tablas de soporte (mediante upsert o insert/update)
-    const relationUpdates = [
-      adminClient.from('student_details').upsert({
-        student_id: id,
-        document_type: data.details.documentType,
-        document_number: data.details.documentNumber,
-        expedition_date: data.details.expeditionDate || null,
-        expedition_place: data.details.expeditionPlace || null,
-        first_name: data.details.firstName,
-        second_name: data.details.secondName || null,
-        first_surname: data.details.firstSurname,
-        second_surname: data.details.secondSurname || null,
-        birth_date: data.details.birthDate || new Date().toISOString().split('T')[0],
-        gender: data.details.gender,
-        blood_type: data.details.bloodType || null,
-        rh: data.details.rh || null,
-        nationality: data.details.nationality,
-        birth_municipality: data.details.birthMunicipality || null,
-        birth_department: data.details.birthDepartment || null,
-        updated_at: new Date().toISOString()
-      }),
-      adminClient.from('student_contacts').upsert({
-        student_id: id,
-        address: data.contact.address,
-        neighborhood: data.contact.neighborhood || null,
-        municipality: data.contact.municipality,
-        department: data.contact.department,
-        zone: data.contact.zone,
-        phone: data.contact.phone || null,
-        student_cellphone: data.contact.studentCellphone || null,
-        student_email: data.contact.studentEmail || null,
-        updated_at: new Date().toISOString()
-      }),
-      adminClient.from('student_guardians').upsert({
-        student_id: id,
-        father_name: data.guardians.fatherName || null,
-        father_document: data.guardians.fatherDocument || null,
-        father_phone: data.guardians.fatherPhone || null,
-        father_email: data.guardians.fatherEmail || null,
-        father_occupation: data.guardians.fatherOccupation || null,
-        mother_name: data.guardians.motherName || null,
-        mother_document: data.guardians.motherDocument || null,
-        mother_phone: data.guardians.motherPhone || null,
-        mother_email: data.guardians.motherEmail || null,
-        mother_occupation: data.guardians.motherOccupation || null,
-        guardian_name: data.guardians.guardianName,
-        guardian_document: data.guardians.guardianDocument,
-        guardian_relationship: data.guardians.guardianRelationship,
-        guardian_phone: data.guardians.guardianPhone,
-        guardian_email: data.guardians.guardianEmail || null,
-        guardian_address: data.guardians.guardianAddress || null,
-        guardian_occupation: data.guardians.guardianOccupation || null,
-        updated_at: new Date().toISOString()
-      }),
-      adminClient.from('student_medical_info').upsert({
-        student_id: id,
-        eps: data.medical.eps,
-        affiliation_type: data.medical.affiliationType || null,
-        ips: data.medical.ips || null,
-        allergies: data.medical.allergies || null,
-        diseases: data.medical.diseases || null,
-        medicines: data.medical.medicines || null,
-        observations: data.medical.observations || null,
-        updated_at: new Date().toISOString()
-      }),
-      adminClient.from('student_enrollments').upsert({
-        student_id: id,
-        academic_year: data.enrollment.academicYear,
-        enrollment_date: data.enrollment.enrollmentDate,
-        enrollment_status: data.enrollment.enrollmentStatus,
-        sede: data.enrollment.sede,
-        jornada: data.enrollment.jornada,
-        grade_level: data.enrollment.gradeLevel,
-        group_name: data.enrollment.groupName,
-        enrollment_number: data.enrollment.enrollmentNumber || null,
-        simat_beneficiary: data.enrollment.simatBeneficiary,
-        estrato: data.enrollment.estrato || null,
-        sisben: data.enrollment.sisben || null,
-        conflict_victim: data.enrollment.conflictVictim,
-        special_population: data.enrollment.specialPopulation || null,
-        previous_institution: data.enrollment.previousInstitution || null,
-        previous_municipality: data.enrollment.previousMunicipality || null,
-        previous_department: data.enrollment.previousDepartment || null,
-        previous_grade: data.enrollment.previousGrade || null,
-        previous_year: data.enrollment.previousYear || null,
-        observations: data.enrollment.observations || null,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'student_id,academic_year' })
-    ]
+    // Caso A: El estudiante está en student_directory y no tiene cuenta virtual todavía
+    if (!profileId && directoryId) {
+      // Actualizar registro en student_directory
+      const { error: dirUpdateErr } = await adminClient
+        .from('student_directory')
+        .update({
+          first_name: firstName,
+          last_name: lastName,
+          document_id: data.details.documentNumber || null,
+          grade_level: data.enrollment.gradeLevel,
+          group_name: data.enrollment.groupName,
+          status: data.enrollment.enrollmentStatus === 'active' ? 'active' : 'inactive',
+          academic_year: String(data.enrollment.academicYear),
+          notes: data.enrollment.observations || null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', directoryId)
 
-    const results = await Promise.all(relationUpdates)
-    for (const r of results) {
-      if (r.error) throw new Error(`Error en relaciones de actualización: ${r.error.message}`)
+      if (dirUpdateErr) throw dirUpdateErr
+
+      // Verificar si se ingresó un correo institucional válido para formalizar la cuenta
+      const hasValidEmail = data.email && 
+        data.email.includes('@') && 
+        !data.email.toLowerCase().includes('sin cuenta')
+
+      if (hasValidEmail) {
+        try {
+          const tempPassword = data.password && data.password.trim().length >= 6 
+            ? data.password.trim() 
+            : `Ensuny${new Date().getFullYear()}!`
+
+          const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
+            email: data.email,
+            password: tempPassword,
+            email_confirm: true,
+            user_metadata: {
+              first_name: firstName,
+              last_name: lastName,
+              role_name: 'student',
+              grade_level: data.enrollment.gradeLevel,
+            }
+          })
+
+          if (newUser?.user) {
+            profileId = newUser.user.id
+            await adminClient
+              .from('student_directory')
+              .update({ profile_id: profileId })
+              .eq('id', directoryId)
+
+            await adminClient
+              .from('profiles')
+              .update({
+                first_name: firstName,
+                last_name: lastName,
+                grade_level: data.enrollment.gradeLevel,
+                group_name: data.enrollment.groupName,
+                status: data.enrollment.enrollmentStatus === 'active' ? 'active' : 'inactive'
+              })
+              .eq('id', profileId)
+          }
+        } catch (authErr) {
+          console.warn('No se pudo crear usuario auth para estudiante de directorio:', authErr)
+        }
+      }
+
+      // Si no se creó profileId (no tenía correo válido o solo se editó directorio)
+      if (!profileId) {
+        revalidatePath('/admin/students')
+        return { success: true }
+      }
     }
 
-    // 5. Actualizar historial académico (borrar anteriores e insertar actuales)
-    const { error: delHistError } = await adminClient
-      .from('student_academic_history')
-      .delete()
-      .eq('student_id', id)
-    if (delHistError) throw delHistError
+    // Caso B: El estudiante tiene profileId (registrado o recién formalizado)
+    if (profileId) {
+      // 2. Actualizar profiles
+      const { error: profileError } = await adminClient
+        .from('profiles')
+        .update({
+          first_name: firstName,
+          last_name: lastName,
+          grade_level: data.enrollment.gradeLevel,
+          group_name: data.enrollment.groupName,
+          status: data.enrollment.enrollmentStatus === 'active' ? 'active' : 'inactive'
+        })
+        .eq('id', profileId)
 
-    if (data.academicHistory && data.academicHistory.length > 0) {
-      const histInserts = data.academicHistory.map(h => ({
-        student_id: id,
-        year: h.year,
-        grade_level: h.gradeLevel,
-        group_name: h.groupName,
-        final_status: h.finalStatus,
-        final_average: h.finalAverage || null,
-        result: h.result || null
-      }))
-      const { error: histError } = await adminClient
-        .from('student_academic_history')
-        .insert(histInserts)
-      if (histError) throw histError
-    }
+      if (profileError) throw profileError
 
-    // 6. Actualizar documentos soporte (borrar anteriores de base de datos e insertar actuales)
-    const { error: delDocsError } = await adminClient
-      .from('student_documents')
-      .delete()
-      .eq('student_id', id)
-    if (delDocsError) throw delDocsError
+      // Actualizar student_directory vinculado si existe
+      if (directoryId) {
+        await adminClient
+          .from('student_directory')
+          .update({
+            first_name: firstName,
+            last_name: lastName,
+            document_id: data.details.documentNumber || null,
+            grade_level: data.enrollment.gradeLevel,
+            group_name: data.enrollment.groupName,
+            status: data.enrollment.enrollmentStatus === 'active' ? 'active' : 'inactive',
+            academic_year: String(data.enrollment.academicYear),
+            notes: data.enrollment.observations || null,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', directoryId)
+      }
 
-    if (data.documents && data.documents.length > 0) {
-      const docInserts = data.documents.map(d => ({
-        student_id: id,
-        document_category: d.category,
-        document_name: d.name,
-        file_url: d.fileUrl,
-        file_name: d.fileName
-      }))
-      const { error: docError } = await adminClient
-        .from('student_documents')
-        .insert(docInserts)
-      if (docError) throw docError
-    }
+      // 3. Actualizar Auth
+      if (data.email && data.email.includes('@') && !data.email.toLowerCase().includes('sin cuenta')) {
+        const { error: authError } = await adminClient.auth.admin.updateUserById(profileId, {
+          email: data.email,
+          user_metadata: {
+            first_name: firstName,
+            last_name: lastName,
+            role_name: 'student',
+            grade_level: data.enrollment.gradeLevel
+          }
+        })
+        if (authError) {
+          console.warn('Error al actualizar correo en Supabase Auth:', authError.message)
+        }
+      }
 
-    // 7. Actualizar asignación de cursos (borrar anteriores de base de datos e insertar actuales)
-    const { error: delCoursesError } = await adminClient
-      .from('student_courses')
-      .delete()
-      .eq('student_id', id)
-    if (delCoursesError) throw delCoursesError
+      // 3b. Actualizar contraseña si se proporcionó una nueva
+      if (data.password && data.password.trim().length >= 6) {
+        const { error: passwordError } = await adminClient.auth.admin.updateUserById(profileId, {
+          password: data.password.trim()
+        })
+        if (passwordError) {
+          return { error: `Error actualizando contraseña: ${passwordError.message}` }
+        }
+      }
 
-    if (data.courses && data.courses.length > 0) {
-      const courseInserts = data.courses.map(courseId => ({
-        student_id: id,
-        course_id: courseId
-      }))
-      const { error: cError } = await adminClient
-        .from('student_courses')
-        .insert(courseInserts)
-      if (cError) throw cError
+      // 4. Actualizar tablas de soporte
+      const relationUpdates = [
+        adminClient.from('student_details').upsert({
+          student_id: profileId,
+          document_type: data.details.documentType,
+          document_number: data.details.documentNumber,
+          expedition_date: data.details.expeditionDate || null,
+          expedition_place: data.details.expeditionPlace || null,
+          first_name: data.details.firstName,
+          second_name: data.details.secondName || null,
+          first_surname: data.details.firstSurname,
+          second_surname: data.details.secondSurname || null,
+          birth_date: data.details.birthDate || new Date().toISOString().split('T')[0],
+          gender: data.details.gender,
+          blood_type: data.details.bloodType || null,
+          rh: data.details.rh || null,
+          nationality: data.details.nationality,
+          birth_municipality: data.details.birthMunicipality || null,
+          birth_department: data.details.birthDepartment || null,
+          updated_at: new Date().toISOString()
+        }),
+        adminClient.from('student_contacts').upsert({
+          student_id: profileId,
+          address: data.contact.address || 'Sin dirección registrada',
+          neighborhood: data.contact.neighborhood || null,
+          municipality: data.contact.municipality || 'Bucaramanga',
+          department: data.contact.department || 'Santander',
+          zone: data.contact.zone || 'Urbana',
+          phone: data.contact.phone || null,
+          student_cellphone: data.contact.studentCellphone || null,
+          student_email: data.contact.studentEmail || null,
+          updated_at: new Date().toISOString()
+        }),
+        adminClient.from('student_guardians').upsert({
+          student_id: profileId,
+          father_name: data.guardians.fatherName || null,
+          father_document: data.guardians.fatherDocument || null,
+          father_phone: data.guardians.fatherPhone || null,
+          father_email: data.guardians.fatherEmail || null,
+          father_occupation: data.guardians.fatherOccupation || null,
+          mother_name: data.guardians.motherName || null,
+          mother_document: data.guardians.motherDocument || null,
+          mother_phone: data.guardians.motherPhone || null,
+          mother_email: data.guardians.motherEmail || null,
+          mother_occupation: data.guardians.motherOccupation || null,
+          guardian_name: data.guardians.guardianName || `${firstName} (Acudiente)`,
+          guardian_document: data.guardians.guardianDocument || data.details.documentNumber || '000000',
+          guardian_relationship: data.guardians.guardianRelationship || 'Madre',
+          guardian_phone: data.guardians.guardianPhone || '0000000000',
+          guardian_email: data.guardians.guardianEmail || null,
+          guardian_address: data.guardians.guardianAddress || null,
+          guardian_occupation: data.guardians.guardianOccupation || null,
+          updated_at: new Date().toISOString()
+        }),
+        adminClient.from('student_medical_info').upsert({
+          student_id: profileId,
+          eps: data.medical.eps || 'Ninguna / Sisbén',
+          affiliation_type: data.medical.affiliationType || null,
+          ips: data.medical.ips || null,
+          allergies: data.medical.allergies || null,
+          diseases: data.medical.diseases || null,
+          medicines: data.medical.medicines || null,
+          observations: data.medical.observations || null,
+          updated_at: new Date().toISOString()
+        }),
+        adminClient.from('student_enrollments').upsert({
+          student_id: profileId,
+          academic_year: data.enrollment.academicYear,
+          enrollment_date: data.enrollment.enrollmentDate,
+          enrollment_status: data.enrollment.enrollmentStatus,
+          sede: data.enrollment.sede,
+          jornada: data.enrollment.jornada,
+          grade_level: data.enrollment.gradeLevel,
+          group_name: data.enrollment.groupName,
+          enrollment_number: data.enrollment.enrollmentNumber || null,
+          simat_beneficiary: data.enrollment.simatBeneficiary,
+          estrato: data.enrollment.estrato || null,
+          sisben: data.enrollment.sisben || null,
+          conflict_victim: data.enrollment.conflictVictim,
+          special_population: data.enrollment.specialPopulation || null,
+          previous_institution: data.enrollment.previousInstitution || null,
+          previous_municipality: data.enrollment.previousMunicipality || null,
+          previous_department: data.enrollment.previousDepartment || null,
+          previous_grade: data.enrollment.previousGrade || null,
+          previous_year: data.enrollment.previousYear || null,
+          observations: data.enrollment.observations || null,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'student_id,academic_year' })
+      ]
+
+      const results = await Promise.all(relationUpdates)
+      for (const r of results) {
+        if (r.error) console.warn('Advertencia en relaciones de actualización:', r.error.message)
+      }
+
+      // 5. Historial académico
+      await adminClient.from('student_academic_history').delete().eq('student_id', profileId)
+      if (data.academicHistory && data.academicHistory.length > 0) {
+        const histInserts = data.academicHistory.map(h => ({
+          student_id: profileId,
+          year: h.year,
+          grade_level: h.gradeLevel,
+          group_name: h.groupName,
+          final_status: h.finalStatus,
+          final_average: h.finalAverage || null,
+          result: h.result || null
+        }))
+        await adminClient.from('student_academic_history').insert(histInserts)
+      }
+
+      // 6. Documentos
+      await adminClient.from('student_documents').delete().eq('student_id', profileId)
+      if (data.documents && data.documents.length > 0) {
+        const docInserts = data.documents.map(d => ({
+          student_id: profileId,
+          document_category: d.category,
+          document_name: d.name,
+          file_url: d.fileUrl,
+          file_name: d.fileName
+        }))
+        await adminClient.from('student_documents').insert(docInserts)
+      }
+
+      // 7. Cursos
+      await adminClient.from('student_courses').delete().eq('student_id', profileId)
+      if (data.courses && data.courses.length > 0) {
+        const courseInserts = data.courses.map(courseId => ({
+          student_id: profileId,
+          course_id: courseId
+        }))
+        await adminClient.from('student_courses').insert(courseInserts)
+      }
     }
 
     revalidatePath('/admin/students')
     return { success: true }
   } catch (error: any) {
     console.error('Error en updateStudent:', error)
-    return { error: error.message || 'Error interno al actualizar estudiante.' }
+    return { error: error.message || 'Error al actualizar estudiante.' }
   }
 }
 
-export type {
-  ModulePermission,
-  AdminModuleDefinition,
-  AdministratorUser
-} from '../domain/modulePermissions'
-import {
-  ALL_ADMIN_MODULES,
-  type ModulePermission,
-  type AdministratorUser
-} from '../domain/modulePermissions'
+
 
 /**
  * Obtener lista de usuarios con rol de Administrador.

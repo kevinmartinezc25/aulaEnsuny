@@ -16,7 +16,8 @@ import {
   ShieldCheck,
   Award,
   Layers,
-  CheckCircle2
+  CheckCircle2,
+  GraduationCap
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -150,7 +151,16 @@ export default function LandingPage() {
           </Link>
 
           {/* Enlaces y Acciones */}
-          <div className="flex items-center gap-1.5 sm:gap-4 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+            {/* Acceso rápido directo a Calificaciones */}
+            <Link
+              href="/consulta-calificaciones/login"
+              className="hidden sm:inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-emerald-700 dark:text-emerald-300 hover:text-emerald-800 dark:hover:text-emerald-200 px-3.5 py-1.5 rounded-full bg-emerald-50 hover:bg-emerald-100/80 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/60 transition-all active:scale-95 duration-100 shadow-xs"
+            >
+              <GraduationCap className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+              <span>Calificaciones</span>
+            </Link>
+
             <Link
               href="/docs"
               className="hidden md:inline-flex items-center text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-300 hover:text-[#1F4E31] dark:hover:text-emerald-400 transition-colors active:scale-95 duration-100"
@@ -213,14 +223,25 @@ export default function LandingPage() {
               Ecosistema escolar diseñado para la Escuela Normal Superior del Nordeste. Seguimiento de notas, gestión académica y acceso directo a lecciones.
             </p>
 
-            {/* Botones de Acción */}
-            <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3.5 pt-2">
-              <Link href="/login" className="w-full sm:w-auto">
-                <Button className="w-full sm:w-auto rounded-2xl bg-[#1F4E31] hover:bg-[#183e27] text-white font-semibold text-sm px-6 h-12 shadow-sm shadow-emerald-950/20 active:scale-[0.98] duration-100 ease-out dark:bg-emerald-600 dark:hover:bg-emerald-700 cursor-pointer flex items-center justify-center gap-2">
-                  <span>Acceder a mi cuenta</span>
-                  <ArrowRight className="h-4 w-4" />
+            {/* Botones de Acción Principales */}
+            <div className="flex flex-col sm:flex-row flex-wrap items-center justify-center lg:justify-start gap-3.5 pt-2">
+              {/* Botón Principal Destacado: Consultar Calificaciones */}
+              <Link href="/consulta-calificaciones/login" className="w-full sm:w-auto">
+                <Button className="w-full sm:w-auto rounded-2xl bg-gradient-to-r from-emerald-600 via-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-bold text-sm px-6 h-12 shadow-lg shadow-emerald-600/25 hover:shadow-emerald-600/35 active:scale-[0.98] duration-100 ease-out cursor-pointer flex items-center justify-center gap-2 border border-emerald-400/30">
+                  <GraduationCap className="h-5 w-5 text-emerald-100" />
+                  <span>Consultar Calificaciones</span>
                 </Button>
               </Link>
+
+              {/* Botón Acceder a mi cuenta */}
+              <Link href="/login" className="w-full sm:w-auto">
+                <Button className="w-full sm:w-auto rounded-2xl bg-[#1F4E31] hover:bg-[#183e27] text-white font-semibold text-sm px-6 h-12 shadow-sm shadow-emerald-950/20 active:scale-[0.98] duration-100 ease-out dark:bg-slate-800 dark:hover:bg-slate-700 cursor-pointer flex items-center justify-center gap-2">
+                  <span>Acceder a mi cuenta</span>
+                  <ArrowRight className="h-4 w-4 opacity-70" />
+                </Button>
+              </Link>
+
+              {/* Botón Registro de estudiantes */}
               <Link href="/register/student" className="w-full sm:w-auto">
                 <Button
                   variant="outline"
@@ -429,6 +450,9 @@ export default function LandingPage() {
           </p>
 
           <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-xs font-medium text-slate-500 dark:text-slate-400">
+            <Link href="/consulta-calificaciones/login" className="text-emerald-700 dark:text-emerald-400 font-semibold hover:underline transition-colors">
+              Consultar Calificaciones
+            </Link>
             <Link href="/login" className="hover:text-[#1F4E31] dark:hover:text-emerald-400 transition-colors">
               Iniciar Sesión
             </Link>
