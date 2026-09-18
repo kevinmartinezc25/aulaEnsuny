@@ -263,64 +263,65 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
   }
 
   return (
-    <div className="flex h-full flex-col bg-slate-50 dark:bg-slate-950">
+    <div className="flex h-full min-h-0 flex-col bg-slate-50 dark:bg-slate-950">
       {/* Header Fijo */}
-      <div className="shrink-0 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 sm:px-6 py-0.5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-0 gap-1">
-          <div className="flex items-center gap-4">
-            <Link href="/teacher/planilla-asistida" className="p-2 -ml-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-slate-300">
-              <ArrowLeft className="h-5 w-5" />
+      <div className="shrink-0 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 sm:px-6">
+        <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-3 pt-2">
+          
+          <div className="flex items-center gap-3 mb-1 xl:mb-0">
+            <Link href="/teacher/planilla-asistida" className="p-1.5 -ml-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-slate-300">
+              <ArrowLeft className="h-4 w-4" />
             </Link>
-            <div>
-              <h1 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <FileSpreadsheet className="h-5 w-5 text-emerald-600 dark:text-emerald-500" />
+            <div className="flex items-center gap-2">
+              <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                <FileSpreadsheet className="h-4 w-4 text-emerald-600 dark:text-emerald-500" />
                 {subjectData?.name || 'Cargando...'}
               </h1>
-              <p className="text-xs font-medium text-slate-500">
-                {subjectData?.grade ? `Grado ${subjectData.grade}${subjectData.group_number ? ` - Grupo ${subjectData.group_number}` : ''}` : 'Planilla Asistida'}
-              </p>
+              <span className="text-[11px] font-semibold text-slate-500 px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 rounded-md">
+                {subjectData?.grade ? `G${subjectData.grade}${subjectData.group_number ? ` - ${subjectData.group_number}` : ''}` : 'Planilla Asistida'}
+              </span>
             </div>
           </div>
           
-          <div className="flex items-center gap-3">
-            <Button onClick={handleExportExcel} variant="outline" className="text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border-emerald-200">
-              <Download className="h-4 w-4 mr-2" />
-              Exportar a Excel
+          {/* Tabs */}
+          <div className="flex items-center gap-5 overflow-x-auto custom-scrollbar flex-1 xl:ml-6">
+            <button 
+              onClick={() => setActiveTab('planilla')}
+              className={`pb-2 text-[13px] font-semibold border-b-2 transition-colors whitespace-nowrap ${activeTab === 'planilla' ? 'border-emerald-600 text-emerald-700 dark:text-emerald-500' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+            >
+              Planilla
+            </button>
+            <button 
+              onClick={() => setActiveTab('asistencia')}
+              className={`pb-2 text-[13px] font-semibold border-b-2 transition-colors whitespace-nowrap ${activeTab === 'asistencia' ? 'border-emerald-600 text-emerald-700 dark:text-emerald-500' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+            >
+              Asistencia
+            </button>
+            <button 
+              onClick={() => setActiveTab('estudiantes')}
+              className={`pb-2 text-[13px] font-semibold border-b-2 transition-colors whitespace-nowrap ${activeTab === 'estudiantes' ? 'border-emerald-600 text-emerald-700 dark:text-emerald-500' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+            >
+              Estudiantes
+            </button>
+            <button 
+              onClick={() => setActiveTab('actividades')}
+              className={`pb-2 text-[13px] font-semibold border-b-2 transition-colors whitespace-nowrap ${activeTab === 'actividades' ? 'border-emerald-600 text-emerald-700 dark:text-emerald-500' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+            >
+              Estructura
+            </button>
+          </div>
+          
+          <div className="flex items-center pb-2 xl:pb-1 shrink-0">
+            <Button onClick={handleExportExcel} variant="outline" className="text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border-emerald-200 h-7 text-xs px-2.5">
+              <Download className="h-3 w-3 mr-1.5" />
+              Exportar
             </Button>
           </div>
-        </div>
-
-        {/* Tabs */}
-        <div className="flex items-center gap-6 border-b border-slate-100 dark:border-slate-800 overflow-x-auto custom-scrollbar">
-          <button 
-            onClick={() => setActiveTab('planilla')}
-            className={`pb-3 text-sm font-semibold border-b-2 transition-colors ${activeTab === 'planilla' ? 'border-emerald-600 text-emerald-700 dark:text-emerald-500' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-          >
-            Planilla
-          </button>
-          <button 
-            onClick={() => setActiveTab('asistencia')}
-            className={`pb-3 text-sm font-semibold border-b-2 transition-colors ${activeTab === 'asistencia' ? 'border-emerald-600 text-emerald-700 dark:text-emerald-500' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-          >
-            Asistencia
-          </button>
-          <button 
-            onClick={() => setActiveTab('estudiantes')}
-            className={`pb-3 text-sm font-semibold border-b-2 transition-colors ${activeTab === 'estudiantes' ? 'border-emerald-600 text-emerald-700 dark:text-emerald-500' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-          >
-            Estudiantes
-          </button>
-          <button 
-            onClick={() => setActiveTab('actividades')}
-            className={`pb-3 text-sm font-semibold border-b-2 transition-colors ${activeTab === 'actividades' ? 'border-emerald-600 text-emerald-700 dark:text-emerald-500' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-          >
-            Estructura de Evaluación
-          </button>
         </div>
       </div>
 
       {/* Contenido Principal Scrollable */}
-      <div className="flex-1 overflow-auto p-6">
+      <div className={`flex-1 ${['planilla', 'asistencia'].includes(activeTab) ? 'overflow-hidden flex flex-col p-2 sm:p-4' : 'overflow-auto p-6'}`}>
         {activeTab === 'estudiantes' && (
           <div className="max-w-4xl mx-auto space-y-6">
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
@@ -536,7 +537,7 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
         )}
 
         {activeTab === 'planilla' && (
-          <div className="h-full relative min-h-[500px]">
+          <div className="flex-1 relative flex flex-col min-h-0">
             {isLoadingPlanilla ? (
               <div className="flex flex-col items-center justify-center h-full text-slate-500">
                 <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mb-4" />
@@ -549,7 +550,7 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
         )}
 
         {activeTab === 'asistencia' && (
-          <div className="h-full relative min-h-[500px] flex flex-col">
+          <div className="flex-1 relative flex flex-col min-h-0">
             {isLoadingPlanilla ? (
               <div className="flex flex-col items-center justify-center h-full text-slate-500">
                 <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mb-4" />
@@ -558,7 +559,7 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
             ) : (
               <>
                 <AttendanceDashboard />
-                <div className="flex-1">
+                <div className="flex-1 min-h-0 flex flex-col mt-2">
                   <AttendanceTable subjectId={subjectId} />
                 </div>
               </>

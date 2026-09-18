@@ -148,20 +148,34 @@ export async function getAssistedAttendance(subjectId: string): Promise<Assisted
   return attendance as AssistedAttendance[]
 }
 
-export async function saveAssistedAttendance(records: { session_id: string, student_id: string, status: 'A' | 'I' | 'E' }[]): Promise<boolean> {
+export async function saveAssistedAttendance(records: { session_id: string, student_id: string, status: 'A' | 'I' | 'E' | null }[]): Promise<boolean> {
   const supabase = await createClient()
   const { data: userData, error: authError } = await supabase.auth.getUser()
   if (authError || !userData?.user) throw new Error('No autorizado')
 
   if (records.length === 0) return true
 
-  const { error } = await supabase
-    .from('assisted_attendance')
-    .upsert(records, { onConflict: 'session_id, student_id' })
+  const toUpsert = records.filter(r => r.status !== null)
+  const toDelete = records.filter(r => r.status === null)
 
-  if (error) {
-    console.error('Error saving attendance:', error)
-    throw new Error('Error al guardar la asistencia')
+  if (toUpsert.length > 0) {
+    const { error } = await supabase
+      .from('assisted_attendance')
+      .upsert(toUpsert, { onConflict: 'session_id, student_id' })
+
+    if (error) {
+      console.error('Error saving attendance:', error)
+      throw new Error('Error al guardar la asistencia')
+    }
+  }
+
+  if (toDelete.length > 0) {
+    await Promise.all(toDelete.map(r => 
+      supabase
+        .from('assisted_attendance')
+        .delete()
+        .match({ session_id: r.session_id, student_id: r.student_id })
+    ))
   }
 
   return true

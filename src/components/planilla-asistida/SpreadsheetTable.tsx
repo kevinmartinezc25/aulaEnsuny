@@ -515,29 +515,29 @@ export function SpreadsheetTable({ subjectId }: SpreadsheetTableProps) {
 
   return (
     <div className="flex flex-col h-full select-none" ref={tableRef}>
-      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-4 px-2">
-        <div className="text-sm text-slate-500 flex items-center gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center mb-2 px-1">
+        <div className="text-xs text-slate-500 flex items-center gap-2">
           {isSaving ? (
-            <span className="flex items-center text-amber-600"><span className="h-2 w-2 bg-amber-500 rounded-full animate-pulse mr-2"></span> Guardando...</span>
+            <span className="flex items-center text-amber-600"><span className="h-1.5 w-1.5 bg-amber-500 rounded-full animate-pulse mr-1.5"></span> Guardando...</span>
           ) : hasUnsavedChanges ? (
             <span className="text-slate-400">Cambios sin guardar</span>
           ) : (
-            <span className="flex items-center text-emerald-600"><span className="h-2 w-2 bg-emerald-500 rounded-full mr-2"></span> Guardado</span>
+            <span className="flex items-center text-emerald-600"><span className="h-1.5 w-1.5 bg-emerald-500 rounded-full mr-1.5"></span> Guardado</span>
           )}
         </div>
         <div className="flex items-center gap-2">
           {/* Estadísticas */}
-          <div className="hidden lg:flex items-center gap-4 mr-4 px-4 py-1.5 bg-slate-100 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
-            <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-              <TrendingUp className="h-4 w-4 text-blue-500" />
+          <div className="hidden lg:flex items-center gap-3 mr-3 px-3 py-1 bg-slate-100 dark:bg-slate-800/50 rounded-md border border-slate-200 dark:border-slate-700">
+            <div className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300">
+              <TrendingUp className="h-3.5 w-3.5 text-blue-500" />
               <span className="font-medium">Promedio:</span>
               <span className={`font-bold ${classAverage > 0 && classAverage < 3.0 ? 'text-red-500' : 'text-slate-900 dark:text-white'}`}>
                 {classAverage > 0 ? classAverage.toFixed(1) : '-'}
               </span>
             </div>
-            <div className="w-px h-4 bg-slate-300 dark:bg-slate-600"></div>
-            <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-              <Users className="h-4 w-4 text-emerald-500" />
+            <div className="w-px h-3 bg-slate-300 dark:bg-slate-600"></div>
+            <div className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300">
+              <Users className="h-3.5 w-3.5 text-emerald-500" />
               <span className="font-medium">Aprobados:</span>
               <span className={`font-bold ${passingPercentage < 50 ? 'text-amber-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
                 {validStudents > 0 ? `${passingPercentage}%` : '-'}
@@ -547,38 +547,38 @@ export function SpreadsheetTable({ subjectId }: SpreadsheetTableProps) {
 
           <button
             onClick={() => setIsLocked(!isLocked)}
-            className={`flex items-center justify-center p-1.5 border rounded-lg transition-colors ${
+            className={`flex items-center justify-center p-1 border rounded-md transition-colors ${
               isLocked 
                 ? 'border-red-200 bg-red-50 text-red-600 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400' 
                 : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400'
             }`}
             title={isLocked ? "Desbloquear edición" : "Bloquear edición"}
           >
-            {isLocked ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
+            {isLocked ? <Lock className="h-3.5 w-3.5" /> : <Unlock className="h-3.5 w-3.5" />}
           </button>
           
           <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
             <input 
               type="text"
               placeholder="Buscar estudiante..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8 pr-3 py-1.5 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white"
+              className="pl-7 pr-2 py-1 text-xs border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white"
             />
           </div>
           <button 
             onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
-            className="flex items-center justify-center p-1.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+            className="flex items-center justify-center p-1 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
             title={sortOrder === 'asc' ? "Ordenar Z-A" : "Ordenar A-Z"}
           >
-            {sortOrder === 'asc' ? <ArrowDownAZ className="h-4 w-4" /> : <ArrowDownZA className="h-4 w-4" />}
+            {sortOrder === 'asc' ? <ArrowDownAZ className="h-3.5 w-3.5" /> : <ArrowDownZA className="h-3.5 w-3.5" />}
           </button>
         </div>
       </div>
 
       <div className="overflow-auto border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 shadow-sm relative custom-scrollbar flex-1">
-        <table className="w-full min-w-max border-collapse text-sm table-fixed">
+        <table className="w-max min-w-full border-collapse text-sm">
           <thead className="sticky top-0 z-40 shadow-sm">
             {/* Fila 1: Logros */}
             <tr>
@@ -604,7 +604,7 @@ export function SpreadsheetTable({ subjectId }: SpreadsheetTableProps) {
                 )
               })}
               <th rowSpan={3} className="bg-slate-100 dark:bg-slate-800 border-b border-l border-slate-200 dark:border-slate-700 font-bold sticky right-0 z-50 shadow-[-4px_0_10px_rgba(0,0,0,0.05)] w-16 min-w-[64px] align-bottom pb-4">
-                <div className="writing-vertical-rl transform rotate-180 text-xs font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap mx-auto h-32 text-left uppercase tracking-wide">
+                <div className="writing-vertical-rl transform rotate-180 text-xs font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap mx-auto h-24 text-left uppercase tracking-wide">
                   Promedio final
                 </div>
               </th>
@@ -645,7 +645,7 @@ export function SpreadsheetTable({ subjectId }: SpreadsheetTableProps) {
 
                 headers.push(
                   <th key={`${ach.id}-prom`} rowSpan={2} className={`border-b border-r ${color.border} ${color.bg} align-bottom pb-3 w-12 min-w-[48px]`}>
-                    <div className={`writing-vertical-rl transform rotate-180 text-xs font-bold ${color.text} whitespace-nowrap mx-auto h-28 text-left uppercase tracking-wide`}>
+                    <div className={`writing-vertical-rl transform rotate-180 text-xs font-bold ${color.text} whitespace-nowrap mx-auto h-20 text-left uppercase tracking-wide`}>
                       Promedio
                     </div>
                   </th>
@@ -667,7 +667,7 @@ export function SpreadsheetTable({ subjectId }: SpreadsheetTableProps) {
 
                   return compActivities.map(act => (
                     <th key={act.id} className="px-1 pt-6 pb-2 border-b border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 w-12 min-w-[48px]">
-                      <div className="writing-vertical-rl transform rotate-180 text-[11px] font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap mx-auto h-28 text-left uppercase tracking-wide">
+                      <div className="writing-vertical-rl transform rotate-180 text-[11px] font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap mx-auto h-20 text-left uppercase tracking-wide">
                         {act.name}
                       </div>
                     </th>
