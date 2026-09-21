@@ -245,10 +245,12 @@ export default function EmergencyScheduleView({ profileId, academicTeacherId }: 
                     content = (
                       <div className="flex-1">
                         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
-                          <h4 className="text-lg font-bold text-slate-900 dark:text-slate-100">{regularClass.subject}</h4>
-                          <span className="inline-block px-3 py-1 bg-indigo-50 dark:bg-indigo-500/10 rounded-xl text-xs font-black text-indigo-700 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800/50">
-                            {regularClass.group}
-                          </span>
+                          <h4 className="text-lg font-bold text-slate-900 dark:text-slate-100 text-center break-words">{regularClass.subject}</h4>
+                          {regularClass.group !== 'Jornada Institucional' && (
+                            <span className="inline-block px-3 py-1 bg-indigo-50 dark:bg-indigo-500/10 rounded-xl text-xs font-black text-indigo-700 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800/50 text-center break-words">
+                              {regularClass.group}
+                            </span>
+                          )}
                         </div>
                         {regularClass.room && (
                           <p className="text-xs text-slate-500 mt-2 font-medium">Salón: <span className="font-bold text-slate-700 dark:text-slate-300">{regularClass.room}</span></p>
@@ -258,8 +260,8 @@ export default function EmergencyScheduleView({ profileId, academicTeacherId }: 
                   }
                 } else {
                   content = (
-                    <div className="flex-1 flex items-center text-slate-400 dark:text-slate-500 text-sm font-bold tracking-wide italic px-2">
-                      --- Hora Libre ---
+                    <div className="flex-1 flex items-center text-slate-400 dark:text-slate-500 text-sm font-semibold tracking-wide px-2">
+                      Sin clase Asignada
                     </div>
                   )
                 }

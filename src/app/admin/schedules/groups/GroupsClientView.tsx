@@ -1,10 +1,10 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Users, Info, ArrowUpRight, Search, CheckCircle2 } from 'lucide-react'
+import { Users, Info, ArrowUpRight, Search, CheckCircle2, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { assignGroupDirector, updateGroupLevel } from './actions'
+import { assignGroupDirector, updateGroupLevel, deleteGroupAction } from './actions'
 
 type Group = {
   id: string
@@ -86,6 +86,20 @@ export default function GroupsClientView({ initialGroups, levelsCount, available
       toast.error(res.error || 'Error al asignar director')
     }
     
+    setLoadingGroupId(null)
+  }
+
+  // Eliminar grupo (solo si no tiene cargas académicas / horario asociado)
+  const handleDeleteGroup = async (group: Group) => {
+    if (!window.confirm(`¿Eliminar el grupo "${group.name}"? Esta acción no se puede deshacer.`)) return
+    setLoadingGroupId(group.id)
+    const res = await deleteGroupAction(group.id)
+    if (res.success) {
+      toast.success(`Grupo "${group.name}" eliminado`)
+      setGroups(prev => prev.filter(g => g.id !== group.id))
+    } else {
+      toast.error(res.error || 'No se pudo eliminar el grupo')
+    }
     setLoadingGroupId(null)
   }
 
@@ -212,13 +226,26 @@ export default function GroupsClientView({ initialGroups, levelsCount, available
                     </div>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <Link 
-                      href={`/admin/schedules?view=group&id=${group.id}&group=${encodeURIComponent(group.name)}`}
-                      className="inline-flex items-center gap-1 text-sm font-semibold text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 transition-colors"
-                    >
-                      Ver Horario
-                      <ArrowUpRight className="h-4 w-4" />
-                    </Link>
+                    <div className="flex items-center justify-end gap-2">
+                      <Link 
+                        href={`/admin/schedules?view=group&id=${group.id}&group=${encodeURIComponent(group.name)}`}
+                        className="inline-flex items-center gap-1 text-sm font-semibold text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 transition-colors"
+                      >
+                        Ver Horario
+                        <ArrowUpRight className="h-4 w-4" />
+                      </Link>
+                      {/* Botón eliminar: visible solo si el grupo no tiene nivel (posiblemente corrupto) */}
+                      {!group.level && (
+                        <button
+                          onClick={() => handleDeleteGroup(group)}
+                          disabled={loadingGroupId === group.id}
+                          title="Eliminar grupo corrupto o duplicado"
+                          className="p-1.5 rounded-lg text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 transition-colors disabled:opacity-40"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

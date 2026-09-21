@@ -185,19 +185,19 @@ export default function PrintableSchedule({ groupName, directorName, classes, ti
                               <div className="w-full h-full flex flex-col justify-center items-center text-center px-1.5 py-1">
                                 {isTeacherView ? (
                                   <>
-                                    <span className="font-black text-xl text-[#1e293b] leading-tight tracking-tight">
-                                      {cls.group || cls.teacher}
+                                    <span className="font-black text-xl text-[#1e293b] leading-tight tracking-tight text-center break-words">
+                                      {cls.group === 'Jornada Institucional' ? cls.subject : (cls.group || cls.teacher)}
                                     </span>
-                                    <span className="text-[9px] font-semibold text-slate-600 mt-0.5 line-clamp-1">
-                                      {cls.subject}
+                                    <span className="text-[9px] font-semibold text-slate-600 mt-0.5 text-center break-words">
+                                      {cls.group === 'Jornada Institucional' ? '' : cls.subject}
                                     </span>
                                   </>
                                 ) : (
                                   <>
-                                    <span className="font-bold text-[12px] text-[#1e293b] leading-tight line-clamp-2">
+                                    <span className="font-bold text-[12px] text-[#1e293b] leading-tight text-center break-words">
                                       {cls.subject}
                                     </span>
-                                    <span className="text-[10px] text-slate-600 mt-1 line-clamp-1">
+                                    <span className="text-[10px] text-slate-600 mt-1 text-center break-words">
                                       {cls.teacher}
                                     </span>
                                   </>

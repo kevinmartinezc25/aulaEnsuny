@@ -253,7 +253,7 @@ export default function MobileTeacherSchedule({
               const covering = coveringSubstitutions.find(s => s.period_id === periodId)
 
               // Determine status and details
-              let cardTitle = 'Hora Libre'
+              let cardTitle = 'Sin clase Asignada'
               let cardSubtitle = ''
               let cardRoom = ''
               let cardColor = '#94a3b8' // Slate-400
@@ -297,7 +297,7 @@ export default function MobileTeacherSchedule({
                   <div 
                     className={`absolute -left-[31px] top-4 w-4 h-4 rounded-full border-4 border-slate-50 dark:border-[#0a0f1c] transition-colors ${
                       isFree 
-                        ? 'bg-slate-300 dark:bg-slate-700' 
+                        ? 'bg-emerald-400 dark:bg-emerald-500' 
                         : statusType === 'cancelled'
                         ? 'bg-rose-500'
                         : statusType === 'covered'
@@ -309,37 +309,41 @@ export default function MobileTeacherSchedule({
                   />
 
                   {/* Period Card */}
-                  <div className={`bg-white dark:bg-slate-900 border rounded-2xl shadow-sm overflow-hidden transition-all ${
+                  <div className={`border rounded-2xl shadow-xs overflow-hidden transition-all ${
                     isFree 
-                      ? 'border-slate-200 dark:border-slate-800 opacity-60' 
-                      : 'border-slate-200 dark:border-slate-800 hover:shadow-md'
+                      ? 'bg-emerald-50/70 dark:bg-emerald-950/25 border-emerald-200/80 dark:border-emerald-800/60' 
+                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:shadow-md'
                   }`}>
                     {/* Color Bar */}
-                    {!isFree && (
-                      <div className="h-1.5 w-full" style={{ backgroundColor: cardColor }} />
-                    )}
+                    <div className="h-1.5 w-full" style={{ backgroundColor: isFree ? '#34d399' : cardColor }} />
 
                     <div className="p-4">
                       {/* Header: Period & Time */}
                       <div className="flex justify-between items-center mb-2">
-                        <span className="text-xs font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
+                        <span className={`text-xs font-black uppercase tracking-wider ${isFree ? 'text-emerald-700 dark:text-emerald-300' : 'text-indigo-600 dark:text-indigo-400'}`}>
                           {periodId}ª Hora
                         </span>
-                        <div className="flex items-center gap-1 text-slate-400 dark:text-slate-500">
+                        <div className={`flex items-center gap-1 ${isFree ? 'text-emerald-600/70 dark:text-emerald-400/70' : 'text-slate-400 dark:text-slate-500'}`}>
                           <Clock className="h-3.5 w-3.5" />
                           <span className="text-[11px] font-bold">{slot.startTime} - {slot.endTime}</span>
                         </div>
                       </div>
 
                       {/* Body: Subject & Teacher/Group */}
-                      <div className="space-y-1">
-                        <h3 className={`text-base font-black leading-tight ${isFree ? 'text-slate-400 dark:text-slate-500' : 'text-slate-800 dark:text-slate-100'}`}>
+                      <div className="space-y-1 min-w-0 w-full">
+                        <h3 className={`text-base font-black leading-tight text-center break-words whitespace-normal w-full ${isFree ? 'text-emerald-900 dark:text-emerald-100' : 'text-slate-800 dark:text-slate-100'}`}>
                           {cardTitle}
                         </h3>
-                        {cardSubtitle && (
-                          <p className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                        {cardSubtitle && cardSubtitle !== 'Jornada Institucional' && (
+                          <p className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center justify-center gap-1 text-center break-words whitespace-normal w-full">
                             <User className="h-3.5 w-3.5 shrink-0 text-slate-400" />
                             <span>{cardSubtitle}</span>
+                          </p>
+                        )}
+                        {isFree && (
+                          <p className="text-xs font-medium text-emerald-700/70 dark:text-emerald-400/70 flex items-center justify-center gap-1 text-center break-words whitespace-normal w-full">
+                            <Coffee className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                            <span>Disponibilidad / Tiempo Libre</span>
                           </p>
                         )}
                       </div>
@@ -354,8 +358,8 @@ export default function MobileTeacherSchedule({
                                 {cardRoom}
                               </span>
                             )}
-                            {cardGroup && (
-                              <span className="text-[10px] px-2 py-0.5 bg-slate-100 dark:bg-slate-800 rounded-md text-slate-700 dark:text-slate-300 font-black uppercase tracking-wider">
+                            {cardGroup && cardGroup !== 'Jornada Institucional' && (
+                              <span className="text-[10px] px-2 py-0.5 bg-slate-100 dark:bg-slate-800 rounded-md text-slate-700 dark:text-slate-300 font-black uppercase tracking-wider text-center break-words">
                                 {cardGroup}
                               </span>
                             )}
@@ -427,8 +431,10 @@ export default function MobileTeacherSchedule({
                                 style={{ borderTop: `4px solid ${color}`, backgroundColor: `${color}15` }}
                               >
                                 <div className="h-full min-h-[50px] flex flex-col items-center justify-center p-0.5">
-                                  <span className="text-[8px] font-bold text-slate-800 dark:text-slate-200 mb-0.5 leading-tight text-center line-clamp-3">{cls.subject}</span>
-                                  <span className="text-[7px] text-slate-500 dark:text-slate-400 leading-tight text-center truncate w-full px-0.5">{teacherOrGroup}</span>
+                                  <span className="text-[8px] font-bold text-slate-800 dark:text-slate-200 mb-0.5 leading-tight text-center break-words w-full">{cls.subject}</span>
+                                  {teacherOrGroup && teacherOrGroup !== 'Jornada Institucional' && (
+                                    <span className="text-[7px] text-slate-500 dark:text-slate-400 leading-tight text-center break-words w-full px-0.5">{teacherOrGroup}</span>
+                                  )}
                                 </div>
                               </td>
                             )

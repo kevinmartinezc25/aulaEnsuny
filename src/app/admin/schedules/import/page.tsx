@@ -1,12 +1,15 @@
 import { Metadata } from 'next'
 import { AscImportView } from './components/AscImportView'
+import { getScheduleEntitiesAction } from './importActions'
 
 export const metadata: Metadata = {
   title: 'Importar Horario | aulaEnsuny',
   description: 'Importar horario desde aSc TimeTables',
 }
 
-export default function ImportSchedulePage() {
+export default async function ImportSchedulePage() {
+  const initialEntities = await getScheduleEntitiesAction()
+
   return (
     <div className="container max-w-6xl mx-auto px-4 py-8">
       <div className="mb-8">
@@ -18,7 +21,12 @@ export default function ImportSchedulePage() {
         </p>
       </div>
 
-      <AscImportView />
+      <AscImportView 
+        initialTeachers={initialEntities.teachers || []} 
+        initialProfiles={initialEntities.profiles || []}
+        initialGroups={initialEntities.groups || []} 
+      />
     </div>
   )
 }
+
