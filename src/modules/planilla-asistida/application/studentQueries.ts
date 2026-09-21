@@ -14,21 +14,37 @@ export interface StudentSubjectView {
   achievementsCount: number
 }
 
+function getCandidateDirectoryIds(session: { directoryId?: string; profileId?: string | null }): string[] {
+  const ids = new Set<string>()
+  if (session.directoryId) {
+    ids.add(session.directoryId)
+    ids.add(`prof-${session.directoryId}`)
+    ids.add(`dir-${session.directoryId}`)
+  }
+  if (session.profileId) {
+    ids.add(session.profileId)
+    ids.add(`prof-${session.profileId}`)
+    ids.add(`dir-${session.profileId}`)
+  }
+  return Array.from(ids)
+}
+
 export async function getStudentSubjects(): Promise<StudentSubjectView[]> {
   const session = await getPlanillaStudentSession()
   if (!session) throw new Error('No autorizado')
 
   const supabase = createAdminClient()
   const trimmedFullName = session.fullName.trim()
+  const candidateIds = getCandidateDirectoryIds(session)
 
   // 1. Obtener todas las inscripciones en planillas asistidas de este estudiante
   let enrollments: Array<{ id: string; subject_id: string }> = []
 
-  if (session.directoryId) {
+  if (candidateIds.length > 0) {
     const { data: byDir, error: dirError } = await supabase
       .from('assisted_students')
       .select('id, subject_id')
-      .eq('directory_id', session.directoryId)
+      .in('directory_id', candidateIds)
 
     if (!dirError && byDir) {
       enrollments.push(...byDir)
@@ -91,16 +107,18 @@ export async function getStudentGradesView(subjectId: string) {
 
   const supabase = createAdminClient()
   const trimmedFullName = session.fullName.trim()
+  const candidateIds = getCandidateDirectoryIds(session)
 
   // 1. Validar pertenencia a la materia
   let enrollment: { id: string; number: number } | null = null
 
-  if (session.directoryId) {
+  if (candidateIds.length > 0) {
     const { data: byDir, error: dirError } = await supabase
       .from('assisted_students')
       .select('id, number')
       .eq('subject_id', subjectId)
-      .eq('directory_id', session.directoryId)
+      .in('directory_id', candidateIds)
+      .limit(1)
       .maybeSingle()
 
     if (!dirError && byDir) {
@@ -114,6 +132,7 @@ export async function getStudentGradesView(subjectId: string) {
       .select('id, number')
       .eq('subject_id', subjectId)
       .ilike('full_name', trimmedFullName)
+      .limit(1)
       .maybeSingle()
 
     if (!nameError && byName) {
@@ -228,11 +247,12 @@ export async function getStudentGroupSchedule(): Promise<StudentScheduleResponse
 
       if (!resolved) {
         const assistedSubIds: string[] = []
-        if (session.directoryId) {
+        const candidateIds = getCandidateDirectoryIds(session)
+        if (candidateIds.length > 0) {
           const { data: byDir } = await supabase
             .from('assisted_students')
             .select('subject_id')
-            .eq('directory_id', session.directoryId)
+            .in('directory_id', candidateIds)
             .limit(5)
           if (byDir) assistedSubIds.push(...byDir.map(r => r.subject_id).filter(Boolean))
         }

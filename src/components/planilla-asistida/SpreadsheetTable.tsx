@@ -902,6 +902,7 @@ export function SpreadsheetTable({ subjectId }: SpreadsheetTableProps) {
         onClose={() => setIsLoaderOpen(false)} 
         onAddStudents={handleAddStudentsFromLoader} 
         existingDirectoryIds={students.map(s => (s as any).directoryId).filter(Boolean)} 
+        subjectId={subjectId}
       />
     </div>
   )

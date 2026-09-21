@@ -554,6 +554,250 @@ export async function deleteAllAssistedStudents(subjectId: string): Promise<void
   if (error) throw new Error('Error al vaciar la planilla')
 }
 
+function normalizeStudentName(name: string): string {
+  if (!name) return ''
+  return name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+export interface PlanillaCandidateStudent {
+  id: string             // "prof-<profileId>" or "dir-<dirId>"
+  rawId: string          // raw UUID
+  source: 'profiles' | 'directory'
+  firstName: string
+  lastName: string
+  fullName: string
+  documentNumber: string | null
+  gradeLevel: string
+  groupName: string
+  isAlreadyInPlanilla: boolean
+  currentPlanillaNumber?: number | null
+}
+
+export async function getPlanillaDirectoryCandidates(
+  subjectId: string,
+  rawGrade?: string | number | null,
+  rawGroup?: string | number | null
+): Promise<{
+  candidates: PlanillaCandidateStudent[]
+  totalFound: number
+  alreadyInPlanillaCount: number
+  missingCount: number
+}> {
+  const supabase = await createClient()
+  const { data: userData, error: authError } = await supabase.auth.getUser()
+  if (authError || !userData?.user) throw new Error('No autorizado')
+
+  const adminClient = createAdminClient()
+
+  // 1. Si no se pasaron grado o grupo, obtenerlos de la materia
+  let grade = rawGrade
+  let groupNumber = rawGroup
+
+  if (!grade || !groupNumber) {
+    const { data: subject } = await adminClient
+      .from('assisted_subjects')
+      .select('grade, group_number')
+      .eq('id', subjectId)
+      .maybeSingle()
+
+    if (subject) {
+      if (!grade) grade = subject.grade
+      if (!groupNumber) groupNumber = subject.group_number
+    }
+  }
+
+  // 2. Estudiantes existentes en la materia asistida
+  const { data: existingStudents, error: existErr } = await adminClient
+    .from('assisted_students')
+    .select('id, full_name, directory_id, number')
+    .eq('subject_id', subjectId)
+
+  if (existErr) {
+    console.error('Error al consultar estudiantes existentes:', existErr)
+  }
+
+  const existingDirIds = new Set(
+    (existingStudents || []).map(s => s.directory_id).filter(Boolean)
+  )
+  const existingNames = new Map(
+    (existingStudents || []).map(s => [normalizeStudentName(s.full_name), s.number])
+  )
+
+  // 3. Normalizar variantes de Grado y Grupo para compatibilidad con Gestión de Estudiantes
+  const gradeStr = String(grade || '').trim()
+  const groupStr = String(groupNumber || '').trim()
+  const gradeDigits = gradeStr.replace(/\D/g, '')
+  const groupDigits = groupStr.replace(/\D/g, '')
+
+  const gradeVariants = Array.from(new Set([
+    gradeStr,
+    `${gradeStr}°`,
+    gradeDigits,
+    `${gradeDigits}°`,
+    `${gradeDigits} °`
+  ].filter(Boolean)))
+
+  const groupVariants = Array.from(new Set([
+    groupStr,
+    groupDigits,
+    `0${groupDigits}`,
+    `${gradeDigits}-${groupDigits}`,
+    `${gradeDigits}°-${groupDigits}`,
+    `${gradeDigits}° ${groupDigits}`
+  ].filter(Boolean)))
+
+  // 4. Obtener perfiles de estudiantes (con cuenta en campus)
+  const { data: profiles, error: pError } = await adminClient
+    .from('profiles')
+    .select('id, first_name, last_name, grade_level, group_name, status, roles!inner(name)')
+    .eq('roles.name', 'student')
+    .in('grade_level', gradeVariants)
+    .in('group_name', groupVariants)
+    .eq('status', 'active')
+
+  if (pError) {
+    console.error('Error al obtener perfiles:', pError)
+  }
+
+  // Obtener documentos de student_details para los perfiles encontrados
+  const profileIds = (profiles || []).map(p => p.id)
+  const detailsMap = new Map<string, string>()
+  if (profileIds.length > 0) {
+    const { data: details } = await adminClient
+      .from('student_details')
+      .select('student_id, document_number')
+      .in('student_id', profileIds)
+
+    for (const d of details || []) {
+      if (d.document_number) detailsMap.set(d.student_id, d.document_number)
+    }
+  }
+
+  // 5. Obtener del directorio (sin cuenta en campus: profile_id IS NULL)
+  const { data: directory, error: dError } = await adminClient
+    .from('student_directory')
+    .select('id, first_name, last_name, document_id, grade_level, group_name, status, profile_id')
+    .in('grade_level', gradeVariants)
+    .in('group_name', groupVariants)
+    .is('profile_id', null)
+    .eq('status', 'active')
+
+  if (dError) {
+    console.error('Error al obtener directorio:', dError)
+  }
+
+  // 6. Unificar y determinar estado contra la planilla
+  const candidates: PlanillaCandidateStudent[] = []
+  const seenDocs = new Set<string>()
+  const seenNames = new Set<string>()
+
+  // A. Agregar estudiantes con cuenta (profiles)
+  for (const p of profiles || []) {
+    const fullName = `${p.last_name || ''} ${p.first_name || ''}`.trim().toUpperCase()
+    const norm = normalizeStudentName(fullName)
+    const docNumber = detailsMap.get(p.id) || null
+    const candidateIds = [p.id, `prof-${p.id}`, `dir-${p.id}`]
+
+    let isInPlanilla = false
+    let currentNumber: number | null = null
+
+    for (const cid of candidateIds) {
+      if (existingDirIds.has(cid)) {
+        isInPlanilla = true
+        break
+      }
+    }
+
+    if (!isInPlanilla && existingNames.has(norm)) {
+      isInPlanilla = true
+      currentNumber = existingNames.get(norm) ?? null
+    } else if (isInPlanilla) {
+      const match = (existingStudents || []).find(e => candidateIds.includes(e.directory_id))
+      currentNumber = match?.number ?? existingNames.get(norm) ?? null
+    }
+
+    if (docNumber) seenDocs.add(docNumber.trim().toLowerCase())
+    seenNames.add(norm)
+
+    candidates.push({
+      id: `prof-${p.id}`,
+      rawId: p.id,
+      source: 'profiles',
+      firstName: p.first_name || '',
+      lastName: p.last_name || '',
+      fullName,
+      documentNumber: docNumber,
+      gradeLevel: p.grade_level || gradeStr,
+      groupName: p.group_name || groupStr,
+      isAlreadyInPlanilla: isInPlanilla,
+      currentPlanillaNumber: currentNumber
+    })
+  }
+
+  // B. Agregar estudiantes del directorio (sin cuenta)
+  for (const d of directory || []) {
+    const fullName = `${d.last_name || ''} ${d.first_name || ''}`.trim().toUpperCase()
+    const norm = normalizeStudentName(fullName)
+    const doc = d.document_id ? d.document_id.trim() : null
+
+    // Deduplicación preventiva si el estudiante ya fue procesado como perfil
+    if (doc && seenDocs.has(doc.toLowerCase())) continue
+    if (seenNames.has(norm)) continue
+
+    const candidateIds = [d.id, `dir-${d.id}`, `prof-${d.id}`]
+
+    let isInPlanilla = false
+    let currentNumber: number | null = null
+
+    for (const cid of candidateIds) {
+      if (existingDirIds.has(cid)) {
+        isInPlanilla = true
+        break
+      }
+    }
+
+    if (!isInPlanilla && existingNames.has(norm)) {
+      isInPlanilla = true
+      currentNumber = existingNames.get(norm) ?? null
+    } else if (isInPlanilla) {
+      const match = (existingStudents || []).find(e => candidateIds.includes(e.directory_id))
+      currentNumber = match?.number ?? existingNames.get(norm) ?? null
+    }
+
+    candidates.push({
+      id: `dir-${d.id}`,
+      rawId: d.id,
+      source: 'directory',
+      firstName: d.first_name || '',
+      lastName: d.last_name || '',
+      fullName,
+      documentNumber: doc,
+      gradeLevel: d.grade_level || gradeStr,
+      groupName: d.group_name || groupStr,
+      isAlreadyInPlanilla: isInPlanilla,
+      currentPlanillaNumber: currentNumber
+    })
+  }
+
+  // Ordenar alfabéticamente
+  candidates.sort((a, b) => a.fullName.localeCompare(b.fullName))
+
+  const alreadyCount = candidates.filter(c => c.isAlreadyInPlanilla).length
+  const missingCount = candidates.filter(c => !c.isAlreadyInPlanilla).length
+
+  return {
+    candidates,
+    totalFound: candidates.length,
+    alreadyInPlanillaCount: alreadyCount,
+    missingCount
+  }
+}
+
 export async function getStudentsFromDirectory(grade: number | string, groupNumber: number | string) {
   const supabase = await createClient()
   const { data: userData, error: authError } = await supabase.auth.getUser()

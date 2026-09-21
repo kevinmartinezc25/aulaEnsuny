@@ -14,8 +14,23 @@ import {
 } from "@/components/ui/dialog"
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { createAssistedStudents, getAssistedAchievementsAndActivities, getAssistedStudents, getAssistedGrades, getAssistedSubjectById, AssistedAchievement, AssistedActivity, AssistedSubject } from '../../application/actions'
-import { Loader2, Plus, GripVertical, Edit2, Trash2 } from 'lucide-react'
+import { 
+  createAssistedStudents, 
+  getAssistedAchievementsAndActivities, 
+  getAssistedStudents, 
+  getAssistedGrades, 
+  getAssistedSubjectById, 
+  getPlanillaDirectoryCandidates,
+  PlanillaCandidateStudent,
+  AssistedAchievement, 
+  AssistedActivity, 
+  AssistedSubject 
+} from '../../application/actions'
+import { 
+  Loader2, Plus, GripVertical, Edit2, Trash2,
+  Search, CheckSquare, Square, CheckCircle2, UserPlus,
+  Sparkles, AlertCircle, RefreshCw, Clock, Filter
+} from 'lucide-react'
 import { CreateAchievementModal } from '../components/CreateAchievementModal'
 import { CreateActivityModal } from '../components/CreateActivityModal'
 import { usePlanillaStore } from '@/store/usePlanillaStore'
@@ -37,6 +52,13 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
   const [isLoadingPlanilla, setIsLoadingPlanilla] = useState(true)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [subjectData, setSubjectData] = useState<AssistedSubject | null>(null)
+
+  // Estados para validación inteligente contra Gestión de Estudiantes del Superadmin
+  const [candidates, setCandidates] = useState<PlanillaCandidateStudent[]>([])
+  const [selectedCandidateIds, setSelectedCandidateIds] = useState<Set<string>>(new Set())
+  const [searchCandidate, setSearchCandidate] = useState('')
+  const [filterCandidateTab, setFilterCandidateTab] = useState<'all' | 'missing' | 'already'>('missing')
+  const [hasLoadedCandidates, setHasLoadedCandidates] = useState(false)
 
   // Zustand Store
   const initializeStore = usePlanillaStore(state => state.initialize)
@@ -134,28 +156,108 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
     
     try {
       setIsLoadingFromDir(true)
-      const { getStudentsFromDirectory } = await import('../../application/actions')
-      const dirStudents = await getStudentsFromDirectory(subjectData.grade, subjectData.group_number)
+      const result = await getPlanillaDirectoryCandidates(subjectId, subjectData.grade, subjectData.group_number)
       
-      if (dirStudents.length === 0) {
-        toast.info('No se encontraron estudiantes para este grado y grupo en el directorio.')
+      setCandidates(result.candidates)
+      setHasLoadedCandidates(true)
+      
+      // Pre-seleccionar por defecto todos los que faltan por agregar
+      const missingIds = new Set(
+        result.candidates.filter(c => !c.isAlreadyInPlanilla).map(c => c.id)
+      )
+      setSelectedCandidateIds(missingIds)
+
+      if (result.candidates.length === 0) {
+        toast.info(`No se encontraron estudiantes para el grado ${subjectData.grade}° grupo ${subjectData.group_number} en el sistema.`)
         return
       }
-      
-      const mapped = dirStudents.map(s => ({
-        id: `temp-${Date.now()}-${s.number}`,
-        number: s.number,
-        fullName: s.fullName,
-        directoryId: s.id // El ID del directorio/perfil
-      }))
-      setStudents(mapped)
-      toast.success(`${dirStudents.length} estudiantes cargados del directorio. Por favor, confirma para guardarlos.`)
+
+      if (result.missingCount === 0) {
+        toast.success(`Todos los estudiantes del grado (${result.totalFound}) ya se encuentran cargados en la planilla.`)
+        setFilterCandidateTab('all')
+      } else {
+        toast.info(`Se encontraron ${result.totalFound} estudiantes: ${result.alreadyInPlanillaCount} ya en planilla y ${result.missingCount} pendientes por agregar.`)
+        setFilterCandidateTab('missing')
+      }
     } catch (error: any) {
-      toast.error(error.message || 'Error al cargar desde el directorio')
+      toast.error(error.message || 'Error al cargar estudiantes desde Gestión de Estudiantes')
     } finally {
       setIsLoadingFromDir(false)
     }
   }
+
+  const handleAddSelectedCandidates = async () => {
+    const toAdd = candidates.filter(c => selectedCandidateIds.has(c.id) && !c.isAlreadyInPlanilla)
+    if (toAdd.length === 0) {
+      toast.error('No has seleccionado ningún estudiante nuevo para agregar.')
+      return
+    }
+
+    try {
+      setIsSaving(true)
+      const { addDirectoryStudents } = await import('../../application/actions')
+      const payload = toAdd.map(c => ({
+        full_name: c.fullName,
+        directory_id: c.id
+      }))
+
+      await addDirectoryStudents(subjectId, payload)
+      toast.success(`¡${toAdd.length} estudiante(s) agregados exitosamente a la planilla!`)
+
+      // Recargar evaluación completa para sincronizar store
+      await loadEvaluationStructure()
+
+      // Refrescar lista de candidatos
+      const refreshed = await getPlanillaDirectoryCandidates(subjectId, subjectData?.grade, subjectData?.group_number)
+      setCandidates(refreshed.candidates)
+      
+      const newMissing = new Set(refreshed.candidates.filter(c => !c.isAlreadyInPlanilla).map(c => c.id))
+      setSelectedCandidateIds(newMissing)
+      if (refreshed.missingCount === 0) {
+        setFilterCandidateTab('all')
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Error al agregar estudiantes a la planilla')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleToggleSelectCandidate = (id: string, isAlready: boolean) => {
+    if (isAlready) return
+    const next = new Set(selectedCandidateIds)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    setSelectedCandidateIds(next)
+  }
+
+  const handleSelectAllMissing = () => {
+    const missing = candidates.filter(c => !c.isAlreadyInPlanilla)
+    setSelectedCandidateIds(new Set(missing.map(c => c.id)))
+  }
+
+  const handleDeselectAll = () => {
+    setSelectedCandidateIds(new Set())
+  }
+
+  const filteredCandidates = React.useMemo(() => {
+    return candidates.filter(c => {
+      if (filterCandidateTab === 'missing' && c.isAlreadyInPlanilla) return false
+      if (filterCandidateTab === 'already' && !c.isAlreadyInPlanilla) return false
+
+      if (searchCandidate.trim()) {
+        const query = searchCandidate.toLowerCase().trim()
+        const matchName = c.fullName.toLowerCase().includes(query)
+        const matchDoc = c.documentNumber ? c.documentNumber.includes(query) : false
+        return matchName || matchDoc
+      }
+      return true
+    })
+  }, [candidates, filterCandidateTab, searchCandidate])
+
+  const alreadyInPlanillaCount = candidates.filter(c => c.isAlreadyInPlanilla).length
+  const missingCandidatesCount = candidates.filter(c => !c.isAlreadyInPlanilla).length
+  const selectedToAddCount = candidates.filter(c => selectedCandidateIds.has(c.id) && !c.isAlreadyInPlanilla).length
 
   const handleExportExcel = () => {
     if (!subjectData) return
@@ -272,73 +374,382 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
       {/* Contenido Principal Scrollable */}
       <div className={`flex-1 ${['planilla', 'asistencia'].includes(activeTab) ? 'overflow-hidden flex flex-col p-2 sm:p-4' : 'overflow-auto p-6'}`}>
         {activeTab === 'estudiantes' && (
-          <div className="max-w-4xl mx-auto space-y-6">
+          <div className="max-w-5xl mx-auto space-y-6">
+            {/* Tarjeta de Control Principal */}
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
-              <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
-                <Users className="h-5 w-5 text-emerald-600" />
-                Cargar Estudiantes
-              </h2>
-              <p className="text-sm text-slate-500 mb-6">
-                Haz clic en el botón a continuación para cargar a los estudiantes desde el directorio del colegio.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <Users className="h-5 w-5 text-emerald-600" />
+                    Gestión y Carga de Estudiantes
+                  </h2>
+                  <p className="text-sm text-slate-500 mt-1">
+                    Sincroniza y valida los estudiantes del grupo contra el sistema institucional (Gestión de Estudiantes del Superadmin), detectando quiénes ya están cargados y permitiéndote agregar solo los que faltan.
+                  </p>
+                </div>
+                
+                {/* Badges de Información de la Asignatura */}
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                    Grado {subjectData?.grade}°
+                  </span>
+                  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                    Grupo {subjectData?.group_number}
+                  </span>
+                  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800">
+                    {storeState.students.length} en planilla
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
                 <Button 
                   onClick={handleLoadFromDirectory}
                   disabled={isLoadingFromDir}
-                  variant="outline"
-                  className="w-full sm:w-auto text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border-emerald-200"
+                  className="w-full sm:w-auto bg-[#1F4E31] hover:bg-[#183e27] dark:bg-emerald-600 dark:hover:bg-emerald-700 text-white font-medium shadow-sm"
                 >
-                  {isLoadingFromDir ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Users className="h-4 w-4 mr-2" />}
-                  Cargar desde Directorio Estudiantil
+                  {isLoadingFromDir ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Consultando Gestión de Estudiantes...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      {hasLoadedCandidates ? 'Volver a consultar Directorio' : 'Cargar desde Directorio Estudiantil'}
+                    </>
+                  )}
                 </Button>
                 
                 <Button
                   onClick={() => setIsDeleteDialogOpen(true)}
                   disabled={isSaving || storeState.students.length === 0}
                   variant="outline"
-                  className="w-full sm:w-auto text-red-700 bg-red-50 hover:bg-red-100 border-red-200"
+                  className="w-full sm:w-auto text-red-700 bg-red-50 hover:bg-red-100 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/50"
                 >
-                  {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
+                  <Trash2 className="h-4 w-4 mr-2" />
                   Vaciar toda la planilla ({storeState.students.length})
                 </Button>
               </div>
             </div>
 
-            {students.length > 0 && (
-              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-                <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
-                  <h3 className="font-bold text-slate-900 dark:text-white">
-                    Vista previa de estudiantes ({students.length})
-                  </h3>
-                  <Button 
-                    onClick={handleSaveStudents}
-                    disabled={isSaving}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                  >
-                    {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                    Confirmar estudiantes
-                  </Button>
+            {/* Panel de Validación Contra Gestión de Estudiantes */}
+            {hasLoadedCandidates && (
+              <div className="space-y-4">
+                {/* Métricas KPI */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4">
+                    <div className="text-xs font-medium text-slate-500 flex items-center gap-1.5">
+                      <Users className="h-3.5 w-3.5 text-slate-400" />
+                      Total en Gestión
+                    </div>
+                    <div className="text-2xl font-black text-slate-900 dark:text-white mt-1">
+                      {candidates.length}
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-0.5">Grado {subjectData?.grade}° - Grupo {subjectData?.group_number}</div>
+                  </div>
+
+                  <div className="bg-white dark:bg-slate-900 rounded-xl border border-emerald-200/70 dark:border-emerald-900/40 p-4">
+                    <div className="text-xs font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      Ya en Planilla
+                    </div>
+                    <div className="text-2xl font-black text-emerald-700 dark:text-emerald-400 mt-1">
+                      {alreadyInPlanillaCount}
+                    </div>
+                    <div className="text-[11px] text-emerald-600/70 dark:text-emerald-400/70 mt-0.5">Estudiantes cargados</div>
+                  </div>
+
+                  <div className="bg-white dark:bg-slate-900 rounded-xl border border-amber-200/70 dark:border-amber-900/40 p-4">
+                    <div className="text-xs font-medium text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+                      <Clock className="h-3.5 w-3.5" />
+                      Pendientes por Agregar
+                    </div>
+                    <div className="text-2xl font-black text-amber-700 dark:text-amber-400 mt-1">
+                      {missingCandidatesCount}
+                    </div>
+                    <div className="text-[11px] text-amber-600/70 dark:text-amber-400/70 mt-0.5">Faltan en esta materia</div>
+                  </div>
+
+                  <div className="bg-white dark:bg-slate-900 rounded-xl border border-blue-200/70 dark:border-blue-900/40 p-4">
+                    <div className="text-xs font-medium text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
+                      <UserPlus className="h-3.5 w-3.5" />
+                      Seleccionados
+                    </div>
+                    <div className="text-2xl font-black text-blue-700 dark:text-blue-400 mt-1">
+                      {selectedToAddCount}
+                    </div>
+                    <div className="text-[11px] text-blue-600/70 dark:text-blue-400/70 mt-0.5">Listos para agregar</div>
+                  </div>
                 </div>
-                <div className="max-h-[400px] overflow-auto custom-scrollbar">
-                  <table className="w-full text-sm text-left">
-                    <thead className="text-xs text-slate-500 bg-slate-50 dark:bg-slate-800/50 sticky top-0 uppercase">
+
+                {/* Tabla de Comparación y Selección */}
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                  {/* Encabezado y Barra de Acciones */}
+                  <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                    <div>
+                      <h3 className="font-bold text-base text-slate-900 dark:text-white flex items-center gap-2">
+                        <span>Listado de Estudiantes del Grupo</span>
+                        <span className="text-xs font-normal text-slate-500">
+                          (Cuentas de Campus y Directorio Institucional)
+                        </span>
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Marca los estudiantes que deseas ingresar a la planilla. Los ya cargados se muestran identificados con su número.
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        onClick={handleSelectAllMissing}
+                        disabled={missingCandidatesCount === 0 || isSaving}
+                        variant="outline"
+                        size="sm"
+                        className="text-xs h-8 text-slate-700 dark:text-slate-300"
+                      >
+                        <CheckSquare className="h-3.5 w-3.5 mr-1 text-emerald-600" />
+                        Marcar solo faltantes ({missingCandidatesCount})
+                      </Button>
+
+                      <Button
+                        onClick={handleDeselectAll}
+                        disabled={selectedCandidateIds.size === 0 || isSaving}
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs h-8 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                      >
+                        <Square className="h-3.5 w-3.5 mr-1" />
+                        Deseleccionar
+                      </Button>
+
+                      <Button
+                        onClick={handleAddSelectedCandidates}
+                        disabled={selectedToAddCount === 0 || isSaving}
+                        size="sm"
+                        className="text-xs h-8 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-sm disabled:opacity-50"
+                      >
+                        {isSaving ? (
+                          <>
+                            <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                            Agregando...
+                          </>
+                        ) : (
+                          <>
+                            <UserPlus className="h-3.5 w-3.5 mr-1.5" />
+                            Agregar {selectedToAddCount} faltante(s)
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Filtros y Buscador */}
+                  <div className="p-3 sm:px-5 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white dark:bg-slate-900">
+                    <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl text-xs font-medium self-start">
+                      <button
+                        onClick={() => setFilterCandidateTab('missing')}
+                        className={`px-3 py-1.5 rounded-lg transition-all ${filterCandidateTab === 'missing' ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm font-bold' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}
+                      >
+                        Faltantes ({missingCandidatesCount})
+                      </button>
+                      <button
+                        onClick={() => setFilterCandidateTab('all')}
+                        className={`px-3 py-1.5 rounded-lg transition-all ${filterCandidateTab === 'all' ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm font-bold' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}
+                      >
+                        Todos ({candidates.length})
+                      </button>
+                      <button
+                        onClick={() => setFilterCandidateTab('already')}
+                        className={`px-3 py-1.5 rounded-lg transition-all ${filterCandidateTab === 'already' ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm font-bold' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}
+                      >
+                        Ya en planilla ({alreadyInPlanillaCount})
+                      </button>
+                    </div>
+
+                    <div className="relative w-full sm:w-64">
+                      <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
+                      <input
+                        type="text"
+                        value={searchCandidate}
+                        onChange={(e) => setSearchCandidate(e.target.value)}
+                        placeholder="Buscar por nombre o documento..."
+                        className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl outline-none focus:ring-1 focus:ring-emerald-500 text-slate-900 dark:text-white"
+                      />
+                      {searchCandidate && (
+                        <button
+                          onClick={() => setSearchCandidate('')}
+                          className="absolute right-2.5 top-2 text-xs text-slate-400 hover:text-slate-600"
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Tabla */}
+                  <div className="max-h-[460px] overflow-auto custom-scrollbar">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 sticky top-0 uppercase tracking-wider font-semibold border-b border-slate-200 dark:border-slate-800 z-10">
+                        <tr>
+                          <th className="py-3 px-4 w-12 text-center">Sel.</th>
+                          <th className="py-3 px-3 w-14 text-center">N°</th>
+                          <th className="py-3 px-4">Apellidos y Nombres</th>
+                          <th className="py-3 px-4">Documento</th>
+                          <th className="py-3 px-4">Origen / Cuenta</th>
+                          <th className="py-3 px-4 text-center">Estado en Planilla</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
+                        {filteredCandidates.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="py-10 text-center text-slate-400">
+                              No se encontraron estudiantes con los filtros aplicados.
+                            </td>
+                          </tr>
+                        ) : (
+                          filteredCandidates.map((cand) => {
+                            const isSelected = selectedCandidateIds.has(cand.id)
+                            return (
+                              <tr
+                                key={cand.id}
+                                onClick={() => handleToggleSelectCandidate(cand.id, cand.isAlreadyInPlanilla)}
+                                className={`transition-colors cursor-pointer ${
+                                  cand.isAlreadyInPlanilla
+                                    ? 'bg-slate-50/50 dark:bg-slate-900/30 opacity-80 cursor-default'
+                                    : isSelected
+                                    ? 'bg-emerald-50/60 dark:bg-emerald-950/20 hover:bg-emerald-50 dark:hover:bg-emerald-950/30'
+                                    : 'hover:bg-slate-50 dark:hover:bg-slate-800/40'
+                                }`}
+                              >
+                                <td className="py-2.5 px-4 text-center" onClick={(e) => e.stopPropagation()}>
+                                  {cand.isAlreadyInPlanilla ? (
+                                    <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300">
+                                      <CheckCircle2 className="w-3.5 h-3.5" />
+                                    </span>
+                                  ) : (
+                                    <input
+                                      type="checkbox"
+                                      checked={isSelected}
+                                      onChange={() => handleToggleSelectCandidate(cand.id, cand.isAlreadyInPlanilla)}
+                                      className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
+                                    />
+                                  )}
+                                </td>
+                                
+                                <td className="py-2.5 px-3 text-center font-bold">
+                                  {cand.isAlreadyInPlanilla ? (
+                                    <span className="text-emerald-700 dark:text-emerald-400 font-mono">
+                                      #{cand.currentPlanillaNumber}
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-300 dark:text-slate-600 font-mono">+</span>
+                                  )}
+                                </td>
+
+                                <td className="py-2.5 px-4 font-bold text-slate-900 dark:text-white uppercase tracking-tight">
+                                  {cand.fullName}
+                                </td>
+
+                                <td className="py-2.5 px-4 font-mono text-slate-500 dark:text-slate-400">
+                                  {cand.documentNumber || <span className="text-slate-300 dark:text-slate-600 italic">Sin documento</span>}
+                                </td>
+
+                                <td className="py-2.5 px-4">
+                                  {cand.source === 'profiles' ? (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800">
+                                      <Sparkles className="w-3 h-3 text-emerald-600" />
+                                      Cuenta Campus
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700">
+                                      <FileSpreadsheet className="w-3 h-3 text-slate-400" />
+                                      Directorio / Sin cuenta
+                                    </span>
+                                  )}
+                                </td>
+
+                                <td className="py-2.5 px-4 text-center">
+                                  {cand.isAlreadyInPlanilla ? (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300">
+                                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                      En planilla (N° {cand.currentPlanillaNumber})
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-800 border border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800">
+                                      <Clock className="w-3 h-3 text-amber-600" />
+                                      Pendiente por agregar
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            )
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Listado Oficial Actual de Estudiantes en la Planilla */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+              <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
+                <div>
+                  <h3 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                    <span>Estudiantes matriculados actualmente en la planilla</span>
+                    <span className="px-2 py-0.5 text-xs bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300 rounded-full font-bold">
+                      {storeState.students.length}
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Estudiantes activos que cuentan con registro de calificaciones y asistencias en esta asignatura.
+                  </p>
+                </div>
+              </div>
+
+              {storeState.students.length === 0 ? (
+                <div className="p-10 text-center">
+                  <Users className="h-10 w-10 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
+                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                    Aún no hay estudiantes matriculados en esta planilla
+                  </p>
+                  <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+                    Haz clic en el botón superior &quot;Cargar desde Directorio Estudiantil&quot; para consultar los estudiantes de este grupo y agregarlos en un clic.
+                  </p>
+                </div>
+              ) : (
+                <div className="max-h-[380px] overflow-auto custom-scrollbar">
+                  <table className="w-full text-xs text-left">
+                    <thead className="text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/60 sticky top-0 uppercase font-semibold border-b border-slate-200 dark:border-slate-800">
                       <tr>
-                        <th className="px-6 py-3 font-semibold w-24">N°</th>
-                        <th className="px-6 py-3 font-semibold">Apellidos y Nombres</th>
+                        <th className="px-6 py-3 w-16 text-center">N°</th>
+                        <th className="px-6 py-3">Apellidos y Nombres</th>
+                        <th className="px-6 py-3 text-right">Estado</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {students.map((student) => (
+                      {storeState.students.map((student) => (
                         <tr key={student.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30">
-                          <td className="px-6 py-3 font-medium text-slate-900 dark:text-white">{student.number}</td>
-                          <td className="px-6 py-3 text-slate-700 dark:text-slate-300 uppercase">{student.fullName}</td>
+                          <td className="px-6 py-2.5 font-bold font-mono text-center text-emerald-700 dark:text-emerald-400">
+                            #{student.number}
+                          </td>
+                          <td className="px-6 py-2.5 font-medium text-slate-800 dark:text-slate-200 uppercase">
+                            {student.full_name}
+                          </td>
+                          <td className="px-6 py-2.5 text-right">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800">
+                              <CheckCircle2 className="w-3 h-3" />
+                              Activo en planilla
+                            </span>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         )}
 

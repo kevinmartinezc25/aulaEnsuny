@@ -23,6 +23,7 @@ export interface PlanillaStudentSession {
   gradeLevel?: string
   academicYear?: string
   jornada?: string
+  profileId?: string | null
 }
 
 /**
@@ -36,54 +37,79 @@ export async function authenticatePlanillaStudent(documentId: string) {
     throw new Error('El documento de identidad es requerido')
   }
 
+  // Sanitizar documento para búsquedas flexibles (ej: con o sin puntos/espacios)
+  const cleanDoc = doc.replace(/[^0-9a-zA-Z]/g, '')
+
   const supabase = createAdminClient()
 
-  // 1. Buscamos al estudiante en student_directory
-  const directoryResult = await supabase
+  // 1. Buscamos al estudiante en student_directory (estudiantes importados o precargados)
+  let directoryData: {
+    id: string
+    document_id: string
+    first_name: string
+    last_name: string
+    grade_level?: string
+    group_name?: string
+    academic_year?: string
+    status?: string
+    profile_id?: string | null
+  } | null = null
+
+  const { data: dirRows, error: dirError } = await supabase
     .from('student_directory')
     .select('id, document_id, first_name, last_name, grade_level, group_name, academic_year, status, profile_id')
-    .eq('document_id', doc)
-    .eq('status', 'active')
-    .single()
+    .or(`document_id.eq.${doc},document_id.eq.${cleanDoc}`)
+    .limit(1)
 
-  let directoryData = directoryResult.data
-  const dirError = directoryResult.error
+  if (!dirError && dirRows && dirRows.length > 0) {
+    directoryData = dirRows[0]
+  }
 
   let linkedProfileId: string | null = directoryData?.profile_id || null
 
-  if (dirError || !directoryData) {
-    // Si no está en student_directory, buscamos en profiles
-    const { data: profileData, error: profError } = await supabase
-      .from('profiles')
-      .select('id, document_number, first_name, last_name, status')
-      .eq('document_number', doc)
-      .eq('status', 'active')
-      .single()
-      
-    if (profError || !profileData) {
-      throw new Error('No encontramos un estudiante asociado a este documento.')
-    }
+  // 2. Si no está en student_directory, buscamos en student_details y profiles (estudiantes con cuenta creada)
+  if (!directoryData) {
+    const { data: detailsRows, error: detailsError } = await supabase
+      .from('student_details')
+      .select('student_id, document_number, first_name, first_surname, second_surname')
+      .or(`document_number.eq.${doc},document_number.eq.${cleanDoc}`)
+      .limit(1)
 
-    linkedProfileId = profileData.id
-    
-    // Buscar si existe un registro en student_directory con este profile_id
-    const { data: linkedDir } = await supabase
-      .from('student_directory')
-      .select('id, grade_level, group_name, academic_year')
-      .eq('profile_id', profileData.id)
-      .single()
-      
-    directoryData = {
-      id: linkedDir?.id || profileData.id,
-      document_id: doc,
-      first_name: profileData.first_name,
-      last_name: profileData.last_name,
-      grade_level: linkedDir?.grade_level || '',
-      group_name: linkedDir?.group_name || '',
-      academic_year: linkedDir?.academic_year || new Date().getFullYear().toString(),
-      status: 'active',
-      profile_id: profileData.id
+    if (!detailsError && detailsRows && detailsRows.length > 0) {
+      const studentId = detailsRows[0].student_id
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, grade_level, group_name, status')
+        .eq('id', studentId)
+        .maybeSingle()
+
+      if (profileData) {
+        linkedProfileId = profileData.id
+
+        // Buscar si existe un registro en student_directory con este profile_id
+        const { data: linkedDir } = await supabase
+          .from('student_directory')
+          .select('id, grade_level, group_name, academic_year')
+          .eq('profile_id', profileData.id)
+          .maybeSingle()
+
+        directoryData = {
+          id: linkedDir?.id || profileData.id,
+          document_id: detailsRows[0].document_number || doc,
+          first_name: profileData.first_name,
+          last_name: profileData.last_name,
+          grade_level: linkedDir?.grade_level || profileData.grade_level || '',
+          group_name: linkedDir?.group_name || profileData.group_name || '',
+          academic_year: linkedDir?.academic_year || new Date().getFullYear().toString(),
+          status: profileData.status || 'active',
+          profile_id: profileData.id
+        }
+      }
     }
+  }
+
+  if (!directoryData) {
+    throw new Error('No encontramos un estudiante asociado a este documento.')
   }
 
   // 2. Resolver matrícula académica (jornada, grupo, año) si hay registros en student_enrollments
@@ -100,7 +126,7 @@ export async function authenticatePlanillaStudent(documentId: string) {
       .eq('enrollment_status', 'active')
       .order('academic_year', { ascending: false })
       .limit(1)
-      .single()
+      .maybeSingle()
 
     if (enrollment) {
       if (enrollment.jornada) jornada = enrollment.jornada
@@ -121,15 +147,21 @@ export async function authenticatePlanillaStudent(documentId: string) {
     // Si aún no se resolvió el grupo oficial, buscar en las materias asistidas del estudiante
     if (!resolved) {
       const assistedSubIds: string[] = []
-      
-      if (directoryData.id) {
-        const { data: byDir } = await supabase
-          .from('assisted_students')
-          .select('subject_id')
-          .eq('directory_id', directoryData.id)
-          .limit(5)
-        if (byDir) assistedSubIds.push(...byDir.map(r => r.subject_id).filter(Boolean))
+      const candidateIds = [
+        directoryData.id,
+        `prof-${directoryData.id}`,
+        `dir-${directoryData.id}`
+      ]
+      if (linkedProfileId && linkedProfileId !== directoryData.id) {
+        candidateIds.push(linkedProfileId, `prof-${linkedProfileId}`, `dir-${linkedProfileId}`)
       }
+      
+      const { data: byDir } = await supabase
+        .from('assisted_students')
+        .select('subject_id')
+        .in('directory_id', candidateIds)
+        .limit(5)
+      if (byDir) assistedSubIds.push(...byDir.map(r => r.subject_id).filter(Boolean))
 
       if (assistedSubIds.length === 0 && fullName) {
         const { data: byName } = await supabase
@@ -146,7 +178,7 @@ export async function authenticatePlanillaStudent(documentId: string) {
           .select('grade, group_number')
           .in('id', assistedSubIds)
           .limit(1)
-          .single()
+          .maybeSingle()
 
         if (subData) {
           const fallbackGrade = `${subData.grade}°`
@@ -177,7 +209,8 @@ export async function authenticatePlanillaStudent(documentId: string) {
     groupId,
     gradeLevel: activeGradeLevel,
     academicYear,
-    jornada
+    jornada,
+    profileId: linkedProfileId
   }
 
   const token = await new SignJWT(payload as unknown as Record<string, unknown>)
