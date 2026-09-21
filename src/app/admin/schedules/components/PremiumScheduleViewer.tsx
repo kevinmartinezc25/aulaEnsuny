@@ -5,8 +5,10 @@ import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/core/config/supabase/client'
 import { 
   Calendar, Users, User, Sparkles, Search, Loader2, 
-  Printer, X, FileText, CheckCircle2, Layers 
+  Printer, X, FileText, CheckCircle2, Layers,
+  Trash2, AlertTriangle
 } from 'lucide-react'
+import { clearAllScheduleSlotsAction } from '@/modules/admin/application/actions'
 
 interface Slot {
   id: string
@@ -82,6 +84,12 @@ export function PremiumScheduleViewer() {
   const [printType, setPrintType] = useState<'group' | 'teacher'>('group')
   const [printScope, setPrintScope] = useState<'single' | 'all'>('single')
   const [selectedPrintEntityId, setSelectedPrintEntityId] = useState<string>('')
+
+  // Estado del Modal de Borrado de Horario
+  const [isClearModalOpen, setIsClearModalOpen] = useState(false)
+  const [isClearing, setIsClearing] = useState(false)
+  const [clearError, setClearError] = useState<string | null>(null)
+  const [clearSuccess, setClearSuccess] = useState(false)
 
   const supabase = createClient()
 
@@ -260,6 +268,31 @@ export function PremiumScheduleViewer() {
     }, 200)
   }
 
+  const handleConfirmClearSchedule = async () => {
+    setIsClearing(true)
+    setClearError(null)
+    try {
+      const res = await clearAllScheduleSlotsAction()
+      if (res.success) {
+        setSlots([])
+        setClearSuccess(true)
+      } else {
+        setClearError(res.error || 'Ocurrió un error al intentar borrar el horario.')
+      }
+    } catch (err: any) {
+      setClearError(err?.message || 'Error de comunicación con el servidor.')
+    } finally {
+      setIsClearing(false)
+    }
+  }
+
+  const handleCloseClearModal = () => {
+    if (isClearing) return
+    setIsClearModalOpen(false)
+    setClearError(null)
+    setClearSuccess(false)
+  }
+
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center h-[70vh]">
@@ -302,22 +335,36 @@ export function PremiumScheduleViewer() {
           </button>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <button
+            onClick={() => {
+              setClearSuccess(false)
+              setClearError(null)
+              setIsClearModalOpen(true)
+            }}
+            disabled={slots.length === 0}
+            className="flex items-center gap-2 px-3.5 py-2 bg-white dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/40 rounded-xl text-sm font-semibold shadow-xs transition-all hover:-translate-y-0.5 active:translate-y-0 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+            title={slots.length === 0 ? 'No hay clases asignadas para borrar' : 'Borrar horario actual para cargar un nuevo XML'}
+          >
+            <Trash2 className="h-4 w-4 shrink-0" />
+            <span className="hidden sm:inline">Limpiar Horario</span>
+          </button>
+
           <button
             onClick={handleOpenPrintModal}
-            className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-bold shadow-xs transition-all hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
+            className="flex items-center gap-2 px-3.5 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-semibold shadow-xs transition-all hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
             title="Imprimir horario individual o en lote"
           >
-            <Printer className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+            <Printer className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
             <span>Imprimir</span>
           </button>
 
           <a 
             href="/admin/schedules/import"
-            className="flex items-center gap-2 px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-200 dark:shadow-indigo-900/20 transition-all hover:-translate-y-0.5 active:translate-y-0"
+            className="flex items-center gap-2 px-4 sm:px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-200 dark:shadow-indigo-900/20 transition-all hover:-translate-y-0.5 active:translate-y-0"
           >
-            <Sparkles className="h-4 w-4" />
-            Importar aSc XML
+            <Sparkles className="h-4 w-4 shrink-0" />
+            <span>Importar aSc XML</span>
           </a>
         </div>
       </div>
@@ -600,123 +647,89 @@ export function PremiumScheduleViewer() {
               <button
                 type="button"
                 onClick={() => setIsPrintModalOpen(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
             {/* Contenido del Modal */}
-            <div className="p-5 space-y-4">
-              {/* 1. Selector de Tipo: Grupos vs Docentes */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
-                  1. Categoría
+            <div className="p-6 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                  Tipo de Horario
                 </label>
                 <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
                   <button
                     type="button"
                     onClick={() => handleSwitchPrintType('group')}
-                    className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold transition-all ${
+                    className={`py-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                       printType === 'group'
-                        ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-sm'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                        ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                     }`}
                   >
-                    <Users className="h-4 w-4" />
-                    Grupos
+                    <Users className="h-3.5 w-3.5" />
+                    Por Grupo
                   </button>
                   <button
                     type="button"
                     onClick={() => handleSwitchPrintType('teacher')}
-                    className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold transition-all ${
+                    className={`py-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                       printType === 'teacher'
-                        ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-sm'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                        ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                     }`}
                   >
-                    <User className="h-4 w-4" />
-                    Docentes
+                    <User className="h-3.5 w-3.5" />
+                    Por Docente
                   </button>
                 </div>
               </div>
 
-              {/* 2. Alcance de Impresión */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
-                  2. Alcance
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                  Alcance
                 </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* Opción A: Horario Individual */}
-                  <div
+                <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
+                  <button
+                    type="button"
                     onClick={() => setPrintScope('single')}
-                    className={`cursor-pointer p-3.5 rounded-xl border-2 transition-all flex flex-col justify-between ${
+                    className={`py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
                       printScope === 'single'
-                        ? 'border-indigo-600 bg-indigo-50/40 dark:bg-indigo-950/20 dark:border-indigo-500 shadow-xs'
-                        : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-white dark:bg-slate-900'
+                        ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                     }`}
                   >
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <div className={`p-1.5 rounded-lg ${printScope === 'single' ? 'bg-indigo-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'}`}>
-                          <FileText className="h-4 w-4" />
-                        </div>
-                        {printScope === 'single' && (
-                          <CheckCircle2 className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-                        )}
-                      </div>
-                      <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100">
-                        Individual
-                      </h4>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
-                        Solo 1 {printType === 'group' ? 'grupo' : 'docente'}.
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Opción B: Todos los Horarios */}
-                  <div
+                    Uno solo
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setPrintScope('all')}
-                    className={`cursor-pointer p-3.5 rounded-xl border-2 transition-all flex flex-col justify-between ${
+                    className={`py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
                       printScope === 'all'
-                        ? 'border-indigo-600 bg-indigo-50/40 dark:bg-indigo-950/20 dark:border-indigo-500 shadow-xs'
-                        : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-white dark:bg-slate-900'
+                        ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                     }`}
                   >
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <div className={`p-1.5 rounded-lg ${printScope === 'all' ? 'bg-indigo-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'}`}>
-                          <Layers className="h-4 w-4" />
-                        </div>
-                        {printScope === 'all' && (
-                          <CheckCircle2 className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-                        )}
-                      </div>
-                      <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100">
-                        Todos en Lote
-                      </h4>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
-                        Los {(printType === 'group' ? officialGroups : teachers).length} {printType === 'group' ? 'grupos' : 'docentes'}.
-                      </p>
-                    </div>
-                  </div>
+                    Todos en lote
+                  </button>
                 </div>
               </div>
 
-              {/* 3. Selección de Entidad si es Individual */}
               {printScope === 'single' ? (
-                <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-800">
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Seleccionar {printType === 'group' ? 'Grupo' : 'Docente'}:
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    Seleccionar {printType === 'group' ? 'Grupo' : 'Docente'}
                   </label>
                   <select
                     value={selectedPrintEntityId}
                     onChange={(e) => setSelectedPrintEntityId(e.target.value)}
-                    className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-semibold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500/20"
                   >
-                    {(printType === 'group' ? officialGroups : teachers).map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.name}
+                    {(printType === 'group' ? officialGroups : teachers).map((entity) => (
+                      <option key={entity.id} value={entity.id}>
+                        {entity.name}
                       </option>
                     ))}
                   </select>
@@ -736,7 +749,7 @@ export function PremiumScheduleViewer() {
               <button
                 type="button"
                 onClick={() => setIsPrintModalOpen(false)}
-                className="px-4 py-2 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-colors cursor-pointer"
+                className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-colors cursor-pointer"
               >
                 Cancelar
               </button>
@@ -748,6 +761,132 @@ export function PremiumScheduleViewer() {
                 <Printer className="h-4 w-4" />
                 {printScope === 'single' ? 'Imprimir Horario' : 'Imprimir Todos'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Confirmación y Limpieza de Horario */}
+      {isClearModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-in fade-in duration-150 print:hidden">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col">
+            {/* Header del Modal */}
+            <div className="flex items-center justify-between p-5 border-b border-slate-200 dark:border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className={`p-2.5 rounded-xl ${clearSuccess ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400'}`}>
+                  {clearSuccess ? <CheckCircle2 className="h-5 w-5" /> : <AlertTriangle className="h-5 w-5" />}
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">
+                    {clearSuccess ? 'Horario Limpiado con Éxito' : '¿Borrar Horario Actual?'}
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {clearSuccess ? 'Listo para importar una nueva versión' : 'Acción administrativa de reinicio'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleCloseClearModal}
+                disabled={isClearing}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Contenido */}
+            <div className="p-6 space-y-4">
+              {clearSuccess ? (
+                <div className="space-y-4">
+                  <div className="p-4 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50 rounded-xl text-xs text-emerald-800 dark:text-emerald-300">
+                    <p className="font-semibold text-sm mb-1">Se han borrado las clases semanales.</p>
+                    <p>
+                      El lienzo de horarios ha quedado completamente limpio. Los grupos, docentes y asignaturas se conservan en la base de datos para asociarse automáticamente con el nuevo archivo XML.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm text-slate-600 dark:text-slate-300">
+                    Estás a punto de eliminar todas las clases asignadas en el sistema (<strong className="text-rose-600 dark:text-rose-400">{slots.length} clases semanales</strong>).
+                  </p>
+
+                  <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/40 rounded-xl text-xs text-emerald-800 dark:text-emerald-300 flex items-start gap-2.5">
+                    <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400 mt-0.5" />
+                    <div>
+                      <p className="font-semibold">Datos protegidos que se conservan:</p>
+                      <p className="mt-0.5 text-emerald-700 dark:text-emerald-400">
+                        Grupos oficiales, directores de grupo, cuentas de profesores, calificaciones y catálogo de materias se mantienen intactos.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 rounded-xl text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+                    <span>
+                      Hasta que importes el nuevo XML, la consulta de horarios para estudiantes y docentes indicará que no hay clases programadas.
+                    </span>
+                  </div>
+
+                  {clearError && (
+                    <div className="p-3 bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800/40 rounded-xl text-xs text-rose-700 dark:text-rose-300">
+                      {clearError}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end gap-3">
+              {clearSuccess ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleCloseClearModal}
+                    className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-colors cursor-pointer"
+                  >
+                    Cerrar
+                  </button>
+                  <a
+                    href="/admin/schedules/import"
+                    className="flex items-center gap-2 px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md shadow-indigo-500/25 transition-all hover:-translate-y-0.5 cursor-pointer"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    Subir nuevo XML ahora
+                  </a>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleCloseClearModal}
+                    disabled={isClearing}
+                    className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleConfirmClearSchedule}
+                    disabled={isClearing}
+                    className="flex items-center gap-2 px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-md shadow-rose-500/25 transition-all hover:-translate-y-0.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isClearing ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Borrando horario...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="h-4 w-4" />
+                        <span>Sí, borrar horario</span>
+                      </>
+                    )}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>

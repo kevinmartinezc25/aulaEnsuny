@@ -39,14 +39,6 @@ export function AdminStudentsScreen() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [directoryStats, setDirectoryStats] = useState<{ totalDirectory: number; withAccount: number; withoutAccount: number } | null>(null)
 
-  const mockStudents: Student[] = [
-    { id: 's-1', name: 'Ana María Torres', firstName: 'Ana María', lastName: 'Torres', email: 'a.torres@estudiante.ensuny.edu.co', gradeLevel: '8°', groupName: '1', status: 'active', joinedDate: '2025-01-20' },
-    { id: 's-2', name: 'José Daniel Ramírez', firstName: 'José Daniel', lastName: 'Ramírez', email: 'j.ramirez@estudiante.ensuny.edu.co', gradeLevel: '8°', groupName: '1', status: 'active', joinedDate: '2025-01-22' },
-    { id: 's-3', name: 'Luis Alfredo Sandoval', firstName: 'Luis Alfredo', lastName: 'Sandoval', email: 'l.sandoval@estudiante.ensuny.edu.co', gradeLevel: '9°', groupName: '2', status: 'active', joinedDate: '2024-01-15' },
-    { id: 's-4', name: 'María Camila Herrera', firstName: 'María Camila', lastName: 'Herrera', email: 'm.herrera@estudiante.ensuny.edu.co', gradeLevel: '10°', groupName: '2', status: 'inactive', joinedDate: '2024-02-05' },
-    { id: 's-5', name: 'Kevin Martinez', firstName: 'Kevin', lastName: 'Martinez', email: 'kevin@estudiante.ensuny.edu.co', gradeLevel: '11°', groupName: '1', status: 'active', joinedDate: '2023-01-10' }
-  ]
-
   useEffect(() => {
     async function loadStudents() {
       setLoading(true)
@@ -57,7 +49,7 @@ export function AdminStudentsScreen() {
         console.error('Error loading academic levels:', err)
       }
 
-      // Cargar estadísticas del directorio
+      // Cargar estadísticas del directorio (fuente de verdad de matriculados)
       try {
         const stats = await getDirectoryStats()
         setDirectoryStats(stats)
@@ -65,17 +57,7 @@ export function AdminStudentsScreen() {
         console.error('Error loading directory stats:', err)
       }
 
-      const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL ||
-        process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
-
-      if (isDemoMode) {
-        setTimeout(() => {
-          setStudents(mockStudents)
-          setLoading(false)
-        }, 500)
-        return
-      }
-
+      // Siempre cargar datos reales desde Supabase
       try {
         const mapped = await getAdminStudents()
         setStudents(mapped as Student[])
@@ -207,26 +189,60 @@ export function AdminStudentsScreen() {
         </div>
       )}
 
-      {/* KPIs */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-        {[
-          { title: 'Total Matriculados', value: students.length, icon: GraduationCap, color: 'text-blue-500 bg-blue-50 dark:bg-blue-950/30' },
-          { title: 'Estudiantes Activos', value: students.filter(s => s.status === 'active').length, icon: CheckCircle, color: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-950/30' },
-          { title: 'Distribución por Grados', value: `${new Set(students.map(s => s.gradeLevel)).size} Niveles`, icon: BookOpen, color: 'text-purple-500 bg-purple-50 dark:bg-purple-950/30' }
-        ].map(stat => {
-          const Icon = stat.icon
-          return (
-            <div key={stat.title} className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm dark:border-slate-800/60 dark:bg-slate-900 flex items-center gap-4">
-              <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${stat.color}`}>
-                <Icon className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-slate-400 dark:text-slate-500">{stat.title}</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white mt-0.5">{stat.value}</p>
-              </div>
-            </div>
-          )
-        })}
+      {/* KPIs — fuente de verdad: directoryStats (estudiantes matriculados reales) */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        {/* Total en Directorio */}
+        <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm dark:border-slate-800/60 dark:bg-slate-900 flex items-center gap-4">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl text-blue-500 bg-blue-50 dark:bg-blue-950/30 shrink-0">
+            <GraduationCap className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-slate-400 dark:text-slate-500">Total Matriculados</p>
+            <p className="text-2xl font-bold text-slate-900 dark:text-white mt-0.5">
+              {loading ? '—' : (directoryStats?.totalDirectory ?? students.length)}
+            </p>
+          </div>
+        </div>
+
+        {/* Con cuenta virtual */}
+        <div className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm dark:border-emerald-800/30 dark:bg-slate-900 flex items-center gap-4">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl text-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 shrink-0">
+            <CheckCircle className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-emerald-500 dark:text-emerald-400">Con Cuenta Virtual</p>
+            <p className="text-2xl font-bold text-slate-900 dark:text-white mt-0.5">
+              {loading ? '—' : (directoryStats?.withAccount ?? students.filter(s => s.status === 'active').length)}
+            </p>
+          </div>
+        </div>
+
+        {/* Sin cuenta virtual */}
+        <div className="rounded-2xl border border-amber-100 bg-white p-5 shadow-sm dark:border-amber-800/30 dark:bg-slate-900 flex items-center gap-4">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl text-amber-500 bg-amber-50 dark:bg-amber-950/30 shrink-0">
+            <Users className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-amber-500 dark:text-amber-400">Sin Acceso Virtual</p>
+            <p className="text-2xl font-bold text-slate-900 dark:text-white mt-0.5">
+              {loading ? '—' : (directoryStats?.withoutAccount ?? 0)}
+            </p>
+          </div>
+        </div>
+
+        {/* Distribución por grados */}
+        <div className="rounded-2xl border border-purple-100 bg-white p-5 shadow-sm dark:border-purple-800/30 dark:bg-slate-900 flex items-center gap-4">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl text-purple-500 bg-purple-50 dark:bg-purple-950/30 shrink-0">
+            <BookOpen className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-purple-500 dark:text-purple-400">Distribución</p>
+            <p className="text-2xl font-bold text-slate-900 dark:text-white mt-0.5">
+              {loading ? '—' : `${new Set(students.map(s => s.gradeLevel)).size}`}
+              <span className="text-sm font-semibold text-slate-400 dark:text-slate-500 ml-1">grados</span>
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Controles de filtro */}
@@ -315,7 +331,14 @@ export function AdminStudentsScreen() {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-xs font-mono">
-                    {s.email}
+                    <div className="flex flex-col gap-1">
+                      <span>{s.email}</span>
+                      {(s as any).source === 'directory' && (
+                        <span className="inline-flex w-fit items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/20 dark:text-amber-400 border border-amber-100 dark:border-amber-900/30">
+                          Sin cuenta virtual
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-6 py-4 text-xs">
                     {s.joinedDate}

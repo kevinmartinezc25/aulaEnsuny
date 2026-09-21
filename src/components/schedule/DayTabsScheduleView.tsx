@@ -28,6 +28,7 @@ export interface ScheduleItem {
   teacher?: string
   location?: string
   group?: string
+  period?: number
   status?: ScheduleStatus
   color?: string
 }
@@ -68,6 +69,7 @@ export interface DayTabsScheduleViewProps {
   defaultDayKey?: ScheduleDayKey
   onClassClick?: (item: ScheduleItem) => void
   className?: string
+  hideGroupBadge?: boolean
 }
 
 // ==========================================
@@ -117,36 +119,85 @@ export default function DayTabsScheduleView({
   isPublished = true,
   defaultDayKey,
   onClassClick,
-  className = ''
+  className = '',
+  hideGroupBadge = false
 }: DayTabsScheduleViewProps) {
-  // Detección del día de hoy en el cliente
-  const todayKey = useMemo<ScheduleDayKey>(() => {
-    const dayIndex = new Date().getDay() // 0: Dom, 1: Lun, ..., 6: Sáb
-    const map: Record<number, ScheduleDayKey> = {
-      1: 'lunes',
-      2: 'martes',
-      3: 'miercoles',
-      4: 'jueves',
-      5: 'viernes',
-      6: 'sabado'
+  // Detección exacta del día actual en la zona horaria institucional (America/Bogota)
+  const todayKey = useMemo<ScheduleDayKey | null>(() => {
+    try {
+      const weekday = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Bogota',
+        weekday: 'short'
+      }).format(new Date())
+
+      const map: Record<string, ScheduleDayKey> = {
+        Mon: 'lunes',
+        Tue: 'martes',
+        Wed: 'miercoles',
+        Thu: 'jueves',
+        Fri: 'viernes',
+        Sat: 'sabado'
+      }
+
+      // Si es domingo ('Sun'), no hay jornada escolar ordinaria hoy, retorna null
+      return map[weekday] || null
+    } catch {
+      const dayIndex = new Date().getDay()
+      const map: Record<number, ScheduleDayKey> = {
+        1: 'lunes',
+        2: 'martes',
+        3: 'miercoles',
+        4: 'jueves',
+        5: 'viernes',
+        6: 'sabado'
+      }
+      return map[dayIndex] || null
     }
-    return map[dayIndex] || 'lunes'
   }, [])
 
-  const [activeDay, setActiveDay] = useState<ScheduleDayKey>(defaultDayKey || todayKey)
+  // Día activo inicial: Si hoy es lunes a viernes abre en el día actual; en fin de semana abre en 'lunes'
+  const [activeDay, setActiveDay] = useState<ScheduleDayKey>(() => {
+    if (defaultDayKey) return defaultDayKey
+    if (todayKey && todayKey !== 'sabado') return todayKey
+    return 'lunes'
+  })
+
   const [currentMinutes, setCurrentMinutes] = useState<number>(() => {
-    const now = new Date()
-    return now.getHours() * 60 + now.getMinutes()
+    try {
+      const timeStr = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Bogota',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }).format(new Date())
+      const [h, m] = timeStr.split(':').map(Number)
+      return (h || 0) * 60 + (m || 0)
+    } catch {
+      const now = new Date()
+      return now.getHours() * 60 + now.getMinutes()
+    }
   })
 
   const tabsScrollRef = useRef<HTMLDivElement>(null)
 
   // Actualizar minutos cada minuto para el cálculo de clase en curso
   useEffect(() => {
-    const timer = setInterval(() => {
-      const now = new Date()
-      setCurrentMinutes(now.getHours() * 60 + now.getMinutes())
-    }, 60000)
+    const update = () => {
+      try {
+        const timeStr = new Intl.DateTimeFormat('en-US', {
+          timeZone: 'America/Bogota',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        }).format(new Date())
+        const [h, m] = timeStr.split(':').map(Number)
+        setCurrentMinutes((h || 0) * 60 + (m || 0))
+      } catch {
+        const now = new Date()
+        setCurrentMinutes(now.getHours() * 60 + now.getMinutes())
+      }
+    }
+    const timer = setInterval(update, 60000)
     return () => clearInterval(timer)
   }, [])
 
@@ -161,7 +212,7 @@ export default function DayTabsScheduleView({
     return [...raw].sort((a, b) => parseTimeToMinutes(a.startTime) - parseTimeToMinutes(b.startTime))
   }, [schedule, activeDay])
 
-  const isSelectedDayToday = activeDay === todayKey
+  const isSelectedDayToday = todayKey !== null && activeDay === todayKey
 
   // ==========================================
   // RENDERIZADO DE ESTADOS ESPECIALES
@@ -302,9 +353,10 @@ export default function DayTabsScheduleView({
           </div>
         ) : (
           /* TARJETAS DE CLASES */
-          dayClasses.map((item) => {
+          dayClasses.map((item, index) => {
             const isOngoing = isClassOngoing(item, isSelectedDayToday, currentMinutes)
             const accentColor = item.color || '#4f46e5'
+            const hourLabel = item.period ? `${item.period}ª Hora` : `${index + 1}ª Hora`
 
             return (
               <article
@@ -372,16 +424,27 @@ export default function DayTabsScheduleView({
                     </div>
                   </div>
 
-                  {/* Grupo y Grado a la derecha con mayor visibilidad */}
-                  {item.group && (
-                    <div className="shrink-0 flex flex-col items-center justify-center px-3.5 py-2 rounded-2xl bg-indigo-50/90 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-900/60 shadow-xs min-w-[72px]">
-                      <span className="text-[9px] font-black uppercase tracking-widest text-indigo-400 dark:text-indigo-400 leading-none">
-                        Grupo
+                  {/* A la derecha: Si hideGroupBadge es true (Consulta Académica), mostrar la hora de la jornada */}
+                  {hideGroupBadge ? (
+                    <div className="shrink-0 flex flex-col items-center justify-center px-3 py-2 rounded-2xl bg-emerald-500/10 dark:bg-emerald-950/50 border border-emerald-500/20 dark:border-emerald-800/40 shadow-xs min-w-[76px]">
+                      <span className="text-[9px] font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-400 leading-none">
+                        Jornada
                       </span>
-                      <span className="text-xl sm:text-2xl font-black text-indigo-700 dark:text-indigo-300 leading-tight mt-1 tracking-tight">
-                        {item.group}
+                      <span className="text-xs sm:text-sm font-black text-[#1F4E31] dark:text-emerald-300 leading-tight mt-1 tracking-tight whitespace-nowrap">
+                        {hourLabel}
                       </span>
                     </div>
+                  ) : (
+                    item.group && (
+                      <div className="shrink-0 flex flex-col items-center justify-center px-3.5 py-2 rounded-2xl bg-indigo-50/90 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-900/60 shadow-xs min-w-[72px]">
+                        <span className="text-[9px] font-black uppercase tracking-widest text-indigo-400 dark:text-indigo-400 leading-none">
+                          Grupo
+                        </span>
+                        <span className="text-xl sm:text-2xl font-black text-indigo-700 dark:text-indigo-300 leading-tight mt-1 tracking-tight">
+                          {item.group}
+                        </span>
+                      </div>
+                    )
                   )}
                 </div>
               </article>

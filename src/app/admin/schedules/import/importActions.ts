@@ -33,58 +33,142 @@ export async function commitImportedSchedule(data: AscParsedData, fileName: stri
     }
     const importId = importRecord.id
 
-    // 3. UPSERT Materias (reutilizando IDs existentes si coincide el nombre)
+    // 3. Procesar Materias (reutilizando IDs existentes si coincide el nombre)
     const { data: existingSubjects } = await adminClient.from('sch_subjects').select('id, name')
     const subByName = new Map(existingSubjects?.map(s => [s.name.trim().toLowerCase(), s.id]))
-    const subjectsPayload = data.subjects.map(s => ({
-      id: subByName.get(s.name.trim().toLowerCase()) || undefined,
-      external_id: s.id,
-      name: s.name,
-      is_active: true
-    }))
-    const { data: dbSubjects, error: subErr } = await adminClient
-      .from('sch_subjects')
-      .upsert(subjectsPayload, { onConflict: 'id' })
-      .select('id, external_id')
-    if (subErr) throw new Error(`Error upsert materias: ${subErr.message}`)
+    
+    // Deduplicar materias del XML por external_id y nombre
+    const uniqueSubjects = Array.from(new Map(data.subjects.map(s => [s.id, s])).values())
+    const existingSubjectsPayload: any[] = []
+    const newSubjectsPayload: any[] = []
 
-    // 4. UPSERT Grupos (reutilizando IDs existentes si coincide el nombre para conservar director_id)
+    uniqueSubjects.forEach(s => {
+      const matchId = subByName.get(s.name.trim().toLowerCase())
+      if (matchId) {
+        existingSubjectsPayload.push({
+          id: matchId,
+          external_id: s.id,
+          name: s.name,
+          is_active: true
+        })
+      } else {
+        newSubjectsPayload.push({
+          external_id: s.id,
+          name: s.name,
+          is_active: true
+        })
+      }
+    })
+
+    const dbSubjects: { id: string; external_id: string }[] = []
+    if (existingSubjectsPayload.length > 0) {
+      const { data: upserted, error: subErr } = await adminClient
+        .from('sch_subjects')
+        .upsert(existingSubjectsPayload, { onConflict: 'id' })
+        .select('id, external_id')
+      if (subErr) throw new Error(`Error upsert materias existentes: ${subErr.message}`)
+      if (upserted) dbSubjects.push(...upserted)
+    }
+    if (newSubjectsPayload.length > 0) {
+      const { data: inserted, error: subErr } = await adminClient
+        .from('sch_subjects')
+        .insert(newSubjectsPayload)
+        .select('id, external_id')
+      if (subErr) throw new Error(`Error insert nuevas materias: ${subErr.message}`)
+      if (inserted) dbSubjects.push(...inserted)
+    }
+
+    // 4. Procesar Grupos (reutilizando IDs existentes si coincide el nombre para conservar director_id)
     const { data: existingGroups } = await adminClient.from('sch_groups').select('id, name, director_id')
     const grpByName = new Map(existingGroups?.map(g => [g.name.trim().toLowerCase(), g]))
-    const groupsPayload = data.groups.map(g => {
+
+    const uniqueGroups = Array.from(new Map(data.groups.map(g => [g.id, g])).values())
+    const existingGroupsPayload: any[] = []
+    const newGroupsPayload: any[] = []
+
+    uniqueGroups.forEach(g => {
       const match = grpByName.get(g.name.trim().toLowerCase())
-      return {
-        id: match ? match.id : undefined,
-        external_id: g.id,
-        name: g.name,
-        director_id: match?.director_id || null,
-        is_active: true
+      if (match) {
+        existingGroupsPayload.push({
+          id: match.id,
+          external_id: g.id,
+          name: g.name,
+          director_id: match.director_id || null,
+          is_active: true
+        })
+      } else {
+        newGroupsPayload.push({
+          external_id: g.id,
+          name: g.name,
+          director_id: null,
+          is_active: true
+        })
       }
     })
-    const { data: dbGroups, error: grpErr } = await adminClient
-      .from('sch_groups')
-      .upsert(groupsPayload, { onConflict: 'id' })
-      .select('id, external_id')
-    if (grpErr) throw new Error(`Error upsert grupos: ${grpErr.message}`)
 
-    // 5. UPSERT Docentes (reutilizando IDs existentes si coincide el nombre para conservar profile_id)
+    const dbGroups: { id: string; external_id: string }[] = []
+    if (existingGroupsPayload.length > 0) {
+      const { data: upserted, error: grpErr } = await adminClient
+        .from('sch_groups')
+        .upsert(existingGroupsPayload, { onConflict: 'id' })
+        .select('id, external_id')
+      if (grpErr) throw new Error(`Error upsert grupos existentes: ${grpErr.message}`)
+      if (upserted) dbGroups.push(...upserted)
+    }
+    if (newGroupsPayload.length > 0) {
+      const { data: inserted, error: grpErr } = await adminClient
+        .from('sch_groups')
+        .insert(newGroupsPayload)
+        .select('id, external_id')
+      if (grpErr) throw new Error(`Error insert nuevos grupos: ${grpErr.message}`)
+      if (inserted) dbGroups.push(...inserted)
+    }
+
+    // 5. Procesar Docentes (reutilizando IDs existentes si coincide el nombre para conservar profile_id)
     const { data: existingTeachers } = await adminClient.from('academic_teachers').select('id, full_name, profile_id')
     const tchByName = new Map(existingTeachers?.map(t => [t.full_name.trim().toLowerCase(), t]))
-    const teachersPayload = data.teachers.map(t => {
+
+    const uniqueTeachers = Array.from(new Map(data.teachers.map(t => [t.id, t])).values())
+    const existingTeachersPayload: any[] = []
+    const newTeachersPayload: any[] = []
+
+    uniqueTeachers.forEach(t => {
       const match = tchByName.get(t.name.trim().toLowerCase())
-      return {
-        id: match ? match.id : undefined,
-        external_id: t.id,
-        full_name: t.name,
-        profile_id: match?.profile_id || null,
-        is_active: true
+      if (match) {
+        existingTeachersPayload.push({
+          id: match.id,
+          external_id: t.id,
+          full_name: t.name,
+          profile_id: match.profile_id || null,
+          is_active: true
+        })
+      } else {
+        newTeachersPayload.push({
+          external_id: t.id,
+          full_name: t.name,
+          profile_id: null,
+          is_active: true
+        })
       }
     })
-    const { data: dbTeachers, error: tchErr } = await adminClient
-      .from('academic_teachers')
-      .upsert(teachersPayload, { onConflict: 'id' })
-      .select('id, external_id')
-    if (tchErr) throw new Error(`Error upsert docentes: ${tchErr.message}`)
+
+    const dbTeachers: { id: string; external_id: string }[] = []
+    if (existingTeachersPayload.length > 0) {
+      const { data: upserted, error: tchErr } = await adminClient
+        .from('academic_teachers')
+        .upsert(existingTeachersPayload, { onConflict: 'id' })
+        .select('id, external_id')
+      if (tchErr) throw new Error(`Error upsert docentes existentes: ${tchErr.message}`)
+      if (upserted) dbTeachers.push(...upserted)
+    }
+    if (newTeachersPayload.length > 0) {
+      const { data: inserted, error: tchErr } = await adminClient
+        .from('academic_teachers')
+        .insert(newTeachersPayload)
+        .select('id, external_id')
+      if (tchErr) throw new Error(`Error insert nuevos docentes: ${tchErr.message}`)
+      if (inserted) dbTeachers.push(...inserted)
+    }
 
     // Mapas para cruzar IDs del XML con los UUID de Supabase
     const subMap = new Map(dbSubjects?.map(s => [s.external_id, s.id]))
@@ -115,6 +199,27 @@ export async function commitImportedSchedule(data: AscParsedData, fileName: stri
     // (Por seguridad, limpiamos slots viejos del lienzo general, en un futuro se filtra por import_id activo)
     await adminClient.from('sch_schedule_slots').delete().neq('id', '00000000-0000-0000-0000-000000000000')
     await adminClient.from('academic_assignments').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+
+    // 6b. Marcar como is_active=false los docentes que ya no vienen en el nuevo XML
+    // Solo se desactivan los que NO tienen cuenta de plataforma vinculada (profile_id IS NULL)
+    // Los docentes con profile_id se preservan siempre para no romper el acceso a sus cuentas.
+    const incomingTeacherExternalIds = new Set(uniqueTeachers.map(t => t.id))
+    const obsoleteTeacherIds = (existingTeachers || [])
+      .filter(t => {
+        const wasMappedFromXml = [...tchMap.entries()].some(([extId, dbId]) =>
+          dbId === t.id && incomingTeacherExternalIds.has(extId)
+        )
+        return !wasMappedFromXml && !t.profile_id
+      })
+      .map(t => t.id)
+
+    if (obsoleteTeacherIds.length > 0) {
+      await adminClient
+        .from('academic_teachers')
+        .update({ is_active: false })
+        .in('id', obsoleteTeacherIds)
+      console.log(`[ImportActions] ${obsoleteTeacherIds.length} docente(s) marcado(s) como inactivos (no presentes en nuevo XML).`)
+    }
 
     const { data: dbAssignments, error: asgErr } = await adminClient
       .from('academic_assignments')

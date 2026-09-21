@@ -305,12 +305,12 @@ export function LoginScreen() {
                 {/* Enlaces inferiores */}
                 <motion.div variants={itemVariants} className="pt-2 text-center flex flex-col items-center gap-3">
                   <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-                    ¿No tienes una cuenta?{' '}
+                    ¿Eres estudiante y aún no tienes una cuenta?{' '}
                     <Link
                       href="/register/student"
-                      className="font-semibold text-[#1F4E31] hover:text-[#153823] underline-offset-2 hover:underline transition-colors dark:text-emerald-400 dark:hover:text-emerald-300 active:scale-95 duration-100 inline-block"
+                      className="font-bold text-[#1F4E31] hover:text-[#153823] underline-offset-2 hover:underline transition-colors dark:text-emerald-400 dark:hover:text-emerald-300 active:scale-95 duration-100 inline-block"
                     >
-                      Regístrate aquí
+                      Crear acceso de estudiante
                     </Link>
                   </p>
 
