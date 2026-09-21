@@ -188,9 +188,14 @@ function StatusBadge({ row }: { row: ImportRowValidated; excluded?: boolean }) {
     )
   }
   if (row.isDuplicate) {
+    const isCampus = row.duplicateReason === 'campus_account'
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
-        <AlertTriangle className="h-3 w-3" /> Duplicado
+      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+        isCampus
+          ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400'
+          : 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400'
+      }`}>
+        <AlertTriangle className="h-3 w-3" /> {isCampus ? 'Con Cuenta Virtual' : 'Duplicado'}
       </span>
     )
   }
@@ -237,6 +242,7 @@ export function AdminStudentImportScreen() {
                 errors: vRow.errors,
                 isDuplicate: vRow.isDuplicate,
                 duplicateId: vRow.duplicateId,
+                duplicateReason: vRow.duplicateReason,
                 _needsValidation: false
               }
             }
@@ -593,6 +599,13 @@ export function AdminStudentImportScreen() {
                               {!isExcluded && <StatusBadge row={row} />}
                               {row.errors.length > 0 && !isExcluded && (
                                 <p className="text-[10px] text-red-500 mt-1">{row.errors[0]}</p>
+                              )}
+                              {row.isDuplicate && row.errors.length === 0 && !isExcluded && (
+                                <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1">
+                                  {row.duplicateReason === 'campus_account'
+                                    ? 'Ya tiene cuenta activa en campus'
+                                    : 'Ya registrado en directorio'}
+                                </p>
                               )}
                             </td>
 

@@ -760,6 +760,27 @@ export async function getAdminStudents(): Promise<AdminStudent[]> {
 
     if (dirError) throw dirError
 
+    // Consultar student_details para identificar documentos de los estudiantes ya registrados
+    const { data: registeredDetails } = await adminClient
+      .from('student_details')
+      .select('student_id, document_number')
+
+    const registeredDocSet = new Set<string>()
+    for (const d of registeredDetails || []) {
+      if (d.document_number) registeredDocSet.add(d.document_number.trim().toLowerCase())
+    }
+
+    const norm = (s: string) =>
+      (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim()
+
+    const registeredNameSet = new Set<string>()
+    for (const p of profiles || []) {
+      const n1 = norm(`${p.first_name || ''} ${p.last_name || ''}`)
+      const n2 = norm(`${p.last_name || ''} ${p.first_name || ''}`)
+      if (n1) registeredNameSet.add(n1)
+      if (n2) registeredNameSet.add(n2)
+    }
+
     const registeredStudents = (profiles || []).map(p => {
       const authUser = authUsers?.find(u => u.id === p.id)
       return {
@@ -776,18 +797,30 @@ export async function getAdminStudents(): Promise<AdminStudent[]> {
       }
     })
 
-    const unregisteredStudents = (directoryStudents || []).map(d => ({
-      id: d.id,
-      name: `${d.first_name} ${d.last_name}`,
-      firstName: d.first_name || '',
-      lastName: d.last_name || '',
-      email: 'Sin cuenta virtual',
-      gradeLevel: d.grade_level || '',
-      groupName: d.group_name || '',
-      status: (d.status || 'active') as 'active' | 'inactive',
-      joinedDate: new Date(d.created_at).toISOString().split('T')[0],
-      source: 'directory' as const
-    }))
+    const unregisteredStudents = (directoryStudents || [])
+      .filter(d => {
+        // Descartar si el estudiante del directorio ya tiene una cuenta registrada en profiles
+        if (d.document_id && registeredDocSet.has(d.document_id.trim().toLowerCase())) {
+          return false
+        }
+        const dirName = norm(`${d.first_name || ''} ${d.last_name || ''}`)
+        if (dirName && registeredNameSet.has(dirName)) {
+          return false
+        }
+        return true
+      })
+      .map(d => ({
+        id: d.id,
+        name: `${d.first_name} ${d.last_name}`,
+        firstName: d.first_name || '',
+        lastName: d.last_name || '',
+        email: 'Sin cuenta virtual',
+        gradeLevel: d.grade_level || '',
+        groupName: d.group_name || '',
+        status: (d.status || 'active') as 'active' | 'inactive',
+        joinedDate: new Date(d.created_at).toISOString().split('T')[0],
+        source: 'directory' as const
+      }))
 
     return [...registeredStudents, ...unregisteredStudents]
   } catch (error) {

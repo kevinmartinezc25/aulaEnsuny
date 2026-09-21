@@ -7,10 +7,11 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   GraduationCap, Search, UserPlus, Trash2, Edit,
   Filter, CheckCircle, Loader2, AlertCircle, BookOpen, Link as LinkIcon,
-  FileSpreadsheet, Users
+  FileSpreadsheet, Users, RefreshCw
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { getAcademicLevels, getAdminStudents, deleteAdminUser } from '../../application/actions'
-import { getDirectoryStats } from '../../application/studentImportActions'
+import { getDirectoryStats, syncDirectoryWithProfiles } from '../../application/studentImportActions'
 import { AcademicLevel } from '../../application/types'
 
 interface Student {
@@ -29,6 +30,7 @@ export function AdminStudentsScreen() {
   const router = useRouter()
   const [students, setStudents] = useState<Student[]>([])
   const [loading, setLoading] = useState(true)
+  const [syncing, setSyncing] = useState(false)
   const [search, setSearch] = useState('')
   const [filterGrade, setFilterGrade] = useState<string>('all')
   const [filterGroup, setFilterGroup] = useState<string>('all')
@@ -144,6 +146,29 @@ export function AdminStudentsScreen() {
     setTimeout(() => setSuccessMsg(''), 3000)
   }
 
+  const handleSync = async () => {
+    setSyncing(true)
+    try {
+      const result = await syncDirectoryWithProfiles()
+      if (result.error) {
+        toast.error(`Error al sincronizar: ${result.error}`)
+      } else if (result.synced === 0) {
+        toast.info('Todo está sincronizado. No se encontraron cuentas sin vincular.')
+      } else {
+        toast.success(`${result.synced} cuenta${result.synced !== 1 ? 's' : ''} vinculada${result.synced !== 1 ? 's' : ''} al directorio exitosamente.`)
+        // Recargar lista actualizada
+        const updated = await getAdminStudents()
+        setStudents(updated as Student[])
+        const stats = await getDirectoryStats()
+        setDirectoryStats(stats)
+      }
+    } catch {
+      toast.error('Error inesperado al sincronizar cuentas.')
+    } finally {
+      setSyncing(false)
+    }
+  }
+
   return (
     <div className="max-w-7xl mx-auto space-y-8 text-left">
       {/* Header */}
@@ -157,6 +182,15 @@ export function AdminStudentsScreen() {
           </p>
         </div>
         <div className="flex items-center gap-2 self-start sm:self-center">
+          <button
+            onClick={handleSync}
+            disabled={syncing}
+            className="flex items-center gap-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 px-4 py-2 text-sm font-semibold active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Vincular cuentas virtuales con el directorio estudiantil"
+          >
+            {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            <span className="hidden sm:inline whitespace-nowrap">Sincronizar</span>
+          </button>
           <button
             onClick={copyRegistrationLink}
             className="flex items-center gap-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 px-4 py-2 text-sm font-semibold active:scale-[0.98] transition-all cursor-pointer"

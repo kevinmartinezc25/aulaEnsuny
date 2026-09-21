@@ -36,6 +36,7 @@ export interface ImportRowValidated extends StudentImportRow {
   errors: string[]
   isDuplicate: boolean
   duplicateId?: string // ID del registro existente si es duplicado
+  duplicateReason?: 'directory' | 'campus_account' // Motivo del duplicado
 }
 
 export interface ImportResult {
@@ -152,7 +153,7 @@ export async function getDirectoryStats(): Promise<{
 
 /**
  * Validar y preparar filas para importar.
- * Detecta duplicados consultando la BD.
+ * Detecta duplicados consultando tanto el directorio estudiantil como las cuentas virtuales (student_details / profiles).
  */
 export async function validateImportRows(
   rows: StudentImportRow[]
@@ -160,28 +161,53 @@ export async function validateImportRows(
   try {
     const adminClient = createAdminClient()
 
-    // Cargar registros existentes para detección de duplicados
-    const { data: existing } = await adminClient
+    // 1. Cargar registros existentes del directorio
+    const { data: existingDir } = await adminClient
       .from('student_directory')
-      .select('id, document_id, first_name, last_name, grade_level')
+      .select('id, document_id, first_name, last_name, grade_level, profile_id')
 
-    const existingByDoc = new Map<string, string>()
-    const existingByName = new Map<string, string>()
+    // 2. Cargar detalles de estudiantes con cuenta de campus (student_details)
+    const { data: existingDetails } = await adminClient
+      .from('student_details')
+      .select('student_id, document_number, first_name, first_surname')
 
-    for (const rec of existing || []) {
+    // 3. Cargar perfiles de estudiantes
+    const { data: existingProfiles } = await adminClient
+      .from('profiles')
+      .select('id, first_name, last_name, roles!inner(name)')
+      .eq('roles.name', 'student')
+
+    const dirByDoc = new Map<string, { id: string; profileId: string | null }>()
+    const dirByName = new Map<string, string>()
+
+    for (const rec of existingDir || []) {
       if (rec.document_id) {
-        existingByDoc.set(rec.document_id.trim().toLowerCase(), rec.id)
+        dirByDoc.set(rec.document_id.trim().toLowerCase(), { id: rec.id, profileId: rec.profile_id })
       }
-      const nameKey = `${rec.last_name?.toLowerCase()}|${rec.first_name?.toLowerCase()}|${rec.grade_level?.toLowerCase()}`
-      existingByName.set(nameKey, rec.id)
+      const nameKey = `${(rec.last_name || '').toLowerCase().trim()}|${(rec.first_name || '').toLowerCase().trim()}|${(rec.grade_level || '').toLowerCase().trim()}`
+      dirByName.set(nameKey, rec.id)
+    }
+
+    const detailsByDoc = new Map<string, string>()
+    for (const det of existingDetails || []) {
+      if (det.document_number) {
+        detailsByDoc.set(det.document_number.trim().toLowerCase(), det.student_id)
+      }
+    }
+
+    const profileByName = new Map<string, string>()
+    for (const p of existingProfiles || []) {
+      const nameKey = `${(p.last_name || '').toLowerCase().trim()}|${(p.first_name || '').toLowerCase().trim()}`
+      profileByName.set(nameKey, p.id)
     }
 
     return rows.map((row, i) => {
       const errors: string[] = []
       let isDuplicate = false
       let duplicateId: string | undefined
+      let duplicateReason: 'directory' | 'campus_account' | undefined
 
-      // Validaciones
+      // Validaciones básicas
       if (!row.lastName || row.lastName.trim().length < 2) {
         errors.push('Apellidos requerido (mín. 2 caracteres)')
       }
@@ -197,17 +223,34 @@ export async function validateImportRows(
 
       // Detección de duplicados (solo si los campos clave son válidos)
       if (errors.length === 0) {
-        if (row.documentId && row.documentId.trim()) {
-          const docKey = row.documentId.trim().toLowerCase()
-          if (existingByDoc.has(docKey)) {
+        const cleanDoc = row.documentId?.trim().toLowerCase()
+        const nameKey = `${row.lastName.trim().toLowerCase()}|${row.firstName.trim().toLowerCase()}|${row.gradeLevel.trim().toLowerCase()}`
+        const profNameKey = `${row.lastName.trim().toLowerCase()}|${row.firstName.trim().toLowerCase()}`
+
+        if (cleanDoc) {
+          // A. ¿Existe ya en el directorio estudiantil?
+          if (dirByDoc.has(cleanDoc)) {
             isDuplicate = true
-            duplicateId = existingByDoc.get(docKey)
+            const dirRecord = dirByDoc.get(cleanDoc)
+            duplicateId = dirRecord?.id
+            duplicateReason = dirRecord?.profileId ? 'campus_account' : 'directory'
+          }
+          // B. ¿Tiene ya una cuenta virtual creada en el campus (student_details)?
+          else if (detailsByDoc.has(cleanDoc)) {
+            isDuplicate = true
+            duplicateId = detailsByDoc.get(cleanDoc)
+            duplicateReason = 'campus_account'
           }
         } else {
-          const nameKey = `${row.lastName.trim().toLowerCase()}|${row.firstName.trim().toLowerCase()}|${row.gradeLevel.trim().toLowerCase()}`
-          if (existingByName.has(nameKey)) {
+          // Si no tiene documento, validar por nombre y grado
+          if (dirByName.has(nameKey)) {
             isDuplicate = true
-            duplicateId = existingByName.get(nameKey)
+            duplicateId = dirByName.get(nameKey)
+            duplicateReason = 'directory'
+          } else if (profileByName.has(profNameKey)) {
+            isDuplicate = true
+            duplicateId = profileByName.get(profNameKey)
+            duplicateReason = 'campus_account'
           }
         }
       }
@@ -219,6 +262,7 @@ export async function validateImportRows(
         errors,
         isDuplicate,
         duplicateId,
+        duplicateReason,
       }
     })
   } catch (error) {
@@ -234,7 +278,8 @@ export async function validateImportRows(
 
 /**
  * Importar estudiantes en lotes.
- * Solo importa filas válidas y no duplicadas (o actualizadas si el admin lo indica).
+ * Auto-vincula profile_id si el estudiante ya cuenta con usuario virtual, y previene
+ * duplicidad en student_directory actualizando registros preexistentes.
  */
 export async function importStudentsBatch(
   rows: StudentImportRow[],
@@ -249,34 +294,91 @@ export async function importStudentsBatch(
     const BATCH_SIZE = 50
     const result: ImportResult = { imported: 0, skipped: 0, errors: 0, details: [] }
 
+    // Consultar student_details para vincular inmediatamente con cuentas virtuales existentes
+    const { data: allDetails } = await adminClient
+      .from('student_details')
+      .select('student_id, document_number')
+
+    const detailsMap = new Map<string, string>()
+    for (const d of allDetails || []) {
+      if (d.document_number) {
+        detailsMap.set(d.document_number.trim().toLowerCase(), d.student_id)
+      }
+    }
+
+    // Consultar registros existentes en student_directory para actualizar en vez de duplicar
+    const { data: existingDirs } = await adminClient
+      .from('student_directory')
+      .select('id, document_id')
+
+    const existingDirDocMap = new Map<string, string>()
+    for (const d of existingDirs || []) {
+      if (d.document_id) {
+        existingDirDocMap.set(d.document_id.trim().toLowerCase(), d.id)
+      }
+    }
+
     for (let i = 0; i < rows.length; i += BATCH_SIZE) {
       const batch = rows.slice(i, i + BATCH_SIZE)
 
-      const records = batch.map(row => ({
-        first_name: toTitleCase(row.firstName),
-        last_name: toTitleCase(row.lastName),
-        document_id: row.documentId?.trim() || null,
-        grade_level: row.gradeLevel.trim(),
-        group_name: row.groupName.trim(),
-        status: 'active' as const
-      }))
+      const toInsert: { payload: any; rowIdx: number }[] = []
+      const toUpdate: { id: string; payload: any; rowIdx: number }[] = []
 
-      const { data, error } = await adminClient
-        .from('student_directory')
-        .insert(records)
-        .select('id')
+      batch.forEach((row, idx) => {
+        const cleanDoc = row.documentId?.trim().toLowerCase()
+        const existingProfileId = cleanDoc ? detailsMap.get(cleanDoc) || null : null
+        const existingDirId = cleanDoc ? existingDirDocMap.get(cleanDoc) : undefined
 
-      if (error) {
-        // Marcar todas las filas del batch como error
-        batch.forEach((_, idx) => {
+        const payload = {
+          first_name: toTitleCase(row.firstName),
+          last_name: toTitleCase(row.lastName),
+          document_id: row.documentId?.trim() || null,
+          grade_level: row.gradeLevel.trim(),
+          group_name: row.groupName.trim(),
+          profile_id: existingProfileId,
+          status: 'active' as const
+        }
+
+        if (existingDirId) {
+          toUpdate.push({ id: existingDirId, payload, rowIdx: i + idx + 2 })
+        } else {
+          toInsert.push({ payload, rowIdx: i + idx + 2 })
+        }
+      })
+
+      // Inserciones de nuevos estudiantes
+      if (toInsert.length > 0) {
+        const { error } = await adminClient
+          .from('student_directory')
+          .insert(toInsert.map(item => item.payload))
+
+        if (error) {
+          toInsert.forEach(item => {
+            result.errors++
+            result.details.push({ row: item.rowIdx, status: 'error', message: error.message })
+          })
+        } else {
+          toInsert.forEach(item => {
+            result.imported++
+            result.details.push({ row: item.rowIdx, status: 'ok' })
+          })
+        }
+      }
+
+      // Actualizaciones para registros ya existentes en el directorio
+      for (const item of toUpdate) {
+        const { error } = await adminClient
+          .from('student_directory')
+          .update(item.payload)
+          .eq('id', item.id)
+
+        if (error) {
           result.errors++
-          result.details.push({ row: i + idx + 2, status: 'error', message: error.message })
-        })
-      } else {
-        batch.forEach((_, idx) => {
+          result.details.push({ row: item.rowIdx, status: 'error', message: error.message })
+        } else {
           result.imported++
-          result.details.push({ row: i + idx + 2, status: 'ok' })
-        })
+          result.details.push({ row: item.rowIdx, status: 'ok' })
+        }
       }
     }
 
@@ -403,7 +505,7 @@ export async function generateImportTemplate(): Promise<string> {
 
 /**
  * Sincronizar registros del directorio con perfiles de Auth existentes.
- * Vincula `profile_id` automáticamente si coincide el número de documento.
+ * Vincula `profile_id` automáticamente si coincide el número de documento o nombre completo.
  */
 export async function syncDirectoryWithProfiles(): Promise<{
   synced: number
@@ -412,42 +514,77 @@ export async function syncDirectoryWithProfiles(): Promise<{
   try {
     const adminClient = createAdminClient()
 
-    // Obtener directorio sin vínculo
+    // 1. Obtener directorio sin vínculo (profile_id IS NULL)
     const { data: dirStudents, error: dirError } = await adminClient
       .from('student_directory')
       .select('id, document_id, first_name, last_name')
       .is('profile_id', null)
-      .not('document_id', 'is', null)
 
     if (dirError) throw dirError
 
-    // Obtener perfiles con rol estudiante
+    // 2. Obtener detalles de estudiantes con cuenta virtual (student_details)
+    const { data: details, error: detError } = await adminClient
+      .from('student_details')
+      .select('student_id, document_number, first_name, first_surname')
+
+    if (detError) throw detError
+
+    // 3. Obtener perfiles de estudiantes
     const { data: profiles, error: profError } = await adminClient
       .from('profiles')
-      .select('id, first_name, last_name, document_number')
+      .select('id, first_name, last_name, roles!inner(name)')
+      .eq('roles.name', 'student')
 
     if (profError) throw profError
 
     let synced = 0
 
-    for (const dir of dirStudents || []) {
-      const match = profiles?.find(
-        p =>
-          p.document_number &&
-          dir.document_id &&
-          p.document_number.trim() === dir.document_id.trim()
-      )
+    const norm = (s: string) =>
+      (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim()
 
-      if (match) {
-        await adminClient
+    for (const dir of dirStudents || []) {
+      let matchedStudentId: string | null = null
+
+      // Buscar primero por documento en student_details
+      if (dir.document_id && dir.document_id.trim()) {
+        const cleanDoc = dir.document_id.trim().toLowerCase()
+        const detMatch = details?.find(
+          d => d.document_number && d.document_number.trim().toLowerCase() === cleanDoc
+        )
+        if (detMatch) {
+          matchedStudentId = detMatch.student_id
+        }
+      }
+
+      // Si no se encontró por documento, buscar por nombres normalizados en profiles
+      if (!matchedStudentId && dir.first_name && dir.last_name) {
+        const dirName = norm(`${dir.first_name} ${dir.last_name}`)
+        const dirLastFirst = norm(`${dir.last_name} ${dir.first_name}`)
+
+        const profMatch = profiles?.find(p => {
+          const pName = norm(`${p.first_name} ${p.last_name}`)
+          const pLastFirst = norm(`${p.last_name} ${p.first_name}`)
+          return pName === dirName || pName === dirLastFirst || pLastFirst === dirName
+        })
+        if (profMatch) {
+          matchedStudentId = profMatch.id
+        }
+      }
+
+      if (matchedStudentId) {
+        const { error: updErr } = await adminClient
           .from('student_directory')
-          .update({ profile_id: match.id })
+          .update({ profile_id: matchedStudentId })
           .eq('id', dir.id)
-        synced++
+
+        if (!updErr) {
+          synced++
+        }
       }
     }
 
     revalidatePath('/admin/students')
+    revalidatePath('/admin/students/import')
     return { synced }
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Error desconocido'
