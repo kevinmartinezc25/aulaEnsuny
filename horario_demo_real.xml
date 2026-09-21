@@ -1,0 +1,788 @@
+<?xml version="1.0" encoding="windows-1252"?>
+<timetable>
+   <periods>
+      <period name="1" short="1" period="1" starttime="8:00" endtime="8:45"/>
+      <period name="2" short="2" period="2" starttime="9:00" endtime="9:45"/>
+      <period name="3" short="3" period="3" starttime="10:00" endtime="10:45"/>
+      <period name="4" short="4" period="4" starttime="11:00" endtime="11:45"/>
+      <period name="5" short="5" period="5" starttime="12:00" endtime="12:45"/>
+      <period name="6" short="6" period="6" starttime="13:00" endtime="13:45"/>
+      <period name="7" short="7" period="7" starttime="14:00" endtime="14:45"/>
+   </periods>
+   <daysdefs>
+      <daysdef id="DB07EC40571DBDEC" name="Lunes" short="Lu" days="10000"/>
+      <daysdef id="46356E02560B19D4" name="Martes" short="Ma" days="01000"/>
+      <daysdef id="172C9202074662F7" name="Miercoles" short="Mi" days="00100"/>
+      <daysdef id="267527FD78002C4B" name="Jueves" short="Ju" days="00010"/>
+      <daysdef id="BC3CB88C66687C92" name="Viernes" short="Vi" days="00001"/>
+   </daysdefs>
+   <subjects>
+      <subject id="S1" name="Proyecto de Vida" short="Pro"/>
+      <subject id="S2" name="Comité De Investigación" short="Com"/>
+      <subject id="S3" name="Urbanidad y Cívica" short="Urb"/>
+      <subject id="S4" name="Investigación" short="Inv"/>
+      <subject id="S5" name="Ética y Valores" short="Éti"/>
+      <subject id="S6" name="Didáctica de Ética y Valores" short="Did"/>
+      <subject id="S7" name="Economía y Política" short="Eco"/>
+      <subject id="S8" name="Sociales" short="Soc"/>
+      <subject id="S9" name="Psicología  del desarrollo" short="Psi"/>
+      <subject id="S10" name="Matemáticas" short="Mat"/>
+      <subject id="S11" name="Emprendimiento" short="Emp"/>
+      <subject id="S12" name="Artística" short="Art"/>
+      <subject id="S13" name="Legislación Educativa" short="Leg"/>
+      <subject id="S14" name="Gestión Educativa" short="Ges"/>
+      <subject id="S15" name="Tecnología e Informática" short="Tec"/>
+      <subject id="S16" name="Didáctica de las Ciencias Naturales" short="Did"/>
+      <subject id="S17" name="Semillero de Investigación" short="Sem"/>
+      <subject id="S18" name="Química" short="Quí"/>
+      <subject id="S19" name="Ingles" short="Ing"/>
+      <subject id="S20" name="Didáctica de la Religión" short="Did"/>
+      <subject id="S21" name="Filosofía" short="Fil"/>
+      <subject id="S22" name="Religión" short="Rel"/>
+      <subject id="S23" name="Ciencias Naturales" short="Cie"/>
+      <subject id="S24" name="Español" short="Esp"/>
+      <subject id="S25" name="Formación Humana II" short="For"/>
+      <subject id="S26" name="Seminario de Proyecto Pedagógico" short="Sem"/>
+      <subject id="S27" name="Evaluacion Escolar" short="Eva"/>
+      <subject id="S28" name="Modelos Pedagógicos" short="Mod"/>
+      <subject id="S29" name="Educación Física" short="Edu"/>
+      <subject id="S30" name="Seminario de Investigación" short="Sem"/>
+      <subject id="S31" name="Lineamientos Curriculares Preescolar" short="Lin"/>
+      <subject id="S32" name="Fundamentación Pedagógica" short="Fun"/>
+      <subject id="S33" name="Practicas Pedagógicas" short="Pra"/>
+      <subject id="S34" name="Didáctica General" short="Did"/>
+      <subject id="S35" name="Proyecto pedagógico Investigativo" short="Pro"/>
+      <subject id="S36" name="Proc. Logic-Matemáticos" short="Pro"/>
+      <subject id="S37" name="Coord. Práctica" short="Coo"/>
+      <subject id="S38" name="Población Vulnerable" short="Pob"/>
+      <subject id="S39" name="Modelos Flexibles I" short="Mod"/>
+      <subject id="S40" name="Didáctica de Ingles" short="Did"/>
+      <subject id="S41" name="Pedagogía  e Historia - educación" short="Ped"/>
+      <subject id="S42" name="Seminario de lect y Esc Ped" short="Sem"/>
+      <subject id="S43" name="Habilidades Comunicativas" short="Hab"/>
+      <subject id="S44" name="Didáctica de las Ciencias Sociales" short="Did"/>
+      <subject id="S45" name="Emprendimiento -Urb Civic" short="Emp"/>
+      <subject id="S46" name="Física Matemáticas" short="Fís"/>
+   </subjects>
+   <teachers>
+      <teacher id="T1" name="Manuel Naspiran" short="Ma"/>
+      <teacher id="T2" name="Daniela Patiño" short="Da"/>
+      <teacher id="T3" name="Julio Tolosa" short="Ju"/>
+      <teacher id="T4" name="Diego Guerrero" short="Di"/>
+      <teacher id="T5" name="Camilo Idarraga" short="Ca"/>
+      <teacher id="T6" name="Julian Velilla" short="Ju"/>
+      <teacher id="T7" name="Gloria Patricia Ruiz" short="Gl"/>
+      <teacher id="T8" name="Elkin Mejia Valencia" short="El"/>
+      <teacher id="T9" name="Franci Zuleta" short="Fr"/>
+      <teacher id="T10" name="Gloria Cecilia Patiño" short="Gl"/>
+      <teacher id="T11" name="Edwin Tamayo" short="Ed"/>
+      <teacher id="T12" name="Doralba Cadavid" short="Do"/>
+      <teacher id="T13" name="Sandra Patiño Agudelo" short="Sa"/>
+      <teacher id="T14" name="Ana Cecilia González" short="An"/>
+      <teacher id="T15" name="Luz Mery Querubín" short="Lu"/>
+      <teacher id="T16" name="Edilber Rentería" short="Ed"/>
+      <teacher id="T17" name="Esteban Aristizábal" short="Es"/>
+      <teacher id="T18" name="Victor Manuel Alvarez Aguirre" short="Vi"/>
+      <teacher id="T19" name="Luz Gicela Gonzalez Acevedo" short="Lu"/>
+      <teacher id="T20" name="Laura Cordoba" short="La"/>
+      <teacher id="T21" name="Kevin Martínez" short="Ke"/>
+   </teachers>
+   <classrooms>
+      <classroom id="C1" name="Aula General" short="A1" />
+   </classrooms>
+   <classes>
+      <class id="G0" name="6°-1" short="6°-1"/>
+      <class id="G1" name="6°-2" short="6°-2"/>
+      <class id="G2" name="7°-1" short="7°-1"/>
+      <class id="G3" name="7°-2" short="7°-2"/>
+      <class id="G4" name="8°-1" short="8°-1"/>
+      <class id="G5" name="8°-2" short="8°-2"/>
+      <class id="G6" name="9°-1" short="9°-1"/>
+      <class id="G7" name="9°-2" short="9°-2"/>
+      <class id="G8" name="10°-1" short="10°-1"/>
+      <class id="G9" name="10°-2" short="10°-2"/>
+      <class id="G10" name="11°-1" short="11°-1"/>
+      <class id="G11" name="11°-2" short="11°-2"/>
+      <class id="G12" name="Nivelatorio" short="Nivelatorio"/>
+      <class id="G13" name="PFC-12" short="PFC-12"/>
+      <class id="G14" name="PFC-13" short="PFC-13"/>
+   </classes>
+   <groups>
+      <group id="G0_all" name="La clase entera" classid="G0" entireclass="1" />
+      <group id="G1_all" name="La clase entera" classid="G1" entireclass="1" />
+      <group id="G2_all" name="La clase entera" classid="G2" entireclass="1" />
+      <group id="G3_all" name="La clase entera" classid="G3" entireclass="1" />
+      <group id="G4_all" name="La clase entera" classid="G4" entireclass="1" />
+      <group id="G5_all" name="La clase entera" classid="G5" entireclass="1" />
+      <group id="G6_all" name="La clase entera" classid="G6" entireclass="1" />
+      <group id="G7_all" name="La clase entera" classid="G7" entireclass="1" />
+      <group id="G8_all" name="La clase entera" classid="G8" entireclass="1" />
+      <group id="G9_all" name="La clase entera" classid="G9" entireclass="1" />
+      <group id="G10_all" name="La clase entera" classid="G10" entireclass="1" />
+      <group id="G11_all" name="La clase entera" classid="G11" entireclass="1" />
+      <group id="G12_all" name="La clase entera" classid="G12" entireclass="1" />
+      <group id="G13_all" name="La clase entera" classid="G13" entireclass="1" />
+      <group id="G14_all" name="La clase entera" classid="G14" entireclass="1" />
+   </groups>
+   <lessons>
+      <lesson id="L1" classids="G12" subjectid="S1" periodspercard="1" periodsperweek="2" teacherids="T1" groupids="G12_all" />
+      <lesson id="L2" classids="G7" subjectid="S3" periodspercard="1" periodsperweek="1" teacherids="T1" groupids="G7_all" />
+      <lesson id="L3" classids="G13" subjectid="S4" periodspercard="1" periodsperweek="5" teacherids="T1" groupids="G13_all" />
+      <lesson id="L4" classids="G14" subjectid="S4" periodspercard="1" periodsperweek="5" teacherids="T1" groupids="G14_all" />
+      <lesson id="L5" classids="G7" subjectid="S5" periodspercard="1" periodsperweek="2" teacherids="T1" groupids="G7_all" />
+      <lesson id="L6" classids="G8" subjectid="S5" periodspercard="1" periodsperweek="1" teacherids="T1" groupids="G8_all" />
+      <lesson id="L7" classids="G9" subjectid="S5" periodspercard="1" periodsperweek="1" teacherids="T1" groupids="G9_all" />
+      <lesson id="L8" classids="G10" subjectid="S5" periodspercard="1" periodsperweek="1" teacherids="T1" groupids="G10_all" />
+      <lesson id="L9" classids="G11" subjectid="S5" periodspercard="1" periodsperweek="1" teacherids="T1" groupids="G11_all" />
+      <lesson id="L10" classids="G14" subjectid="S6" periodspercard="1" periodsperweek="2" teacherids="T1" groupids="G14_all" />
+      <lesson id="L11" classids="G8" subjectid="S7" periodspercard="1" periodsperweek="2" teacherids="T2" groupids="G8_all" />
+      <lesson id="L12" classids="G9" subjectid="S7" periodspercard="1" periodsperweek="2" teacherids="T2" groupids="G9_all" />
+      <lesson id="L13" classids="G0" subjectid="S8" periodspercard="1" periodsperweek="3" teacherids="T2" groupids="G0_all" />
+      <lesson id="L14" classids="G1" subjectid="S8" periodspercard="1" periodsperweek="3" teacherids="T2" groupids="G1_all" />
+      <lesson id="L15" classids="G6" subjectid="S8" periodspercard="1" periodsperweek="3" teacherids="T2" groupids="G6_all" />
+      <lesson id="L16" classids="G7" subjectid="S8" periodspercard="1" periodsperweek="3" teacherids="T2" groupids="G7_all" />
+      <lesson id="L17" classids="G8" subjectid="S8" periodspercard="1" periodsperweek="1" teacherids="T2" groupids="G8_all" />
+      <lesson id="L18" classids="G9" subjectid="S8" periodspercard="1" periodsperweek="1" teacherids="T2" groupids="G9_all" />
+      <lesson id="L19" classids="G10" subjectid="S8" periodspercard="1" periodsperweek="1" teacherids="T2" groupids="G10_all" />
+      <lesson id="L20" classids="G11" subjectid="S8" periodspercard="1" periodsperweek="1" teacherids="T2" groupids="G11_all" />
+      <lesson id="L21" classids="G13" subjectid="S9" periodspercard="1" periodsperweek="2" teacherids="T2" groupids="G13_all" />
+      <lesson id="L22" classids="G4" subjectid="S10" periodspercard="1" periodsperweek="4" teacherids="T3" groupids="G4_all" />
+      <lesson id="L23" classids="G5" subjectid="S10" periodspercard="1" periodsperweek="4" teacherids="T3" groupids="G5_all" />
+      <lesson id="L24" classids="G6" subjectid="S10" periodspercard="1" periodsperweek="4" teacherids="T3" groupids="G6_all" />
+      <lesson id="L25" classids="G7" subjectid="S10" periodspercard="1" periodsperweek="4" teacherids="T3" groupids="G7_all" />
+      <lesson id="L26" classids="G4" subjectid="S11" periodspercard="1" periodsperweek="1" teacherids="T3" groupids="G4_all" />
+      <lesson id="L27" classids="G5" subjectid="S11" periodspercard="1" periodsperweek="1" teacherids="T3" groupids="G5_all" />
+      <lesson id="L28" classids="G1" subjectid="S12" periodspercard="1" periodsperweek="2" teacherids="T3" groupids="G1_all" />
+      <lesson id="L29" classids="G3" subjectid="S12" periodspercard="1" periodsperweek="2" teacherids="T3" groupids="G3_all" />
+      <lesson id="L30" classids="G13" subjectid="S13" periodspercard="1" periodsperweek="2" teacherids="T4" groupids="G13_all" />
+      <lesson id="L31" classids="G14" subjectid="S14" periodspercard="1" periodsperweek="4" teacherids="T4" groupids="G14_all" />
+      <lesson id="L32" classids="G0" subjectid="S15" periodspercard="1" periodsperweek="2" teacherids="T4" groupids="G0_all" />
+      <lesson id="L33" classids="G1" subjectid="S15" periodspercard="1" periodsperweek="2" teacherids="T4" groupids="G1_all" />
+      <lesson id="L34" classids="G2" subjectid="S15" periodspercard="1" periodsperweek="2" teacherids="T4" groupids="G2_all" />
+      <lesson id="L35" classids="G3" subjectid="S15" periodspercard="1" periodsperweek="2" teacherids="T4" groupids="G3_all" />
+      <lesson id="L36" classids="G4" subjectid="S15" periodspercard="1" periodsperweek="2" teacherids="T4" groupids="G4_all" />
+      <lesson id="L37" classids="G5" subjectid="S15" periodspercard="1" periodsperweek="2" teacherids="T4" groupids="G5_all" />
+      <lesson id="L38" classids="G6" subjectid="S15" periodspercard="1" periodsperweek="2" teacherids="T4" groupids="G6_all" />
+      <lesson id="L39" classids="G7" subjectid="S15" periodspercard="1" periodsperweek="2" teacherids="T4" groupids="G7_all" />
+      <lesson id="L40" classids="G13" subjectid="S16" periodspercard="1" periodsperweek="4" teacherids="T5" groupids="G13_all" />
+      <lesson id="L41" classids="G8" subjectid="S18" periodspercard="1" periodsperweek="3" teacherids="T5" groupids="G8_all" />
+      <lesson id="L42" classids="G9" subjectid="S18" periodspercard="1" periodsperweek="3" teacherids="T5" groupids="G9_all" />
+      <lesson id="L43" classids="G10" subjectid="S18" periodspercard="1" periodsperweek="3" teacherids="T5" groupids="G10_all" />
+      <lesson id="L44" classids="G11" subjectid="S18" periodspercard="1" periodsperweek="3" teacherids="T5" groupids="G11_all" />
+      <lesson id="L45" classids="G0" subjectid="S19" periodspercard="1" periodsperweek="2" teacherids="T5" groupids="G0_all" />
+      <lesson id="L46" classids="G1" subjectid="S19" periodspercard="1" periodsperweek="2" teacherids="T5" groupids="G1_all" />
+      <lesson id="L47" classids="G14" subjectid="S20" periodspercard="1" periodsperweek="2" teacherids="T6" groupids="G14_all" />
+      <lesson id="L48" classids="G8" subjectid="S21" periodspercard="1" periodsperweek="2" teacherids="T6" groupids="G8_all" />
+      <lesson id="L49" classids="G9" subjectid="S21" periodspercard="1" periodsperweek="2" teacherids="T6" groupids="G9_all" />
+      <lesson id="L50" classids="G10" subjectid="S21" periodspercard="1" periodsperweek="2" teacherids="T6" groupids="G10_all" />
+      <lesson id="L51" classids="G11" subjectid="S21" periodspercard="1" periodsperweek="2" teacherids="T6" groupids="G11_all" />
+      <lesson id="L52" classids="G0" subjectid="S22" periodspercard="1" periodsperweek="2" teacherids="T6" groupids="G0_all" />
+      <lesson id="L53" classids="G1" subjectid="S22" periodspercard="1" periodsperweek="2" teacherids="T6" groupids="G1_all" />
+      <lesson id="L54" classids="G2" subjectid="S22" periodspercard="1" periodsperweek="2" teacherids="T6" groupids="G2_all" />
+      <lesson id="L55" classids="G3" subjectid="S22" periodspercard="1" periodsperweek="2" teacherids="T6" groupids="G3_all" />
+      <lesson id="L56" classids="G8" subjectid="S22" periodspercard="1" periodsperweek="1" teacherids="T6" groupids="G8_all" />
+      <lesson id="L57" classids="G9" subjectid="S22" periodspercard="1" periodsperweek="1" teacherids="T6" groupids="G9_all" />
+      <lesson id="L58" classids="G1" subjectid="S3" periodspercard="1" periodsperweek="1" teacherids="T6" groupids="G1_all" />
+      <lesson id="L59" classids="G4" subjectid="S23" periodspercard="1" periodsperweek="4" teacherids="T7" groupids="G4_all" />
+      <lesson id="L60" classids="G5" subjectid="S23" periodspercard="1" periodsperweek="4" teacherids="T7" groupids="G5_all" />
+      <lesson id="L61" classids="G6" subjectid="S23" periodspercard="1" periodsperweek="4" teacherids="T7" groupids="G6_all" />
+      <lesson id="L62" classids="G7" subjectid="S23" periodspercard="1" periodsperweek="4" teacherids="T7" groupids="G7_all" />
+      <lesson id="L63" classids="G6" subjectid="S22" periodspercard="1" periodsperweek="2" teacherids="T7" groupids="G6_all" />
+      <lesson id="L64" classids="G7" subjectid="S22" periodspercard="1" periodsperweek="2" teacherids="T7" groupids="G7_all" />
+      <lesson id="L65" classids="G10" subjectid="S22" periodspercard="1" periodsperweek="1" teacherids="T7" groupids="G10_all" />
+      <lesson id="L66" classids="G11" subjectid="S22" periodspercard="1" periodsperweek="1" teacherids="T7" groupids="G11_all" />
+      <lesson id="L67" classids="G4" subjectid="S24" periodspercard="1" periodsperweek="4" teacherids="T8" groupids="G4_all" />
+      <lesson id="L68" classids="G5" subjectid="S24" periodspercard="1" periodsperweek="4" teacherids="T8" groupids="G5_all" />
+      <lesson id="L69" classids="G6" subjectid="S24" periodspercard="1" periodsperweek="4" teacherids="T8" groupids="G6_all" />
+      <lesson id="L70" classids="G7" subjectid="S24" periodspercard="1" periodsperweek="4" teacherids="T8" groupids="G7_all" />
+      <lesson id="L71" classids="G13" subjectid="S25" periodspercard="1" periodsperweek="2" teacherids="T8" groupids="G13_all" />
+      <lesson id="L72" classids="G6" subjectid="S3" periodspercard="1" periodsperweek="1" teacherids="T8" groupids="G6_all" />
+      <lesson id="L73" classids="G6" subjectid="S26" periodspercard="1" periodsperweek="1" teacherids="T8" groupids="G6_all" />
+      <lesson id="L74" classids="G7" subjectid="S26" periodspercard="1" periodsperweek="1" teacherids="T8" groupids="G7_all" />
+      <lesson id="L75" classids="G14" subjectid="S27" periodspercard="1" periodsperweek="2" teacherids="T9" groupids="G14_all" />
+      <lesson id="L76" classids="G14" subjectid="S28" periodspercard="1" periodsperweek="2" teacherids="T9" groupids="G14_all" />
+      <lesson id="L77" classids="G4" subjectid="S12" periodspercard="1" periodsperweek="2" teacherids="T9" groupids="G4_all" />
+      <lesson id="L78" classids="G5" subjectid="S12" periodspercard="1" periodsperweek="2" teacherids="T9" groupids="G5_all" />
+      <lesson id="L79" classids="G6" subjectid="S12" periodspercard="1" periodsperweek="2" teacherids="T9" groupids="G6_all" />
+      <lesson id="L80" classids="G7" subjectid="S12" periodspercard="1" periodsperweek="2" teacherids="T9" groupids="G7_all" />
+      <lesson id="L81" classids="G8" subjectid="S12" periodspercard="1" periodsperweek="2" teacherids="T9" groupids="G8_all" />
+      <lesson id="L82" classids="G9" subjectid="S12" periodspercard="1" periodsperweek="2" teacherids="T9" groupids="G9_all" />
+      <lesson id="L83" classids="G10" subjectid="S12" periodspercard="1" periodsperweek="2" teacherids="T9" groupids="G10_all" />
+      <lesson id="L84" classids="G11" subjectid="S12" periodspercard="1" periodsperweek="2" teacherids="T9" groupids="G11_all" />
+      <lesson id="L85" classids="G0" subjectid="S29" periodspercard="1" periodsperweek="2" teacherids="T9" groupids="G0_all" />
+      <lesson id="L86" classids="G4" subjectid="S22" periodspercard="1" periodsperweek="2" teacherids="T10" groupids="G4_all" />
+      <lesson id="L87" classids="G5" subjectid="S22" periodspercard="1" periodsperweek="2" teacherids="T10" groupids="G5_all" />
+      <lesson id="L88" classids="G10" subjectid="S30" periodspercard="1" periodsperweek="2" teacherids="T10" groupids="G10_all" />
+      <lesson id="L89" classids="G11" subjectid="S30" periodspercard="1" periodsperweek="2" teacherids="T10" groupids="G11_all" />
+      <lesson id="L90" classids="G14" subjectid="S31" periodspercard="1" periodsperweek="4" teacherids="T10" groupids="G14_all" />
+      <lesson id="L91" classids="G8" subjectid="S32" periodspercard="1" periodsperweek="2" teacherids="T10" groupids="G8_all" />
+      <lesson id="L92" classids="G9" subjectid="S32" periodspercard="1" periodsperweek="2" teacherids="T10" groupids="G9_all" />
+      <lesson id="L93" classids="G10" subjectid="S32" periodspercard="1" periodsperweek="2" teacherids="T10" groupids="G10_all" />
+      <lesson id="L94" classids="G11" subjectid="S32" periodspercard="1" periodsperweek="2" teacherids="T10" groupids="G11_all" />
+      <lesson id="L95" classids="G12" subjectid="S32" periodspercard="1" periodsperweek="2" teacherids="T10" groupids="G12_all" />
+      <lesson id="L96" classids="G1" subjectid="S29" periodspercard="1" periodsperweek="2" teacherids="T11" groupids="G1_all" />
+      <lesson id="L97" classids="G2" subjectid="S29" periodspercard="1" periodsperweek="2" teacherids="T11" groupids="G2_all" />
+      <lesson id="L98" classids="G3" subjectid="S29" periodspercard="1" periodsperweek="2" teacherids="T11" groupids="G3_all" />
+      <lesson id="L99" classids="G4" subjectid="S29" periodspercard="1" periodsperweek="2" teacherids="T11" groupids="G4_all" />
+      <lesson id="L100" classids="G5" subjectid="S29" periodspercard="1" periodsperweek="2" teacherids="T11" groupids="G5_all" />
+      <lesson id="L101" classids="G6" subjectid="S29" periodspercard="1" periodsperweek="2" teacherids="T11" groupids="G6_all" />
+      <lesson id="L102" classids="G7" subjectid="S29" periodspercard="1" periodsperweek="2" teacherids="T11" groupids="G7_all" />
+      <lesson id="L103" classids="G8" subjectid="S29" periodspercard="1" periodsperweek="2" teacherids="T11" groupids="G8_all" />
+      <lesson id="L104" classids="G9" subjectid="S29" periodspercard="1" periodsperweek="2" teacherids="T11" groupids="G9_all" />
+      <lesson id="L105" classids="G10" subjectid="S29" periodspercard="1" periodsperweek="2" teacherids="T11" groupids="G10_all" />
+      <lesson id="L106" classids="G11" subjectid="S29" periodspercard="1" periodsperweek="2" teacherids="T11" groupids="G11_all" />
+      <lesson id="L107" classids="G0" subjectid="S24" periodspercard="1" periodsperweek="5" teacherids="T12" groupids="G0_all" />
+      <lesson id="L108" classids="G1" subjectid="S24" periodspercard="1" periodsperweek="5" teacherids="T12" groupids="G1_all" />
+      <lesson id="L109" classids="G2" subjectid="S24" periodspercard="1" periodsperweek="5" teacherids="T12" groupids="G2_all" />
+      <lesson id="L110" classids="G3" subjectid="S24" periodspercard="1" periodsperweek="5" teacherids="T12" groupids="G3_all" />
+      <lesson id="L111" classids="G3" subjectid="S5" periodspercard="1" periodsperweek="2" teacherids="T12" groupids="G3_all" />
+      <lesson id="L112" classids="G8" subjectid="S33" periodspercard="1" periodsperweek="2" teacherids="T13" groupids="G8_all" />
+      <lesson id="L113" classids="G9" subjectid="S33" periodspercard="1" periodsperweek="2" teacherids="T13" groupids="G9_all" />
+      <lesson id="L114" classids="G8" subjectid="S34" periodspercard="1" periodsperweek="2" teacherids="T13" groupids="G8_all" />
+      <lesson id="L115" classids="G9" subjectid="S34" periodspercard="1" periodsperweek="2" teacherids="T13" groupids="G9_all" />
+      <lesson id="L116" classids="G12" subjectid="S35" periodspercard="1" periodsperweek="4" teacherids="T13" groupids="G12_all" />
+      <lesson id="L117" classids="G2" subjectid="S12" periodspercard="1" periodsperweek="2" teacherids="T13" groupids="G2_all" />
+      <lesson id="L118" classids="G0" subjectid="S11" periodspercard="1" periodsperweek="1" teacherids="T13" groupids="G0_all" />
+      <lesson id="L119" classids="G1" subjectid="S11" periodspercard="1" periodsperweek="1" teacherids="T13" groupids="G1_all" />
+      <lesson id="L120" classids="G2" subjectid="S11" periodspercard="1" periodsperweek="1" teacherids="T13" groupids="G2_all" />
+      <lesson id="L121" classids="G3" subjectid="S11" periodspercard="1" periodsperweek="1" teacherids="T13" groupids="G3_all" />
+      <lesson id="L122" classids="G8" subjectid="S30" periodspercard="1" periodsperweek="2" teacherids="T13" groupids="G8_all" />
+      <lesson id="L123" classids="G9" subjectid="S30" periodspercard="1" periodsperweek="2" teacherids="T13" groupids="G9_all" />
+      <lesson id="L124" classids="G11" subjectid="S36" periodspercard="1" periodsperweek="4" teacherids="T14" groupids="G11_all" />
+      <lesson id="L125" classids="G14" subjectid="S36" periodspercard="1" periodsperweek="4" teacherids="T14" groupids="G14_all" />
+      <lesson id="L126" classids="G0" subjectid="S10" periodspercard="1" periodsperweek="4" teacherids="T14" groupids="G0_all" />
+      <lesson id="L127" classids="G1" subjectid="S10" periodspercard="1" periodsperweek="4" teacherids="T14" groupids="G1_all" />
+      <lesson id="L128" classids="G2" subjectid="S10" periodspercard="1" periodsperweek="4" teacherids="T14" groupids="G2_all" />
+      <lesson id="L129" classids="G3" subjectid="S10" periodspercard="1" periodsperweek="4" teacherids="T14" groupids="G3_all" />
+      <lesson id="L130" classids="G0" subjectid="S12" periodspercard="1" periodsperweek="2" teacherids="T14" groupids="G0_all" />
+      <lesson id="L131" classids="G13" subjectid="S37" periodspercard="1" periodsperweek="3" teacherids="T15" groupids="G13_all" />
+      <lesson id="L132" classids="G14" subjectid="S37" periodspercard="1" periodsperweek="3" teacherids="T15" groupids="G14_all" />
+      <lesson id="L133" classids="G14" subjectid="S38" periodspercard="1" periodsperweek="4" teacherids="T15" groupids="G14_all" />
+      <lesson id="L134" classids="G10" subjectid="S34" periodspercard="1" periodsperweek="2" teacherids="T15" groupids="G10_all" />
+      <lesson id="L135" classids="G11" subjectid="S34" periodspercard="1" periodsperweek="2" teacherids="T15" groupids="G11_all" />
+      <lesson id="L136" classids="G12" subjectid="S34" periodspercard="1" periodsperweek="2" teacherids="T15" groupids="G12_all" />
+      <lesson id="L137" classids="G13" subjectid="S39" periodspercard="1" periodsperweek="2" teacherids="T15" groupids="G13_all" />
+      <lesson id="L138" classids="G10" subjectid="S33" periodspercard="1" periodsperweek="2" teacherids="T15" groupids="G10_all" />
+      <lesson id="L139" classids="G11" subjectid="S33" periodspercard="1" periodsperweek="2" teacherids="T15" groupids="G11_all" />
+      <lesson id="L140" classids="G13" subjectid="S40" periodspercard="1" periodsperweek="2" teacherids="T16" groupids="G13_all" />
+      <lesson id="L141" classids="G2" subjectid="S19" periodspercard="1" periodsperweek="2" teacherids="T16" groupids="G2_all" />
+      <lesson id="L142" classids="G3" subjectid="S19" periodspercard="1" periodsperweek="2" teacherids="T16" groupids="G3_all" />
+      <lesson id="L143" classids="G4" subjectid="S19" periodspercard="1" periodsperweek="2" teacherids="T16" groupids="G4_all" />
+      <lesson id="L144" classids="G5" subjectid="S19" periodspercard="1" periodsperweek="2" teacherids="T16" groupids="G5_all" />
+      <lesson id="L145" classids="G6" subjectid="S19" periodspercard="1" periodsperweek="2" teacherids="T16" groupids="G6_all" />
+      <lesson id="L146" classids="G7" subjectid="S19" periodspercard="1" periodsperweek="2" teacherids="T16" groupids="G7_all" />
+      <lesson id="L147" classids="G8" subjectid="S19" periodspercard="1" periodsperweek="2" teacherids="T16" groupids="G8_all" />
+      <lesson id="L148" classids="G9" subjectid="S19" periodspercard="1" periodsperweek="2" teacherids="T16" groupids="G9_all" />
+      <lesson id="L149" classids="G10" subjectid="S19" periodspercard="1" periodsperweek="2" teacherids="T16" groupids="G10_all" />
+      <lesson id="L150" classids="G11" subjectid="S19" periodspercard="1" periodsperweek="2" teacherids="T16" groupids="G11_all" />
+      <lesson id="L151" classids="G13" subjectid="S41" periodspercard="1" periodsperweek="2" teacherids="T17" groupids="G13_all" />
+      <lesson id="L152" classids="G6" subjectid="S5" periodspercard="1" periodsperweek="2" teacherids="T17" groupids="G6_all" />
+      <lesson id="L153" classids="G8" subjectid="S24" periodspercard="1" periodsperweek="3" teacherids="T17" groupids="G8_all" />
+      <lesson id="L154" classids="G9" subjectid="S24" periodspercard="1" periodsperweek="3" teacherids="T17" groupids="G9_all" />
+      <lesson id="L155" classids="G10" subjectid="S24" periodspercard="1" periodsperweek="3" teacherids="T17" groupids="G10_all" />
+      <lesson id="L156" classids="G11" subjectid="S24" periodspercard="1" periodsperweek="3" teacherids="T17" groupids="G11_all" />
+      <lesson id="L157" classids="G4" subjectid="S42" periodspercard="1" periodsperweek="1" teacherids="T17" groupids="G4_all" />
+      <lesson id="L158" classids="G5" subjectid="S42" periodspercard="1" periodsperweek="1" teacherids="T17" groupids="G5_all" />
+      <lesson id="L159" classids="G12" subjectid="S43" periodspercard="1" periodsperweek="4" teacherids="T17" groupids="G12_all" />
+      <lesson id="L160" classids="G2" subjectid="S8" periodspercard="1" periodsperweek="3" teacherids="T18" groupids="G2_all" />
+      <lesson id="L161" classids="G3" subjectid="S8" periodspercard="1" periodsperweek="3" teacherids="T18" groupids="G3_all" />
+      <lesson id="L162" classids="G4" subjectid="S8" periodspercard="1" periodsperweek="3" teacherids="T18" groupids="G4_all" />
+      <lesson id="L163" classids="G5" subjectid="S8" periodspercard="1" periodsperweek="3" teacherids="T18" groupids="G5_all" />
+      <lesson id="L164" classids="G13" subjectid="S44" periodspercard="1" periodsperweek="4" teacherids="T18" groupids="G13_all" />
+      <lesson id="L165" classids="G10" subjectid="S7" periodspercard="1" periodsperweek="2" teacherids="T18" groupids="G10_all" />
+      <lesson id="L166" classids="G11" subjectid="S7" periodspercard="1" periodsperweek="2" teacherids="T18" groupids="G11_all" />
+      <lesson id="L167" classids="G0" subjectid="S3" periodspercard="1" periodsperweek="1" teacherids="T18" groupids="G0_all" />
+      <lesson id="L168" classids="G0" subjectid="S23" periodspercard="1" periodsperweek="4" teacherids="T19" groupids="G0_all" />
+      <lesson id="L169" classids="G1" subjectid="S23" periodspercard="1" periodsperweek="4" teacherids="T19" groupids="G1_all" />
+      <lesson id="L170" classids="G2" subjectid="S23" periodspercard="1" periodsperweek="4" teacherids="T19" groupids="G2_all" />
+      <lesson id="L171" classids="G3" subjectid="S23" periodspercard="1" periodsperweek="4" teacherids="T19" groupids="G3_all" />
+      <lesson id="L172" classids="G0" subjectid="S5" periodspercard="1" periodsperweek="2" teacherids="T19" groupids="G0_all" />
+      <lesson id="L173" classids="G1" subjectid="S5" periodspercard="1" periodsperweek="2" teacherids="T19" groupids="G1_all" />
+      <lesson id="L174" classids="G2" subjectid="S5" periodspercard="1" periodsperweek="2" teacherids="T19" groupids="G2_all" />
+      <lesson id="L175" classids="G8" subjectid="S10" periodspercard="1" periodsperweek="3" teacherids="T20" groupids="G8_all" />
+      <lesson id="L176" classids="G9" subjectid="S10" periodspercard="1" periodsperweek="3" teacherids="T20" groupids="G9_all" />
+      <lesson id="L177" classids="G10" subjectid="S10" periodspercard="1" periodsperweek="3" teacherids="T20" groupids="G10_all" />
+      <lesson id="L178" classids="G11" subjectid="S10" periodspercard="1" periodsperweek="3" teacherids="T20" groupids="G11_all" />
+      <lesson id="L179" classids="G6" subjectid="S11" periodspercard="1" periodsperweek="1" teacherids="T20" groupids="G6_all" />
+      <lesson id="L180" classids="G7" subjectid="S11" periodspercard="1" periodsperweek="1" teacherids="T20" groupids="G7_all" />
+      <lesson id="L181" classids="G8" subjectid="S45" periodspercard="1" periodsperweek="1" teacherids="T20" groupids="G8_all" />
+      <lesson id="L182" classids="G9" subjectid="S45" periodspercard="1" periodsperweek="1" teacherids="T20" groupids="G9_all" />
+      <lesson id="L183" classids="G10" subjectid="S45" periodspercard="1" periodsperweek="1" teacherids="T20" groupids="G10_all" />
+      <lesson id="L184" classids="G11" subjectid="S45" periodspercard="1" periodsperweek="1" teacherids="T20" groupids="G11_all" />
+      <lesson id="L185" classids="G4" subjectid="S5" periodspercard="1" periodsperweek="2" teacherids="T20" groupids="G4_all" />
+      <lesson id="L186" classids="G5" subjectid="S5" periodspercard="1" periodsperweek="2" teacherids="T20" groupids="G5_all" />
+      <lesson id="L187" classids="G2" subjectid="S3" periodspercard="1" periodsperweek="1" teacherids="T21" groupids="G2_all" />
+      <lesson id="L188" classids="G3" subjectid="S3" periodspercard="1" periodsperweek="1" teacherids="T21" groupids="G3_all" />
+      <lesson id="L189" classids="G4" subjectid="S3" periodspercard="1" periodsperweek="1" teacherids="T21" groupids="G4_all" />
+      <lesson id="L190" classids="G5" subjectid="S3" periodspercard="1" periodsperweek="1" teacherids="T21" groupids="G5_all" />
+      <lesson id="L191" classids="G8" subjectid="S15" periodspercard="1" periodsperweek="2" teacherids="T21" groupids="G8_all" />
+      <lesson id="L192" classids="G9" subjectid="S15" periodspercard="1" periodsperweek="2" teacherids="T21" groupids="G9_all" />
+      <lesson id="L193" classids="G10" subjectid="S15" periodspercard="1" periodsperweek="2" teacherids="T21" groupids="G10_all" />
+      <lesson id="L194" classids="G11" subjectid="S15" periodspercard="1" periodsperweek="2" teacherids="T21" groupids="G11_all" />
+      <lesson id="L195" classids="G8" subjectid="S46" periodspercard="1" periodsperweek="2" teacherids="T21" groupids="G8_all" />
+      <lesson id="L196" classids="G9" subjectid="S46" periodspercard="1" periodsperweek="2" teacherids="T21" groupids="G9_all" />
+      <lesson id="L197" classids="G10" subjectid="S46" periodspercard="1" periodsperweek="2" teacherids="T21" groupids="G10_all" />
+      <lesson id="L198" classids="G11" subjectid="S46" periodspercard="1" periodsperweek="2" teacherids="T21" groupids="G11_all" />
+   </lessons>
+   <cards>
+      <card lessonid="L1" classroomids="" period="1" days="01000"/>
+      <card lessonid="L1" classroomids="" period="2" days="00001"/>
+      <card lessonid="L2" classroomids="" period="5" days="00001"/>
+      <card lessonid="L3" classroomids="" period="3" days="00001"/>
+      <card lessonid="L3" classroomids="" period="4" days="01000"/>
+      <card lessonid="L3" classroomids="" period="7" days="00010"/>
+      <card lessonid="L3" classroomids="" period="4" days="00001"/>
+      <card lessonid="L3" classroomids="" period="2" days="00100"/>
+      <card lessonid="L4" classroomids="" period="3" days="01000"/>
+      <card lessonid="L4" classroomids="" period="1" days="00100"/>
+      <card lessonid="L4" classroomids="" period="3" days="10000"/>
+      <card lessonid="L4" classroomids="" period="4" days="00010"/>
+      <card lessonid="L4" classroomids="" period="5" days="00001"/>
+      <card lessonid="L5" classroomids="" period="5" days="00010"/>
+      <card lessonid="L5" classroomids="" period="1" days="00001"/>
+      <card lessonid="L6" classroomids="" period="5" days="00010"/>
+      <card lessonid="L7" classroomids="" period="4" days="00100"/>
+      <card lessonid="L8" classroomids="" period="6" days="01000"/>
+      <card lessonid="L9" classroomids="" period="4" days="10000"/>
+      <card lessonid="L10" classroomids="" period="5" days="00001"/>
+      <card lessonid="L10" classroomids="" period="4" days="00010"/>
+      <card lessonid="L11" classroomids="" period="1" days="00100"/>
+      <card lessonid="L11" classroomids="" period="1" days="00001"/>
+      <card lessonid="L12" classroomids="" period="6" days="01000"/>
+      <card lessonid="L12" classroomids="" period="5" days="00010"/>
+      <card lessonid="L13" classroomids="" period="1" days="00100"/>
+      <card lessonid="L13" classroomids="" period="7" days="00100"/>
+      <card lessonid="L13" classroomids="" period="2" days="00100"/>
+      <card lessonid="L14" classroomids="" period="4" days="00001"/>
+      <card lessonid="L14" classroomids="" period="3" days="00010"/>
+      <card lessonid="L14" classroomids="" period="5" days="00010"/>
+      <card lessonid="L15" classroomids="" period="4" days="01000"/>
+      <card lessonid="L15" classroomids="" period="5" days="01000"/>
+      <card lessonid="L15" classroomids="" period="6" days="01000"/>
+      <card lessonid="L16" classroomids="" period="3" days="00010"/>
+      <card lessonid="L16" classroomids="" period="7" days="01000"/>
+      <card lessonid="L16" classroomids="" period="7" days="00010"/>
+      <card lessonid="L17" classroomids="" period="7" days="10000"/>
+      <card lessonid="L18" classroomids="" period="5" days="01000"/>
+      <card lessonid="L19" classroomids="" period="5" days="00100"/>
+      <card lessonid="L20" classroomids="" period="2" days="00100"/>
+      <card lessonid="L21" classroomids="" period="5" days="10000"/>
+      <card lessonid="L21" classroomids="" period="5" days="00010"/>
+      <card lessonid="L22" classroomids="" period="3" days="10000"/>
+      <card lessonid="L22" classroomids="" period="1" days="00100"/>
+      <card lessonid="L22" classroomids="" period="6" days="01000"/>
+      <card lessonid="L22" classroomids="" period="5" days="00001"/>
+      <card lessonid="L23" classroomids="" period="3" days="00001"/>
+      <card lessonid="L23" classroomids="" period="4" days="10000"/>
+      <card lessonid="L23" classroomids="" period="5" days="00010"/>
+      <card lessonid="L23" classroomids="" period="3" days="00001"/>
+      <card lessonid="L24" classroomids="" period="6" days="00001"/>
+      <card lessonid="L24" classroomids="" period="3" days="00001"/>
+      <card lessonid="L24" classroomids="" period="2" days="00001"/>
+      <card lessonid="L24" classroomids="" period="3" days="00001"/>
+      <card lessonid="L25" classroomids="" period="2" days="00010"/>
+      <card lessonid="L25" classroomids="" period="5" days="00001"/>
+      <card lessonid="L25" classroomids="" period="4" days="01000"/>
+      <card lessonid="L25" classroomids="" period="7" days="01000"/>
+      <card lessonid="L26" classroomids="" period="2" days="01000"/>
+      <card lessonid="L27" classroomids="" period="7" days="01000"/>
+      <card lessonid="L28" classroomids="" period="5" days="01000"/>
+      <card lessonid="L28" classroomids="" period="7" days="00100"/>
+      <card lessonid="L29" classroomids="" period="2" days="00010"/>
+      <card lessonid="L29" classroomids="" period="5" days="00010"/>
+      <card lessonid="L30" classroomids="" period="4" days="10000"/>
+      <card lessonid="L30" classroomids="" period="3" days="00010"/>
+      <card lessonid="L31" classroomids="" period="5" days="00010"/>
+      <card lessonid="L31" classroomids="" period="3" days="00010"/>
+      <card lessonid="L31" classroomids="" period="5" days="00100"/>
+      <card lessonid="L31" classroomids="" period="2" days="01000"/>
+      <card lessonid="L32" classroomids="" period="1" days="00100"/>
+      <card lessonid="L32" classroomids="" period="4" days="01000"/>
+      <card lessonid="L33" classroomids="" period="3" days="00010"/>
+      <card lessonid="L33" classroomids="" period="2" days="00001"/>
+      <card lessonid="L34" classroomids="" period="1" days="00010"/>
+      <card lessonid="L34" classroomids="" period="2" days="10000"/>
+      <card lessonid="L35" classroomids="" period="1" days="10000"/>
+      <card lessonid="L35" classroomids="" period="7" days="10000"/>
+      <card lessonid="L36" classroomids="" period="1" days="01000"/>
+      <card lessonid="L36" classroomids="" period="4" days="10000"/>
+      <card lessonid="L37" classroomids="" period="2" days="00100"/>
+      <card lessonid="L37" classroomids="" period="7" days="10000"/>
+      <card lessonid="L38" classroomids="" period="4" days="10000"/>
+      <card lessonid="L38" classroomids="" period="4" days="00001"/>
+      <card lessonid="L39" classroomids="" period="2" days="00001"/>
+      <card lessonid="L39" classroomids="" period="3" days="00001"/>
+      <card lessonid="L40" classroomids="" period="5" days="01000"/>
+      <card lessonid="L40" classroomids="" period="2" days="00100"/>
+      <card lessonid="L40" classroomids="" period="5" days="00100"/>
+      <card lessonid="L40" classroomids="" period="4" days="00010"/>
+      <card lessonid="L41" classroomids="" period="6" days="01000"/>
+      <card lessonid="L41" classroomids="" period="1" days="00010"/>
+      <card lessonid="L41" classroomids="" period="1" days="10000"/>
+      <card lessonid="L42" classroomids="" period="7" days="00001"/>
+      <card lessonid="L42" classroomids="" period="3" days="00100"/>
+      <card lessonid="L42" classroomids="" period="3" days="00001"/>
+      <card lessonid="L43" classroomids="" period="1" days="10000"/>
+      <card lessonid="L43" classroomids="" period="4" days="10000"/>
+      <card lessonid="L43" classroomids="" period="3" days="01000"/>
+      <card lessonid="L44" classroomids="" period="3" days="00010"/>
+      <card lessonid="L44" classroomids="" period="6" days="00100"/>
+      <card lessonid="L44" classroomids="" period="6" days="00100"/>
+      <card lessonid="L45" classroomids="" period="4" days="00001"/>
+      <card lessonid="L45" classroomids="" period="7" days="10000"/>
+      <card lessonid="L46" classroomids="" period="2" days="00100"/>
+      <card lessonid="L46" classroomids="" period="5" days="10000"/>
+      <card lessonid="L47" classroomids="" period="6" days="00010"/>
+      <card lessonid="L47" classroomids="" period="2" days="00001"/>
+      <card lessonid="L48" classroomids="" period="7" days="01000"/>
+      <card lessonid="L48" classroomids="" period="5" days="00001"/>
+      <card lessonid="L49" classroomids="" period="3" days="01000"/>
+      <card lessonid="L49" classroomids="" period="5" days="00010"/>
+      <card lessonid="L50" classroomids="" period="5" days="00010"/>
+      <card lessonid="L50" classroomids="" period="3" days="10000"/>
+      <card lessonid="L51" classroomids="" period="6" days="01000"/>
+      <card lessonid="L51" classroomids="" period="6" days="00001"/>
+      <card lessonid="L52" classroomids="" period="1" days="10000"/>
+      <card lessonid="L52" classroomids="" period="3" days="10000"/>
+      <card lessonid="L53" classroomids="" period="2" days="00010"/>
+      <card lessonid="L53" classroomids="" period="1" days="10000"/>
+      <card lessonid="L54" classroomids="" period="3" days="00010"/>
+      <card lessonid="L54" classroomids="" period="5" days="10000"/>
+      <card lessonid="L55" classroomids="" period="5" days="01000"/>
+      <card lessonid="L55" classroomids="" period="1" days="00001"/>
+      <card lessonid="L56" classroomids="" period="5" days="10000"/>
+      <card lessonid="L57" classroomids="" period="7" days="00100"/>
+      <card lessonid="L58" classroomids="" period="5" days="01000"/>
+      <card lessonid="L59" classroomids="" period="1" days="10000"/>
+      <card lessonid="L59" classroomids="" period="1" days="01000"/>
+      <card lessonid="L59" classroomids="" period="5" days="00010"/>
+      <card lessonid="L59" classroomids="" period="2" days="00010"/>
+      <card lessonid="L60" classroomids="" period="2" days="01000"/>
+      <card lessonid="L60" classroomids="" period="3" days="00001"/>
+      <card lessonid="L60" classroomids="" period="5" days="00100"/>
+      <card lessonid="L60" classroomids="" period="4" days="01000"/>
+      <card lessonid="L61" classroomids="" period="2" days="00100"/>
+      <card lessonid="L61" classroomids="" period="3" days="01000"/>
+      <card lessonid="L61" classroomids="" period="4" days="00010"/>
+      <card lessonid="L61" classroomids="" period="7" days="00100"/>
+      <card lessonid="L62" classroomids="" period="1" days="10000"/>
+      <card lessonid="L62" classroomids="" period="5" days="10000"/>
+      <card lessonid="L62" classroomids="" period="2" days="10000"/>
+      <card lessonid="L62" classroomids="" period="5" days="00100"/>
+      <card lessonid="L63" classroomids="" period="6" days="10000"/>
+      <card lessonid="L63" classroomids="" period="4" days="10000"/>
+      <card lessonid="L64" classroomids="" period="3" days="00100"/>
+      <card lessonid="L64" classroomids="" period="2" days="00010"/>
+      <card lessonid="L65" classroomids="" period="1" days="00010"/>
+      <card lessonid="L66" classroomids="" period="4" days="00001"/>
+      <card lessonid="L67" classroomids="" period="7" days="01000"/>
+      <card lessonid="L67" classroomids="" period="5" days="10000"/>
+      <card lessonid="L67" classroomids="" period="2" days="00100"/>
+      <card lessonid="L67" classroomids="" period="3" days="10000"/>
+      <card lessonid="L68" classroomids="" period="1" days="10000"/>
+      <card lessonid="L68" classroomids="" period="4" days="10000"/>
+      <card lessonid="L68" classroomids="" period="6" days="01000"/>
+      <card lessonid="L68" classroomids="" period="7" days="00001"/>
+      <card lessonid="L69" classroomids="" period="5" days="00100"/>
+      <card lessonid="L69" classroomids="" period="1" days="01000"/>
+      <card lessonid="L69" classroomids="" period="3" days="10000"/>
+      <card lessonid="L69" classroomids="" period="3" days="00100"/>
+      <card lessonid="L70" classroomids="" period="3" days="01000"/>
+      <card lessonid="L70" classroomids="" period="6" days="00001"/>
+      <card lessonid="L70" classroomids="" period="7" days="01000"/>
+      <card lessonid="L70" classroomids="" period="6" days="01000"/>
+      <card lessonid="L71" classroomids="" period="2" days="01000"/>
+      <card lessonid="L71" classroomids="" period="1" days="00010"/>
+      <card lessonid="L72" classroomids="" period="1" days="00010"/>
+      <card lessonid="L73" classroomids="" period="1" days="00010"/>
+      <card lessonid="L74" classroomids="" period="1" days="00001"/>
+      <card lessonid="L75" classroomids="" period="6" days="00010"/>
+      <card lessonid="L75" classroomids="" period="2" days="00001"/>
+      <card lessonid="L76" classroomids="" period="1" days="01000"/>
+      <card lessonid="L76" classroomids="" period="4" days="00100"/>
+      <card lessonid="L77" classroomids="" period="7" days="00001"/>
+      <card lessonid="L77" classroomids="" period="7" days="00100"/>
+      <card lessonid="L78" classroomids="" period="5" days="00001"/>
+      <card lessonid="L78" classroomids="" period="1" days="10000"/>
+      <card lessonid="L79" classroomids="" period="6" days="01000"/>
+      <card lessonid="L79" classroomids="" period="3" days="01000"/>
+      <card lessonid="L80" classroomids="" period="6" days="01000"/>
+      <card lessonid="L80" classroomids="" period="7" days="10000"/>
+      <card lessonid="L81" classroomids="" period="4" days="10000"/>
+      <card lessonid="L81" classroomids="" period="2" days="00001"/>
+      <card lessonid="L82" classroomids="" period="5" days="01000"/>
+      <card lessonid="L82" classroomids="" period="5" days="01000"/>
+      <card lessonid="L83" classroomids="" period="2" days="00001"/>
+      <card lessonid="L83" classroomids="" period="1" days="01000"/>
+      <card lessonid="L84" classroomids="" period="3" days="00100"/>
+      <card lessonid="L84" classroomids="" period="5" days="00001"/>
+      <card lessonid="L85" classroomids="" period="1" days="00001"/>
+      <card lessonid="L85" classroomids="" period="1" days="10000"/>
+      <card lessonid="L86" classroomids="" period="3" days="10000"/>
+      <card lessonid="L86" classroomids="" period="3" days="00100"/>
+      <card lessonid="L87" classroomids="" period="2" days="10000"/>
+      <card lessonid="L87" classroomids="" period="4" days="00100"/>
+      <card lessonid="L88" classroomids="" period="4" days="01000"/>
+      <card lessonid="L88" classroomids="" period="6" days="10000"/>
+      <card lessonid="L89" classroomids="" period="1" days="00010"/>
+      <card lessonid="L89" classroomids="" period="1" days="00010"/>
+      <card lessonid="L90" classroomids="" period="5" days="10000"/>
+      <card lessonid="L90" classroomids="" period="4" days="01000"/>
+      <card lessonid="L90" classroomids="" period="1" days="10000"/>
+      <card lessonid="L90" classroomids="" period="7" days="00100"/>
+      <card lessonid="L91" classroomids="" period="6" days="10000"/>
+      <card lessonid="L91" classroomids="" period="5" days="00010"/>
+      <card lessonid="L92" classroomids="" period="1" days="00001"/>
+      <card lessonid="L92" classroomids="" period="4" days="00100"/>
+      <card lessonid="L93" classroomids="" period="4" days="10000"/>
+      <card lessonid="L93" classroomids="" period="4" days="00010"/>
+      <card lessonid="L94" classroomids="" period="2" days="00010"/>
+      <card lessonid="L94" classroomids="" period="5" days="00010"/>
+      <card lessonid="L95" classroomids="" period="2" days="01000"/>
+      <card lessonid="L95" classroomids="" period="6" days="01000"/>
+      <card lessonid="L96" classroomids="" period="6" days="01000"/>
+      <card lessonid="L96" classroomids="" period="5" days="01000"/>
+      <card lessonid="L97" classroomids="" period="3" days="00100"/>
+      <card lessonid="L97" classroomids="" period="2" days="00010"/>
+      <card lessonid="L98" classroomids="" period="3" days="00010"/>
+      <card lessonid="L98" classroomids="" period="5" days="00001"/>
+      <card lessonid="L99" classroomids="" period="3" days="01000"/>
+      <card lessonid="L99" classroomids="" period="6" days="00001"/>
+      <card lessonid="L100" classroomids="" period="3" days="00001"/>
+      <card lessonid="L100" classroomids="" period="5" days="00010"/>
+      <card lessonid="L101" classroomids="" period="7" days="10000"/>
+      <card lessonid="L101" classroomids="" period="1" days="01000"/>
+      <card lessonid="L102" classroomids="" period="3" days="00010"/>
+      <card lessonid="L102" classroomids="" period="4" days="00100"/>
+      <card lessonid="L103" classroomids="" period="4" days="00100"/>
+      <card lessonid="L103" classroomids="" period="1" days="01000"/>
+      <card lessonid="L104" classroomids="" period="3" days="01000"/>
+      <card lessonid="L104" classroomids="" period="2" days="10000"/>
+      <card lessonid="L105" classroomids="" period="1" days="00010"/>
+      <card lessonid="L105" classroomids="" period="7" days="10000"/>
+      <card lessonid="L106" classroomids="" period="7" days="10000"/>
+      <card lessonid="L106" classroomids="" period="4" days="00001"/>
+      <card lessonid="L107" classroomids="" period="7" days="00001"/>
+      <card lessonid="L107" classroomids="" period="1" days="00001"/>
+      <card lessonid="L107" classroomids="" period="3" days="00010"/>
+      <card lessonid="L107" classroomids="" period="3" days="00010"/>
+      <card lessonid="L107" classroomids="" period="7" days="00100"/>
+      <card lessonid="L108" classroomids="" period="4" days="00010"/>
+      <card lessonid="L108" classroomids="" period="5" days="00100"/>
+      <card lessonid="L108" classroomids="" period="2" days="00010"/>
+      <card lessonid="L108" classroomids="" period="3" days="10000"/>
+      <card lessonid="L108" classroomids="" period="7" days="01000"/>
+      <card lessonid="L109" classroomids="" period="6" days="10000"/>
+      <card lessonid="L109" classroomids="" period="4" days="00010"/>
+      <card lessonid="L109" classroomids="" period="2" days="10000"/>
+      <card lessonid="L109" classroomids="" period="6" days="00100"/>
+      <card lessonid="L109" classroomids="" period="6" days="00100"/>
+      <card lessonid="L110" classroomids="" period="2" days="10000"/>
+      <card lessonid="L110" classroomids="" period="7" days="00001"/>
+      <card lessonid="L110" classroomids="" period="7" days="01000"/>
+      <card lessonid="L110" classroomids="" period="3" days="00010"/>
+      <card lessonid="L110" classroomids="" period="5" days="00001"/>
+      <card lessonid="L111" classroomids="" period="5" days="01000"/>
+      <card lessonid="L111" classroomids="" period="3" days="01000"/>
+      <card lessonid="L112" classroomids="" period="4" days="10000"/>
+      <card lessonid="L112" classroomids="" period="7" days="00100"/>
+      <card lessonid="L113" classroomids="" period="3" days="00100"/>
+      <card lessonid="L113" classroomids="" period="6" days="01000"/>
+      <card lessonid="L114" classroomids="" period="1" days="00100"/>
+      <card lessonid="L114" classroomids="" period="1" days="00001"/>
+      <card lessonid="L115" classroomids="" period="7" days="00010"/>
+      <card lessonid="L115" classroomids="" period="4" days="00001"/>
+      <card lessonid="L116" classroomids="" period="1" days="10000"/>
+      <card lessonid="L116" classroomids="" period="7" days="00100"/>
+      <card lessonid="L116" classroomids="" period="3" days="00010"/>
+      <card lessonid="L116" classroomids="" period="2" days="00001"/>
+      <card lessonid="L117" classroomids="" period="3" days="00001"/>
+      <card lessonid="L117" classroomids="" period="7" days="00010"/>
+      <card lessonid="L118" classroomids="" period="4" days="00010"/>
+      <card lessonid="L119" classroomids="" period="4" days="01000"/>
+      <card lessonid="L120" classroomids="" period="4" days="01000"/>
+      <card lessonid="L121" classroomids="" period="3" days="00001"/>
+      <card lessonid="L122" classroomids="" period="7" days="00001"/>
+      <card lessonid="L122" classroomids="" period="4" days="10000"/>
+      <card lessonid="L123" classroomids="" period="2" days="00001"/>
+      <card lessonid="L123" classroomids="" period="1" days="10000"/>
+      <card lessonid="L124" classroomids="" period="5" days="00001"/>
+      <card lessonid="L124" classroomids="" period="7" days="10000"/>
+      <card lessonid="L124" classroomids="" period="7" days="00010"/>
+      <card lessonid="L124" classroomids="" period="6" days="00100"/>
+      <card lessonid="L125" classroomids="" period="1" days="00010"/>
+      <card lessonid="L125" classroomids="" period="5" days="01000"/>
+      <card lessonid="L125" classroomids="" period="6" days="00001"/>
+      <card lessonid="L125" classroomids="" period="7" days="00010"/>
+      <card lessonid="L126" classroomids="" period="1" days="00010"/>
+      <card lessonid="L126" classroomids="" period="5" days="00001"/>
+      <card lessonid="L126" classroomids="" period="2" days="00010"/>
+      <card lessonid="L126" classroomids="" period="6" days="01000"/>
+      <card lessonid="L127" classroomids="" period="6" days="10000"/>
+      <card lessonid="L127" classroomids="" period="5" days="01000"/>
+      <card lessonid="L127" classroomids="" period="3" days="01000"/>
+      <card lessonid="L127" classroomids="" period="6" days="00100"/>
+      <card lessonid="L128" classroomids="" period="1" days="10000"/>
+      <card lessonid="L128" classroomids="" period="3" days="00100"/>
+      <card lessonid="L128" classroomids="" period="3" days="00010"/>
+      <card lessonid="L128" classroomids="" period="3" days="00100"/>
+      <card lessonid="L129" classroomids="" period="7" days="00001"/>
+      <card lessonid="L129" classroomids="" period="1" days="00100"/>
+      <card lessonid="L129" classroomids="" period="3" days="00001"/>
+      <card lessonid="L129" classroomids="" period="1" days="01000"/>
+      <card lessonid="L130" classroomids="" period="7" days="00100"/>
+      <card lessonid="L130" classroomids="" period="4" days="00001"/>
+      <card lessonid="L131" classroomids="" period="7" days="00010"/>
+      <card lessonid="L131" classroomids="" period="3" days="00001"/>
+      <card lessonid="L131" classroomids="" period="4" days="00010"/>
+      <card lessonid="L132" classroomids="" period="6" days="00001"/>
+      <card lessonid="L132" classroomids="" period="7" days="00100"/>
+      <card lessonid="L132" classroomids="" period="7" days="10000"/>
+      <card lessonid="L133" classroomids="" period="4" days="00100"/>
+      <card lessonid="L133" classroomids="" period="1" days="10000"/>
+      <card lessonid="L133" classroomids="" period="1" days="10000"/>
+      <card lessonid="L133" classroomids="" period="6" days="00001"/>
+      <card lessonid="L134" classroomids="" period="4" days="01000"/>
+      <card lessonid="L134" classroomids="" period="2" days="10000"/>
+      <card lessonid="L135" classroomids="" period="1" days="00010"/>
+      <card lessonid="L135" classroomids="" period="3" days="00001"/>
+      <card lessonid="L136" classroomids="" period="6" days="00001"/>
+      <card lessonid="L136" classroomids="" period="3" days="00010"/>
+      <card lessonid="L137" classroomids="" period="5" days="00010"/>
+      <card lessonid="L137" classroomids="" period="6" days="00010"/>
+      <card lessonid="L138" classroomids="" period="5" days="01000"/>
+      <card lessonid="L138" classroomids="" period="7" days="00001"/>
+      <card lessonid="L139" classroomids="" period="5" days="10000"/>
+      <card lessonid="L139" classroomids="" period="1" days="00001"/>
+      <card lessonid="L140" classroomids="" period="1" days="10000"/>
+      <card lessonid="L140" classroomids="" period="5" days="00100"/>
+      <card lessonid="L141" classroomids="" period="1" days="00100"/>
+      <card lessonid="L141" classroomids="" period="2" days="00001"/>
+      <card lessonid="L142" classroomids="" period="5" days="01000"/>
+      <card lessonid="L142" classroomids="" period="4" days="00010"/>
+      <card lessonid="L143" classroomids="" period="6" days="01000"/>
+      <card lessonid="L143" classroomids="" period="4" days="01000"/>
+      <card lessonid="L144" classroomids="" period="5" days="00010"/>
+      <card lessonid="L144" classroomids="" period="4" days="10000"/>
+      <card lessonid="L145" classroomids="" period="5" days="00001"/>
+      <card lessonid="L145" classroomids="" period="7" days="00001"/>
+      <card lessonid="L146" classroomids="" period="3" days="00001"/>
+      <card lessonid="L146" classroomids="" period="7" days="00010"/>
+      <card lessonid="L147" classroomids="" period="1" days="00100"/>
+      <card lessonid="L147" classroomids="" period="2" days="10000"/>
+      <card lessonid="L148" classroomids="" period="4" days="00100"/>
+      <card lessonid="L148" classroomids="" period="1" days="00010"/>
+      <card lessonid="L149" classroomids="" period="2" days="00010"/>
+      <card lessonid="L149" classroomids="" period="3" days="00010"/>
+      <card lessonid="L150" classroomids="" period="7" days="00010"/>
+      <card lessonid="L150" classroomids="" period="1" days="10000"/>
+      <card lessonid="L151" classroomids="" period="3" days="01000"/>
+      <card lessonid="L151" classroomids="" period="1" days="00100"/>
+      <card lessonid="L152" classroomids="" period="7" days="00100"/>
+      <card lessonid="L152" classroomids="" period="1" days="01000"/>
+      <card lessonid="L153" classroomids="" period="4" days="00100"/>
+      <card lessonid="L153" classroomids="" period="2" days="00001"/>
+      <card lessonid="L153" classroomids="" period="3" days="10000"/>
+      <card lessonid="L154" classroomids="" period="6" days="00100"/>
+      <card lessonid="L154" classroomids="" period="5" days="00001"/>
+      <card lessonid="L154" classroomids="" period="6" days="00010"/>
+      <card lessonid="L155" classroomids="" period="1" days="01000"/>
+      <card lessonid="L155" classroomids="" period="2" days="00001"/>
+      <card lessonid="L155" classroomids="" period="7" days="10000"/>
+      <card lessonid="L156" classroomids="" period="5" days="00100"/>
+      <card lessonid="L156" classroomids="" period="4" days="00100"/>
+      <card lessonid="L156" classroomids="" period="5" days="00010"/>
+      <card lessonid="L157" classroomids="" period="4" days="01000"/>
+      <card lessonid="L158" classroomids="" period="2" days="01000"/>
+      <card lessonid="L159" classroomids="" period="1" days="10000"/>
+      <card lessonid="L159" classroomids="" period="3" days="10000"/>
+      <card lessonid="L159" classroomids="" period="7" days="00100"/>
+      <card lessonid="L159" classroomids="" period="2" days="00001"/>
+      <card lessonid="L160" classroomids="" period="7" days="10000"/>
+      <card lessonid="L160" classroomids="" period="1" days="10000"/>
+      <card lessonid="L160" classroomids="" period="3" days="10000"/>
+      <card lessonid="L161" classroomids="" period="7" days="10000"/>
+      <card lessonid="L161" classroomids="" period="4" days="01000"/>
+      <card lessonid="L161" classroomids="" period="3" days="10000"/>
+      <card lessonid="L162" classroomids="" period="5" days="10000"/>
+      <card lessonid="L162" classroomids="" period="2" days="10000"/>
+      <card lessonid="L162" classroomids="" period="3" days="10000"/>
+      <card lessonid="L163" classroomids="" period="7" days="00100"/>
+      <card lessonid="L163" classroomids="" period="3" days="00100"/>
+      <card lessonid="L163" classroomids="" period="1" days="01000"/>
+      <card lessonid="L164" classroomids="" period="2" days="00010"/>
+      <card lessonid="L164" classroomids="" period="6" days="01000"/>
+      <card lessonid="L164" classroomids="" period="2" days="00010"/>
+      <card lessonid="L164" classroomids="" period="6" days="00100"/>
+      <card lessonid="L165" classroomids="" period="6" days="00001"/>
+      <card lessonid="L165" classroomids="" period="6" days="01000"/>
+      <card lessonid="L166" classroomids="" period="6" days="00100"/>
+      <card lessonid="L166" classroomids="" period="5" days="01000"/>
+      <card lessonid="L167" classroomids="" period="4" days="10000"/>
+      <card lessonid="L168" classroomids="" period="3" days="00100"/>
+      <card lessonid="L168" classroomids="" period="4" days="10000"/>
+      <card lessonid="L168" classroomids="" period="3" days="00010"/>
+      <card lessonid="L168" classroomids="" period="6" days="01000"/>
+      <card lessonid="L169" classroomids="" period="7" days="00100"/>
+      <card lessonid="L169" classroomids="" period="5" days="01000"/>
+      <card lessonid="L169" classroomids="" period="4" days="01000"/>
+      <card lessonid="L169" classroomids="" period="5" days="00001"/>
+      <card lessonid="L170" classroomids="" period="1" days="10000"/>
+      <card lessonid="L170" classroomids="" period="6" days="01000"/>
+      <card lessonid="L170" classroomids="" period="4" days="00100"/>
+      <card lessonid="L170" classroomids="" period="7" days="10000"/>
+      <card lessonid="L171" classroomids="" period="2" days="00001"/>
+      <card lessonid="L171" classroomids="" period="5" days="01000"/>
+      <card lessonid="L171" classroomids="" period="5" days="00010"/>
+      <card lessonid="L171" classroomids="" period="7" days="00001"/>
+      <card lessonid="L172" classroomids="" period="7" days="10000"/>
+      <card lessonid="L172" classroomids="" period="2" days="00010"/>
+      <card lessonid="L173" classroomids="" period="4" days="10000"/>
+      <card lessonid="L173" classroomids="" period="3" days="10000"/>
+      <card lessonid="L174" classroomids="" period="5" days="00001"/>
+      <card lessonid="L174" classroomids="" period="6" days="00010"/>
+      <card lessonid="L175" classroomids="" period="3" days="01000"/>
+      <card lessonid="L175" classroomids="" period="6" days="00010"/>
+      <card lessonid="L175" classroomids="" period="4" days="10000"/>
+      <card lessonid="L176" classroomids="" period="2" days="00001"/>
+      <card lessonid="L176" classroomids="" period="3" days="01000"/>
+      <card lessonid="L176" classroomids="" period="4" days="00001"/>
+      <card lessonid="L177" classroomids="" period="5" days="00100"/>
+      <card lessonid="L177" classroomids="" period="2" days="10000"/>
+      <card lessonid="L177" classroomids="" period="6" days="00100"/>
+      <card lessonid="L178" classroomids="" period="1" days="00010"/>
+      <card lessonid="L178" classroomids="" period="1" days="01000"/>
+      <card lessonid="L178" classroomids="" period="5" days="00100"/>
+      <card lessonid="L179" classroomids="" period="2" days="01000"/>
+      <card lessonid="L180" classroomids="" period="5" days="00001"/>
+      <card lessonid="L181" classroomids="" period="7" days="10000"/>
+      <card lessonid="L182" classroomids="" period="2" days="01000"/>
+      <card lessonid="L183" classroomids="" period="6" days="00100"/>
+      <card lessonid="L184" classroomids="" period="6" days="10000"/>
+      <card lessonid="L185" classroomids="" period="5" days="01000"/>
+      <card lessonid="L185" classroomids="" period="7" days="01000"/>
+      <card lessonid="L186" classroomids="" period="1" days="10000"/>
+      <card lessonid="L186" classroomids="" period="3" days="00001"/>
+      <card lessonid="L187" classroomids="" period="5" days="00100"/>
+      <card lessonid="L188" classroomids="" period="2" days="10000"/>
+      <card lessonid="L189" classroomids="" period="7" days="10000"/>
+      <card lessonid="L190" classroomids="" period="4" days="00010"/>
+      <card lessonid="L191" classroomids="" period="6" days="10000"/>
+      <card lessonid="L191" classroomids="" period="4" days="00010"/>
+      <card lessonid="L192" classroomids="" period="2" days="00100"/>
+      <card lessonid="L192" classroomids="" period="5" days="00001"/>
+      <card lessonid="L193" classroomids="" period="2" days="01000"/>
+      <card lessonid="L193" classroomids="" period="6" days="00001"/>
+      <card lessonid="L194" classroomids="" period="7" days="00100"/>
+      <card lessonid="L194" classroomids="" period="3" days="00001"/>
+      <card lessonid="L195" classroomids="" period="4" days="01000"/>
+      <card lessonid="L195" classroomids="" period="2" days="01000"/>
+      <card lessonid="L196" classroomids="" period="7" days="00001"/>
+      <card lessonid="L196" classroomids="" period="4" days="00010"/>
+      <card lessonid="L197" classroomids="" period="6" days="00100"/>
+      <card lessonid="L197" classroomids="" period="1" days="00100"/>
+      <card lessonid="L198" classroomids="" period="1" days="10000"/>
+      <card lessonid="L198" classroomids="" period="2" days="01000"/>
+
+   </cards>
+</timetable>

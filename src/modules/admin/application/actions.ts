@@ -2224,7 +2224,7 @@ export async function saveUserModulePermissions(
 
 export async function getScheduleSlotsAction(entityType?: 'group' | 'teacher', entityId?: string) {
   try {
-    const adminClient = createAdminClient()
+      const adminClient = createAdminClient()
     let query = adminClient
       .from('sch_schedule_slots')
       .select(`
@@ -2236,7 +2236,7 @@ export async function getScheduleSlotsAction(entityType?: 'group' | 'teacher', e
         subject_id,
         teacher_id,
         group:sch_groups(id, name),
-        teacher:profiles(id, first_name, last_name),
+        teacher:academic_teachers(id, full_name),
         subject:sch_subjects(id, name, color, room_type),
         classroom:sch_classrooms(id, name)
       `)

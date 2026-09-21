@@ -20,90 +20,119 @@ const DAYS = [
   { id: 'Viernes', iconColor: 'text-indigo-500', bgColor: 'bg-indigo-50' }
 ]
 
+const cleanStr = (s: any) => String(s || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
+
+const normalizeDay = (d: any): string => {
+  if (typeof d === 'number' || (!isNaN(parseInt(d, 10)) && /^\d+$/.test(String(d).trim()))) {
+    const num = parseInt(String(d), 10)
+    const names = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+    return names[num - 1] || ''
+  }
+  const str = cleanStr(d)
+  if (str.startsWith('lun')) return 'Lunes'
+  if (str.startsWith('mar')) return 'Martes'
+  if (str.startsWith('mie')) return 'Miércoles'
+  if (str.startsWith('jue')) return 'Jueves'
+  if (str.startsWith('vie')) return 'Viernes'
+  if (str.startsWith('sab')) return 'Sábado'
+  if (str.startsWith('dom')) return 'Domingo'
+  return String(d || '')
+}
+
 export default function PrintableSchedule({ groupName, directorName, classes, timeSlots, groupMax, isTeacherView = false }: PrintableScheduleProps) {
-  const allSlots = timeSlots.filter(s => s.type !== 'break' && s.id! <= groupMax)
+  const maxPeriod = Number(groupMax) || 7
+  const defaultFallback: TimeSlot[] = Array.from({ length: maxPeriod }, (_, i) => ({
+    type: 'period',
+    id: i + 1,
+    startTime: '',
+    endTime: ''
+  }))
+
+  let allSlots = (timeSlots || []).filter(s => s.type !== 'break' && (s.id == null || Number(s.id) <= maxPeriod))
+  if (allSlots.length === 0) {
+    allSlots = defaultFallback
+  }
 
   // Filter classes for student group view so non-academic / multi-teacher meetings do not appear
   const filteredClasses = isTeacherView
-    ? classes
-    : classes.filter(c => {
+    ? (classes || [])
+    : (classes || []).filter(c => {
         if (!c.group) return true
         const gStr = String(c.group)
         if (gStr.includes('Comité') || gStr.includes('Reunión') || gStr.includes('DOCENTES')) return false
-        return isOfficialGradeGroup(gStr)
+        return true
       })
 
   const isCoveredByPreviousBlock = (day: string, period: number) => {
-    return filteredClasses.some(c => c.day === day && period > c.period && period < c.period + (c.duration || 1))
+    const targetDay = cleanStr(day)
+    const p = Number(period)
+    return filteredClasses.some(c => {
+      const cDay = cleanStr(normalizeDay(c.day))
+      const cPeriod = parseInt(String(c.period), 10)
+      const cDuration = parseInt(String(c.duration || 1), 10) || 1
+      return cDay === targetDay && p > cPeriod && p < cPeriod + cDuration
+    })
   }
 
   const getStartingClass = (day: string, period: number) => {
-    return filteredClasses.find(c => c.day === day && c.period === period)
+    const targetDay = cleanStr(day)
+    const p = Number(period)
+    return filteredClasses.find(c => {
+      const cDay = cleanStr(normalizeDay(c.day))
+      const cPeriod = parseInt(String(c.period), 10)
+      return cDay === targetDay && cPeriod === p
+    })
   }
 
   return (
     <>
-      <style type="text/css" media="print" dangerouslySetInnerHTML={{ __html: '@page { margin: 0; size: A4 landscape; } @media print { body, html { margin: 0 !important; padding: 0 !important; height: 100% !important; overflow: hidden !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } }' }} />
+      <style type="text/css" media="print" dangerouslySetInnerHTML={{ __html: '@page { margin: 0; size: A4 landscape; } @media print { body, html { margin: 0 !important; padding: 0 !important; height: auto !important; overflow: visible !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } .print-page-wrapper { break-after: page !important; page-break-after: always !important; height: 100vh !important; max-height: 100vh !important; overflow: hidden !important; } }' }} />
       
-      <div id="printable-schedule-container" className="w-[297mm] h-[209mm] bg-white text-slate-800 p-6 font-sans mx-auto relative overflow-hidden flex flex-col justify-between box-border print:w-full print:h-screen print:max-h-screen">
+      <div id="printable-schedule-container" className="print-page-wrapper w-[297mm] h-[209mm] bg-white text-slate-800 p-6 font-sans mx-auto relative overflow-hidden flex flex-col justify-between box-border print:w-full print:h-screen print:max-h-screen">
         <div className="relative z-10 h-full flex flex-col">
-          {/* Header Section */}
-          <div className="flex justify-between items-center mb-6 px-4">
-            {/* Left Logo */}
-            <div className="w-40 flex items-center justify-start">
-              <img src="/logo_1.svg" alt="aulaEnsuny Logo" className="h-28 object-contain drop-shadow-md" />
-            </div>
-
-            {/* Center Titles */}
-            <div className="flex-1 flex flex-col items-center justify-center text-center px-4">
-              <h3 className="text-[11px] font-bold text-[#1e293b] uppercase tracking-[0.2em] mb-1">
-                Institución Educativa Escuela Normal Superior del Nordeste - ENSUNY {new Date().getFullYear()}
-              </h3>
-              <h1 className="text-[42px] font-black uppercase tracking-wider text-[#1e293b] leading-tight drop-shadow-sm">
-                Horario de Clases
-              </h1>
-              
-              <div className="flex items-center justify-center w-full max-w-md my-3 relative">
-                <div className="h-px bg-slate-300 w-full absolute"></div>
-                <div className="bg-white px-2 relative z-10 text-[#1e293b]">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="text-[#1e293b]">
-                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-                  </svg>
-                </div>
+          {/* Header Section Oficial de Convivencia Escolar / Institucional */}
+          <div className="mb-4">
+            <div className="w-full flex items-center justify-between border-b-2 border-slate-900 pb-2 px-2">
+              <div className="flex-1 flex justify-center">
+                <img
+                  src="/institutional-header.png"
+                  alt="Institución Educativa Escuela Normal Superior del Nordeste - Yolombó Antioquia"
+                  className="max-h-20 w-auto max-w-2xl object-contain drop-shadow-xs"
+                  loading="eager"
+                />
               </div>
-
-              <div className="flex flex-col items-center gap-1.5 mt-1">
-                <div className="bg-[#1e3a8a] text-white px-6 py-1.5 rounded-full flex items-center gap-2 shadow-sm">
-                  {isTeacherView ? <User className="w-4 h-4" /> : <Users className="w-4 h-4" />}
-                  <span className="font-bold text-sm tracking-wide">{isTeacherView ? 'Docente:' : 'Grupo:'} {groupName}</span>
+              <div className="shrink-0 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 shadow-xs flex flex-col gap-1 text-right ml-4">
+                <div className="flex items-center gap-1.5 justify-end text-[10px] text-slate-500 uppercase font-bold">
+                  <Calendar className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Año Lectivo {new Date().getFullYear()}</span>
                 </div>
-                {!isTeacherView && directorName && (
-                  <div className="flex items-center gap-1.5 text-slate-700 text-xs">
-                    <User className="w-3.5 h-3.5" />
-                    <span>Director de Grupo: <b>{directorName}</b></span>
-                  </div>
-                )}
+                <div className="flex items-center gap-1.5 justify-end text-xs font-black text-[#1e293b]">
+                  <Clock className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Jornada Mañana</span>
+                </div>
               </div>
             </div>
 
-            {/* Right Info Boxes */}
-            <div className="w-40 flex flex-col items-end justify-center">
-              <div className="bg-[#f1f5f9] border border-slate-200 rounded-xl p-3 shadow-sm flex flex-col gap-3 w-full">
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-5 h-5 text-indigo-600" />
-                  <div className="flex flex-col leading-none">
-                    <span className="text-[9px] text-slate-500 uppercase">Año Lectivo</span>
-                    <span className="text-xs font-bold text-[#1e293b]">{new Date().getFullYear()}</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Clock className="w-5 h-5 text-indigo-600" />
-                  <div className="flex flex-col leading-none">
-                    <span className="text-[9px] text-slate-500 uppercase">Jornada</span>
-                    <span className="text-xs font-bold text-[#1e293b]">Mañana</span>
-                  </div>
+            {/* Subheader con título y entidad */}
+            <div className="flex items-center justify-between pt-2 px-2">
+              <div className="flex items-center gap-3">
+                <h1 className="text-xl font-black uppercase tracking-wider text-[#1e293b]">
+                  Horario de Clases
+                </h1>
+                <div className="bg-[#1e3a8a] text-white px-4 py-1 rounded-full flex items-center gap-1.5 shadow-xs">
+                  {isTeacherView ? <User className="w-3.5 h-3.5" /> : <Users className="w-3.5 h-3.5" />}
+                  <span className="font-bold text-xs tracking-wide">
+                    {isTeacherView ? 'Docente:' : 'Grupo:'} {groupName}
+                  </span>
                 </div>
               </div>
+
+              {!isTeacherView && directorName && (
+                <div className="flex items-center gap-1.5 text-slate-700 text-xs">
+                  <User className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Director de Grupo: <b className="text-slate-900">{directorName}</b></span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -119,7 +148,11 @@ export default function PrintableSchedule({ groupName, directorName, classes, ti
                     <th key={`head-${i}`} className="bg-white text-[#1e293b] border-b-2 border-r border-slate-200 last:border-r-0 py-2">
                       <div className="flex flex-col items-center">
                         <span className="text-lg font-bold">{slot.id}ª</span>
-                        <span className="text-[9px] font-bold text-slate-500 mt-0.5 tracking-wider">{slot.startTime} - {slot.endTime}</span>
+                        {slot.startTime ? (
+                          <span className="text-[9px] font-bold text-slate-500 mt-0.5 tracking-wider">
+                            {slot.startTime}{slot.endTime ? ` - ${slot.endTime}` : ''}
+                          </span>
+                        ) : null}
                       </div>
                     </th>
                   ))}
@@ -145,13 +178,30 @@ export default function PrintableSchedule({ groupName, directorName, classes, ti
                         return (
                           <td 
                             key={`${day.id}-${p}`} 
-                            colSpan={cls.duration || 1} 
+                            colSpan={parseInt(String(cls.duration || 1), 10) || 1} 
                             className="border-r border-slate-200 last:border-r-0 relative p-0" 
                           >
-                            <div className="absolute inset-0" style={{ backgroundColor: `${cls.color}15` }}>
-                              <div className="w-full h-full flex flex-col justify-center items-center text-center px-2 py-1">
-                                <span className="font-bold text-[12px] text-[#1e293b] leading-tight line-clamp-2">{cls.subject}</span>
-                                <span className="text-[10px] text-slate-600 mt-1 line-clamp-1">{cls.teacher}</span>
+                            <div className="absolute inset-0" style={{ backgroundColor: `${cls.color || '#4f46e5'}15` }}>
+                              <div className="w-full h-full flex flex-col justify-center items-center text-center px-1.5 py-1">
+                                {isTeacherView ? (
+                                  <>
+                                    <span className="font-black text-xl text-[#1e293b] leading-tight tracking-tight">
+                                      {cls.group || cls.teacher}
+                                    </span>
+                                    <span className="text-[9px] font-semibold text-slate-600 mt-0.5 line-clamp-1">
+                                      {cls.subject}
+                                    </span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span className="font-bold text-[12px] text-[#1e293b] leading-tight line-clamp-2">
+                                      {cls.subject}
+                                    </span>
+                                    <span className="text-[10px] text-slate-600 mt-1 line-clamp-1">
+                                      {cls.teacher}
+                                    </span>
+                                  </>
+                                )}
                               </div>
                             </div>
                           </td>

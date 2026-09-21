@@ -23,13 +23,9 @@ import {
 
 const SIDEBAR_ITEMS = [
   { name: 'Horarios', href: '/admin/schedules', query: null, icon: CalendarDays, color: 'text-blue-500 dark:text-blue-400' },
-  { name: 'Grupos', href: '/admin/schedules?panel=groups', query: 'groups', icon: Users, color: 'text-orange-500 dark:text-orange-400' },
-  { name: 'Docentes', href: '/admin/schedules?panel=teachers', query: 'teachers', icon: UserCog, color: 'text-emerald-500 dark:text-emerald-400' },
-  { name: 'Carga Académica', href: '/admin/schedules/workload', query: null, icon: Briefcase, color: 'text-purple-500 dark:text-purple-400' },
-  { name: 'Materias', href: '/admin/schedules/subjects', query: 'subjects', icon: BookOpen, color: 'text-cyan-500 dark:text-cyan-400' },
-  { name: 'Aulas', href: '/admin/schedules?panel=classrooms', query: 'classrooms', icon: DoorOpen, color: 'text-pink-500 dark:text-pink-400' },
+  { name: 'Grupos', href: '/admin/schedules/groups', query: null, icon: Users, color: 'text-orange-500 dark:text-orange-400' },
+  { name: 'Docentes', href: '/admin/schedules/teachers', query: null, icon: UserCog, color: 'text-emerald-500 dark:text-emerald-400' },
   { name: 'Sustituciones', href: '/admin/schedules/substitutions', query: null, icon: UserMinus, color: 'text-amber-500 dark:text-amber-400' },
-  { name: 'Reglas', href: '/admin/schedules/rules', query: null, icon: ShieldCheck, color: 'text-red-500 dark:text-red-400' },
   { name: 'Ajustes', href: '/admin/schedules/settings', query: null, icon: Settings2, color: 'text-slate-500 dark:text-slate-400' },
 ]
 
@@ -175,8 +171,8 @@ function SchedulesLayoutInner({ children }: { children: React.ReactNode }) {
       {/* --- CANVAS CONTENT --- */}
       <main
         id="printable-canvas"
-        className="absolute inset-0 z-10 transition-all duration-300 print:relative print:inset-auto print:p-0"
-        style={{ paddingLeft: isSidebarPinned ? 272 : 92 }}
+        className="absolute inset-0 z-10 transition-all duration-300 overflow-y-auto pt-6 pr-6 pb-6 custom-scrollbar print:relative print:inset-auto print:p-0 print:overflow-visible"
+        style={{ paddingLeft: isSidebarPinned ? 272 + 24 : 92 + 24 }} 
       >
         {children}
       </main>

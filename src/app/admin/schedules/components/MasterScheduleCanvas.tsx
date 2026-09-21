@@ -672,13 +672,13 @@ export default function MasterScheduleCanvas({ viewMode, onNavigate }: MasterSch
       {portalNode && createPortal(
         <div className="flex items-center gap-2 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl px-4 py-2 rounded-xl shadow-sm border border-slate-200/50 dark:border-slate-700/50 z-50 no-print">
           {viewMode === 'group' && (
-            <button 
-              onClick={autoGenerateGlobalSchedule}
-              className="flex items-center gap-2 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold transition-colors shadow-sm"
+            <a 
+              href="/admin/schedules/import"
+              className="flex items-center gap-2 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold shadow-sm transition-colors"
             >
               <Sparkles className="h-4 w-4" />
-              Autogenerar
-            </button>
+              Importar aSc
+            </a>
           )}
           
           <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1" />

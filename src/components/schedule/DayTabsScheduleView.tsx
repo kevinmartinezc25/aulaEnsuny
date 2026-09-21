@@ -1,0 +1,394 @@
+'use client'
+
+import React, { useState, useMemo, useEffect, useRef } from 'react'
+import { 
+  Clock, 
+  MapPin, 
+  User, 
+  Users, 
+  Calendar, 
+  CalendarX2, 
+  AlertCircle, 
+  Loader2, 
+  CheckCircle2,
+  Sparkles
+} from 'lucide-react'
+
+// ==========================================
+// TIPOS Y MODELO DE DATOS
+// ==========================================
+
+export type ScheduleStatus = 'scheduled' | 'cancelled' | 'in_progress' | 'completed'
+
+export interface ScheduleItem {
+  id: string
+  startTime: string // "07:00" o "07:00 AM"
+  endTime: string   // "08:00" o "08:00 AM"
+  subject: string
+  teacher?: string
+  location?: string
+  group?: string
+  status?: ScheduleStatus
+  color?: string
+}
+
+export type ScheduleDayKey = 'lunes' | 'martes' | 'miercoles' | 'jueves' | 'viernes' | 'sabado'
+
+export interface DayTabConfig {
+  key: ScheduleDayKey
+  label: string
+  shortLabel: string
+}
+
+export const DEFAULT_DAYS: DayTabConfig[] = [
+  { key: 'lunes', label: 'Lunes', shortLabel: 'LUN' },
+  { key: 'martes', label: 'Martes', shortLabel: 'MAR' },
+  { key: 'miercoles', label: 'Miércoles', shortLabel: 'MIÉ' },
+  { key: 'jueves', label: 'Jueves', shortLabel: 'JUE' },
+  { key: 'viernes', label: 'Viernes', shortLabel: 'VIE' },
+]
+
+export interface ScheduleData {
+  [key: string]: ScheduleItem[]
+}
+
+export interface ScheduleContextInfo {
+  title?: string            // Ej: "Mi horario"
+  subtitle?: string         // Ej: "10°-1 · Jornada mañana" o "Prof. Juan Pérez · Docente"
+  type: 'student' | 'teacher' | 'group'
+}
+
+export interface DayTabsScheduleViewProps {
+  schedule?: ScheduleData
+  context?: ScheduleContextInfo
+  days?: DayTabConfig[]
+  isLoading?: boolean
+  error?: string | null
+  isPublished?: boolean
+  defaultDayKey?: ScheduleDayKey
+  onClassClick?: (item: ScheduleItem) => void
+  className?: string
+}
+
+// ==========================================
+// UTILIDADES INTERNAS (TIEMPO Y COMPARACIÓN)
+// ==========================================
+
+/**
+ * Convierte un string de hora (ej: "07:00", "07:00 AM", "14:30") a minutos desde medianoche
+ */
+function parseTimeToMinutes(timeStr: string): number {
+  if (!timeStr) return 0
+  const clean = timeStr.trim().toUpperCase()
+  const isPM = clean.includes('PM')
+  const isAM = clean.includes('AM')
+  
+  const timeOnly = clean.replace(/[AP]M/, '').trim()
+  const [hStr, mStr] = timeOnly.split(':')
+  let hours = parseInt(hStr, 10) || 0
+  const minutes = parseInt(mStr, 10) || 0
+
+  if (isPM && hours < 12) hours += 12
+  if (isAM && hours === 12) hours = 0
+
+  return hours * 60 + minutes
+}
+
+/**
+ * Determina si la clase está ocurriendo actualmente
+ */
+function isClassOngoing(item: ScheduleItem, isToday: boolean, currentMinutes: number): boolean {
+  if (!isToday) return false
+  const startMin = parseTimeToMinutes(item.startTime)
+  const endMin = parseTimeToMinutes(item.endTime)
+  return currentMinutes >= startMin && currentMinutes < endMin
+}
+
+// ==========================================
+// COMPONENTE PRINCIPAL
+// ==========================================
+
+export default function DayTabsScheduleView({
+  schedule = {},
+  context = { title: 'Mi horario', subtitle: 'Jornada escolar', type: 'student' },
+  days = DEFAULT_DAYS,
+  isLoading = false,
+  error = null,
+  isPublished = true,
+  defaultDayKey,
+  onClassClick,
+  className = ''
+}: DayTabsScheduleViewProps) {
+  // Detección del día de hoy en el cliente
+  const todayKey = useMemo<ScheduleDayKey>(() => {
+    const dayIndex = new Date().getDay() // 0: Dom, 1: Lun, ..., 6: Sáb
+    const map: Record<number, ScheduleDayKey> = {
+      1: 'lunes',
+      2: 'martes',
+      3: 'miercoles',
+      4: 'jueves',
+      5: 'viernes',
+      6: 'sabado'
+    }
+    return map[dayIndex] || 'lunes'
+  }, [])
+
+  const [activeDay, setActiveDay] = useState<ScheduleDayKey>(defaultDayKey || todayKey)
+  const [currentMinutes, setCurrentMinutes] = useState<number>(() => {
+    const now = new Date()
+    return now.getHours() * 60 + now.getMinutes()
+  })
+
+  const tabsScrollRef = useRef<HTMLDivElement>(null)
+
+  // Actualizar minutos cada minuto para el cálculo de clase en curso
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const now = new Date()
+      setCurrentMinutes(now.getHours() * 60 + now.getMinutes())
+    }, 60000)
+    return () => clearInterval(timer)
+  }, [])
+
+  // Auto-scroll para centrar la pestaña activa en pantallas pequeñas
+  const handleDaySelect = (key: ScheduleDayKey) => {
+    setActiveDay(key)
+  }
+
+  // Clases del día seleccionado, ordenadas cronológicamente
+  const dayClasses = useMemo(() => {
+    const raw = schedule[activeDay] || []
+    return [...raw].sort((a, b) => parseTimeToMinutes(a.startTime) - parseTimeToMinutes(b.startTime))
+  }, [schedule, activeDay])
+
+  const isSelectedDayToday = activeDay === todayKey
+
+  // ==========================================
+  // RENDERIZADO DE ESTADOS ESPECIALES
+  // ==========================================
+
+  if (isLoading) {
+    return (
+      <div className={`w-full max-w-4xl mx-auto p-4 sm:p-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm ${className}`}>
+        {/* Header Skeleton */}
+        <div className="space-y-2 mb-6">
+          <div className="h-6 w-36 bg-slate-200 dark:bg-slate-800 rounded-md animate-pulse" />
+          <div className="h-4 w-48 bg-slate-100 dark:bg-slate-800/60 rounded-md animate-pulse" />
+        </div>
+        {/* Tabs Skeleton */}
+        <div className="flex gap-2 mb-6 pb-2 overflow-x-hidden">
+          {[1, 2, 3, 4, 5].map(i => (
+            <div key={i} className="h-10 w-24 bg-slate-100 dark:bg-slate-800 rounded-xl shrink-0 animate-pulse" />
+          ))}
+        </div>
+        {/* Cards Skeleton */}
+        <div className="space-y-3">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="h-28 bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 rounded-2xl animate-pulse" />
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className={`w-full max-w-4xl mx-auto p-6 sm:p-10 bg-white dark:bg-slate-900 rounded-3xl border border-rose-200 dark:border-rose-900/40 text-center ${className}`}>
+        <div className="w-12 h-12 rounded-2xl bg-rose-50 dark:bg-rose-950/50 text-rose-500 mx-auto flex items-center justify-center mb-3">
+          <AlertCircle className="w-6 h-6" />
+        </div>
+        <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">Error al cargar el horario</h3>
+        <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-md mx-auto">{error}</p>
+      </div>
+    )
+  }
+
+  if (!isPublished) {
+    return (
+      <div className={`w-full max-w-4xl mx-auto p-8 sm:p-12 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 text-center ${className}`}>
+        <div className="w-14 h-14 rounded-2xl bg-amber-50 dark:bg-amber-950/40 text-amber-500 mx-auto flex items-center justify-center mb-3">
+          <Calendar className="w-7 h-7" />
+        </div>
+        <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Horario aún no publicado</h3>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-md mx-auto">
+          La institución educativa está finalizando la asignación de este período. Estará disponible en breve.
+        </p>
+      </div>
+    )
+  }
+
+  // ==========================================
+  // RENDERIZADO PRINCIPAL
+  // ==========================================
+
+  return (
+    <div className={`w-full max-w-4xl mx-auto bg-slate-50/50 dark:bg-slate-950/40 sm:bg-white sm:dark:bg-slate-900 sm:border border-slate-200/80 dark:border-slate-800 sm:rounded-3xl sm:shadow-sm p-1 sm:p-6 lg:p-8 transition-colors ${className}`}>
+      
+      {/* ── 1. HEADER CONTEXTUAL ── */}
+      <header className="mb-4 sm:mb-6 px-1 sm:px-0">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">
+              {context.title || 'Mi horario'}
+            </h1>
+            {context.subtitle && (
+              <p className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400 mt-0.5">
+                {context.subtitle}
+              </p>
+            )}
+          </div>
+          {isSelectedDayToday && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200/50 dark:border-indigo-800/40">
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+              Hoy
+            </span>
+          )}
+        </div>
+      </header>
+
+      {/* ── 2. TOP TABS — NAVEGACIÓN POR DÍAS (5 Días visibles sin scroll horizontal) ── */}
+      <nav 
+        role="tablist" 
+        aria-label="Días de la semana"
+        className={`grid ${days.length === 6 ? 'grid-cols-6' : 'grid-cols-5'} gap-1 sm:gap-1.5 w-full max-w-full overflow-hidden pb-2.5 pt-1 border-b border-slate-100 dark:border-slate-800/80 mb-5`}
+      >
+        {days.map(d => {
+          const isActive = activeDay === d.key
+
+          return (
+            <button
+              key={d.key}
+              role="tab"
+              id={`tab-${d.key}`}
+              aria-selected={isActive}
+              aria-controls={`tabpanel-${d.key}`}
+              onClick={() => handleDaySelect(d.key)}
+              className={`group relative min-w-0 w-full flex items-center justify-center py-2 sm:py-2.5 px-0.5 sm:px-2 rounded-xl sm:rounded-2xl font-bold transition-all duration-200 select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 overflow-hidden ${
+                isActive
+                  ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/20'
+                  : 'bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <span className="hidden sm:inline text-xs sm:text-sm font-black tracking-tight truncate max-w-full">
+                {d.label}
+              </span>
+              <span className="sm:hidden text-xs font-black uppercase tracking-tight truncate">
+                {d.shortLabel || d.label.substring(0, 3)}
+              </span>
+            </button>
+          )
+        })}
+      </nav>
+
+      {/* ── 3. LISTADO CRONOLÓGICO DE CLASES / ESTADO VACÍO ── */}
+      <main 
+        role="tabpanel" 
+        id={`tabpanel-${activeDay}`} 
+        aria-labelledby={`tab-${activeDay}`}
+        className="space-y-3 focus:outline-none"
+      >
+        {dayClasses.length === 0 ? (
+          /* ESTADO DÍA SIN CLASES */
+          <div className="py-12 sm:py-16 text-center flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl bg-white/50 dark:bg-slate-900/50">
+            <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-500 mb-3">
+              <CalendarX2 className="w-7 h-7" />
+            </div>
+            <h3 className="text-base font-bold text-slate-700 dark:text-slate-200">
+              No hay clases programadas
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 mt-1 max-w-xs">
+              No tienes asignaciones de horario para este día.
+            </p>
+          </div>
+        ) : (
+          /* TARJETAS DE CLASES */
+          dayClasses.map((item) => {
+            const isOngoing = isClassOngoing(item, isSelectedDayToday, currentMinutes)
+            const accentColor = item.color || '#4f46e5'
+
+            return (
+              <article
+                key={item.id}
+                onClick={() => onClassClick && onClassClick(item)}
+                tabIndex={0}
+                className={`relative group bg-white dark:bg-slate-900 rounded-2xl border transition-all duration-200 overflow-hidden shadow-xs hover:shadow-md cursor-default ${
+                  isOngoing 
+                    ? 'border-indigo-400 dark:border-indigo-600 ring-2 ring-indigo-500/20 bg-indigo-50/10' 
+                    : 'border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                }`}
+              >
+                {/* Acento lateral izquierdo (identificación sobria) */}
+                <div 
+                  className="absolute left-0 top-0 bottom-0 w-1.5" 
+                  style={{ backgroundColor: accentColor }} 
+                  aria-hidden="true"
+                />
+
+                <div className="p-4 sm:p-5 pl-5 sm:pl-6 flex items-center justify-between gap-3">
+                  <div className="flex-1 flex flex-col gap-2 min-w-0">
+                    {/* Fila Superior: Rango Horario + Badge Estado */}
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-slate-500 dark:text-slate-400">
+                        <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span>{item.startTime} – {item.endTime}</span>
+                      </div>
+
+                      {isOngoing && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 animate-pulse">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          En Curso
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Materia (Elemento dominante) */}
+                    <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white leading-snug tracking-tight truncate">
+                      {item.subject}
+                    </h2>
+
+                    {/* Fila Inferior: Información Secundaria (Aula, Docente) */}
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400 pt-0.5">
+                      {item.location && (
+                        <div className="flex items-center gap-1.5">
+                          <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span className="font-semibold text-slate-700 dark:text-slate-300">{item.location}</span>
+                        </div>
+                      )}
+
+                      {/* Según el contexto: mostramos docente (para estudiante o grupo) */}
+                      {context.type === 'student' && item.teacher && (
+                        <div className="flex items-center gap-1.5">
+                          <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span>Prof. {item.teacher}</span>
+                        </div>
+                      )}
+
+                      {context.type === 'group' && item.teacher && (
+                        <div className="flex items-center gap-1.5">
+                          <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span>{item.teacher}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Grupo y Grado a la derecha con mayor visibilidad */}
+                  {item.group && (
+                    <div className="shrink-0 flex flex-col items-center justify-center px-3.5 py-2 rounded-2xl bg-indigo-50/90 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-900/60 shadow-xs min-w-[72px]">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-indigo-400 dark:text-indigo-400 leading-none">
+                        Grupo
+                      </span>
+                      <span className="text-xl sm:text-2xl font-black text-indigo-700 dark:text-indigo-300 leading-tight mt-1 tracking-tight">
+                        {item.group}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </article>
+            )
+          })
+        )}
+      </main>
+    </div>
+  )
+}

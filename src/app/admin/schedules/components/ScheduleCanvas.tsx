@@ -6,7 +6,7 @@ import { motion } from 'framer-motion'
 import { AlertTriangle, User, MapPin, Loader2, Plus, Trash2, Sparkles, Download, Coffee } from 'lucide-react'
 import { createClient } from '@/core/config/supabase/client'
 import { generateTimeSlots, TimeSlot } from '../utils/timeCalculator'
-import MobileTeacherSchedule from '@/app/(dashboard)/teacher/schedule/components/MobileTeacherSchedule'
+import MobileTeacherSchedule from '@/app/teacher/schedule/components/MobileTeacherSchedule'
 import { toast } from 'sonner'
 import { getScheduleSlotsAction, clearGroupScheduleSlotsAction, saveScheduleSlotsAction } from '@/modules/admin/application/actions'
 import { getCurriculumAction } from '../actions'
@@ -197,7 +197,7 @@ export default function ScheduleCanvas({
         }
         const item = groupedSlots.get(slotKey)!
         if (d.teacher) {
-          const tName = `${d.teacher.first_name || ''} ${d.teacher.last_name || ''}`.trim()
+          const tName = (d.teacher.full_name || `${d.teacher.first_name || ''} ${d.teacher.last_name || ''}`).trim()
           if (tName && !item.teachers.includes(tName)) item.teachers.push(tName)
         }
         if (d.group?.name && !item.groups.includes(d.group.name)) {
@@ -707,10 +707,10 @@ export default function ScheduleCanvas({
         <div className="w-full h-full flex flex-col px-4 pt-0 pb-2 print:hidden relative">
         {portalNode && !readOnly && createPortal(
           <div className="flex items-center gap-2 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md px-3 py-2 rounded-xl shadow-sm border border-slate-200/50 dark:border-slate-800/50 mr-2 pointer-events-auto">
-            <button onClick={autoGenerateSchedule} className="flex items-center gap-2 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold shadow-sm transition-colors">
+            <a href="/admin/schedules/import" className="flex items-center gap-2 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold shadow-sm transition-colors">
               <Sparkles className="h-4 w-4" />
-              Autogenerar
-            </button>
+              Importar aSc
+            </a>
 
             <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1" />
 
