@@ -289,6 +289,7 @@ export default function TeacherSchedulePage() {
               entityId={activeGroupId}
               entityName={directorGroups.find(g => g.id === activeGroupId)?.name}
               directorName={`${teacherProfile.first_name} ${teacherProfile.last_name}`}
+              hideGroupBadge={true}
             />
           </div>
         )}

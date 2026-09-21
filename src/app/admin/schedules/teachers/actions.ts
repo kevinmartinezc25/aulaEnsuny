@@ -107,3 +107,78 @@ export async function removeObsoleteTeacherAction(
     return { success: false, error: err.message || 'Error inesperado al eliminar docente' }
   }
 }
+
+/**
+ * Fusiona dos docentes: transfiere todas las clases (sch_schedule_slots) y asignaciones 
+ * del docente duplicado (sourceTeacherId) hacia el docente principal (targetTeacherId)
+ * y elimina el registro del docente duplicado si no tiene cuenta de acceso vinculada.
+ */
+export async function mergeTeachersAction(
+  sourceTeacherId: string,
+  targetTeacherId: string
+): Promise<{ success: boolean; error?: string; transferredSlots?: number }> {
+  try {
+    const supabase = createAdminClient()
+
+    if (sourceTeacherId === targetTeacherId) {
+      return { success: false, error: 'No se puede fusionar un docente consigo mismo.' }
+    }
+
+    // 1. Obtener ambos docentes
+    const { data: source } = await supabase
+      .from('academic_teachers')
+      .select('id, full_name, profile_id')
+      .eq('id', sourceTeacherId)
+      .single()
+
+    const { data: target } = await supabase
+      .from('academic_teachers')
+      .select('id, full_name, profile_id')
+      .eq('id', targetTeacherId)
+      .single()
+
+    if (!source || !target) {
+      return { success: false, error: 'Uno o ambos docentes no fueron encontrados.' }
+    }
+
+    // 2. Reasignar los slots de horario (sch_schedule_slots)
+    const { data: updatedSlots, error: slotsErr } = await supabase
+      .from('sch_schedule_slots')
+      .update({ teacher_id: targetTeacherId })
+      .eq('teacher_id', sourceTeacherId)
+      .select('id')
+
+    if (slotsErr) {
+      console.error('Error transfiriendo slots:', slotsErr)
+      return { success: false, error: `Error transfiriendo clases: ${slotsErr.message}` }
+    }
+
+    // 3. Reasignar las asignaciones académicas (academic_assignments)
+    await supabase
+      .from('academic_assignments')
+      .update({ teacher_id: targetTeacherId })
+      .eq('teacher_id', sourceTeacherId)
+
+    // 4. Si el docente origen no tiene perfil de usuario asignado, eliminarlo
+    if (!source.profile_id) {
+      await supabase
+        .from('academic_teachers')
+        .delete()
+        .eq('id', sourceTeacherId)
+    } else {
+      // Si tenía perfil, marcarlo como inactivo para no dejar datos corruptos
+      await supabase
+        .from('academic_teachers')
+        .update({ is_active: false })
+        .eq('id', sourceTeacherId)
+    }
+
+    revalidatePath('/admin/schedules/teachers')
+    revalidatePath('/admin/schedules')
+    return { success: true, transferredSlots: updatedSlots?.length || 0 }
+  } catch (err: any) {
+    console.error('Error en mergeTeachersAction:', err)
+    return { success: false, error: err.message || 'Error inesperado al fusionar docentes.' }
+  }
+}
+

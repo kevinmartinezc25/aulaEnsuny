@@ -25,11 +25,15 @@ export interface AscClassroom {
 export interface AscSlot {
   teacher_id: string
   subject_id: string
+  /** '__JORNADA_INSTITUCIONAL__' when the lesson has no classids in the XML */
   group_id: string
   classroom_id: string
   day_of_week: number
   period: number
 }
+
+/** Sentinel value used when a lesson has no classids (administrative/non-classroom duties) */
+export const JORNADA_INSTITUCIONAL_ID = '__JORNADA_INSTITUCIONAL__'
 
 export interface AscParsedData {
   teachers: AscTeacher[]
@@ -47,6 +51,39 @@ function parseAscDays(daysStr: string): number {
   const index = daysStr.indexOf('1')
   if (index === -1) return 1 // fallback
   return index + 1 // 0-index a 1-index (1=Lunes)
+}
+
+function sanitizeAscText(str: string): string {
+  if (!str) return ''
+  return str
+    // Limpiar caracteres de reemplazo unicode o signos corruptos
+    .replace(/\uFFFD/g, '')
+    // Reemplazar espacios duros o no separables por espacio normal
+    .replace(/[\u00A0\u1680\u180e\u2000-\u200a\u202f\u205f\u3000\ufeff]/g, ' ')
+    // Correcciones léxicas comunes originadas de fallos de codificación
+    .replace(/\bESPA\s*OL\b/gi, 'ESPAÑOL')
+    .replace(/\bPATI\s*O\b/gi, 'PATIÑO')
+    .replace(/\bMATEM\s*TICAS\b/gi, 'MATEMÁTICAS')
+    .replace(/\bPEDAGOG\s*A\b/gi, 'PEDAGOGÍA')
+    .replace(/\bEDUCACI\s*N\b/gi, 'EDUCACIÓN')
+    .replace(/\bINVESTIGACI\s*N\b/gi, 'INVESTIGACIÓN')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function normalizeAscGroupName(str: string): string {
+  const clean = sanitizeAscText(str)
+  // Formato tipo "6 1", "10 2", "7- 1", "8  2" -> "6-1", "10-2"
+  const gradeMatch = clean.match(/^(\d{1,2})\s*[\s\-_º°]\s*(\d{1,2})$/)
+  if (gradeMatch) {
+    return `${gradeMatch[1]}-${gradeMatch[2]}`
+  }
+  // Formato tipo "12 " -> "12"
+  const singleGradeMatch = clean.match(/^(\d{1,2})\s*$/)
+  if (singleGradeMatch) {
+    return singleGradeMatch[1]
+  }
+  return clean
 }
 
 export class AscXmlParser {
@@ -70,30 +107,36 @@ export class AscXmlParser {
     // 1. Extraer Docentes
     const teachersNodes = xmlDoc.querySelectorAll("teachers > teacher")
     teachersNodes.forEach(node => {
+      const rawName = node.getAttribute("name") || ''
+      const rawShort = node.getAttribute("short") || ''
       data.teachers.push({
         id: node.getAttribute("id") || '',
-        name: node.getAttribute("name") || '',
-        short: node.getAttribute("short") || ''
+        name: sanitizeAscText(rawName),
+        short: sanitizeAscText(rawShort)
       })
     })
 
     // 2. Extraer Materias
     const subjectsNodes = xmlDoc.querySelectorAll("subjects > subject")
     subjectsNodes.forEach(node => {
+      const rawName = node.getAttribute("name") || ''
+      const rawShort = node.getAttribute("short") || ''
       data.subjects.push({
         id: node.getAttribute("id") || '',
-        name: node.getAttribute("name") || '',
-        short: node.getAttribute("short") || ''
+        name: sanitizeAscText(rawName),
+        short: sanitizeAscText(rawShort)
       })
     })
 
     // 3. Extraer Grupos (Clases en aSc)
     const classesNodes = xmlDoc.querySelectorAll("classes > class")
     classesNodes.forEach(node => {
+      const rawName = node.getAttribute("name") || ''
+      const rawShort = node.getAttribute("short") || ''
       data.groups.push({
         id: node.getAttribute("id") || '',
-        name: node.getAttribute("name") || '',
-        short: node.getAttribute("short") || ''
+        name: normalizeAscGroupName(rawName),
+        short: normalizeAscGroupName(rawShort)
       })
     })
 
@@ -134,18 +177,32 @@ export class AscXmlParser {
 
         lesson.teacherids.forEach((teacherId: string) => {
           if (!teacherId) return
-          lesson.classids.forEach((groupId: string) => {
-            if (!groupId) return
 
+          const effectiveClassIds = lesson.classids.filter((id: string) => id.trim() !== '')
+
+          if (effectiveClassIds.length === 0) {
+            // Lesson sin grupo asignado: asesoría, coordinación, directivo, etc.
+            // Se representa con el centinela __JORNADA_INSTITUCIONAL__ para no perderla.
             data.slots.push({
               teacher_id: teacherId,
               subject_id: lesson.subjectid,
-              group_id: groupId,
+              group_id: '__JORNADA_INSTITUCIONAL__',
               classroom_id: mainClassroomId,
               day_of_week: dayOfWeek,
               period: period
             })
-          })
+          } else {
+            effectiveClassIds.forEach((groupId: string) => {
+              data.slots.push({
+                teacher_id: teacherId,
+                subject_id: lesson.subjectid,
+                group_id: groupId,
+                classroom_id: mainClassroomId,
+                day_of_week: dayOfWeek,
+                period: period
+              })
+            })
+          }
         })
       }
     })

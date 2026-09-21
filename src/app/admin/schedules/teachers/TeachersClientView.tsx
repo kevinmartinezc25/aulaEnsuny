@@ -1,9 +1,9 @@
 'use client'
 
 import React, { useState } from 'react'
-import { UserCog, CheckCircle2, XCircle, Info, ArrowUpRight, Search, Link2, Unlink, X, Briefcase, Trash2, AlertTriangle } from 'lucide-react'
+import { UserCog, CheckCircle2, XCircle, Info, ArrowUpRight, Search, Link2, Unlink, X, Briefcase, Trash2, AlertTriangle, GitMerge } from 'lucide-react'
 import { toast } from 'sonner'
-import { linkTeacherProfile, unlinkTeacherProfile, removeObsoleteTeacherAction } from './actions'
+import { linkTeacherProfile, unlinkTeacherProfile, removeObsoleteTeacherAction, mergeTeachersAction } from './actions'
 
 interface Teacher {
   id: string
@@ -57,6 +57,11 @@ export default function TeachersClientView({
   // Estado para el modal de confirmación de eliminación
   const [deleteConfirmTeacher, setDeleteConfirmTeacher] = useState<Teacher | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+
+  // Estado para el modal de Fusión de Docentes
+  const [mergeSourceTeacher, setMergeSourceTeacher] = useState<Teacher | null>(null)
+  const [mergeTargetTeacherId, setMergeTargetTeacherId] = useState<string>('')
+  const [isMerging, setIsMerging] = useState(false)
 
   const filteredTeachers = teachers.filter(t => 
     t.full_name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -129,6 +134,26 @@ export default function TeachersClientView({
     } else {
       toast.error(res.error || 'No se pudo eliminar el docente.')
       setDeleteConfirmTeacher(null)
+    }
+  }
+
+  const handleConfirmMerge = async () => {
+    if (!mergeSourceTeacher || !mergeTargetTeacherId) {
+      toast.error('Selecciona el docente de destino para transferir las clases.')
+      return
+    }
+
+    setIsMerging(true)
+    const res = await mergeTeachersAction(mergeSourceTeacher.id, mergeTargetTeacherId)
+    setIsMerging(false)
+
+    if (res.success) {
+      toast.success(`Docente fusionado correctamente. Se transfirieron ${res.transferredSlots || 0} clase(s).`)
+      setTeachers(prev => prev.filter(t => t.id !== mergeSourceTeacher.id))
+      setMergeSourceTeacher(null)
+      setMergeTargetTeacherId('')
+    } else {
+      toast.error(res.error || 'Error al fusionar docentes.')
     }
   }
 
@@ -247,6 +272,19 @@ export default function TeachersClientView({
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
+                      {/* Botón Fusionar: transfiere clases al docente principal si este quedó duplicado */}
+                      <button
+                        onClick={() => {
+                          setMergeSourceTeacher(teacher)
+                          setMergeTargetTeacherId('')
+                        }}
+                        disabled={loadingId === teacher.id}
+                        className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 rounded-lg transition-colors"
+                        title="Fusionar / Transferir clases a otro docente"
+                      >
+                        <GitMerge className="h-4 w-4" />
+                      </button>
+
                       {/* Botón eliminar: solo disponible para docentes sin cuenta vinculada */}
                       {teacher.profile_id === null && (
                         <button
@@ -415,6 +453,70 @@ export default function TeachersClientView({
                 className="flex items-center gap-2 px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isDeleting ? 'Eliminando...' : 'Sí, eliminar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL DE FUSIÓN DE DOCENTES --- */}
+      {mergeSourceTeacher && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => !isMerging && setMergeSourceTeacher(null)} />
+          <div className="relative bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col border border-slate-200 dark:border-slate-800">
+            <div className="flex items-center gap-3 p-5 border-b border-slate-100 dark:border-slate-800">
+              <div className="p-2.5 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-xl">
+                <GitMerge className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">Fusionar Docente</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Transferir clases y unificar registros</p>
+              </div>
+            </div>
+            <div className="p-5 space-y-4">
+              <p className="text-sm text-slate-600 dark:text-slate-300">
+                Se transferirán todas las clases del horario asignadas a <strong className="text-slate-900 dark:text-white">{mergeSourceTeacher.full_name}</strong> hacia el docente principal que selecciones:
+              </p>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1.5">
+                  Docente Destino (Cuenta / Perfil principal):
+                </label>
+                <select
+                  value={mergeTargetTeacherId}
+                  onChange={(e) => setMergeTargetTeacherId(e.target.value)}
+                  disabled={isMerging}
+                  className="w-full text-sm py-2 px-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="">-- Selecciona el docente principal --</option>
+                  {teachers
+                    .filter(t => t.id !== mergeSourceTeacher.id)
+                    .map(t => (
+                      <option key={t.id} value={t.id}>
+                        {t.full_name} {t.profile_id ? '✓ (Tiene cuenta vinculada)' : ''}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 rounded-xl text-xs text-amber-800 dark:text-amber-300">
+                Al completar la fusión, el registro duplicado ({mergeSourceTeacher.full_name}) será eliminado para no generar inconsistencias.
+              </div>
+            </div>
+            <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-3">
+              <button
+                onClick={() => setMergeSourceTeacher(null)}
+                disabled={isMerging}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-colors disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmMerge}
+                disabled={isMerging || !mergeTargetTeacherId}
+                className="flex items-center gap-2 px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isMerging ? 'Fusionando...' : 'Confirmar Fusión'}
               </button>
             </div>
           </div>

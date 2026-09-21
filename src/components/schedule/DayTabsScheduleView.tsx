@@ -11,14 +11,15 @@ import {
   AlertCircle, 
   Loader2, 
   CheckCircle2,
-  Sparkles
+  Sparkles,
+  Coffee
 } from 'lucide-react'
 
 // ==========================================
 // TIPOS Y MODELO DE DATOS
 // ==========================================
 
-export type ScheduleStatus = 'scheduled' | 'cancelled' | 'in_progress' | 'completed'
+export type ScheduleStatus = 'scheduled' | 'cancelled' | 'in_progress' | 'completed' | 'free'
 
 export interface ScheduleItem {
   id: string
@@ -31,6 +32,7 @@ export interface ScheduleItem {
   period?: number
   status?: ScheduleStatus
   color?: string
+  isFree?: boolean
 }
 
 export type ScheduleDayKey = 'lunes' | 'martes' | 'miercoles' | 'jueves' | 'viernes' | 'sabado'
@@ -352,12 +354,77 @@ export default function DayTabsScheduleView({
             </p>
           </div>
         ) : (
-          /* TARJETAS DE CLASES */
+          /* TARJETAS DE CLASES Y HUECOS */
           dayClasses.map((item, index) => {
             const isOngoing = isClassOngoing(item, isSelectedDayToday, currentMinutes)
             const accentColor = item.color || '#4f46e5'
             const hourLabel = item.period ? `${item.period}ª Hora` : `${index + 1}ª Hora`
 
+            // CARD VACÍA / HUECO: Período sin clase asignada (Verde Pastel)
+            if (item.isFree) {
+              return (
+                <article
+                  key={item.id}
+                  className={`relative group rounded-2xl border transition-all duration-200 overflow-hidden shadow-xs hover:shadow-md cursor-default ${
+                    isOngoing
+                      ? 'bg-emerald-100/60 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 ring-2 ring-emerald-500/20'
+                      : 'bg-emerald-50/70 dark:bg-emerald-950/25 border-emerald-200/80 dark:border-emerald-800/60'
+                  }`}
+                >
+                  {/* Acento lateral verde pastel */}
+                  <div
+                    className="absolute left-0 top-0 bottom-0 w-1.5 bg-emerald-400 dark:bg-emerald-500"
+                    aria-hidden="true"
+                  />
+
+                  <div className="p-4 sm:p-5 pl-5 sm:pl-6 flex items-center justify-between gap-3 min-h-[110px]">
+                    <div className="flex-1 flex flex-col justify-between gap-2 min-w-0">
+                      {/* Fila Superior: Badge Hora + Rango Horario + Estado */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-black uppercase tracking-tight bg-emerald-100/90 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200/90 dark:border-emerald-700/60 shrink-0 shadow-xs">
+                          {hourLabel}
+                        </span>
+
+                        <div className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-emerald-700/80 dark:text-emerald-400/80">
+                          <Clock className="w-3.5 h-3.5 text-emerald-600/70 dark:text-emerald-400/70 shrink-0" />
+                          <span>{item.startTime}{item.endTime ? ` – ${item.endTime}` : ''}</span>
+                        </div>
+
+                        {isOngoing && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-200/90 dark:bg-emerald-900/70 text-emerald-900 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700 animate-pulse">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 dark:bg-emerald-400" />
+                            Hora Libre Actual
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Título: Sin clase Asignada */}
+                      <h2 className="text-base sm:text-lg font-black text-emerald-900 dark:text-emerald-100 leading-snug tracking-tight truncate">
+                        Sin clase Asignada
+                      </h2>
+
+                      {/* Subtítulo informativo */}
+                      <div className="flex items-center gap-1.5 text-xs text-emerald-700/80 dark:text-emerald-400/80 pt-0.5">
+                        <Coffee className="w-3.5 h-3.5 text-emerald-600/70 dark:text-emerald-400/70 shrink-0" />
+                        <span className="font-semibold">Disponibilidad / Tiempo Libre</span>
+                      </div>
+                    </div>
+
+                    {/* Badge derecho: Simétrico al badge de grupo */}
+                    <div className="shrink-0 flex flex-col items-center justify-center px-3.5 py-2 rounded-2xl bg-emerald-100/80 dark:bg-emerald-900/40 border border-emerald-200/80 dark:border-emerald-800/60 shadow-xs min-w-[76px]">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-emerald-700/80 dark:text-emerald-300/80 leading-none">
+                        Estado
+                      </span>
+                      <span className="text-base sm:text-lg font-black text-emerald-800 dark:text-emerald-200 leading-tight mt-1 tracking-tight">
+                        Libre
+                      </span>
+                    </div>
+                  </div>
+                </article>
+              )
+            }
+
+            // CARD DE MATERIA ASIGNADA
             return (
               <article
                 key={item.id}
@@ -376,13 +443,17 @@ export default function DayTabsScheduleView({
                   aria-hidden="true"
                 />
 
-                <div className="p-4 sm:p-5 pl-5 sm:pl-6 flex items-center justify-between gap-3">
-                  <div className="flex-1 flex flex-col gap-2 min-w-0">
-                    {/* Fila Superior: Rango Horario + Badge Estado */}
-                    <div className="flex items-center gap-2">
+                <div className="p-4 sm:p-5 pl-5 sm:pl-6 flex items-center justify-between gap-3 min-h-[110px]">
+                  <div className="flex-1 flex flex-col justify-between gap-2 min-w-0">
+                    {/* Fila Superior: Badge Hora + Rango Horario + Badge Estado */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-black uppercase tracking-tight bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200/70 dark:border-indigo-800/70 shrink-0 shadow-xs">
+                        {hourLabel}
+                      </span>
+
                       <div className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-slate-500 dark:text-slate-400">
                         <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <span>{item.startTime} – {item.endTime}</span>
+                        <span>{item.startTime}{item.endTime ? ` – ${item.endTime}` : ''}</span>
                       </div>
 
                       {isOngoing && (
@@ -394,7 +465,7 @@ export default function DayTabsScheduleView({
                     </div>
 
                     {/* Materia (Elemento dominante) */}
-                    <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white leading-snug tracking-tight truncate">
+                    <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white leading-snug tracking-tight text-center break-words whitespace-normal w-full">
                       {item.subject}
                     </h2>
 
@@ -421,12 +492,16 @@ export default function DayTabsScheduleView({
                           <span>{item.teacher}</span>
                         </div>
                       )}
+
+                      {!item.location && !item.teacher && (
+                        <span className="text-slate-400 dark:text-slate-500 font-medium">Clase Programada</span>
+                      )}
                     </div>
                   </div>
 
-                  {/* A la derecha: Si hideGroupBadge es true (Consulta Académica), mostrar la hora de la jornada */}
-                  {hideGroupBadge ? (
-                    <div className="shrink-0 flex flex-col items-center justify-center px-3 py-2 rounded-2xl bg-emerald-500/10 dark:bg-emerald-950/50 border border-emerald-500/20 dark:border-emerald-800/40 shadow-xs min-w-[76px]">
+                  {/* A la derecha: Badge del Grupo (solo si no es vista de grupo ni se oculta), o Jornada para consulta estudiante */}
+                  {hideGroupBadge && context.type === 'student' ? (
+                    <div className="shrink-0 flex flex-col items-center justify-center px-3.5 py-2 rounded-2xl bg-emerald-500/10 dark:bg-emerald-950/50 border border-emerald-500/20 dark:border-emerald-800/40 shadow-xs min-w-[76px]">
                       <span className="text-[9px] font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-400 leading-none">
                         Jornada
                       </span>
@@ -434,18 +509,16 @@ export default function DayTabsScheduleView({
                         {hourLabel}
                       </span>
                     </div>
-                  ) : (
-                    item.group && (
-                      <div className="shrink-0 flex flex-col items-center justify-center px-3.5 py-2 rounded-2xl bg-indigo-50/90 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-900/60 shadow-xs min-w-[72px]">
-                        <span className="text-[9px] font-black uppercase tracking-widest text-indigo-400 dark:text-indigo-400 leading-none">
-                          Grupo
-                        </span>
-                        <span className="text-xl sm:text-2xl font-black text-indigo-700 dark:text-indigo-300 leading-tight mt-1 tracking-tight">
-                          {item.group}
-                        </span>
-                      </div>
-                    )
-                  )}
+                  ) : !hideGroupBadge && context.type !== 'group' && Boolean(item.group) && item.group !== 'Jornada Institucional' ? (
+                    <div className="shrink-0 flex flex-col items-center justify-center px-3 sm:px-3.5 py-2 rounded-2xl bg-indigo-50/90 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-900/60 shadow-xs min-w-[76px] max-w-[45%] sm:max-w-[35%]">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-indigo-400 dark:text-indigo-400 leading-none mb-1">
+                        Grupo
+                      </span>
+                      <span className={`font-black text-indigo-700 dark:text-indigo-300 leading-tight tracking-tight text-center break-words whitespace-normal w-full ${(item.group?.length || 0) > 8 ? 'text-xs sm:text-sm' : 'text-xl sm:text-2xl'}`}>
+                        {item.group}
+                      </span>
+                    </div>
+                  ) : null}
                 </div>
               </article>
             )

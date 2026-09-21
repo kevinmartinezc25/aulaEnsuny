@@ -14,11 +14,19 @@ interface StaticScheduleGridProps {
   entityName?: string
   directorName?: string
   disablePrint?: boolean
+  hideGroupBadge?: boolean
 }
 
 const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes']
 
-export default function StaticScheduleGrid({ entityType, entityId, entityName, directorName, disablePrint = false }: StaticScheduleGridProps) {
+export default function StaticScheduleGrid({ 
+  entityType, 
+  entityId, 
+  entityName, 
+  directorName, 
+  disablePrint = false,
+  hideGroupBadge = false 
+}: StaticScheduleGridProps) {
   const [loading, setLoading] = useState(true)
   const [classes, setClasses] = useState<any[]>([])
   const [timeSlots, setTimeSlots] = useState<any[]>([])
@@ -48,52 +56,145 @@ export default function StaticScheduleGrid({ entityType, entityId, entityName, d
       viernes: []
     }
 
-    classes.forEach(c => {
-      const dayKey = dayKeyMap[c.day]
-      if (!dayKey) return
+    // Determine dynamic max period based on actual classes
+    const actualMaxPeriod = classes.reduce((max: number, c: any) => {
+      const endP = c.period + (c.duration || 1) - 1;
+      return endP > max ? endP : max;
+    }, 0);
 
-      const startSlot = timeSlots.find(s => s.id === c.period)
-      const endPeriod = c.period + (c.duration || 1) - 1
-      const endSlot = timeSlots.find(s => s.id === endPeriod)
+    // Aseguramos cantidad de períodos diarios a evaluar (adaptativo si el docente tiene menos)
+    const basePeriods = Math.max(maxPeriods || 7, timeSlots.length || 7);
+    const totalPeriods = entityType === 'teacher' && actualMaxPeriod > 0 && actualMaxPeriod < basePeriods
+      ? actualMaxPeriod
+      : basePeriods;
 
-      data[dayKey].push({
-        id: `${c.day}-${c.period}`,
-        startTime: startSlot?.startTime || `${c.period}ª`,
-        endTime: endSlot?.endTime || startSlot?.endTime || '',
-        subject: c.subject || 'Clase',
-        teacher: entityType === 'teacher' ? undefined : (c.teachers?.join(', ') || c.labelTitle),
-        group: entityType === 'teacher' ? c.labelSubtitle : undefined,
-        location: c.room || '',
-        color: c.color || '#4f46e5'
+    // Lista de slots con tiempos formateados
+    const effectiveSlots: { id: number; startTime: string; endTime: string }[] = []
+    for (let p = 1; p <= totalPeriods; p++) {
+      const found = timeSlots.find(s => s.id === p)
+      effectiveSlots.push({
+        id: p,
+        startTime: found?.startTime || `${p}ª Hora`,
+        endTime: found?.endTime || ''
       })
-    })
+    }
+
+    // Recorrer los 5 días de la semana (1: Lunes a 5: Viernes)
+    for (let dayNum = 1; dayNum <= 5; dayNum++) {
+      const dayKey = dayKeyMap[dayNum]
+      if (!dayKey) continue
+
+      const dayClasses = classes.filter(c => c.day === dayNum)
+
+      if (entityType === 'teacher') {
+        // Calcular el período máximo específicamente para ESTE DÍA
+        const actualMaxPeriodForDay = dayClasses.reduce((max: number, c: any) => {
+          const endP = c.period + (c.duration || 1) - 1;
+          return endP > max ? endP : max;
+        }, 0);
+
+        // Siempre se van a pintar 6 horas como mínimo, pero si viene con la 7ma (o más) se pinta hasta esa hora.
+        const periodsForThisDay = Math.max(6, actualMaxPeriodForDay);
+
+        let p = 1
+        while (p <= periodsForThisDay) {
+          const slotInfo = effectiveSlots.find(s => s.id === p) || { id: p, startTime: `${p}ª Hora`, endTime: '' }
+          
+          // Buscar si hay una clase asignada que comience o cubra este período
+          const cls = dayClasses.find(c => c.period <= p && (c.period + (c.duration || 1) - 1) >= p)
+
+          if (cls) {
+            // Solo añadir en el período inicial del bloque
+            if (cls.period === p) {
+              const dur = cls.duration || 1
+              const endP = p + dur - 1
+              const endSlotInfo = effectiveSlots.find(s => s.id === endP) || slotInfo
+              data[dayKey].push({
+                id: `${dayNum}-${p}`,
+                period: p,
+                startTime: slotInfo.startTime,
+                endTime: endSlotInfo.endTime || slotInfo.endTime,
+                subject: cls.subject || 'Clase',
+                group: cls.labelSubtitle === 'Jornada Institucional' ? 'Jornada Institucional' : cls.labelSubtitle,
+                location: cls.room || '',
+                color: cls.isJornada ? '#f59e0b' : (cls.color || '#4f46e5'),
+                isFree: false
+              })
+              p += dur
+              continue
+            }
+          } else {
+            // Hueco libre del docente (Sin clase Asignada)
+            data[dayKey].push({
+              id: `free-${dayNum}-${p}`,
+              period: p,
+              startTime: slotInfo.startTime,
+              endTime: slotInfo.endTime,
+              subject: 'Sin clase Asignada',
+              group: undefined,
+              location: '',
+              color: '#94a3b8',
+              isFree: true
+            })
+          }
+          p++
+        }
+      } else {
+        // Grupos: Renderizar materias asignadas
+        dayClasses.forEach(c => {
+          const startSlot = effectiveSlots.find(s => s.id === c.period)
+          const endPeriod = c.period + (c.duration || 1) - 1
+          const endSlot = effectiveSlots.find(s => s.id === endPeriod)
+
+          data[dayKey].push({
+            id: `${c.day}-${c.period}`,
+            period: c.period,
+            startTime: startSlot?.startTime || `${c.period}ª`,
+            endTime: endSlot?.endTime || startSlot?.endTime || '',
+            subject: c.subject || 'Clase',
+            teacher: c.teachers?.join(', ') || c.labelTitle,
+            group: undefined,
+            location: c.room || '',
+            color: c.color || '#4f46e5',
+            isFree: false
+          })
+        })
+      }
+    }
 
     return data
-  }, [classes, timeSlots, entityType])
+  }, [classes, timeSlots, maxPeriods, entityType])
 
   const loadSettingsAndSchedule = async () => {
     setLoading(true)
     
     // 1. Cargar configuración de horarios
     let activeSlots: any[] = []
+    let periodsPerDay = 7
+    let startHour = '07:00'
+    let blockDuration = 55
+    let use12h = true
+    let breaks: any[] = []
+
     try {
-      const settings = JSON.parse(localStorage.getItem('sch_settings') || '{}')
-      const startHour = settings.startHour || '07:00'
-      const blockDuration = parseInt(settings.blockDuration || '55', 10)
+      const settings = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('sch_settings') || '{}') : {}
+      startHour = settings.startHour || '07:00'
+      blockDuration = parseInt(settings.blockDuration || '55', 10)
       
-      const groupPeriods = JSON.parse(localStorage.getItem('sch_group_periods') || '{}')
-      const periodsPerDay = entityType === 'group' && groupPeriods[entityId] 
+      const groupPeriods = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('sch_group_periods') || '{}') : {}
+      periodsPerDay = entityType === 'group' && groupPeriods[entityId] 
         ? groupPeriods[entityId] 
         : parseInt(settings.periodsPerDay || '7', 10)
       
+      if (!periodsPerDay || periodsPerDay < 6) periodsPerDay = 7
       setMaxPeriods(periodsPerDay)
 
-      const use12h = settings.timeFormat !== '24h'
-      let breaks = settings.breaks
+      use12h = settings.timeFormat !== '24h'
+      breaks = settings.breaks
       if (!breaks && settings.breakPeriod) {
         breaks = [{ id: '1', name: 'Recreo', afterPeriod: parseInt(settings.breakPeriod, 10), durationMinutes: 30 }]
       } else if (!breaks) {
-        breaks = []
+        breaks = [{ id: '1', name: 'Recreo', afterPeriod: 3, durationMinutes: 30 }]
       }
 
       const generated = generateTimeSlots(startHour, blockDuration, periodsPerDay, breaks, use12h)
@@ -102,6 +203,9 @@ export default function StaticScheduleGrid({ entityType, entityId, entityName, d
       setTimeSlots(activeSlots)
     } catch(e) {
       console.error('Error cargando configuración:', e)
+      const generated = generateTimeSlots('07:00', 55, 7, [{ id: '1', name: 'Recreo', afterPeriod: 3, durationMinutes: 30 }], true)
+      activeSlots = generated.filter(s => s.type !== 'break')
+      setTimeSlots(activeSlots)
     }
 
     // 2. Fetch de datos desde la base de datos usando el Server Action (para saltar RLS)
@@ -113,12 +217,30 @@ export default function StaticScheduleGrid({ entityType, entityId, entityName, d
       return
     }
 
+    // Si data tiene períodos mayores a periodsPerDay, ajustar maxPeriods y regenerar slots
+    const maxPeriodInData = (data || []).reduce((max: number, d: any) => {
+      const p = parseInt(d.period_id || '0', 10)
+      const duration = parseInt(d.duration || '1', 10)
+      const endP = p + duration - 1
+      return endP > max ? endP : max
+    }, 0)
+
+    if (maxPeriodInData > periodsPerDay) {
+      periodsPerDay = maxPeriodInData
+      setMaxPeriods(periodsPerDay)
+      const generated = generateTimeSlots(startHour, blockDuration, periodsPerDay, breaks, use12h)
+      activeSlots = generated.filter(s => s.type !== 'break')
+      setTimeSlots(activeSlots)
+    }
+
     // 3. Formatear y agrupar clases (por si hay bloques unidos o múltiples docentes)
     const groupedSlots = new Map<string, any>()
       
     ;(data || []).forEach((d: any) => {
-      // Ignorar grupos externos si estamos viendo la vista de un Grupo Estudiantil
-      if (entityType === 'group' && d.group?.name) {
+      // Filtrar el grupo virtual de jornada si estamos viendo el horario de un grupo estudiantil
+      // (esas asignaciones pertenecen al docente, no al grupo)
+      if (entityType === 'group') {
+        if (!d.group?.name || d.group.name === 'Jornada Institucional') return
         const isOfficial = !d.group.name.toLowerCase().includes('comité') && !d.group.name.toLowerCase().includes('reunión')
         if (!isOfficial) return
       }
@@ -150,15 +272,21 @@ export default function StaticScheduleGrid({ entityType, entityId, entityName, d
     })
 
     const formattedClasses = Array.from(groupedSlots.values()).map((item: any) => {
-      const displayGroup = item.groups.length > 0 ? item.groups.join(', ') : 'Comité / Reunión'
-      
+      const isInstitucional = item.groups.includes('Jornada Institucional') || item.groups.length === 0
+      const displayGroup = isInstitucional
+        ? 'Jornada Institucional'
+        : item.groups.filter((g: string) => g !== 'Jornada Institucional').join(', ')
+
+      // Bandera para estilo diferenciado en la card de escritorio
+      const isJornada = isInstitucional
+
       let labelTitle = ''
       let labelSubtitle = ''
-      
+
       if (entityType === 'teacher') {
-        // Docente: Grupo en grande (arriba), Materia en pequeño (abajo)
-        labelSubtitle = displayGroup
-        labelTitle = item.subject
+        // Docente: Grupo en grande (arriba), Materia en pequeño (abajo). Fix Next.js Cache
+        labelSubtitle = isInstitucional ? item.subject : displayGroup;
+        labelTitle = isInstitucional ? '' : item.subject;
       } else {
         // Grupo: Materia en grande (arriba), Docente en pequeño (abajo)
         labelSubtitle = item.subject
@@ -168,7 +296,8 @@ export default function StaticScheduleGrid({ entityType, entityId, entityName, d
       return {
         ...item,
         labelTitle,
-        labelSubtitle
+        labelSubtitle,
+        isJornada
       }
     })
     
@@ -203,6 +332,7 @@ export default function StaticScheduleGrid({ entityType, entityId, entityName, d
           subtitle: entityType === 'teacher' ? 'Docente' : (directorName ? `Director: ${directorName}` : 'Horario de Clases'),
           type: entityType
         }}
+        hideGroupBadge={hideGroupBadge || entityType === 'group'}
       />
     </div>
   )
@@ -272,40 +402,51 @@ export default function StaticScheduleGrid({ entityType, entityId, entityName, d
                   style={{ gridColumn: `span ${cls.duration}` }}
                 >
                   <div
-                    className="absolute inset-[3px] rounded-lg border flex flex-col overflow-hidden transition-all hover:shadow-md hover:brightness-95 cursor-default"
-                    style={{
+                    className={`absolute inset-[3px] rounded-lg border flex flex-col overflow-hidden transition-all hover:shadow-md hover:brightness-95 cursor-default ${
+                      cls.isJornada
+                        ? 'bg-amber-50/70 dark:bg-amber-950/30 border-amber-200/70 dark:border-amber-800/50'
+                        : ''
+                    }`}
+                    style={cls.isJornada ? {} : {
                       backgroundColor: `${cls.color}18`,
                       borderColor: `${cls.color}50`,
                     }}
                   >
-                    <div className="absolute left-0 top-0 bottom-0 w-[3.5px] rounded-l-lg" style={{ backgroundColor: cls.color || '#cbd5e1' }} />
+                    <div
+                      className={`absolute left-0 top-0 bottom-0 w-[3.5px] rounded-l-lg ${cls.isJornada ? 'bg-amber-400' : ''}`}
+                      style={cls.isJornada ? {} : { backgroundColor: cls.color || '#cbd5e1' }}
+                    />
                     <div className="flex-1 flex flex-col justify-center items-center text-center px-1 pl-2 overflow-hidden">
                       {entityType === 'teacher' ? (
                         <div className="w-full h-full flex flex-col justify-center items-center py-0.5">
-                          <h4 
-                            className={`font-black text-indigo-700 dark:text-indigo-300 tracking-tighter select-none ${
-                              cls.labelSubtitle.length <= 6 
-                                ? 'text-[20px] sm:text-[22px] xl:text-[24px] leading-tight' 
-                                : 'text-[11px] sm:text-[13px] leading-tight'
+                          <h4
+                            className={`font-black tracking-tighter select-none text-center break-words w-full ${
+                              cls.isJornada
+                                ? 'text-amber-700 dark:text-amber-300 text-[10px] sm:text-[11px] leading-tight'
+                                : `text-indigo-700 dark:text-indigo-300 ${
+                                    cls.labelSubtitle.length <= 6
+                                      ? 'text-[20px] sm:text-[22px] xl:text-[24px] leading-tight'
+                                      : 'text-[11px] sm:text-[13px] leading-tight'
+                                  }`
                             }`}
                           >
                             {cls.labelSubtitle}
                           </h4>
-                          <span className="text-slate-600 dark:text-slate-300 text-[9px] sm:text-[10px] font-bold leading-tight line-clamp-1 mt-0.5 max-w-[95%] truncate tracking-tight">
+                          <span className="text-slate-600 dark:text-slate-300 text-[9px] sm:text-[10px] font-bold leading-tight mt-0.5 tracking-tight text-center break-words w-full px-0.5">
                             {cls.labelTitle}
                           </span>
                           {cls.room && (
-                            <span className="text-slate-400 dark:text-slate-500 text-[7px] font-extrabold uppercase tracking-wider leading-none mt-0.5">
+                            <span className="text-slate-400 dark:text-slate-500 text-[7px] font-extrabold uppercase tracking-wider leading-none mt-0.5 text-center break-words">
                               {cls.room}
                             </span>
                           )}
                         </div>
                       ) : (
                         <div className="w-full flex flex-col justify-center items-center gap-0.5">
-                          <h4 className="font-black text-indigo-700 dark:text-indigo-300 text-[15px] sm:text-[16px] leading-tight tracking-tight line-clamp-2">
+                          <h4 className="font-black text-indigo-700 dark:text-indigo-300 text-[11px] sm:text-[13px] leading-tight tracking-tight text-center break-words w-full px-0.5">
                             {cls.labelSubtitle}
                           </h4>
-                          <span className="text-slate-500 dark:text-slate-400 text-[9px] font-semibold leading-tight line-clamp-1">
+                          <span className="text-slate-500 dark:text-slate-400 text-[9px] font-semibold leading-tight text-center break-words w-full px-0.5">
                             {cls.labelTitle}
                           </span>
                           {cls.room && (
