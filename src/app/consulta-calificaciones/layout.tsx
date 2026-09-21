@@ -6,7 +6,8 @@ import { redirect } from 'next/navigation'
 import { ThemeToggleClient } from './ThemeToggleClient'
 
 export const metadata = {
-  title: 'Consulta de Calificaciones - aulaEnsuny',
+  title: 'Portal de Consulta Académica - aulaEnsuny',
+  description: 'Consulta oficial de calificaciones y horario escolar para estudiantes de la ENSUNY.',
 }
 
 export default async function ConsultaCalificacionesLayout({
@@ -17,14 +18,14 @@ export default async function ConsultaCalificacionesLayout({
   const session = await getPlanillaStudentSession()
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col">
-      <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-30">
+    <div className="min-h-screen bg-[#fbfbfd] dark:bg-slate-950 flex flex-col selection:bg-emerald-500/20 selection:text-emerald-900 dark:selection:text-emerald-200">
+      <header className="bg-white/85 dark:bg-slate-900/85 backdrop-blur-xl border-b border-slate-200/80 dark:border-white/10 sticky top-0 z-30">
         <div className="max-w-5xl mx-auto px-3 sm:px-6 h-16 relative flex items-center justify-between">
           {/* Izquierda: Botón Volver al inicio */}
           <div className="flex items-center z-10 shrink-0">
             <Link
               href="/"
-              className="group inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs sm:text-sm font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-all active:scale-95 border border-slate-200/80 dark:border-slate-700/80"
+              className="group inline-flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-semibold rounded-full bg-slate-100/80 hover:bg-slate-200/80 dark:bg-slate-800/80 dark:hover:bg-slate-700/80 text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-all active:scale-95 border border-slate-200/60 dark:border-white/5"
               title="Volver al inicio"
             >
               <ArrowLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4 transition-transform duration-150 group-hover:-translate-x-0.5" />
@@ -32,21 +33,21 @@ export default async function ConsultaCalificacionesLayout({
             </Link>
           </div>
 
-          {/* Centro: Título Mis Calificaciones exactamente centrado */}
+          {/* Centro: Título Consulta Académica exactamente centrado */}
           <div className="absolute inset-x-0 flex flex-col items-center justify-center pointer-events-none px-20 sm:px-36">
             <div className="flex items-center gap-2 pointer-events-auto">
-              <div className="bg-emerald-100 dark:bg-emerald-900/50 p-1.5 rounded-xl text-emerald-600 dark:text-emerald-400 shrink-0">
+              <div className="bg-emerald-500/10 dark:bg-emerald-500/20 p-1.5 rounded-xl text-[#1F4E31] dark:text-emerald-400 shrink-0 border border-emerald-500/20">
                 <GraduationCap className="h-4 w-4 sm:h-5 sm:w-5" />
               </div>
               <Link
                 href="/consulta-calificaciones"
-                className="font-bold text-slate-900 dark:text-white text-sm sm:text-base leading-none hover:opacity-80 transition-opacity truncate whitespace-nowrap"
+                className="font-extrabold text-slate-900 dark:text-white text-sm sm:text-base leading-none hover:opacity-80 transition-opacity truncate whitespace-nowrap tracking-tight"
               >
-                Mis Calificaciones
+                Consulta Académica
               </Link>
             </div>
             {session && (
-              <p className="text-[10px] sm:text-xs text-slate-500 dark:text-white sm:dark:text-slate-400 font-medium truncate max-w-[160px] sm:max-w-md uppercase mt-0.5 pointer-events-auto">
+              <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium truncate max-w-[180px] sm:max-w-md uppercase mt-0.5 pointer-events-auto">
                 {session.fullName}
               </p>
             )}

@@ -152,13 +152,13 @@ export default function LandingPage() {
 
           {/* Enlaces y Acciones */}
           <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
-            {/* Acceso rápido directo a Calificaciones */}
+            {/* Acceso rápido directo a Consulta Académica */}
             <Link
               href="/consulta-calificaciones"
               className="hidden sm:inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-emerald-700 dark:text-emerald-300 hover:text-emerald-800 dark:hover:text-emerald-200 px-3.5 py-1.5 rounded-full bg-emerald-50 hover:bg-emerald-100/80 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/60 transition-all active:scale-95 duration-100 shadow-xs"
             >
               <GraduationCap className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-              <span>Calificaciones</span>
+              <span>Consulta Académica</span>
             </Link>
 
             <Link
@@ -223,33 +223,68 @@ export default function LandingPage() {
               Ecosistema escolar diseñado para la Escuela Normal Superior del Nordeste. Seguimiento de notas, gestión académica y acceso directo a lecciones.
             </p>
 
-            {/* Botones de Acción Principales */}
-            <div className="flex flex-col sm:flex-row flex-wrap items-center justify-center lg:justify-start gap-3.5 pt-2">
-              {/* Botón Principal Destacado: Consultar Calificaciones */}
-              <Link href="/consulta-calificaciones" className="w-full sm:w-auto">
-                <Button className="w-full sm:w-auto rounded-2xl bg-gradient-to-r from-emerald-600 via-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-bold text-sm px-6 h-12 shadow-lg shadow-emerald-600/25 hover:shadow-emerald-600/35 active:scale-[0.98] duration-100 ease-out cursor-pointer flex items-center justify-center gap-2 border border-emerald-400/30">
-                  <GraduationCap className="h-5 w-5 text-emerald-100" />
-                  <span>Consultar Calificaciones</span>
-                </Button>
-              </Link>
+            {/* ── Dos Accesos Principales del Landing ── */}
+            <div className="space-y-4 pt-3 max-w-xl mx-auto lg:mx-0 text-left">
+              {/* Opción 1: INGRESAR A AULAENSUNY (Campus Completo) */}
+              <div className="group relative rounded-3xl bg-white/90 dark:bg-slate-900/90 border border-slate-200/90 dark:border-white/10 p-5 sm:p-6 shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-none hover:border-emerald-500/40 transition-all duration-200 backdrop-blur-xl">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base sm:text-lg">🔐</span>
+                      <h2 className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white tracking-tight uppercase">
+                        Ingresar a aulaEnsuny
+                      </h2>
+                    </div>
+                    <p className="text-xs sm:text-[13px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                      Accede a tus cursos, calificaciones, horario y servicios institucionales.
+                    </p>
+                  </div>
 
-              {/* Botón Acceder a mi cuenta (Docentes/Admin) */}
-              <Link href="/login" className="w-full sm:w-auto">
-                <Button className="w-full sm:w-auto rounded-2xl bg-[#1F4E31] hover:bg-[#183e27] text-white font-semibold text-sm px-6 h-12 shadow-sm shadow-emerald-950/20 active:scale-[0.98] duration-100 ease-out dark:bg-slate-800 dark:hover:bg-slate-700 cursor-pointer flex items-center justify-center gap-2">
-                  <span>Docentes / Administrativos</span>
-                  <ArrowRight className="h-4 w-4 opacity-70" />
-                </Button>
-              </Link>
+                  <Link href="/login" className="shrink-0 w-full sm:w-auto">
+                    <Button className="w-full sm:w-auto rounded-2xl bg-[#1F4E31] hover:bg-[#183e27] text-white font-bold text-xs sm:text-sm px-5 h-11 shadow-sm shadow-emerald-950/20 active:scale-[0.98] duration-100 ease-out dark:bg-emerald-600 dark:hover:bg-emerald-700 cursor-pointer flex items-center justify-center gap-2">
+                      <span>Ingresar</span>
+                      <ArrowRight className="h-4 w-4 opacity-80" />
+                    </Button>
+                  </Link>
+                </div>
 
-              {/* Botón Registro de estudiantes */}
-              <Link href="/register/student" className="w-full sm:w-auto">
-                <Button
-                  variant="outline"
-                  className="w-full sm:w-auto rounded-2xl border-slate-200/90 dark:border-white/10 bg-white/70 hover:bg-white dark:bg-slate-900/70 dark:hover:bg-slate-900 text-slate-700 dark:text-slate-200 font-semibold text-sm px-6 h-12 backdrop-blur-xl shadow-[0_2px_8px_rgba(0,0,0,0.03)] active:scale-[0.98] duration-100 ease-out cursor-pointer"
-                >
-                  Registro de estudiantes
-                </Button>
-              </Link>
+                {/* Sub-opción integrada: Registro de Estudiantes */}
+                <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                  <span className="text-slate-500 dark:text-slate-400">
+                    ¿Eres estudiante y aún no tienes una cuenta?
+                  </span>
+                  <Link
+                    href="/register/student"
+                    className="font-bold text-[#1F4E31] hover:text-[#153823] dark:text-emerald-400 dark:hover:text-emerald-300 underline underline-offset-4 active:scale-95 transition-all self-start sm:self-auto"
+                  >
+                    Crear acceso de estudiante
+                  </Link>
+                </div>
+              </div>
+
+              {/* Opción 2: CONSULTA ACADÉMICA (Acceso Simplificado por Documento) */}
+              <div className="group relative rounded-3xl bg-gradient-to-r from-emerald-50/70 via-teal-50/50 to-white/90 dark:from-emerald-950/20 dark:via-slate-900/90 dark:to-slate-900/90 border border-emerald-500/30 dark:border-emerald-500/20 p-5 sm:p-6 shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-none hover:border-emerald-500/50 transition-all duration-200 backdrop-blur-xl">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base sm:text-lg">📚</span>
+                      <h2 className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white tracking-tight uppercase">
+                        Consulta Académica
+                      </h2>
+                    </div>
+                    <p className="text-xs sm:text-[13px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                      Consulta tus calificaciones y el horario de tu grupo.
+                    </p>
+                  </div>
+
+                  <Link href="/consulta-calificaciones" className="shrink-0 w-full sm:w-auto">
+                    <Button className="w-full sm:w-auto rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-bold text-xs sm:text-sm px-5 h-11 shadow-md shadow-emerald-600/20 active:scale-[0.98] duration-100 ease-out cursor-pointer flex items-center justify-center gap-2 border border-emerald-400/30">
+                      <GraduationCap className="h-4 w-4 text-emerald-100" />
+                      <span>Consultar</span>
+                    </Button>
+                  </Link>
+                </div>
+              </div>
             </div>
 
             {/* Garantías o Micro-detalles */}

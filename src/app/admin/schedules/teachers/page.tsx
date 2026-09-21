@@ -45,15 +45,18 @@ export default async function TeachersPage() {
   const { data: teachersRaw, error } = await supabase
     .from('academic_teachers')
     .select('id, full_name, profile_id, profiles(id, first_name, last_name)')
+    .eq('is_active', true)
     .order('full_name')
 
   if (error) console.error('Error fetching teachers:', error)
 
   // Fix possible array mappings for profiles relationship and map email
+  // Normalizar profile_id siempre a string | null (nunca undefined)
   const teachers = (teachersRaw || []).map((t: any) => {
     const profile = Array.isArray(t.profiles) ? t.profiles[0] : t.profiles
     return {
       ...t,
+      profile_id: t.profile_id ?? null,
       profiles: profile ? {
         ...profile,
         email: authUsersMap[profile.id] || 'Sin correo'

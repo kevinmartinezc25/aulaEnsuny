@@ -1004,8 +1004,18 @@ export async function getAdminDashboardStats() {
       accesos: activityDays[day] || 0
     }))
 
+    // 9. Obtener estudiantes del directorio sin cuenta virtual
+    // (estos son los matriculados importados por CSV que aún no tienen acceso a la plataforma)
+    const { count: directoryOnlyCount } = await adminClient
+      .from('student_directory')
+      .select('id', { count: 'exact', head: true })
+      .is('profile_id', null)
+      .eq('status', 'active')
+
+    const totalStudentCount = students.length + (directoryOnlyCount || 0)
+
     return {
-      studentCount: students.length,
+      studentCount: totalStudentCount,
       teacherCount: teachers.length,
       activeCoursesCount,
       quizzesCount,
@@ -2266,14 +2276,25 @@ export async function getScheduleSlotsAction(entityType?: 'group' | 'teacher', e
 export async function clearAllScheduleSlotsAction(): Promise<{ success: boolean; error?: string }> {
   try {
     const adminClient = createAdminClient()
-    const { error } = await adminClient
+    // 1. Limpiar slots de horario
+    const { error: slotsError } = await adminClient
       .from('sch_schedule_slots')
       .delete()
       .neq('id', '00000000-0000-0000-0000-000000000000')
-    if (error) {
-      console.error('Error clearing schedule slots:', error)
-      return { success: false, error: error.message }
+    if (slotsError) {
+      console.error('Error clearing schedule slots:', slotsError)
+      return { success: false, error: slotsError.message }
     }
+
+    // 2. Limpiar asignaciones académicas temporales asociadas al horario
+    const { error: asgError } = await adminClient
+      .from('academic_assignments')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000')
+    if (asgError) {
+      console.warn('Aviso limpiando academic_assignments (no bloqueante):', asgError.message)
+    }
+
     return { success: true }
   } catch (err: any) {
     return { success: false, error: err.message || 'Error desconocido' }

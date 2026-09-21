@@ -1,9 +1,9 @@
 'use client'
 
 import React, { useState } from 'react'
-import { UserCog, CheckCircle2, XCircle, Info, ArrowUpRight, Search, Link2, Unlink, X, Briefcase } from 'lucide-react'
+import { UserCog, CheckCircle2, XCircle, Info, ArrowUpRight, Search, Link2, Unlink, X, Briefcase, Trash2, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
-import { linkTeacherProfile, unlinkTeacherProfile } from './actions'
+import { linkTeacherProfile, unlinkTeacherProfile, removeObsoleteTeacherAction } from './actions'
 
 interface Teacher {
   id: string
@@ -53,6 +53,10 @@ export default function TeachersClientView({
   
   // Estado para el modal de Carga Académica
   const [selectedTeacherModal, setSelectedTeacherModal] = useState<Teacher | null>(null)
+
+  // Estado para el modal de confirmación de eliminación
+  const [deleteConfirmTeacher, setDeleteConfirmTeacher] = useState<Teacher | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const filteredTeachers = teachers.filter(t => 
     t.full_name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -111,6 +115,21 @@ export default function TeachersClientView({
     }, {})
 
     return { totalHours, bySubject }
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deleteConfirmTeacher) return
+    setIsDeleting(true)
+    const res = await removeObsoleteTeacherAction(deleteConfirmTeacher.id)
+    setIsDeleting(false)
+    if (res.success) {
+      toast.success(`Docente "${deleteConfirmTeacher.full_name}" eliminado correctamente.`)
+      setTeachers(prev => prev.filter(t => t.id !== deleteConfirmTeacher.id))
+      setDeleteConfirmTeacher(null)
+    } else {
+      toast.error(res.error || 'No se pudo eliminar el docente.')
+      setDeleteConfirmTeacher(null)
+    }
   }
 
   return (
@@ -227,13 +246,26 @@ export default function TeachersClientView({
                     )}
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button 
-                      onClick={() => setSelectedTeacherModal(teacher)}
-                      className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-500/10 text-sm font-semibold text-emerald-600 dark:text-emerald-400 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-colors"
-                    >
-                      <Briefcase className="h-4 w-4" />
-                      Ver Carga
-                    </button>
+                    <div className="flex items-center justify-end gap-2">
+                      {/* Botón eliminar: solo disponible para docentes sin cuenta vinculada */}
+                      {teacher.profile_id === null && (
+                        <button
+                          onClick={() => setDeleteConfirmTeacher(teacher)}
+                          disabled={loadingId === teacher.id}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition-colors"
+                          title="Eliminar docente (solo si no tiene clases activas)"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                      <button 
+                        onClick={() => setSelectedTeacherModal(teacher)}
+                        className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-500/10 text-sm font-semibold text-emerald-600 dark:text-emerald-400 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-colors"
+                      >
+                        <Briefcase className="h-4 w-4" />
+                        Ver Carga
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -339,6 +371,51 @@ export default function TeachersClientView({
                   </div>
                 )
               })()}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* --- MODAL DE CONFIRMACIÓN DE ELIMINACIÓN --- */}
+      {deleteConfirmTeacher && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => !isDeleting && setDeleteConfirmTeacher(null)} />
+          <div className="relative bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col border border-slate-200 dark:border-slate-800">
+            <div className="flex items-center gap-3 p-5 border-b border-slate-100 dark:border-slate-800">
+              <div className="p-2.5 bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 rounded-xl">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">¿Eliminar Docente?</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Esta acción no se puede deshacer</p>
+              </div>
+            </div>
+            <div className="p-5 space-y-3">
+              <p className="text-sm text-slate-600 dark:text-slate-300">
+                Se eliminará a <strong className="text-slate-900 dark:text-white">{deleteConfirmTeacher.full_name}</strong> del catálogo de docentes académicos.
+              </p>
+              <div className="p-3 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/40 rounded-xl text-xs text-emerald-700 dark:text-emerald-300 flex items-start gap-2">
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400 mt-0.5" />
+                <span>Los usuarios de la plataforma, calificaciones y registros de asistencia <strong>no se ven afectados</strong>.</span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Si el docente tiene clases asignadas en el horario activo, la operación será rechazada de forma automática.
+              </p>
+            </div>
+            <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-3">
+              <button
+                onClick={() => setDeleteConfirmTeacher(null)}
+                disabled={isDeleting}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-colors disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                className="flex items-center gap-2 px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isDeleting ? 'Eliminando...' : 'Sí, eliminar'}
+              </button>
             </div>
           </div>
         </div>

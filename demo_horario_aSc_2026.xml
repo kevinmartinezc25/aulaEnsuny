@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="utf-8"?>
+<timetable ascttversion="2024.24.1" importtype="database" displayname="Horario Institucional Demo 2026">
+   <periods columns="period,name,short,starttime,endtime">
+      <period name="1" short="1" period="1" starttime="06:30" endtime="07:25"/>
+      <period name="2" short="2" period="2" starttime="07:25" endtime="08:20"/>
+      <period name="3" short="3" period="3" starttime="08:20" endtime="09:15"/>
+      <period name="4" short="4" period="4" starttime="09:45" endtime="10:40"/>
+      <period name="5" short="5" period="5" starttime="10:40" endtime="11:35"/>
+      <period name="6" short="6" period="6" starttime="11:35" endtime="12:30"/>
+      <period name="7" short="7" period="7" starttime="12:30" endtime="13:25"/>
+   </periods>
+
+   <daysdefs columns="id,days,name,short">
+      <daysdef id="D-LUN" name="Lunes" short="Lu" days="10000"/>
+      <daysdef id="D-MAR" name="Martes" short="Ma" days="01000"/>
+      <daysdef id="D-MIE" name="Miércoles" short="Mi" days="00100"/>
+      <daysdef id="D-JUE" name="Jueves" short="Ju" days="00010"/>
+      <daysdef id="D-VIE" name="Viernes" short="Vi" days="00001"/>
+   </daysdefs>
+
+   <subjects columns="id,name,short">
+      <subject id="S-MAT" name="Matemáticas" short="MAT"/>
+      <subject id="S-LEN" name="Lengua Castellana" short="LEN"/>
+      <subject id="S-NAT" name="Ciencias Naturales" short="NAT"/>
+      <subject id="S-SOC" name="Ciencias Sociales" short="SOC"/>
+      <subject id="S-ING" name="Inglés" short="ING"/>
+      <subject id="S-EFI" name="Educación Física" short="EFI"/>
+      <subject id="S-INF" name="Tecnología e Informática" short="INF"/>
+      <subject id="S-ROB" name="Robótica e Inteligencia Artificial" short="ROB"/>
+      <subject id="S-ETI" name="Ética y Valores" short="ETI"/>
+   </subjects>
+
+   <teachers columns="id,name,short">
+      <teacher id="T-01" name="Carlos Pérez" short="CP"/>
+      <teacher id="T-02" name="María Rodríguez" short="MR"/>
+      <teacher id="T-03" name="Ana Gómez" short="AG"/>
+      <teacher id="T-04" name="Kayleigh Brown" short="KB"/>
+      <teacher id="T-05" name="Ingeniero David Torres" short="DT"/>
+      <teacher id="T-06" name="Profesora Valentina Soto" short="VS"/>
+   </teachers>
+
+   <classrooms columns="id,name,short">
+      <classroom id="R-101" name="Aula 101" short="101"/>
+      <classroom id="R-102" name="Aula 102" short="102"/>
+      <classroom id="R-201" name="Aula 201" short="201"/>
+      <classroom id="R-STEM" name="Laboratorio STEM" short="STEM"/>
+      <classroom id="R-DEP" name="Cancha Deportiva" short="DEP"/>
+   </classrooms>
+
+   <classes columns="id,name,short">
+      <class id="C-701" name="7°-1" short="7°-1"/>
+      <class id="C-702" name="7°-2" short="7°-2"/>
+      <class id="C-1001" name="10°-1" short="10°-1"/>
+      <class id="C-1101" name="11°-1" short="11°-1"/>
+   </classes>
+
+   <lessons columns="id,subjectid,teacherids,classids,classroomids">
+      <!-- Lecciones para 7°-2 -->
+      <lesson id="L-702-MAT" subjectid="S-MAT" teacherids="T-01" classids="C-702" classroomids="R-101"/>
+      <lesson id="L-702-LEN" subjectid="S-LEN" teacherids="T-02" classids="C-702" classroomids="R-101"/>
+      <lesson id="L-702-NAT" subjectid="S-NAT" teacherids="T-03" classids="C-702" classroomids="R-101"/>
+      <lesson id="L-702-ING" subjectid="S-ING" teacherids="T-04" classids="C-702" classroomids="R-101"/>
+      <lesson id="L-702-ROB" subjectid="S-ROB" teacherids="T-05" classids="C-702" classroomids="R-STEM"/>
+      <lesson id="L-702-EFI" subjectid="S-EFI" teacherids="T-06" classids="C-702" classroomids="R-DEP"/>
+
+      <!-- Lecciones para 7°-1 -->
+      <lesson id="L-701-LEN" subjectid="S-LEN" teacherids="T-02" classids="C-701" classroomids="R-102"/>
+      <lesson id="L-701-MAT" subjectid="S-MAT" teacherids="T-01" classids="C-701" classroomids="R-102"/>
+      <lesson id="L-701-SOC" subjectid="S-SOC" teacherids="T-03" classids="C-701" classroomids="R-102"/>
+      <lesson id="L-701-INF" subjectid="S-INF" teacherids="T-05" classids="C-701" classroomids="R-STEM"/>
+
+      <!-- Lecciones para 10°-1 -->
+      <lesson id="L-1001-MAT" subjectid="S-MAT" teacherids="T-01" classids="C-1001" classroomids="R-201"/>
+      <lesson id="L-1001-ING" subjectid="S-ING" teacherids="T-04" classids="C-1001" classroomids="R-201"/>
+      <lesson id="L-1001-ROB" subjectid="S-ROB" teacherids="T-05" classids="C-1001" classroomids="R-STEM"/>
+      <lesson id="L-1001-EFI" subjectid="S-EFI" teacherids="T-06" classids="C-1001" classroomids="R-DEP"/>
+
+      <!-- Lecciones para 11°-1 (Nuevo Grupo) -->
+      <lesson id="L-1101-LEN" subjectid="S-LEN" teacherids="T-02" classids="C-1101" classroomids="R-201"/>
+      <lesson id="L-1101-ING" subjectid="S-ING" teacherids="T-04" classids="C-1101" classroomids="R-201"/>
+      <lesson id="L-1101-ROB" subjectid="S-ROB" teacherids="T-05" classids="C-1101" classroomids="R-STEM"/>
+      <lesson id="L-1101-NAT" subjectid="S-NAT" teacherids="T-03" classids="C-1101" classroomids="R-201"/>
+   </lessons>
+
+   <cards columns="lessonid,period,days,classroomids">
+      <!-- ==================== HORARIO GRUPO 7°-2 ==================== -->
+      <!-- Lunes (10000) -->
+      <card lessonid="L-702-MAT" period="1" days="10000" classroomids="R-101"/>
+      <card lessonid="L-702-MAT" period="2" days="10000" classroomids="R-101"/>
+      <card lessonid="L-702-LEN" period="3" days="10000" classroomids="R-101"/>
+      <card lessonid="L-702-ING" period="4" days="10000" classroomids="R-101"/>
+      <card lessonid="L-702-ROB" period="5" days="10000" classroomids="R-STEM"/>
+      <card lessonid="L-702-EFI" period="6" days="10000" classroomids="R-DEP"/>
+
+      <!-- Martes (01000) -->
+      <card lessonid="L-702-LEN" period="1" days="01000" classroomids="R-101"/>
+      <card lessonid="L-702-LEN" period="2" days="01000" classroomids="R-101"/>
+      <card lessonid="L-702-MAT" period="3" days="01000" classroomids="R-101"/>
+      <card lessonid="L-702-NAT" period="4" days="01000" classroomids="R-101"/>
+      <card lessonid="L-702-NAT" period="5" days="01000" classroomids="R-101"/>
+      <card lessonid="L-702-ING" period="6" days="01000" classroomids="R-101"/>
+
+      <!-- Miércoles (00100) -->
+      <card lessonid="L-702-ROB" period="1" days="00100" classroomids="R-STEM"/>
+      <card lessonid="L-702-ROB" period="2" days="00100" classroomids="R-STEM"/>
+      <card lessonid="L-702-MAT" period="3" days="00100" classroomids="R-101"/>
+      <card lessonid="L-702-LEN" period="4" days="00100" classroomids="R-101"/>
+      <card lessonid="L-702-ING" period="5" days="00100" classroomids="R-101"/>
+      <card lessonid="L-702-EFI" period="6" days="00100" classroomids="R-DEP"/>
+
+      <!-- Jueves (00010) -->
+      <card lessonid="L-702-NAT" period="1" days="00010" classroomids="R-101"/>
+      <card lessonid="L-702-NAT" period="2" days="00010" classroomids="R-101"/>
+      <card lessonid="L-702-LEN" period="3" days="00010" classroomids="R-101"/>
+      <card lessonid="L-702-MAT" period="4" days="00010" classroomids="R-101"/>
+      <card lessonid="L-702-ROB" period="5" days="00010" classroomids="R-STEM"/>
+      <card lessonid="L-702-ING" period="6" days="00010" classroomids="R-101"/>
+
+      <!-- Viernes (00001) -->
+      <card lessonid="L-702-MAT" period="1" days="00001" classroomids="R-101"/>
+      <card lessonid="L-702-ING" period="2" days="00001" classroomids="R-101"/>
+      <card lessonid="L-702-LEN" period="3" days="00001" classroomids="R-101"/>
+      <card lessonid="L-702-EFI" period="4" days="00001" classroomids="R-DEP"/>
+      <card lessonid="L-702-NAT" period="5" days="00001" classroomids="R-101"/>
+
+      <!-- ==================== HORARIO GRUPO 7°-1 ==================== -->
+      <!-- Lunes (10000) -->
+      <card lessonid="L-701-LEN" period="1" days="10000" classroomids="R-102"/>
+      <card lessonid="L-701-LEN" period="2" days="10000" classroomids="R-102"/>
+      <card lessonid="L-701-MAT" period="4" days="10000" classroomids="R-102"/>
+      <card lessonid="L-701-MAT" period="5" days="10000" classroomids="R-102"/>
+      <card lessonid="L-701-SOC" period="6" days="10000" classroomids="R-102"/>
+
+      <!-- Martes (01000) -->
+      <card lessonid="L-701-SOC" period="1" days="01000" classroomids="R-102"/>
+      <card lessonid="L-701-SOC" period="2" days="01000" classroomids="R-102"/>
+      <card lessonid="L-701-LEN" period="4" days="01000" classroomids="R-102"/>
+      <card lessonid="L-701-MAT" period="5" days="01000" classroomids="R-102"/>
+      <card lessonid="L-701-INF" period="6" days="01000" classroomids="R-STEM"/>
+
+      <!-- ==================== HORARIO GRUPO 10°-1 ==================== -->
+      <!-- Lunes (10000) -->
+      <card lessonid="L-1001-ING" period="1" days="10000" classroomids="R-201"/>
+      <card lessonid="L-1001-ING" period="2" days="10000" classroomids="R-201"/>
+      <card lessonid="L-1001-MAT" period="3" days="10000" classroomids="R-201"/>
+      <card lessonid="L-1001-ROB" period="4" days="10000" classroomids="R-STEM"/>
+      <card lessonid="L-1001-EFI" period="5" days="10000" classroomids="R-DEP"/>
+
+      <!-- ==================== HORARIO GRUPO 11°-1 (Nuevo) ==================== -->
+      <!-- Lunes (10000) -->
+      <card lessonid="L-1101-NAT" period="1" days="10000" classroomids="R-201"/>
+      <card lessonid="L-1101-NAT" period="2" days="10000" classroomids="R-201"/>
+      <card lessonid="L-1101-ROB" period="3" days="10000" classroomids="R-STEM"/>
+      <card lessonid="L-1101-LEN" period="4" days="10000" classroomids="R-201"/>
+      <card lessonid="L-1101-ING" period="5" days="10000" classroomids="R-201"/>
+   </cards>
+</timetable>

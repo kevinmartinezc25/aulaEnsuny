@@ -182,3 +182,193 @@ export async function getStudentGradesView(subjectId: string) {
 
   return { subject, achievements: achievements || [], activities, grades: grades || [] }
 }
+
+import { generateTimeSlots } from '@/app/admin/schedules/utils/timeCalculator'
+import { ScheduleData, ScheduleDayKey } from '@/components/schedule/DayTabsScheduleView'
+import { resolveOfficialGroup } from './groupResolver'
+
+export interface StudentScheduleResponse {
+  success: boolean
+  hasGroup: boolean
+  isPublished: boolean
+  groupName: string
+  groupId: string | null
+  schedule: ScheduleData
+  error?: string
+}
+
+/**
+ * Consulta de forma segura el horario del grupo matriculado del estudiante.
+ * El estudiante NO envía group_id, se resuelve desde su sesión activa.
+ */
+export async function getStudentGroupSchedule(): Promise<StudentScheduleResponse> {
+  const session = await getPlanillaStudentSession()
+  if (!session) {
+    throw new Error('No autorizado. Debes iniciar sesión con tu documento.')
+  }
+
+  const emptySchedule: ScheduleData = {
+    lunes: [],
+    martes: [],
+    miercoles: [],
+    jueves: [],
+    viernes: []
+  }
+
+  const supabase = createAdminClient()
+  let targetGroupId = session.groupId
+  let targetGroupName = session.groupName || ''
+
+  // Si groupId no estaba en sesión o no ha sido resuelto, buscarlo dinámicamente
+  if (!targetGroupId) {
+    const { data: allGroups } = await supabase.from('sch_groups').select('id, name')
+
+    if (allGroups && allGroups.length > 0) {
+      let resolved = resolveOfficialGroup(allGroups, session.gradeLevel, session.groupName)
+
+      if (!resolved) {
+        const assistedSubIds: string[] = []
+        if (session.directoryId) {
+          const { data: byDir } = await supabase
+            .from('assisted_students')
+            .select('subject_id')
+            .eq('directory_id', session.directoryId)
+            .limit(5)
+          if (byDir) assistedSubIds.push(...byDir.map(r => r.subject_id).filter(Boolean))
+        }
+
+        if (assistedSubIds.length === 0 && session.fullName) {
+          const { data: byName } = await supabase
+            .from('assisted_students')
+            .select('subject_id')
+            .ilike('full_name', session.fullName.trim())
+            .limit(5)
+          if (byName) assistedSubIds.push(...byName.map(r => r.subject_id).filter(Boolean))
+        }
+
+        if (assistedSubIds.length > 0) {
+          const { data: subData } = await supabase
+            .from('assisted_subjects')
+            .select('grade, group_number')
+            .in('id', assistedSubIds)
+            .limit(1)
+            .single()
+
+          if (subData) {
+            resolved = resolveOfficialGroup(allGroups, `${subData.grade}°`, `${subData.group_number}`)
+          }
+        }
+      }
+
+      if (resolved) {
+        targetGroupId = resolved.groupId
+        targetGroupName = resolved.groupName
+      }
+    }
+  }
+
+  if (!targetGroupId) {
+    return {
+      success: true,
+      hasGroup: false,
+      isPublished: false,
+      groupName: targetGroupName || session.groupName || 'Sin grupo asignado',
+      groupId: null,
+      schedule: emptySchedule
+    }
+  }
+
+  // Obtener los slots del horario oficial para este grupo
+  const { data: slots, error } = await supabase
+    .from('sch_schedule_slots')
+    .select(`
+      id,
+      day_of_week,
+      period_id,
+      duration,
+      group_id,
+      subject_id,
+      teacher_id,
+      group:sch_groups(id, name),
+      teacher:academic_teachers(id, full_name),
+      subject:sch_subjects(id, name, color, room_type),
+      classroom:sch_classrooms(id, name)
+    `)
+    .eq('group_id', targetGroupId)
+    .order('period_id', { ascending: true })
+
+  if (error) {
+    console.error('Error al consultar horario de grupo para estudiante:', error)
+    return {
+      success: false,
+      hasGroup: true,
+      isPublished: false,
+      groupName: session.groupName || '',
+      groupId: targetGroupId,
+      schedule: emptySchedule,
+      error: 'Error al consultar el horario en la base de datos.'
+    }
+  }
+
+  if (!slots || slots.length === 0) {
+    return {
+      success: true,
+      hasGroup: true,
+      isPublished: false,
+      groupName: session.groupName || '',
+      groupId: targetGroupId,
+      schedule: emptySchedule
+    }
+  }
+
+  // Generar franjas horarias estándar de la institución (07:00 a 13:55 con recreo de 30min tras el bloque 4)
+  const defaultTimeSlots = generateTimeSlots('07:00', 55, 7, [
+    { id: '1', name: 'Recreo', afterPeriod: 4, durationMinutes: 30 }
+  ], true).filter(s => s.type === 'period')
+
+  const dayKeyMap: Record<number, ScheduleDayKey> = {
+    1: 'lunes',
+    2: 'martes',
+    3: 'miercoles',
+    4: 'jueves',
+    5: 'viernes'
+  }
+
+  const formattedSchedule: ScheduleData = {
+    lunes: [],
+    martes: [],
+    miercoles: [],
+    jueves: [],
+    viernes: []
+  }
+
+  for (const slot of (slots as any[])) {
+    const dayKey = dayKeyMap[slot.day_of_week]
+    if (!dayKey) continue
+
+    const startSlot = defaultTimeSlots.find(t => t.id === slot.period_id)
+    const endPeriod = slot.period_id + (slot.duration || 1) - 1
+    const endSlot = defaultTimeSlots.find(t => t.id === endPeriod)
+
+    formattedSchedule[dayKey].push({
+      id: slot.id,
+      startTime: startSlot?.startTime || `Bloque ${slot.period_id}`,
+      endTime: endSlot?.endTime || startSlot?.endTime || '',
+      subject: slot.subject?.name || 'Materia sin asignar',
+      teacher: slot.teacher?.full_name || undefined,
+      location: slot.classroom?.name || undefined,
+      group: slot.group?.name || session.groupName || undefined,
+      period: slot.period_id,
+      color: slot.subject?.color || '#059669'
+    })
+  }
+
+  return {
+    success: true,
+    hasGroup: true,
+    isPublished: true,
+    groupName: session.groupName || (slots[0] as any)?.group?.name || '',
+    groupId: targetGroupId,
+    schedule: formattedSchedule
+  }
+}
