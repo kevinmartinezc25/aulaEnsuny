@@ -59,6 +59,11 @@ export async function updateSession(request: NextRequest) {
   const isLandingPage = pathname === '/'
   const isConsultaCalificaciones = pathname.startsWith('/consulta-calificaciones')
 
+  // Bypassear el middleware de Supabase para el portal de calificaciones (usa su propio JWT)
+  if (isConsultaCalificaciones) {
+    return response
+  }
+
   if (isDemoMode) {
     const demoSessionCookie = request.cookies.get('aulaensuny-demo-session')
     const session = demoSessionCookie ? JSON.parse(demoSessionCookie.value) : null

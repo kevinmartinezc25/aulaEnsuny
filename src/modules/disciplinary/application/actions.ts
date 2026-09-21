@@ -665,9 +665,9 @@ export async function getTeacherAssignedGroups(): Promise<{ id: string, name: st
     const adminClient = createAdminClient()
 
     const { data, error } = await adminClient
-      .from('sch_curriculum')
-      .select('group_id, sch_groups(id, name, level)')
-      .eq('teacher_id', user.id)
+      .from('academic_assignments')
+      .select('group:sch_groups!inner(id, name, level), teacher:academic_teachers!inner(profile_id)')
+      .eq('teacher.profile_id', user.id)
 
     if (error) throw error
 
@@ -675,7 +675,7 @@ export async function getTeacherAssignedGroups(): Promise<{ id: string, name: st
     const groupsMap = new Map<string, { id: string, name: string, level: string }>()
     
     data?.forEach((row: any) => {
-      const g = row.sch_groups
+      const g = row.group
       if (g && !Array.isArray(g)) {
         groupsMap.set(g.id, { id: g.id, name: g.name, level: g.level || '' })
       }

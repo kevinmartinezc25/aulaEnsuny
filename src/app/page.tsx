@@ -233,10 +233,10 @@ export default function LandingPage() {
                 </Button>
               </Link>
 
-              {/* Botón Acceder a mi cuenta */}
+              {/* Botón Acceder a mi cuenta (Docentes/Admin) */}
               <Link href="/login" className="w-full sm:w-auto">
                 <Button className="w-full sm:w-auto rounded-2xl bg-[#1F4E31] hover:bg-[#183e27] text-white font-semibold text-sm px-6 h-12 shadow-sm shadow-emerald-950/20 active:scale-[0.98] duration-100 ease-out dark:bg-slate-800 dark:hover:bg-slate-700 cursor-pointer flex items-center justify-center gap-2">
-                  <span>Acceder a mi cuenta</span>
+                  <span>Docentes / Administrativos</span>
                   <ArrowRight className="h-4 w-4 opacity-70" />
                 </Button>
               </Link>

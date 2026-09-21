@@ -22,6 +22,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://aula.ensuny.edu.co'),
   title: "aulaEnsuny - Sistema de Gestión Escolar",
   description: "Sistema de gestión escolar aulaEnsuny. Plataforma educativa integral para estudiantes, docentes y administradores de la Institución Educativa Escuela Normal Superior del Nordeste.",
   applicationName: "aulaEnsuny",
