@@ -2329,15 +2329,25 @@ export async function getScheduleSlotsAction(entityType?: 'group' | 'teacher', e
 
     if (overrideSlots && overrideSlots.length > 0) {
       // Si hay novedades para hoy, reemplazamos las clases regulares de ese dia
-      const todayDayOfWeek = overrideSlots[0].day_of_week
+      const normalizeDay = (day: any): string => {
+        if (!day) return ''
+        const d = day.toString().trim()
+        const map: Record<string, string> = {
+          'lunes': '1', 'martes': '2', 'miércoles': '3', 'miercoles': '3', 'jueves': '4', 'viernes': '5',
+          '1': '1', '2': '2', '3': '3', '4': '4', '5': '5'
+        }
+        return map[d.toLowerCase()] || d
+      }
+
+      const todayDayOfWeek = normalizeDay(overrideSlots[0].day_of_week)
       
-      const filteredRegular = (regularSlots || []).filter(s => s.day_of_week !== todayDayOfWeek)
+      const filteredRegular = (regularSlots || []).filter(s => normalizeDay(s.day_of_week) !== todayDayOfWeek)
       
       const mappedOverrides = overrideSlots.map(s => {
         // Buscar si existe una clase regular exactamente igual en el mismo periodo
         const isIdentical = (regularSlots || []).some(r => 
-          r.day_of_week === s.day_of_week &&
-          r.period_id === s.period_id &&
+          normalizeDay(r.day_of_week) === normalizeDay(s.day_of_week) &&
+          r.period_id?.toString() === s.period_id?.toString() &&
           r.teacher_id === s.teacher_id &&
           r.subject_id === s.subject_id &&
           r.group_id === s.group_id &&
