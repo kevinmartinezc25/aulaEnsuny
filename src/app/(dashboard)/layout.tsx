@@ -14,6 +14,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { logout } from '@/modules/auth/application/actions'
 import { createClient } from '@/core/config/supabase/client'
 import { PendingPermissionsAlertModal } from '@/modules/permissions/presentation/components/PendingPermissionsAlertModal'
+import { PushNotificationPrompt } from '@/components/notifications/PushNotificationPrompt'
 
 // ─── Admin Sidebar (grouped sections) ──────────────────────────────────────────
 const ADMIN_NAV = [
@@ -114,7 +115,7 @@ function AdminSidebar({ onClose, user, enabledModules = [], isCollapsed = false 
     } else {
       items = items.filter(item => {
         const key = item.href.split('/').pop()!
-        if (key === 'dashboard') return true
+        if (key === 'dashboard' || key === 'notifications') return true
         return enabledModules.includes(key)
       })
     }
@@ -727,11 +728,56 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const [notifications, setNotifications] = useState<any[]>([])
 
+  useEffect(() => {
+    async function loadInAppNotifications() {
+      if (!user?.id) return;
+      
+      try {
+        const response = await fetch(`/api/notifications/inbox?userId=${user.id}`);
+        if (!response.ok) throw new Error('Network error');
+        
+        const { data, error } = await response.json();
+        
+        if (error) {
+          console.error('Error fetching in-app notifications:', error);
+          return;
+        }
+
+        if (data) {
+          const formatted = data.map((d: any) => ({
+            id: d.id,
+            title: d.title,
+            message: d.message,
+            time: new Date(d.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            read: !!d.read_at,
+            type: d.type,
+          }));
+          setNotifications(formatted);
+        }
+      } catch (err) {
+        console.error('Fetch notification error:', err);
+      }
+    }
+
+    loadInAppNotifications();
+    
+    // Configurar recarga periódica de notificaciones
+    const interval = setInterval(loadInAppNotifications, 30000); // 30s
+    return () => clearInterval(interval);
+  }, [user]);
+
   const unreadCount = notifications.filter(n => !n.read).length
 
-  const markAllNotificationsAsRead = () => {
+  const markAllNotificationsAsRead = async () => {
+    if (!user?.id) return;
     const updated = notifications.map(n => ({ ...n, read: true }))
     setNotifications(updated)
+    
+    const supabase = createClient();
+    await supabase.from('push_notification_deliveries')
+      .update({ read_at: new Date().toISOString() })
+      .eq('user_id', user.id)
+      .is('read_at', null);
     const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL ||
                        process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
     if (isDemoMode && typeof window !== 'undefined') {
@@ -739,9 +785,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }
 
-  const markNotificationAsRead = (id: any) => {
+  const markNotificationAsRead = async (id: any) => {
+    if (!user?.id) return;
     const updated = notifications.map(n => n.id === id ? { ...n, read: true } : n)
     setNotifications(updated)
+    
+    const supabase = createClient();
+    await supabase.from('push_notification_deliveries')
+      .update({ read_at: new Date().toISOString() })
+      .eq('id', id);
     const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL ||
                        process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
     if (isDemoMode && typeof window !== 'undefined') {

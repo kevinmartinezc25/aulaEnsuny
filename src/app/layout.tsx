@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "sonner";
 import { PwaManager } from "@/components/pwa/PwaManager";
+import { PushNotificationPrompt } from "@/components/notifications/PushNotificationPrompt";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -86,6 +87,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col overflow-x-hidden">
         {children}
         <PwaManager />
+        <PushNotificationPrompt />
         <Toaster position="bottom-right" richColors closeButton />
       </body>
     </html>
