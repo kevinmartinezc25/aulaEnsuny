@@ -2,15 +2,20 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createAdminClient } from '@/core/config/supabase/server';
 import webPush from 'web-push';
 
-// Configurar web-push con las llaves VAPID
-webPush.setVapidDetails(
-  'mailto:soporte@ensuny.edu.co',
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY as string,
-  process.env.VAPID_PRIVATE_KEY as string
-);
-
 export async function POST(req: NextRequest) {
   try {
+    // Configurar web-push con las llaves VAPID de manera segura (solo si existen para que el build en Vercel no crashee)
+    const vapidPublic = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    const vapidPrivate = process.env.VAPID_PRIVATE_KEY;
+    
+    if (vapidPublic && vapidPrivate) {
+      webPush.setVapidDetails(
+        'mailto:soporte@ensuny.edu.co',
+        vapidPublic,
+        vapidPrivate
+      );
+    }
+
     const supabase = await createClient();
     const adminSupabase = createAdminClient();
     
