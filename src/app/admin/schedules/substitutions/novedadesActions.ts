@@ -142,3 +142,26 @@ export async function importDailyNovedadesXML(parsedData: AscParsedData, targetD
     throw new Error(error.message)
   }
 }
+
+export async function deleteDailyNovedades(targetDateStr: string) {
+  const supabase = await createClient()
+  const adminClient = await createAdminClient()
+  
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error("No autorizado.")
+
+    const { error } = await adminClient
+      .from('sch_daily_overrides')
+      .delete()
+      .eq('target_date', targetDateStr)
+
+    if (error) {
+      throw new Error(`Error al eliminar las novedades: ${error.message}`)
+    }
+
+    return { success: true }
+  } catch (error: any) {
+    throw new Error(error.message)
+  }
+}
