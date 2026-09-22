@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/core/config/supabase/client'
 import { getScheduleSlotsAction } from '@/modules/admin/application/actions'
-import { Loader2, CalendarX2 } from 'lucide-react'
+import { Loader2, CalendarX2, AlertCircle } from 'lucide-react'
 import { generateTimeSlots } from '@/app/admin/schedules/utils/timeCalculator'
 import PrintableSchedule from '@/app/admin/schedules/components/PrintableSchedule'
 import DayTabsScheduleView, { ScheduleData, ScheduleDayKey } from '@/components/schedule/DayTabsScheduleView'
@@ -118,7 +118,8 @@ export default function StaticScheduleGrid({
                 group: cls.labelSubtitle === 'Jornada Institucional' ? 'Jornada Institucional' : cls.labelSubtitle,
                 location: cls.room || '',
                 color: cls.isJornada ? '#f59e0b' : (cls.color || '#4f46e5'),
-                isFree: false
+                isFree: false,
+                isNovedad: cls.isNovedad
               })
               p += dur
               continue
@@ -156,7 +157,8 @@ export default function StaticScheduleGrid({
             group: undefined,
             location: c.room || '',
             color: c.color || '#4f46e5',
-            isFree: false
+            isFree: false,
+            isNovedad: c.isNovedad
           })
         })
       }
@@ -258,7 +260,8 @@ export default function StaticScheduleGrid({
           teachers: [],
           groups: [],
           color: d.subject?.color || '#ffffff',
-          room: d.classroom?.name || ''
+          room: d.classroom?.name || '',
+          isNovedad: d.isNovedad || false
         })
       }
       const item = groupedSlots.get(slotKey)!
@@ -297,7 +300,8 @@ export default function StaticScheduleGrid({
         ...item,
         labelTitle,
         labelSubtitle,
-        isJornada
+        isJornada,
+        isNovedad: item.isNovedad
       }
     })
     
@@ -416,6 +420,11 @@ export default function StaticScheduleGrid({
                       className={`absolute left-0 top-0 bottom-0 w-[3.5px] rounded-l-lg ${cls.isJornada ? 'bg-amber-400' : ''}`}
                       style={cls.isJornada ? {} : { backgroundColor: cls.color || '#cbd5e1' }}
                     />
+                    {cls.isNovedad && (
+                      <div className="absolute top-0 right-0 p-1" title="Horario con Novedad">
+                        <AlertCircle className="w-3 h-3 text-amber-500 bg-white dark:bg-slate-900 rounded-full" />
+                      </div>
+                    )}
                     <div className="flex-1 flex flex-col justify-center items-center text-center px-1 pl-2 overflow-hidden">
                       {entityType === 'teacher' ? (
                         <div className="w-full h-full flex flex-col justify-center items-center py-0.5">

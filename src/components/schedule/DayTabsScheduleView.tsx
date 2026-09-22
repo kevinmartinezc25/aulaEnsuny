@@ -33,6 +33,7 @@ export interface ScheduleItem {
   status?: ScheduleStatus
   color?: string
   isFree?: boolean
+  isNovedad?: boolean
 }
 
 export type ScheduleDayKey = 'lunes' | 'martes' | 'miercoles' | 'jueves' | 'viernes' | 'sabado'
@@ -445,16 +446,23 @@ export default function DayTabsScheduleView({
 
                 <div className="p-4 sm:p-5 pl-5 sm:pl-6 flex items-center justify-between gap-3 min-h-[110px]">
                   <div className="flex-1 flex flex-col justify-between gap-2 min-w-0">
-                    {/* Fila Superior: Badge Hora + Rango Horario + Badge Estado */}
+                    {/* Fila Superior: Badge Hora + Rango Horario + Badge Estado + Badge Novedad */}
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-black uppercase tracking-tight bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200/70 dark:border-indigo-800/70 shrink-0 shadow-xs">
                         {hourLabel}
                       </span>
-
+                      
                       <div className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-slate-500 dark:text-slate-400">
                         <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                         <span>{item.startTime}{item.endTime ? ` – ${item.endTime}` : ''}</span>
                       </div>
+
+                      {item.isNovedad && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-700/60 ml-2">
+                          <AlertCircle className="w-3 h-3" /> Horario Novedad
+                        </span>
+                      )}
+
 
                       {isOngoing && (
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 animate-pulse">

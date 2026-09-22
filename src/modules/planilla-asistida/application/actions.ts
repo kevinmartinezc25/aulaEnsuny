@@ -498,31 +498,100 @@ export async function addDirectoryStudents(subjectId: string, students: { full_n
   
   const supabase = await createClient()
   
-  // Get max number
-  const { data: currentStudents } = await supabase
+  // 1. Obtener estudiantes actuales de la base de datos
+  const { data: currentStudents, error: fetchError } = await supabase
     .from('assisted_students')
-    .select('number')
+    .select('id, full_name, directory_id, number')
     .eq('subject_id', subjectId)
-    .order('number', { ascending: false })
-    .limit(1)
     
-  let startNum = (currentStudents && currentStudents.length > 0) ? currentStudents[0].number + 1 : 1
+  if (fetchError) throw new Error('Error al obtener estudiantes actuales')
+    
+  const allStudents: Array<{
+    id: string;
+    full_name: string;
+    directory_id: string | null;
+    number: number;
+    isNew?: boolean;
+  }> = [...(currentStudents || [])]
+  const existingDirIds = new Set(allStudents.filter(s => s.directory_id).map(s => s.directory_id))
   
-  const toInsert = students.map(s => ({
-    subject_id: subjectId,
-    full_name: s.full_name,
-    directory_id: s.directory_id,
-    number: startNum++
-  }))
+  // 2. Combinar y desduplicar preventivamente
+  const newStudentsToInsert: any[] = []
   
-  const { data, error } = await supabase
+  for (const s of students) {
+    if (s.directory_id && existingDirIds.has(s.directory_id)) {
+      continue // Evitar duplicar si ya existe en la materia
+    }
+    
+    const newStudent = {
+      subject_id: subjectId,
+      full_name: s.full_name.trim().toUpperCase(),
+      directory_id: s.directory_id,
+      number: 0, // Placeholder, se reordenará después
+      id: crypto.randomUUID(), // Temporario para manejar diferencias en array
+      isNew: true
+    }
+    allStudents.push(newStudent)
+    newStudentsToInsert.push(newStudent)
+  }
+  
+  // 3. Ordenar todo el array alfabéticamente
+  allStudents.sort((a, b) => {
+    const normalize = (name: string) => name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+    const nameA = normalize(a.full_name)
+    const nameB = normalize(b.full_name)
+    return nameA.localeCompare(nameB, 'es')
+  })
+  
+  // 4. Asignar números de lista de 1 a N
+  const updates: any[] = []
+  const inserts: any[] = []
+  
+  allStudents.forEach((student, index) => {
+    const newNumber = index + 1
+    
+    if (student.isNew) {
+      inserts.push({
+        subject_id: subjectId,
+        full_name: student.full_name,
+        directory_id: student.directory_id,
+        number: newNumber
+      })
+    } else {
+      if (student.number !== newNumber) {
+        updates.push(
+          supabase
+            .from('assisted_students')
+            .update({ number: newNumber })
+            .eq('id', student.id)
+        )
+      }
+    }
+  })
+  
+  // 5. Ejecutar operaciones BDD
+  if (inserts.length > 0) {
+    const { error: insertError } = await supabase
+      .from('assisted_students')
+      .insert(inserts)
+    
+    if (insertError) throw new Error('Error al insertar nuevos estudiantes: ' + insertError.message)
+  }
+  
+  if (updates.length > 0) {
+    await Promise.all(updates)
+  }
+  
+  // 6. Retornar todos los estudiantes ordenados
+  const { data: freshStudents, error: fetchFreshError } = await supabase
     .from('assisted_students')
-    .insert(toInsert)
     .select('*')
+    .eq('subject_id', subjectId)
+    .order('number', { ascending: true })
     
-  if (error) throw new Error('Error al añadir estudiantes desde el directorio: ' + error.message)
-  
-  return data.map(d => ({
+  if (fetchFreshError) throw new Error('Error al recargar la planilla')
+    
+  return freshStudents.map(d => ({
     id: d.id,
     subject_id: d.subject_id,
     full_name: d.full_name,
