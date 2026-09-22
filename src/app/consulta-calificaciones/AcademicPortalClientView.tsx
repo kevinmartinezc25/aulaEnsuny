@@ -104,8 +104,8 @@ export function AcademicPortalClientView({
           >
             <div className="pointer-events-none absolute -top-24 -right-24 w-60 h-60 rounded-full bg-emerald-500/10 blur-[80px]" />
 
-            <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
-              <div className="space-y-2">
+            <div className="relative z-10 flex flex-col items-center justify-center text-center gap-5 sm:gap-6">
+              <div className="space-y-3 flex flex-col items-center">
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[#1F4E31] dark:text-emerald-300 text-[11px] sm:text-xs font-bold uppercase tracking-wider">
                   <Sparkles className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
                   <span>Portal de Consulta Académica</span>
@@ -119,7 +119,7 @@ export function AcademicPortalClientView({
               </div>
 
               {/* Fichas informativas de matrícula (Grupo, Jornada, Año) */}
-              <div className="flex flex-wrap items-center gap-2 sm:gap-2.5" suppressHydrationWarning>
+              <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-2.5" suppressHydrationWarning>
                 <div className="flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-white/80 dark:bg-slate-800/80 border border-slate-200/60 dark:border-white/5 text-xs font-semibold text-slate-700 dark:text-slate-200 shadow-xs">
                   <Users className="h-4 w-4 text-[#1F4E31] dark:text-emerald-400" />
                   <span>Grupo Matriculado: <strong className="text-slate-900 dark:text-white">{groupDisplay}</strong></span>
@@ -148,15 +148,17 @@ export function AcademicPortalClientView({
               className="group relative flex flex-col justify-between rounded-[28px] bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-white/10 p-6 sm:p-8 shadow-[0_10px_30px_rgba(0,0,0,0.03)] hover:shadow-[0_20px_40px_rgba(0,0,0,0.08)] dark:shadow-none hover:border-emerald-500/40 transition-all duration-200"
             >
               <div className="space-y-4">
-                <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 dark:bg-emerald-500/20 border border-emerald-500/20 flex items-center justify-center text-[#1F4E31] dark:text-emerald-400 group-hover:scale-105 transition-transform duration-200">
-                  <GraduationCap className="w-7 h-7" />
+                <div className="flex items-center gap-4">
+                  <div className="shrink-0 w-14 h-14 rounded-2xl bg-emerald-500/10 dark:bg-emerald-500/20 border border-emerald-500/20 flex items-center justify-center text-[#1F4E31] dark:text-emerald-400 group-hover:scale-105 transition-transform duration-200">
+                    <GraduationCap className="w-7 h-7" />
+                  </div>
+                  <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                    Calificaciones
+                  </h2>
                 </div>
 
                 <div>
-                  <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
-                    <span>📊 Calificaciones</span>
-                  </h2>
-                  <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
+                  <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
                     Consulta tus resultados académicos por período, área, asignatura y logro.
                   </p>
                 </div>
@@ -190,15 +192,17 @@ export function AcademicPortalClientView({
               className="group relative flex flex-col justify-between rounded-[28px] bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-white/10 p-6 sm:p-8 shadow-[0_10px_30px_rgba(0,0,0,0.03)] hover:shadow-[0_20px_40px_rgba(0,0,0,0.08)] dark:shadow-none hover:border-emerald-500/40 transition-all duration-200"
             >
               <div className="space-y-4">
-                <div className="w-14 h-14 rounded-2xl bg-teal-500/10 dark:bg-teal-500/20 border border-teal-500/20 flex items-center justify-center text-teal-700 dark:text-teal-400 group-hover:scale-105 transition-transform duration-200">
-                  <Calendar className="w-7 h-7" />
+                <div className="flex items-center gap-4">
+                  <div className="shrink-0 w-14 h-14 rounded-2xl bg-teal-500/10 dark:bg-teal-500/20 border border-teal-500/20 flex items-center justify-center text-teal-700 dark:text-teal-400 group-hover:scale-105 transition-transform duration-200">
+                    <Calendar className="w-7 h-7" />
+                  </div>
+                  <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                    Mi Horario
+                  </h2>
                 </div>
 
                 <div>
-                  <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
-                    <span>🗓 Mi Horario</span>
-                  </h2>
-                  <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
+                  <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
                     Consulta el horario correspondiente al grupo en el que estás matriculado.
                   </p>
                 </div>

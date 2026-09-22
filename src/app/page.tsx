@@ -196,22 +196,15 @@ export default function LandingPage() {
       {/* Contenido Principal */}
       <main className="relative z-10 mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 pt-20 sm:pt-32 pb-20">
         {/* ── Sección Hero ── */}
-        <section className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center mb-24 sm:mb-28">
-          {/* Columna Izquierda: Mensaje y Llamada a la Acción */}
+        <section className="flex flex-col items-center justify-center text-center max-w-4xl mx-auto mb-24 sm:mb-28 pt-8">
           <motion.div
             initial={{ opacity: 0, y: shouldReduceMotion ? 0 : 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ type: 'spring', damping: 26, stiffness: 220, mass: 0.9 }}
-            className="lg:col-span-6 space-y-6 text-center lg:text-left"
+            className="space-y-6 sm:space-y-8 w-full"
           >
-            {/* Pill Chip Apple */}
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[#1F4E31] dark:text-emerald-300 text-xs font-semibold tracking-wide backdrop-blur-md shadow-sm">
-              <Sparkles className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-              <span>Plataforma Educativa Oficial ENSUNY</span>
-            </div>
-
             {/* Titular Principal Display */}
-            <h1 className="text-4xl sm:text-5xl lg:text-[56px] font-extrabold tracking-[-0.03em] leading-[1.08] text-slate-900 dark:text-white">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-[-0.03em] leading-[1.1] text-slate-900 dark:text-white max-w-3xl mx-auto">
               Aprender, gestionar y crecer en{' '}
               <span className="bg-gradient-to-r from-emerald-600 via-[#1F4E31] to-teal-700 dark:from-emerald-400 dark:via-emerald-300 dark:to-teal-400 bg-clip-text text-transparent">
                 un solo lugar.
@@ -219,167 +212,47 @@ export default function LandingPage() {
             </h1>
 
             {/* Subtítulo */}
-            <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 max-w-lg mx-auto lg:mx-0 leading-relaxed font-normal">
-              Ecosistema escolar diseñado para la Escuela Normal Superior del Nordeste. Seguimiento de notas, gestión académica y acceso directo a lecciones.
+            <p className="text-sm sm:text-lg text-slate-600 dark:text-slate-300 max-w-2xl mx-auto leading-relaxed font-normal">
+              Ecosistema escolar diseñado para la Escuela Normal Superior del Nordeste. Seguimiento de notas, gestión académica y acceso directo a tu horario.
             </p>
 
-            {/* ── Dos Accesos Principales del Landing ── */}
-            <div className="space-y-4 pt-3 max-w-xl mx-auto lg:mx-0 text-left">
-              {/* Opción 1: INGRESAR A AULAENSUNY (Campus Completo) */}
-              <div className="group relative rounded-3xl bg-white/90 dark:bg-slate-900/90 border border-slate-200/90 dark:border-white/10 p-5 sm:p-6 shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-none hover:border-emerald-500/40 transition-all duration-200 backdrop-blur-xl">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-base sm:text-lg">🔐</span>
-                      <h2 className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white tracking-tight uppercase">
-                        Ingresar a aulaEnsuny
-                      </h2>
-                    </div>
-                    <p className="text-xs sm:text-[13px] text-slate-500 dark:text-slate-400 leading-relaxed">
-                      Accede a tus cursos, calificaciones, horario y servicios institucionales.
-                    </p>
-                  </div>
+            {/* Accesos Simplificados (Botones) */}
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-6 max-w-xl mx-auto">
+              <Link href="/login" className="w-full sm:w-auto">
+                <Button className="w-full sm:w-auto rounded-2xl bg-[#1F4E31] hover:bg-[#183e27] text-white font-bold text-sm px-8 h-14 shadow-sm shadow-emerald-950/20 active:scale-[0.98] duration-100 ease-out dark:bg-emerald-600 dark:hover:bg-emerald-700 cursor-pointer flex items-center justify-center gap-2">
+                  <span>Iniciar Sesión</span>
+                  <ArrowRight className="h-5 w-5 opacity-80" />
+                </Button>
+              </Link>
+              
+              <Link href="/consulta-calificaciones" className="w-full sm:w-auto">
+                <Button variant="outline" className="w-full sm:w-auto rounded-2xl border-2 border-emerald-200 dark:border-emerald-800/60 bg-emerald-50/50 hover:bg-emerald-100/50 dark:bg-slate-900/50 dark:hover:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 font-bold text-sm px-8 h-14 active:scale-[0.98] duration-100 ease-out cursor-pointer flex items-center justify-center gap-2 transition-all">
+                  <GraduationCap className="h-5 w-5" />
+                  <span>Consulta Académica</span>
+                </Button>
+              </Link>
+            </div>
 
-                  <Link href="/login" className="shrink-0 w-full sm:w-auto">
-                    <Button className="w-full sm:w-auto rounded-2xl bg-[#1F4E31] hover:bg-[#183e27] text-white font-bold text-xs sm:text-sm px-5 h-11 shadow-sm shadow-emerald-950/20 active:scale-[0.98] duration-100 ease-out dark:bg-emerald-600 dark:hover:bg-emerald-700 cursor-pointer flex items-center justify-center gap-2">
-                      <span>Ingresar</span>
-                      <ArrowRight className="h-4 w-4 opacity-80" />
-                    </Button>
-                  </Link>
-                </div>
-
-                {/* Sub-opción integrada: Registro de Estudiantes */}
-                <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-                  <span className="text-slate-500 dark:text-slate-400">
-                    ¿Eres estudiante y aún no tienes una cuenta?
-                  </span>
-                  <Link
-                    href="/register/student"
-                    className="font-bold text-[#1F4E31] hover:text-[#153823] dark:text-emerald-400 dark:hover:text-emerald-300 underline underline-offset-4 active:scale-95 transition-all self-start sm:self-auto"
-                  >
-                    Crear acceso de estudiante
-                  </Link>
-                </div>
-              </div>
-
-              {/* Opción 2: CONSULTA ACADÉMICA (Acceso Simplificado por Documento) */}
-              <div className="group relative rounded-3xl bg-gradient-to-r from-emerald-50/70 via-teal-50/50 to-white/90 dark:from-emerald-950/20 dark:via-slate-900/90 dark:to-slate-900/90 border border-emerald-500/30 dark:border-emerald-500/20 p-5 sm:p-6 shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-none hover:border-emerald-500/50 transition-all duration-200 backdrop-blur-xl">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-base sm:text-lg">📚</span>
-                      <h2 className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white tracking-tight uppercase">
-                        Consulta Académica
-                      </h2>
-                    </div>
-                    <p className="text-xs sm:text-[13px] text-slate-600 dark:text-slate-300 leading-relaxed">
-                      Consulta tus calificaciones y el horario de tu grupo.
-                    </p>
-                  </div>
-
-                  <Link href="/consulta-calificaciones" className="shrink-0 w-full sm:w-auto">
-                    <Button className="w-full sm:w-auto rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-bold text-xs sm:text-sm px-5 h-11 shadow-md shadow-emerald-600/20 active:scale-[0.98] duration-100 ease-out cursor-pointer flex items-center justify-center gap-2 border border-emerald-400/30">
-                      <GraduationCap className="h-4 w-4 text-emerald-100" />
-                      <span>Consultar</span>
-                    </Button>
-                  </Link>
-                </div>
-              </div>
+            {/* Enlace de Registro sutil inferior */}
+            <div className="pt-2">
+              <Link
+                href="/register/student"
+                className="text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-[#1F4E31] dark:hover:text-emerald-400 transition-colors underline underline-offset-4"
+              >
+                Solicita tu acceso al campus virtual aquí
+              </Link>
             </div>
 
             {/* Garantías o Micro-detalles */}
-            <div className="pt-2 flex items-center justify-center lg:justify-start gap-6 text-xs text-slate-500 dark:text-slate-400 font-medium">
+            <div className="pt-8 flex flex-wrap items-center justify-center gap-6 text-xs sm:text-sm text-slate-400 dark:text-slate-500 font-medium">
               <span className="flex items-center gap-1.5">
-                <ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                <ShieldCheck className="h-4 w-4 text-emerald-600/70 dark:text-emerald-400/70" />
                 Seguridad institucional
               </span>
               <span className="flex items-center gap-1.5">
-                <Award className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                <Award className="h-4 w-4 text-emerald-600/70 dark:text-emerald-400/70" />
                 Acreditación ENSUNY
               </span>
-            </div>
-          </motion.div>
-
-          {/* Columna Derecha: Mockup Vidrio Multicapa (Apple Glass Preview) */}
-          <motion.div
-            initial={{ opacity: 0, scale: shouldReduceMotion ? 1 : 0.96 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ type: 'spring', damping: 24, stiffness: 220, mass: 0.9, delay: 0.1 }}
-            className="lg:col-span-6 flex justify-center lg:justify-end"
-          >
-            <div className="relative w-full max-w-[480px] rounded-[32px] border border-white/80 dark:border-white/10 bg-white/80 dark:bg-slate-900/80 p-5 sm:p-6 shadow-[0_25px_60px_rgba(0,0,0,0.07),0_1px_3px_rgba(0,0,0,0.04)] dark:shadow-[0_25px_60px_rgba(0,0,0,0.45)] backdrop-blur-2xl overflow-hidden">
-              {/* Línea de luz especular superior */}
-              <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white dark:via-white/20 to-transparent" />
-
-              {/* Cabecera del mockup */}
-              <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-white/5 pb-3 mb-4">
-                <div className="flex items-center gap-1.5">
-                  <div className="h-2.5 w-2.5 rounded-full bg-slate-300 dark:bg-slate-700" />
-                  <div className="h-2.5 w-2.5 rounded-full bg-slate-300 dark:bg-slate-700" />
-                  <div className="h-2.5 w-2.5 rounded-full bg-slate-300 dark:bg-slate-700" />
-                  <span className="text-[11px] text-slate-400 font-medium ml-2">Panel del Estudiante</span>
-                </div>
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  En línea
-                </span>
-              </div>
-
-              {/* Cuerpo del Mockup */}
-              <div className="space-y-3.5">
-                {/* Perfil del estudiante */}
-                <div className="flex items-center justify-between bg-slate-100/60 dark:bg-slate-800/40 p-3.5 rounded-2xl border border-slate-200/50 dark:border-white/5">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-emerald-500 to-[#1F4E31] flex items-center justify-center text-white font-bold text-xs shadow-sm shadow-emerald-950/20">
-                      AM
-                    </div>
-                    <div>
-                      <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">García Ana María</p>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400">Grado 11° - Grupo 1</p>
-                    </div>
-                  </div>
-                  <span className="text-[10px] font-semibold px-2.5 py-1 rounded-xl bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 shadow-xs border border-slate-200/60 dark:border-white/10">
-                    Periodo II
-                  </span>
-                </div>
-
-                {/* Barra de progreso de materia */}
-                <div className="bg-slate-100/60 dark:bg-slate-800/40 p-3.5 rounded-2xl border border-slate-200/50 dark:border-white/5 space-y-2">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="font-semibold text-slate-700 dark:text-slate-300">Física General & Mecánica</span>
-                    <span className="font-bold text-[#1F4E31] dark:text-emerald-400">88%</span>
-                  </div>
-                  <div className="h-2 w-full bg-slate-200/70 dark:bg-slate-800 rounded-full overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-emerald-500 to-[#1F4E31] rounded-full w-[88%]" />
-                  </div>
-                  <div className="flex justify-between text-[10px] text-slate-400 pt-0.5">
-                    <span>Módulo 4 de 5 completado</span>
-                    <span className="text-emerald-600 dark:text-emerald-400 font-medium">Al día</span>
-                  </div>
-                </div>
-
-                {/* Tarjetas métricas rápidas */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-slate-100/60 dark:bg-slate-800/40 p-3.5 rounded-2xl border border-slate-200/50 dark:border-white/5 space-y-0.5">
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold tracking-wider block">
-                      Promedio
-                    </span>
-                    <span className="text-lg font-bold text-slate-900 dark:text-white">4.8 / 5.0</span>
-                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium block">
-                      Desempeño Superior
-                    </span>
-                  </div>
-                  <div className="bg-slate-100/60 dark:bg-slate-800/40 p-3.5 rounded-2xl border border-slate-200/50 dark:border-white/5 space-y-0.5">
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold tracking-wider block">
-                      Asistencia
-                    </span>
-                    <span className="text-lg font-bold text-slate-900 dark:text-white">99.2%</span>
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium block">
-                      0 fallas sin justificar
-                    </span>
-                  </div>
-                </div>
-              </div>
             </div>
           </motion.div>
         </section>
