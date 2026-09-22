@@ -25,6 +25,7 @@ const SIDEBAR_ITEMS = [
   { name: 'Horarios', href: '/admin/schedules', query: null, icon: CalendarDays, color: 'text-blue-500 dark:text-blue-400' },
   { name: 'Grupos', href: '/admin/schedules/groups', query: null, icon: Users, color: 'text-orange-500 dark:text-orange-400' },
   { name: 'Docentes', href: '/admin/schedules/teachers', query: null, icon: UserCog, color: 'text-emerald-500 dark:text-emerald-400' },
+  { name: 'Materias', href: '/admin/schedules/subjects', query: null, icon: BookOpen, color: 'text-purple-500 dark:text-purple-400' },
   { name: 'Horario (Novedades)', href: '/admin/schedules/substitutions', query: null, icon: UserMinus, color: 'text-amber-500 dark:text-amber-400' },
   { name: 'Ajustes', href: '/admin/schedules/settings', query: null, icon: Settings2, color: 'text-slate-500 dark:text-slate-400' },
 ]

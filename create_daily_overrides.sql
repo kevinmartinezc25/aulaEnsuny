@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS public.sch_daily_overrides (
     day_of_week INT NOT NULL,
     period_id TEXT NOT NULL,
     duration INT DEFAULT 1,
-    classroom TEXT,
+    classroom_id UUID REFERENCES sch_classrooms(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

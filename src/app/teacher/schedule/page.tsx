@@ -68,8 +68,9 @@ export default function TeacherSchedulePage() {
       // Fetch workload details (Carga Académica desde Master Data)
       const { data: curriculumRows } = await supabase
         .from('academic_assignments')
-        .select('hours_per_week, sch_groups!inner(name, level), sch_subjects!inner(name), academic_teachers!inner(profile_id)')
+        .select('hours_per_week, sch_groups!inner(name, level), sch_subjects!inner(name, is_academic_workload), academic_teachers!inner(profile_id)')
         .eq('academic_teachers.profile_id', user.id)
+        .eq('sch_subjects.is_academic_workload', true)
 
       if (curriculumRows) {
         const details = curriculumRows.map((row: any) => ({
@@ -196,18 +197,7 @@ export default function TeacherSchedulePage() {
                 <span className="hidden md:inline">Carga Académica</span>
               </button>
 
-              {/* 4. Emergencia */}
-              <button
-                onClick={() => setActiveTab('emergency')}
-                className={`py-1.5 md:py-1 px-1 sm:px-3 text-[11px] sm:text-xs font-bold rounded-lg transition-all text-center select-none flex items-center justify-center ${
-                  activeTab === 'emergency'
-                    ? 'bg-orange-500 text-white shadow-xs font-black'
-                    : 'text-orange-600 dark:text-orange-400 hover:bg-orange-50/50'
-                }`}
-              >
-                <span className="md:hidden">🚨 Alerta</span>
-                <span className="hidden md:inline">🚨 Emergencia</span>
-              </button>
+
             </div>
 
             {/* Selector de subgrupos si está en pestaña de grupo */}
@@ -246,7 +236,7 @@ export default function TeacherSchedulePage() {
                       ? `Horario ${directorGroups.find(g => g.id === activeGroupId)?.name || 'de Grupo'}`
                       : activeTab === 'workload'
                       ? 'Carga Académica'
-                      : 'Horario de Emergencia'
+                      : ''
                   }
                 </span>
               </button>

@@ -32,6 +32,7 @@ export async function importDailyNovedadesXML(parsedData: AscParsedData, targetD
     const { data: existingSubjects } = await adminClient.from('sch_subjects').select('id, name, external_id')
     const { data: existingGroups } = await adminClient.from('sch_groups').select('id, name, external_id')
     const { data: existingTeachers } = await adminClient.from('academic_teachers').select('id, full_name, external_id')
+    const { data: existingClassrooms } = await adminClient.from('sch_classrooms').select('id, name, short')
 
     // Diccionarios para búsqueda rápida
     const subByExtId = new Map(existingSubjects?.filter(s => s.external_id).map(s => [s.external_id, s.id]))
@@ -42,6 +43,12 @@ export async function importDailyNovedadesXML(parsedData: AscParsedData, targetD
 
     const tchByExtId = new Map(existingTeachers?.filter(t => t.external_id).map(t => [t.external_id, t.id]))
     const tchByName = new Map(existingTeachers?.map(t => [t.full_name.trim().toLowerCase(), t.id]))
+
+    const clsById = new Map(existingClassrooms?.map(c => [c.short, c.id])) // short acts as xml external_id sometimes or we can use name
+    // En aSc, el classroom_id que extrajimos es en realidad el id del xml. Pero en nuestra db sch_classrooms no hay external_id!
+    // Usaremos el name o el id
+    const clsByXmlId = new Map(parsedData.classrooms.map(c => [c.id, c.name.trim().toLowerCase()]))
+    const clsByName = new Map(existingClassrooms?.map(c => [c.name.trim().toLowerCase(), c.id]))
 
     // Para evitar errores en grupos institucionales
     const VIRTUAL_GROUP_EXT_ID = '__JORNADA_INSTITUCIONAL__'
@@ -80,6 +87,15 @@ export async function importDailyNovedadesXML(parsedData: AscParsedData, targetD
         }
       }
 
+      // Intentar mapear Aula
+      let cDbId = null
+      if (slot.classroom_id) {
+        const clsName = clsByXmlId.get(slot.classroom_id)
+        if (clsName) {
+          cDbId = clsByName.get(clsName)
+        }
+      }
+
       // Validar integridad mínima: Si no encontramos al docente o materia, contamos el error pero omitimos el slot o lo insertamos nulo
       // Para un horario de Novedad es crítico tener al docente.
       if (!tDbId) unmappedTeachers++
@@ -94,7 +110,7 @@ export async function importDailyNovedadesXML(parsedData: AscParsedData, targetD
           day_of_week: slot.day_of_week,
           period_id: slot.period.toString(),
           duration: 1, // aSc TimeTables export standard
-          classroom: slot.classroom_id || null
+          classroom_id: cDbId || null
         })
       }
     }
