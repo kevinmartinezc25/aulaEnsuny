@@ -20,6 +20,7 @@ import {
   GraduationCap
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { InstallPWA } from '@/components/InstallPWA'
 
 export default function LandingPage() {
   const [isDark, setIsDark] = useState<boolean>(false)
@@ -152,22 +153,6 @@ export default function LandingPage() {
 
           {/* Enlaces y Acciones */}
           <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
-            {/* Acceso rápido directo a Consulta Académica */}
-            <Link
-              href="/consulta-calificaciones"
-              className="hidden sm:inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-emerald-700 dark:text-emerald-300 hover:text-emerald-800 dark:hover:text-emerald-200 px-3.5 py-1.5 rounded-full bg-emerald-50 hover:bg-emerald-100/80 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/60 transition-all active:scale-95 duration-100 shadow-xs"
-            >
-              <GraduationCap className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-              <span>Consulta Académica</span>
-            </Link>
-
-            <Link
-              href="/docs"
-              className="hidden md:inline-flex items-center text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-300 hover:text-[#1F4E31] dark:hover:text-emerald-400 transition-colors active:scale-95 duration-100"
-            >
-              Documentación
-            </Link>
-
             {/* Alternador de tema */}
             <button
               onClick={toggleTheme}
@@ -242,6 +227,9 @@ export default function LandingPage() {
                 Solicita tu acceso al campus virtual aquí
               </Link>
             </div>
+
+            {/* Badges de Instalación PWA Promocionales */}
+            <InstallPWA />
 
             {/* Garantías o Micro-detalles */}
             <div className="pt-8 flex flex-wrap items-center justify-center gap-6 text-xs sm:text-sm text-slate-400 dark:text-slate-500 font-medium">
