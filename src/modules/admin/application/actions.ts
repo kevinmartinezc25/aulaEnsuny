@@ -2265,9 +2265,11 @@ export async function saveUserModulePermissions(
   }
 }
 
-export async function getScheduleSlotsAction(entityType?: 'group' | 'teacher', entityId?: string) {
+export async function getScheduleSlotsAction(entityType?: 'group' | 'teacher', entityId?: string, specificTargetDate?: string) {
   try {
-      const adminClient = createAdminClient()
+    const adminClient = createAdminClient()
+    
+    // 1. Obtener horario regular
     let query = adminClient
       .from('sch_schedule_slots')
       .select(`
@@ -2290,12 +2292,68 @@ export async function getScheduleSlotsAction(entityType?: 'group' | 'teacher', e
       query = query.eq('group_id', entityId)
     }
 
-    const { data, error } = await query
+    const { data: regularSlots, error } = await query
     if (error) {
       console.error('Error fetching schedule slots:', error)
       return []
     }
-    return data || []
+    
+    // 2. Obtener novedades de hoy
+    // Obtenemos la fecha actual en formato YYYY-MM-DD local (Bogotá/Lima/Quito)
+    const today = specificTargetDate || new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' }) 
+    
+    let overrideQuery = adminClient
+      .from('sch_daily_overrides')
+      .select(`
+        id,
+        day_of_week,
+        period_id,
+        duration,
+        group_id,
+        subject_id,
+        teacher_id,
+        group:sch_groups(id, name),
+        teacher:academic_teachers(id, full_name),
+        subject:sch_subjects(id, name, color, room_type),
+        classroom:sch_classrooms(id, name)
+      `)
+      .eq('target_date', today)
+
+    if (entityType === 'teacher' && entityId) {
+      overrideQuery = overrideQuery.eq('teacher_id', entityId)
+    } else if (entityType === 'group' && entityId) {
+      overrideQuery = overrideQuery.eq('group_id', entityId)
+    }
+
+    const { data: overrideSlots } = await overrideQuery
+
+    if (overrideSlots && overrideSlots.length > 0) {
+      // Si hay novedades para hoy, reemplazamos las clases regulares de ese dia
+      const todayDayOfWeek = overrideSlots[0].day_of_week
+      
+      const filteredRegular = (regularSlots || []).filter(s => s.day_of_week !== todayDayOfWeek)
+      
+      const mappedOverrides = overrideSlots.map(s => {
+        // Buscar si existe una clase regular exactamente igual en el mismo periodo
+        const isIdentical = (regularSlots || []).some(r => 
+          r.day_of_week === s.day_of_week &&
+          r.period_id === s.period_id &&
+          r.teacher_id === s.teacher_id &&
+          r.subject_id === s.subject_id &&
+          r.group_id === s.group_id &&
+          (r.classroom as any)?.name === (s.classroom as any)?.name
+        )
+
+        return {
+          ...s,
+          isNovedad: !isIdentical // Flag visual solo si hubo algún cambio real
+        }
+      })
+      
+      return [...filteredRegular, ...mappedOverrides]
+    }
+
+    return regularSlots || []
   } catch (err) {
     console.error('Error in getScheduleSlotsAction:', err)
     return []
