@@ -516,7 +516,7 @@ export default function StaticScheduleGrid({
 
   return (
     <>
-      <div className="flex-1 w-full overflow-y-auto lg:overflow-hidden custom-scrollbar flex flex-col p-1 sm:p-4 lg:p-0 print:hidden">
+      <div className="flex-1 min-h-0 w-full overflow-y-auto lg:overflow-hidden custom-scrollbar flex flex-col p-1 sm:p-4 lg:p-0 print:hidden">
         {renderMobileView()}
         {renderDesktopView()}
       </div>

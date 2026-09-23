@@ -244,7 +244,7 @@ export default function TeacherSchedulePage() {
           </div>
         </div>
 
-      <div className="flex-1 min-h-0 bg-white dark:bg-slate-900 overflow-hidden relative mt-2 md:rounded-2xl md:border border-slate-200 dark:border-slate-800 md:shadow-sm print:mt-0 print:border-none print:shadow-none print:overflow-visible print:h-auto">
+      <div className="flex-1 min-h-0 bg-white dark:bg-slate-900 overflow-hidden flex flex-col relative mt-2 md:rounded-2xl md:border border-slate-200 dark:border-slate-800 md:shadow-sm print:mt-0 print:border-none print:shadow-none print:overflow-visible print:h-auto">
         {activeTab === 'personal' && teacherProfile?.academic_teacher_id && (
           <StaticScheduleGrid 
             entityType="teacher"
@@ -273,7 +273,7 @@ export default function TeacherSchedulePage() {
         )}
         
         {activeTab === 'group' && directorGroups.length > 0 && activeGroupId && (
-          <div className="h-full print:h-auto print:overflow-visible">
+          <div className="flex-1 flex flex-col min-h-0 print:h-auto print:overflow-visible">
             <StaticScheduleGrid
               entityType="group"
               entityId={activeGroupId}
