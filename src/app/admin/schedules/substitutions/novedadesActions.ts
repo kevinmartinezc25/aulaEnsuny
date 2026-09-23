@@ -165,3 +165,26 @@ export async function deleteDailyNovedades(targetDateStr: string) {
     throw new Error(error.message)
   }
 }
+
+export async function checkDailyNovedadesCount(targetDateStr: string) {
+  const supabase = await createClient()
+  const adminClient = await createAdminClient()
+  
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return 0
+
+    const { count, error } = await adminClient
+      .from('sch_daily_overrides')
+      .select('*', { count: 'exact', head: true })
+      .eq('target_date', targetDateStr)
+
+    if (error) {
+      return 0
+    }
+
+    return count || 0
+  } catch (error: any) {
+    return 0
+  }
+}

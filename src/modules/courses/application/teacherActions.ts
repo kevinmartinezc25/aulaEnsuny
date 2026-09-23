@@ -340,17 +340,34 @@ export interface CourseSettings {
   joinCode: string
   joinEnabled: boolean
   requireTeacherApproval: boolean
+  subject?: string
+  weeklyHours?: number
+  academicPeriod?: string
+  academicYear?: string
+  teacherName?: string
 }
 
 export async function getCourseSettings(courseId: string): Promise<CourseSettings> {
   const supabase = createAdminClient()
 
-  // Fetch course details
-  const { data: course } = await supabase
+  // Fetch course details with teacher info
+  const { data: course, error: selectErr } = await supabase
     .from('courses')
-    .select('id, title, description, status, join_code, join_enabled, require_teacher_approval')
+    .select(`
+      id, title, description, join_code, join_enabled, require_teacher_approval,
+      subject, weekly_hours, academic_period, academic_year,
+      profiles!courses_teacher_id_fkey (first_name, last_name)
+    `)
     .eq('id', courseId)
     .single()
+
+  if (selectErr) {
+    console.error("Error fetching course settings:", selectErr)
+  }
+
+  // Extract teacher name if available
+  const profiles = course?.profiles as any
+  const teacherName = profiles ? `${profiles.first_name || ''} ${profiles.last_name || ''}`.trim() : ''
 
   // Fetch grade categories
   const { data: categories } = await supabase
@@ -362,10 +379,15 @@ export async function getCourseSettings(courseId: string): Promise<CourseSetting
     id: courseId,
     title: course?.title || 'Curso',
     description: course?.description || '',
-    status: (course?.status as any) || 'active',
+    status: ((course as any)?.status as any) || 'active',
     joinCode: course?.join_code || '',
     joinEnabled: Boolean(course?.join_enabled),
     requireTeacherApproval: Boolean(course?.require_teacher_approval),
+    subject: course?.subject,
+    weeklyHours: course?.weekly_hours,
+    academicPeriod: course?.academic_period,
+    academicYear: course?.academic_year,
+    teacherName: teacherName || 'Docente',
     categories: (categories || []).map(c => ({
       id: c.id,
       name: c.name,
@@ -381,43 +403,79 @@ export async function saveCourseSettings(courseId: string, settings: Partial<Cou
   const courseUpdates: any = {}
   if (settings.title !== undefined) courseUpdates.title = settings.title
   if (settings.description !== undefined) courseUpdates.description = settings.description
-  if (settings.status !== undefined) courseUpdates.status = settings.status
-  if (settings.joinCode !== undefined) courseUpdates.join_code = settings.joinCode
+  if (settings.joinCode !== undefined) {
+    // If joinCode is empty, set it to null to avoid unique constraint violation on empty strings
+    courseUpdates.join_code = settings.joinCode.trim() === '' ? null : settings.joinCode.trim()
+  }
   if (settings.joinEnabled !== undefined) courseUpdates.join_enabled = settings.joinEnabled
   if (settings.requireTeacherApproval !== undefined) courseUpdates.require_teacher_approval = settings.requireTeacherApproval
+  if (settings.subject !== undefined) courseUpdates.subject = settings.subject
+  if (settings.weeklyHours !== undefined) courseUpdates.weekly_hours = settings.weeklyHours
+  if (settings.academicPeriod !== undefined) courseUpdates.academic_period = settings.academicPeriod
+  if (settings.academicYear !== undefined) courseUpdates.academic_year = settings.academicYear
 
   if (Object.keys(courseUpdates).length > 0) {
     const { error } = await supabase
       .from('courses')
       .update(courseUpdates)
       .eq('id', courseId)
-    if (error) console.error("Error updating course settings:", error)
+    if (error) {
+      console.error("Error updating course settings:", error)
+      throw new Error(`Error updating course settings: ${error.message}`)
+    }
   }
 
   // 2. Update grade categories if provided
   if (settings.categories) {
-    // Delete existing categories
-    const { error: delErr } = await supabase
+    const incomingCategories = settings.categories;
+
+    // Filter categories that have a valid UUID (existing ones) vs new ones (e.g. starts with 'cat_new_')
+    const existingIds = incomingCategories
+      .filter(c => !c.id.startsWith('cat_new_'))
+      .map(c => c.id);
+
+    // Fetch current categories in the database
+    const { data: currentCategories } = await supabase
       .from('course_grade_categories')
-      .delete()
-      .eq('course_id', courseId)
-    
-    if (delErr) {
-      console.error("Error deleting grade categories:", delErr)
+      .select('id')
+      .eq('course_id', courseId);
+
+    // Identify which IDs are in the database but NO LONGER in the incoming list
+    const currentIds = (currentCategories || []).map(c => c.id);
+    const idsToDelete = currentIds.filter(id => !existingIds.includes(id));
+
+    // Delete categories that are no longer in the list
+    if (idsToDelete.length > 0) {
+      const { error: delErr } = await supabase
+        .from('course_grade_categories')
+        .delete()
+        .in('id', idsToDelete);
+        
+      if (delErr) {
+        console.error("Error deleting grade categories:", delErr);
+        throw new Error(`Error deleting grade categories: ${delErr.message}`);
+      }
     }
 
-    // Insert new categories
-    const categoriesToInsert = settings.categories.map(c => ({
-      course_id: courseId,
-      name: c.name,
-      weight: Number(c.weight) / 100
-    }))
+    // Upsert categories
+    const categoriesToUpsert = incomingCategories.map(c => {
+      const isNew = c.id.startsWith('cat_new_');
+      return {
+        ...(isNew ? {} : { id: c.id }), // Include id only for existing ones
+        course_id: courseId,
+        name: c.name,
+        weight: Number(c.weight) / 100
+      };
+    });
 
-    if (categoriesToInsert.length > 0) {
-      const { error: insErr } = await supabase
+    if (categoriesToUpsert.length > 0) {
+      const { error: upsertErr } = await supabase
         .from('course_grade_categories')
-        .insert(categoriesToInsert)
-      if (insErr) console.error("Error inserting grade categories:", insErr)
+        .upsert(categoriesToUpsert, { onConflict: 'id' });
+      if (upsertErr) {
+        console.error("Error upserting grade categories:", upsertErr);
+        throw new Error(`Error inserting/updating grade categories: ${upsertErr.message}`);
+      }
     }
   }
 }

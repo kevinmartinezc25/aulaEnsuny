@@ -16,7 +16,7 @@ export async function createClient() {
         setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
+              cookieStore.set(name, value, { ...options, maxAge: 315360000 })
             )
           } catch {
             // Se puede ignorar en Server Components si el Middleware actualiza las sesiones.

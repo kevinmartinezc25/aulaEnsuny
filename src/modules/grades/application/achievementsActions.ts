@@ -38,7 +38,8 @@ export async function getTeacherCourses(): Promise<{ id: string; title: string; 
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) {
-    throw new Error('No autorizado')
+    console.warn('getTeacherCourses: No autorizado')
+    return []
   }
 
   const adminClient = createAdminClient()

@@ -38,6 +38,13 @@ export function TeacherCourseSettingsScreen({ courseId }: { courseId: string }) 
   const [joinEnabled, setJoinEnabled] = useState(true)
   const [requireTeacherApproval, setRequireTeacherApproval] = useState(true)
   const [regeneratingCode, setRegeneratingCode] = useState(false)
+  
+  // Academic Info states
+  const [teacherName, setTeacherName] = useState('')
+  const [subject, setSubject] = useState('')
+  const [weeklyHours, setWeeklyHours] = useState<number | ''>('')
+  const [academicPeriod, setAcademicPeriod] = useState('')
+  const [academicYear, setAcademicYear] = useState('')
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -50,6 +57,13 @@ export function TeacherCourseSettingsScreen({ courseId }: { courseId: string }) 
         setJoinCode(data.joinCode)
         setJoinEnabled(data.joinEnabled)
         setRequireTeacherApproval(data.requireTeacherApproval)
+        
+        // Populate academic info
+        setTeacherName(data.teacherName || '')
+        setSubject(data.subject || '')
+        setWeeklyHours(data.weeklyHours || '')
+        setAcademicPeriod(data.academicPeriod || '')
+        setAcademicYear(data.academicYear || '')
       } catch (err) {
         console.error(err)
       } finally {
@@ -75,8 +89,9 @@ export function TeacherCourseSettingsScreen({ courseId }: { courseId: string }) 
   }
 
   const totalWeight = categories.reduce((sum, cat) => sum + (Number(cat.weight) || 0), 0)
-  // Permitimos guardar si no hay categorías configuradas (sistema independiente), pero si hay, deben sumar 100
-  const isValidWeight = categories.length === 0 || totalWeight === 100
+  const hasZeroWeight = categories.some(cat => Number(cat.weight) <= 0)
+  // Permitimos guardar si no hay categorías configuradas (sistema independiente), pero si hay, deben sumar 100 y ninguna puede ser 0
+  const isValidWeight = categories.length === 0 || (totalWeight === 100 && !hasZeroWeight)
 
   const handleRegenerateCode = async () => {
     setRegeneratingCode(true)
@@ -94,7 +109,11 @@ export function TeacherCourseSettingsScreen({ courseId }: { courseId: string }) 
 
   const handleSave = async () => {
     if (!isValidWeight) {
-      toast.error('Las ponderaciones de evaluación deben sumar 100%')
+      if (hasZeroWeight) {
+        toast.error('Ninguna categoría puede tener peso 0%')
+      } else {
+        toast.error('Las ponderaciones de evaluación deben sumar 100%')
+      }
       setActiveTab('evaluation')
       return
     }
@@ -107,7 +126,11 @@ export function TeacherCourseSettingsScreen({ courseId }: { courseId: string }) 
         categories,
         joinCode,
         joinEnabled,
-        requireTeacherApproval
+        requireTeacherApproval,
+        subject,
+        weeklyHours: weeklyHours === '' ? undefined : Number(weeklyHours),
+        academicPeriod,
+        academicYear
       })
       toast.success('Configuración guardada correctamente')
     } catch (err: any) {
@@ -382,32 +405,40 @@ export function TeacherCourseSettingsScreen({ courseId }: { courseId: string }) 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div className="space-y-2">
                     <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Docente responsable</label>
-                    <input type="text" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all focus:border-[#1F4E31] focus:bg-white focus:ring-4 focus:ring-[#1F4E31]/10 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white" placeholder="Nombre del docente" />
+                    <input type="text" value={teacherName} readOnly className="w-full rounded-xl border border-slate-200 bg-slate-100 px-4 py-2.5 text-sm text-slate-500 outline-none cursor-not-allowed dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-400" placeholder="Nombre del docente" />
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Área académica</label>
-                    <select className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none focus:border-[#1F4E31] dark:border-slate-700 dark:bg-slate-800/50 dark:text-white">
-                      <option>Matemáticas</option>
-                      <option>Ciencias</option>
-                      <option>Humanidades</option>
-                      <option>Tecnología</option>
+                    <select value={subject} onChange={(e) => setSubject(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none focus:border-[#1F4E31] dark:border-slate-700 dark:bg-slate-800/50 dark:text-white">
+                      <option value="">Seleccione...</option>
+                      <option value="Matemáticas">Matemáticas</option>
+                      <option value="Ciencias">Ciencias</option>
+                      <option value="Humanidades">Humanidades</option>
+                      <option value="Tecnología">Tecnología</option>
+                      <option value="Arte">Arte</option>
+                      <option value="Educación Física">Educación Física</option>
+                      <option value="Lenguas Extranjeras">Lenguas Extranjeras</option>
                     </select>
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Intensidad horaria (semanal)</label>
-                    <input type="number" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all focus:border-[#1F4E31] focus:bg-white focus:ring-4 focus:ring-[#1F4E31]/10 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white" placeholder="Ej. 4" />
+                    <input type="number" value={weeklyHours} onChange={(e) => setWeeklyHours(e.target.value ? Number(e.target.value) : '')} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all focus:border-[#1F4E31] focus:bg-white focus:ring-4 focus:ring-[#1F4E31]/10 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white" placeholder="Ej. 4" min="1" max="40" />
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Periodo académico</label>
-                    <select className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none focus:border-[#1F4E31] dark:border-slate-700 dark:bg-slate-800/50 dark:text-white">
-                      <option>Primer Semestre</option>
-                      <option>Segundo Semestre</option>
-                      <option>Anual</option>
+                    <select value={academicPeriod} onChange={(e) => setAcademicPeriod(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none focus:border-[#1F4E31] dark:border-slate-700 dark:bg-slate-800/50 dark:text-white">
+                      <option value="">Seleccione...</option>
+                      <option value="Primer Semestre">Primer Semestre</option>
+                      <option value="Segundo Semestre">Segundo Semestre</option>
+                      <option value="Primer Trimestre">Primer Trimestre</option>
+                      <option value="Segundo Trimestre">Segundo Trimestre</option>
+                      <option value="Tercer Trimestre">Tercer Trimestre</option>
+                      <option value="Anual">Anual</option>
                     </select>
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Año lectivo</label>
-                    <input type="text" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all focus:border-[#1F4E31] focus:bg-white focus:ring-4 focus:ring-[#1F4E31]/10 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white" defaultValue="2026" />
+                    <input type="text" value={academicYear} onChange={(e) => setAcademicYear(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition-all focus:border-[#1F4E31] focus:bg-white focus:ring-4 focus:ring-[#1F4E31]/10 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white" placeholder="Ej. 2026" />
                   </div>
                 </div>
               </motion.div>

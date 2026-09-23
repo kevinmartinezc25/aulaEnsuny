@@ -66,6 +66,21 @@ export function resolveOfficialGroup(
     }
   }
 
+  // 2.5 Intento de coincidencia textual completa (ej: "Sexto" y "A" -> "SextoA")
+  const normGrade = norm(gradeStr)
+  const normGroup = norm(groupStr)
+  if (normGrade && normGroup) {
+    const combinedStr = `${normGrade}${normGroup}`
+    const matchStr = allGroups.find(g => norm(g.name) === combinedStr)
+    if (matchStr) {
+      return {
+        groupId: matchStr.id,
+        groupName: matchStr.name,
+        gradeLevel: gradeStr
+      }
+    }
+  }
+
   // 3. Si groupStr tiene guión o barra (ej: "10-1", "7/2")
   if (groupStr.includes('-') || groupStr.includes('/')) {
     const parts = groupStr.split(/[-/]/).map(p => p.trim().replace(/\D/g, ''))

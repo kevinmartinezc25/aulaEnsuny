@@ -3,17 +3,26 @@
 import React, { useState, useRef } from 'react'
 import { FileUp, Calendar as CalendarIcon, Info, Loader2, ArrowRight } from 'lucide-react'
 import { toast } from 'sonner'
-import { importDailyNovedadesXML, deleteDailyNovedades } from '../novedadesActions'
+import { importDailyNovedadesXML, deleteDailyNovedades, checkDailyNovedadesCount } from '../novedadesActions'
 import { AscXmlParser, AscParsedData } from '../../utils/AscXmlParser'
 import DailyPreviewCanvas from './DailyPreviewCanvas'
 
 export function NovedadesImportView() {
-  const [targetDate, setTargetDate] = useState<string>(new Date().toISOString().split('T')[0])
+  const [targetDate, setTargetDate] = useState<string>('')
   const [activeTab, setActiveTab] = useState<'import' | 'preview'>('import')
   const [isProcessing, setIsProcessing] = useState(false)
   const [parsedData, setParsedData] = useState<AscParsedData | null>(null)
   const [fileName, setFileName] = useState<string | null>(null)
+  const [activeNovedades, setActiveNovedades] = useState<number | null>(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  React.useEffect(() => {
+    if (targetDate) {
+      checkDailyNovedadesCount(targetDate).then(setActiveNovedades)
+    } else {
+      setActiveNovedades(0)
+    }
+  }, [targetDate])
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -58,6 +67,8 @@ export function NovedadesImportView() {
       setFileName(null)
       if (fileInputRef.current) fileInputRef.current.value = ''
       
+      checkDailyNovedadesCount(targetDate).then(setActiveNovedades)
+      
     } catch (error: any) {
       toast.error(error.message)
     } finally {
@@ -78,6 +89,7 @@ export function NovedadesImportView() {
       setIsProcessing(true)
       await deleteDailyNovedades(targetDate)
       toast.success(`Se ha restablecido el horario normal para el ${targetDate}.`)
+      setActiveNovedades(0)
     } catch (error: any) {
       toast.error(error.message)
     } finally {
@@ -123,13 +135,25 @@ export function NovedadesImportView() {
 
       <div className="mb-6 flex flex-col sm:flex-row gap-4 items-end bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm">
         <div className="w-full max-w-sm">
-          <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 flex items-center justify-between">
+          <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 flex items-center justify-between gap-2">
             <span>Fecha Objetivo</span>
-            {targetDate && (
-              <span className="text-emerald-600 dark:text-emerald-400 capitalize bg-emerald-50 dark:bg-emerald-900/30 px-2.5 py-0.5 rounded-md text-xs font-bold border border-emerald-100 dark:border-emerald-800/50 shadow-sm">
-                Día: {getDayName(targetDate)}
-              </span>
-            )}
+            <div className="flex gap-2 items-center flex-wrap justify-end">
+              {activeNovedades === 0 && (
+                <span className="text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 px-2 py-0.5 rounded text-[10px] sm:text-xs font-bold border border-red-200 dark:border-red-800/50 animate-pulse">
+                  Sin Novedades
+                </span>
+              )}
+              {activeNovedades !== null && activeNovedades > 0 && (
+                <span className="text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded text-[10px] sm:text-xs font-bold border border-blue-200 dark:border-blue-800/50">
+                  {activeNovedades} clases aplicadas
+                </span>
+              )}
+              {targetDate && (
+                <span className="text-emerald-600 dark:text-emerald-400 capitalize bg-emerald-50 dark:bg-emerald-900/30 px-2.5 py-0.5 rounded-md text-xs font-bold border border-emerald-100 dark:border-emerald-800/50 shadow-sm">
+                  Día: {getDayName(targetDate)}
+                </span>
+              )}
+            </div>
           </label>
           <input 
             type="date"
