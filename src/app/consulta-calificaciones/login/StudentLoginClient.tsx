@@ -28,6 +28,8 @@ export default function StudentLoginClient() {
         toast.success(`¡Bienvenido(a), ${result.studentName}!`)
         router.push('/consulta-calificaciones')
         router.refresh()
+      } else {
+        toast.error((result as any).message || 'Error al consultar la información.')
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Error al consultar la información.')

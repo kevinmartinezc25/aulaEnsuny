@@ -34,7 +34,7 @@ export async function authenticatePlanillaStudent(documentId: string) {
   const doc = documentId.trim()
   
   if (!doc) {
-    throw new Error('El documento de identidad es requerido')
+    return { success: false, message: 'El documento de identidad es requerido' }
   }
 
   // Sanitizar documento para búsquedas flexibles (ej: con o sin puntos/espacios)
@@ -109,7 +109,7 @@ export async function authenticatePlanillaStudent(documentId: string) {
   }
 
   if (!directoryData) {
-    throw new Error('No encontramos un estudiante asociado a este documento.')
+    return { success: false, message: 'No encontramos un estudiante asociado a este documento.' }
   }
 
   // 2. Resolver matrícula académica (jornada, grupo, año) si hay registros en student_enrollments
