@@ -402,7 +402,7 @@ export function PremiumScheduleViewer() {
           </div>
         )}
 
-        <div className={`flex-1 ${viewMode === 'general' ? 'overflow-auto' : 'h-full overflow-hidden p-3 flex flex-col'} bg-slate-50 dark:bg-[#0B1120] custom-scrollbar`}>
+        <div className={`flex-1 min-h-0 ${viewMode === 'general' ? 'overflow-auto' : 'h-full overflow-hidden p-3 flex flex-col'} bg-slate-50 dark:bg-[#0B1120] custom-scrollbar`}>
           {slots.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-center max-w-md mx-auto mt-20">
                 <div className="w-20 h-20 bg-indigo-50 dark:bg-indigo-500/10 rounded-full flex items-center justify-center mb-6">
@@ -573,7 +573,7 @@ export function PremiumScheduleViewer() {
             })()
           ) : selectedEntity ? (
             /* Vista individual de Grupos o Docentes: Únicamente StaticScheduleGrid con ajuste perfecto 100% sin scroll */
-            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden h-full w-full flex-1 flex flex-col relative">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden h-full w-full flex-1 min-h-0 flex flex-col relative">
               <StaticScheduleGrid 
                 entityType={viewMode}
                 entityId={selectedEntity}
