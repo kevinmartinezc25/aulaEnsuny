@@ -381,6 +381,7 @@ function SidebarContent({ onClose, isCollapsed = false, user }: SidebarProps) {
       label: 'Académico',
       items: [
         { name: 'Mis cursos', href: '/student/dashboard', icon: BookOpen },
+        { name: 'Horario', href: '/student/schedule', icon: CalendarDays },
         { name: 'Mis solicitudes', href: '/student/requests', icon: ClipboardList },
         { name: 'Calificaciones', href: '/student/grades', icon: TrendingUp },
       ]

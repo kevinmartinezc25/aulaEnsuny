@@ -397,7 +397,7 @@ export function StudentDashboardScreen() {
               if (lessonIds.length > 0) {
                 const { data: forumsData } = await supabase
                   .from('forums')
-                  .select('id, lesson_id, due_date, is_graded')
+                  .select('id, lesson_id, due_date, is_graded, forum_type')
                   .in('lesson_id', lessonIds)
                 courseForums = forumsData || []
 
@@ -716,8 +716,14 @@ export function StudentDashboardScreen() {
           setAchievements(mappedAchievements)
 
           // Calculate overall progress across all active courses
-          const totalAllItems = dbLessons.length + dbResources.length
-          const completedAllItems = dbLessons.filter(l => completedLessonIds.has(l.id)).length +
+          const countableLessons = dbLessons.filter(l => {
+            const forumObj = courseForums.find(f => f.lesson_id === l.id)
+            if (forumObj && forumObj.forum_type === 'qa' && !forumObj.is_graded) return false
+            return true
+          })
+
+          const totalAllItems = countableLessons.length + dbResources.length
+          const completedAllItems = countableLessons.filter(l => completedLessonIds.has(l.id)).length +
                                     dbResources.filter(r => completedResourceIds.has(r.id)).length
           const progressPercentage = totalAllItems > 0 ? Math.min(100, Math.round((completedAllItems / totalAllItems) * 100)) : 0
 

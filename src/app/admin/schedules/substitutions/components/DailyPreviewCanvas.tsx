@@ -85,13 +85,45 @@ export default function DailyPreviewCanvas({ targetDate }: DailyPreviewCanvasPro
   const entities = viewMode === 'group' ? groups : Object.values(teachers).sort((a,b) => a.name.localeCompare(b.name, undefined, {numeric:true}))
   const activePeriods = timeSlots.filter(s => s.type !== 'break')
 
+  const hasNovedades = slots.some(s => s.isNovedad === true)
+
+  if (!targetDate) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[400px] border border-slate-200 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900 mt-6 p-8 text-center shadow-sm">
+        <AlertCircle className="w-12 h-12 text-slate-300 dark:text-slate-600 mb-4" />
+        <h3 className="text-lg font-bold text-slate-700 dark:text-slate-200">Selecciona una fecha</h3>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 max-w-md">
+          Por favor, selecciona una fecha en el selector superior para ver la vista previa de las clases.
+        </p>
+      </div>
+    )
+  }
+
   if (loading) return <div className="p-8 text-center flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-indigo-500"/></div>
+
+  if (!hasNovedades) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[400px] border border-slate-200 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900 mt-6 p-8 text-center shadow-sm">
+        <AlertCircle className="w-12 h-12 text-slate-300 dark:text-slate-600 mb-4" />
+        <h3 className="text-lg font-bold text-slate-700 dark:text-slate-200">No hay novedades para mostrar</h3>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 max-w-md">
+          El {new Intl.DateTimeFormat('es-ES', { weekday: 'long' }).format(new Date(`${targetDate}T12:00:00Z`))} no tiene ninguna novedad aplicada. El horario institucional regular está vigente.
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col h-[600px] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden bg-white dark:bg-slate-900 shadow-sm mt-6">
-      <div className="flex items-center gap-2 p-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">
-        <button onClick={() => setViewMode('group')} className={`px-5 py-2.5 text-sm font-bold rounded-xl transition-colors ${viewMode === 'group' ? 'bg-[#1F4E31] dark:bg-emerald-600 text-white shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800'}`}>Grupos</button>
-        <button onClick={() => setViewMode('teacher')} className={`px-5 py-2.5 text-sm font-bold rounded-xl transition-colors ${viewMode === 'teacher' ? 'bg-[#1F4E31] dark:bg-emerald-600 text-white shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800'}`}>Docentes</button>
+      <div className="flex flex-wrap items-center justify-between gap-4 p-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">
+        <div className="flex items-center gap-2">
+          <button onClick={() => setViewMode('group')} className={`px-5 py-2.5 text-sm font-bold rounded-xl transition-colors ${viewMode === 'group' ? 'bg-[#1F4E31] dark:bg-emerald-600 text-white shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800'}`}>Grupos</button>
+          <button onClick={() => setViewMode('teacher')} className={`px-5 py-2.5 text-sm font-bold rounded-xl transition-colors ${viewMode === 'teacher' ? 'bg-[#1F4E31] dark:bg-emerald-600 text-white shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800'}`}>Docentes</button>
+        </div>
+        <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800/50 px-3 py-1.5 rounded-lg shadow-sm animate-pulse">
+          <AlertCircle className="w-4 h-4 text-amber-500" />
+          <span className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wide">Novedad en Curso</span>
+        </div>
       </div>
 
       <div className="flex-1 overflow-auto bg-slate-50/50 dark:bg-slate-900/50">

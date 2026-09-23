@@ -24,12 +24,19 @@ import { createClient } from '@/core/config/supabase/client'
 
 export default function TeacherCourseLayout({
   children,
+  params,
 }: {
   children: React.ReactNode
+  params: Promise<{ slug: string }> | { slug: string }
 }) {
   const pathname = usePathname()
-  const params = useParams<{ slug: string }>()
-  const courseSlug = params?.slug
+  
+  // En Next.js 15, params es una promesa. Lo desenvolvemos si es necesario.
+  const resolvedParams = params && typeof (params as any).then === 'function' 
+    ? React.use(params as Promise<{ slug: string }>) 
+    : (params as { slug: string })
+
+  const courseSlug = resolvedParams?.slug
 
   const [course, setCourse] = useState<{ title: string; subject: string } | null>(null)
   

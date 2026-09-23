@@ -31,6 +31,13 @@ export default function StaticScheduleGrid({
   const [classes, setClasses] = useState<any[]>([])
   const [timeSlots, setTimeSlots] = useState<any[]>([])
   const [maxPeriods, setMaxPeriods] = useState<number>(7)
+  const [visualSettings, setVisualSettings] = useState({
+    density: 'relaxed',
+    showClassrooms: false,
+    showWeekends: false,
+    hideEmptyPeriods: false
+  })
+  const visibleDays = visualSettings.showWeekends ? ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'] : ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes']
 
   useEffect(() => {
     if (entityId) {
@@ -183,6 +190,13 @@ export default function StaticScheduleGrid({
       startHour = settings.startHour || '07:00'
       blockDuration = parseInt(settings.blockDuration || '55', 10)
       
+      setVisualSettings({
+        density: settings.density || 'relaxed',
+        showClassrooms: settings.showClassrooms ?? false,
+        showWeekends: settings.showWeekends ?? false,
+        hideEmptyPeriods: settings.hideEmptyPeriods ?? false
+      })
+      
       const groupPeriods = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('sch_group_periods') || '{}') : {}
       periodsPerDay = entityType === 'group' && groupPeriods[entityId] 
         ? groupPeriods[entityId] 
@@ -192,12 +206,7 @@ export default function StaticScheduleGrid({
       setMaxPeriods(periodsPerDay)
 
       use12h = settings.timeFormat !== '24h'
-      breaks = settings.breaks
-      if (!breaks && settings.breakPeriod) {
-        breaks = [{ id: '1', name: 'Recreo', afterPeriod: parseInt(settings.breakPeriod, 10), durationMinutes: 30 }]
-      } else if (!breaks) {
-        breaks = [{ id: '1', name: 'Recreo', afterPeriod: 3, durationMinutes: 30 }]
-      }
+      breaks = settings.breaks || []
 
       const generated = generateTimeSlots(startHour, blockDuration, periodsPerDay, breaks, use12h)
       // Solo tomamos los periodos académicos (ignorar recreos para la cuadrícula compacta)
@@ -229,11 +238,14 @@ export default function StaticScheduleGrid({
 
     if (maxPeriodInData > periodsPerDay) {
       periodsPerDay = maxPeriodInData
-      setMaxPeriods(periodsPerDay)
-      const generated = generateTimeSlots(startHour, blockDuration, periodsPerDay, breaks, use12h)
-      activeSlots = generated.filter(s => s.type !== 'break')
-      setTimeSlots(activeSlots)
+    } else if (visualSettings.hideEmptyPeriods && maxPeriodInData > 0) {
+      periodsPerDay = maxPeriodInData
     }
+
+    setMaxPeriods(periodsPerDay)
+    const generated = generateTimeSlots(startHour, blockDuration, periodsPerDay, breaks, use12h)
+    activeSlots = generated.filter(s => s.type !== 'break')
+    setTimeSlots(activeSlots)
 
     // 3. Formatear y agrupar clases (por si hay bloques unidos o múltiples docentes)
     const groupedSlots = new Map<string, any>()
@@ -348,20 +360,22 @@ export default function StaticScheduleGrid({
 
     // CSS Grid: columna fija para el día + N columnas iguales para períodos
     const gridCols = `5rem repeat(${numPeriods}, minmax(0, 1fr))`
-    // Filas: header auto + 5 días con 1fr exacto (todos iguales, sin importar contenido)
-    const gridRows = `auto repeat(${DAYS.length}, 1fr)`
+    // Filas: header auto + días con 1fr exacto
+    const gridRows = `auto repeat(${visibleDays.length}, 1fr)`
+    
+    const densityPadding = visualSettings.density === 'compact' ? 'py-1 px-1' : 'py-2 px-1'
 
     return (
       <div
-        className="hidden lg:grid w-full h-full bg-white dark:bg-slate-900 overflow-hidden"
+        className="hidden lg:grid flex-1 w-full bg-white dark:bg-slate-900 overflow-hidden"
         style={{ gridTemplateColumns: gridCols, gridTemplateRows: gridRows }}
       >
         {/* ── HEADER ROW ── */}
-        <div className="bg-slate-50 dark:bg-slate-950/80 border-b border-r border-slate-200 dark:border-slate-800 flex items-center justify-center py-2 px-1">
+        <div className={`bg-slate-50 dark:bg-slate-950/80 border-b border-r border-slate-200 dark:border-slate-800 flex items-center justify-center ${densityPadding}`}>
           <span className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Día</span>
         </div>
         {activePeriods.map(slot => (
-          <div key={`h-${slot.id}`} className="bg-slate-50 dark:bg-slate-950/80 border-b border-r last:border-r-0 border-slate-200 dark:border-slate-800 flex flex-row items-center justify-center gap-1.5 py-2 px-1">
+          <div key={`h-${slot.id}`} className={`bg-slate-50 dark:bg-slate-950/80 border-b border-r last:border-r-0 border-slate-200 dark:border-slate-800 flex flex-row items-center justify-center gap-1.5 ${densityPadding}`}>
             <span className="text-xs sm:text-[13px] font-black text-slate-800 dark:text-slate-200 uppercase tracking-tight whitespace-nowrap">
               {slot.id}ª
             </span>
@@ -372,7 +386,9 @@ export default function StaticScheduleGrid({
         ))}
 
         {/* ── FILAS DE DÍAS (cada día ocupa exactamente 1fr) ── */}
-        {DAYS.map((day) => (
+        {visibleDays.map((day) => {
+          let skipUntil = 0;
+          return (
           <React.Fragment key={day}>
             {/* Celda nombre del día */}
             <div className="border-b last:border-b-0 border-r border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex items-center justify-center">
@@ -384,7 +400,10 @@ export default function StaticScheduleGrid({
             {/* Celdas de períodos */}
             {activePeriods.map(slot => {
               const period = slot.id!
-              const dayNumber = DAYS.indexOf(day) + 1
+              const dayNumber = visibleDays.indexOf(day) + 1
+              
+              if (period < skipUntil) return null;
+
               const cls = classes.find(c => c.day === dayNumber && period >= c.period && period < c.period + c.duration)
 
               // Celda vacía
@@ -399,11 +418,29 @@ export default function StaticScheduleGrid({
               // Celda que NO es el inicio del bloque — el span en el inicio la cubre
               if (period > cls.period) return null
 
+              let span = cls.duration || 1;
+
+              // Check consecutive blocks with the exact same details
+              for (let i = period + span; i <= activePeriods.length; i++) {
+                const nextCls = classes.find(c => c.day === dayNumber && i === c.period);
+                if (nextCls && 
+                    nextCls.subject === cls.subject && 
+                    nextCls.labelTitle === cls.labelTitle && 
+                    nextCls.labelSubtitle === cls.labelSubtitle) {
+                   span += nextCls.duration || 1;
+                   i += (nextCls.duration || 1) - 1; // Advance loop by the extra duration
+                } else {
+                   break;
+                }
+              }
+
+              skipUntil = period + span;
+
               return (
                 <div
                   key={`${day}-${period}`}
                   className="border-b last:border-b-0 border-r last:border-r-0 border-slate-100 dark:border-slate-800 relative"
-                  style={{ gridColumn: `span ${cls.duration}` }}
+                  style={{ gridColumn: `span ${span}` }}
                 >
                   <div
                     className={`absolute inset-[3px] rounded-lg border flex flex-col overflow-hidden transition-all hover:shadow-md hover:brightness-95 cursor-default ${
@@ -434,8 +471,8 @@ export default function StaticScheduleGrid({
                                 ? 'text-amber-700 dark:text-amber-300 text-[10px] sm:text-[11px] leading-tight'
                                 : `text-indigo-700 dark:text-indigo-300 ${
                                     cls.labelSubtitle.length <= 6
-                                      ? 'text-[20px] sm:text-[22px] xl:text-[24px] leading-tight'
-                                      : 'text-[11px] sm:text-[13px] leading-tight'
+                                      ? (visualSettings.density === 'compact' ? 'text-[16px] sm:text-[18px] leading-tight' : 'text-[20px] sm:text-[22px] xl:text-[24px] leading-tight')
+                                      : (visualSettings.density === 'compact' ? 'text-[10px] sm:text-[11px] leading-tight' : 'text-[11px] sm:text-[13px] leading-tight')
                                   }`
                             }`}
                           >
@@ -444,7 +481,7 @@ export default function StaticScheduleGrid({
                           <span className="text-slate-600 dark:text-slate-300 text-[9px] sm:text-[10px] font-bold leading-tight mt-0.5 tracking-tight text-center break-words w-full px-0.5">
                             {cls.labelTitle}
                           </span>
-                          {cls.room && (
+                          {visualSettings.showClassrooms && cls.room && (
                             <span className="text-slate-400 dark:text-slate-500 text-[7px] font-extrabold uppercase tracking-wider leading-none mt-0.5 text-center break-words">
                               {cls.room}
                             </span>
@@ -452,13 +489,13 @@ export default function StaticScheduleGrid({
                         </div>
                       ) : (
                         <div className="w-full flex flex-col justify-center items-center gap-0.5">
-                          <h4 className="font-black text-indigo-700 dark:text-indigo-300 text-[11px] sm:text-[13px] leading-tight tracking-tight text-center break-words w-full px-0.5">
+                          <h4 className={`font-black text-indigo-700 dark:text-indigo-300 ${visualSettings.density === 'compact' ? 'text-[10px] sm:text-[11px]' : 'text-[11px] sm:text-[13px]'} leading-tight tracking-tight text-center break-words w-full px-0.5`}>
                             {cls.labelSubtitle}
                           </h4>
-                          <span className="text-slate-500 dark:text-slate-400 text-[9px] font-semibold leading-tight text-center break-words w-full px-0.5">
+                          <span className={`text-slate-500 dark:text-slate-400 ${visualSettings.density === 'compact' ? 'text-[8px]' : 'text-[9px]'} font-semibold leading-tight text-center break-words w-full px-0.5`}>
                             {cls.labelTitle}
                           </span>
-                          {cls.room && (
+                          {visualSettings.showClassrooms && cls.room && (
                             <span className="text-slate-400 dark:text-slate-500 text-[7px] font-bold uppercase tracking-wider leading-none">
                               {cls.room}
                             </span>
@@ -471,14 +508,15 @@ export default function StaticScheduleGrid({
               )
             })}
           </React.Fragment>
-        ))}
+          )
+        })}
       </div>
     )
   }
 
   return (
     <>
-      <div className="h-full w-full overflow-y-auto lg:overflow-hidden custom-scrollbar flex flex-col p-1 sm:p-4 lg:p-0 print:hidden">
+      <div className="flex-1 w-full overflow-y-auto lg:overflow-hidden custom-scrollbar flex flex-col p-1 sm:p-4 lg:p-0 print:hidden">
         {renderMobileView()}
         {renderDesktopView()}
       </div>

@@ -35,6 +35,7 @@ interface Lesson {
     feedback: string
   } | null
   sort_order?: number
+  countsForProgress?: boolean
 }
 
 interface Module {
@@ -613,7 +614,7 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
     }
   }
 
-  const renderStatusIcon = (status?: LessonStatus, className = "h-3.5 w-3.5") => {
+  const renderStatusIcon = (status?: LessonStatus, className = "h-3.5 w-3.5", countsForProgress?: boolean) => {
     switch (status) {
       case 'completed':
         return <CheckCircle className={className} />
@@ -625,11 +626,12 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
         return <AlertCircle className={className} />
       case 'pending':
       default:
+        if (countsForProgress === false) return <MessageSquare className={className} />
         return <div className={`rounded-full border border-current ${className}`} style={{ borderWidth: '1.5px' }} />
     }
   }
 
-  const getStatusText = (status?: LessonStatus, type?: Lesson['type']) => {
+  const getStatusText = (status?: LessonStatus, type?: Lesson['type'], countsForProgress?: boolean) => {
     switch (status) {
       case 'completed':
         return 'Completado'
@@ -641,6 +643,7 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
         return 'Retrasado'
       case 'pending':
       default:
+        if (countsForProgress === false) return 'Consultas (Opcional)'
         if (type === 'quiz') return 'Pendiente'
         if (type === 'task') return 'Por entregar'
         return 'Pendiente'
@@ -867,7 +870,7 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
       if (lessonIds.length > 0) {
         const { data: forumsData } = await supabase
           .from('forums')
-          .select('id, lesson_id, is_graded')
+          .select('id, lesson_id, is_graded, forum_type')
           .in('lesson_id', lessonIds)
         courseForums = forumsData || []
         
@@ -956,6 +959,8 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
                 submissionText = localText
               }
             }
+            
+            const countsForProgress = !(forumObj && forumObj.forum_type === 'qa' && !forumObj.is_graded)
 
             return {
               id: l.id,
@@ -975,7 +980,8 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
                 maxGrade: Number(gradeEntry.max_grade || 5.0),
                 feedback: gradeEntry.feedback || ''
               } : null,
-              sort_order: l.sort_order || 0
+              sort_order: l.sort_order || 0,
+              countsForProgress
             }
           })
 
@@ -1003,7 +1009,8 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
               driveUrl: r.drive_url || undefined,
               status: completedResourceIds.has(r.id) ? 'completed' as const : 'pending' as const,
               content: r.description || 'Archivo adjunto del módulo.',
-              sort_order: r.sort_order || 0
+              sort_order: r.sort_order || 0,
+              countsForProgress: true
             }
           })
 
@@ -1019,10 +1026,9 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
       })
 
       // Compute total progress (lessons AND file resources)
-      const totalItems = mappedModules.reduce((acc, m) => acc + m.lessons.length, 0)
-      const completedItems = mappedModules.reduce((acc, m) => {
-        return acc + m.lessons.filter(l => l.status === 'completed' || l.status === 'graded').length
-      }, 0)
+      const countableItems = mappedModules.flatMap(m => m.lessons).filter(l => l.countsForProgress !== false)
+      const totalItems = countableItems.length
+      const completedItems = countableItems.filter(l => l.status === 'completed' || l.status === 'graded').length
       const progressPercentage = totalItems > 0 ? Math.min(100, Math.round((completedItems / totalItems) * 100)) : 0
 
       const resolvedCourseDetails: CourseDetails = {
@@ -1350,10 +1356,9 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
           ...m,
           lessons: m.lessons.map(l => l.id === lessonId ? { ...l, status: 'completed' as const, submissionText } : l)
         }))
-        const totalItems = updatedModules.reduce((acc, m) => acc + m.lessons.length, 0)
-        const completedItems = updatedModules.reduce((acc, m) => {
-          return acc + m.lessons.filter(l => l.status === 'completed' || l.status === 'graded').length
-        }, 0)
+        const countableItems = updatedModules.flatMap(m => m.lessons).filter(l => l.countsForProgress !== false)
+        const totalItems = countableItems.length
+        const completedItems = countableItems.filter(l => l.status === 'completed' || l.status === 'graded').length
         const progressPercentage = totalItems > 0 ? Math.min(100, Math.round((completedItems / totalItems) * 100)) : 0
 
         return { ...prev, modules: updatedModules, progress: progressPercentage }
@@ -1407,10 +1412,9 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
           ...m,
           lessons: m.lessons.map(l => l.id === lessonId ? { ...l, status: 'completed' as const, submissionText } : l)
         }))
-        const totalItems = updatedModules.reduce((acc, m) => acc + m.lessons.length, 0)
-        const completedItems = updatedModules.reduce((acc, m) => {
-          return acc + m.lessons.filter(l => l.status === 'completed' || l.status === 'graded').length
-        }, 0)
+        const countableItems = updatedModules.flatMap(m => m.lessons).filter(l => l.countsForProgress !== false)
+        const totalItems = countableItems.length
+        const completedItems = countableItems.filter(l => l.status === 'completed' || l.status === 'graded').length
         const progressPercentage = totalItems > 0 ? Math.min(100, Math.round((completedItems / totalItems) * 100)) : 0
 
         return { ...prev, modules: updatedModules, progress: progressPercentage }
@@ -1491,6 +1495,7 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
           return (
             <div key={mod.id} className="space-y-2.5 text-left">
               <button
+                type="button"
                 onClick={() => setExpandedModules(prev => ({ ...prev, [mod.id]: !prev[mod.id] }))}
                 className="flex w-full items-start justify-between text-left transition-colors py-3 px-3 cursor-pointer bg-transparent border-none outline-none mb-1 group"
               >
@@ -1527,6 +1532,7 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
                     const isActive = activeLesson ? lesson.id === activeLesson.id : false
                     return (
                       <button
+                        type="button"
                         key={lesson.id}
                         onClick={() => handleLessonClick(lesson)}
                         className={`group relative flex w-full items-start gap-3 px-3 py-3 text-xs font-semibold transition-all duration-150 border-y outline-none cursor-pointer ${
@@ -1547,8 +1553,8 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
                             <span className="capitalize">{lesson.type === 'video' ? 'Video' : lesson.type === 'task' ? 'Tarea' : lesson.type === 'quiz' ? 'Quiz' : 'Foro'}</span>
                             <span>•</span>
                             <div className={`flex items-center gap-1 font-bold ${getStatusColor(lesson.status)}`}>
-                              {renderStatusIcon(lesson.status, "h-3 w-3 shrink-0")}
-                              <span>{getStatusText(lesson.status, lesson.type)}</span>
+                              {renderStatusIcon(lesson.status, "h-3 w-3 shrink-0", lesson.countsForProgress)}
+                              <span>{getStatusText(lesson.status, lesson.type, lesson.countsForProgress)}</span>
                             </div>
                           </div>
                         </div>
@@ -1872,7 +1878,7 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
                           {activeLesson.title}
                         </h1>
                         <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold ${getStatusColor(activeLesson.status)} bg-opacity-20`}>
-                          {getStatusText(activeLesson.status, activeLesson.type)}
+                          {getStatusText(activeLesson.status, activeLesson.type, activeLesson.countsForProgress)}
                         </span>
                       </div>
                       <p className="mt-1.5 text-sm text-slate-600 dark:text-slate-400 max-w-2xl">
