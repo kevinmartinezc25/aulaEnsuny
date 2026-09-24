@@ -3,6 +3,7 @@
 import { createClient, createAdminClient } from '@/core/config/supabase/server'
 import { revalidatePath } from 'next/cache'
 import * as XLSX from 'xlsx'
+import { normalizeGradeLevel } from '@/lib/gradeUtils'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TIPOS
@@ -333,7 +334,7 @@ export async function importStudentsBatch(
           first_name: toTitleCase(row.firstName),
           last_name: toTitleCase(row.lastName),
           document_id: row.documentId?.trim() || null,
-          grade_level: row.gradeLevel.trim(),
+          grade_level: normalizeGradeLevel(row.gradeLevel),
           group_name: row.groupName.trim(),
           profile_id: existingProfileId,
           status: 'active' as const
@@ -406,7 +407,7 @@ export async function updateDirectoryStudent(
     if (data.firstName !== undefined) updatePayload.first_name = toTitleCase(data.firstName)
     if (data.lastName !== undefined) updatePayload.last_name = toTitleCase(data.lastName)
     if (data.documentId !== undefined) updatePayload.document_id = data.documentId || null
-    if (data.gradeLevel !== undefined) updatePayload.grade_level = data.gradeLevel.trim()
+    if (data.gradeLevel !== undefined) updatePayload.grade_level = normalizeGradeLevel(data.gradeLevel)
     if (data.groupName !== undefined) updatePayload.group_name = data.groupName.trim()
 
     const { error } = await adminClient
@@ -461,6 +462,7 @@ export async function generateImportTemplate(): Promise<string> {
       ['APELLIDOS Y NOMBRES', 'Documento', 'Grado', 'Grupo'],
       ['MARTÍNEZ LÓPEZ JUAN CARLOS', '1001234567', '10°', '2'],
       ['TORRES GARCÍA ANA MARÍA', '', '11°', '1'],
+      ['PÉREZ RIVERA CARLOS ANDRÉS', '', 'PFC-12', '1'],
     ]
 
     const ws = XLSX.utils.aoa_to_sheet(templateData)
@@ -485,7 +487,7 @@ export async function generateImportTemplate(): Promise<string> {
       ['APELLIDOS Y NOMBRES: Requerido. Ej: MARTÍNEZ LÓPEZ JUAN CARLOS'],
       ['(El sistema asignará las dos primeras palabras como apellidos y el resto como nombres)'],
       ['Documento: Opcional. Número de cédula o TI. Debe ser único.'],
-      ['Grado: Requerido. Ej: 10°, 11°, 9°'],
+      ['Grado: Requerido. Ej: 10°, 11°, PFC-12, PFC-13'],
       ['Grupo: Requerido. Ej: 1, 2, A, B'],
       [''],
       ['Límite: 500 estudiantes por importación.'],

@@ -1,6 +1,7 @@
 'use server'
 
 import { createAdminClient } from '@/core/config/supabase/server'
+import { normalizeGradeLevel } from '@/lib/gradeUtils'
 
 export async function checkStudentPreloaded(documentNumber: string) {
   try {
@@ -39,7 +40,7 @@ export async function checkStudentPreloaded(documentNumber: string) {
       student: {
         firstName: dirData.first_name,
         lastName: dirData.last_name,
-        gradeLevel: dirData.grade_level,
+        gradeLevel: normalizeGradeLevel(dirData.grade_level),
         groupName: dirData.group_name
       }
     }
@@ -76,7 +77,7 @@ export async function selfRegisterStudent(data: {
     }
 
     // 0.5 Verificar si el estudiante existe en el directorio (Carga masiva)
-    let finalGrade = data.gradeLevel
+    let finalGrade = normalizeGradeLevel(data.gradeLevel)
     let finalGroup = data.groupName
     let directoryId = null
 
@@ -91,7 +92,7 @@ export async function selfRegisterStudent(data: {
         return { success: false, error: 'Esta cuenta pre-cargada ya ha sido reclamada. Por favor, inicia sesión.' }
       }
       // Forzar el grado y grupo de la institución
-      finalGrade = dirData.grade_level
+      finalGrade = normalizeGradeLevel(dirData.grade_level) || finalGrade
       finalGroup = dirData.group_name
       directoryId = dirData.id
     }

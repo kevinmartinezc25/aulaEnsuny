@@ -252,12 +252,80 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
       try {
         const res = await getAdminStudentById(studentId!)
         if (res) {
-          setEmail(res.email)
-          if (res.details) setDetails(res.details)
-          if (res.contact) setContact(res.contact)
-          if (res.guardians) setGuardians(res.guardians)
-          if (res.medical) setMedical(res.medical)
-          if (res.enrollment) setEnrollment(res.enrollment)
+          setEmail(res.email || '')
+          const d = res.details
+          if (d) {
+            setDetails(prev => ({
+              ...prev,
+              ...d,
+              expeditionDate: d.expeditionDate || '',
+              expeditionPlace: d.expeditionPlace || '',
+              secondName: d.secondName || '',
+              secondSurname: d.secondSurname || '',
+              bloodType: d.bloodType || 'O',
+              rh: d.rh || '+',
+              birthMunicipality: d.birthMunicipality || '',
+              birthDepartment: d.birthDepartment || ''
+            }))
+          }
+          const c = res.contact
+          if (c) {
+            setContact(prev => ({
+              ...prev,
+              ...c,
+              neighborhood: c.neighborhood || '',
+              phone: c.phone || '',
+              studentCellphone: c.studentCellphone || '',
+              studentEmail: c.studentEmail || ''
+            }))
+          }
+          const g = res.guardians
+          if (g) {
+            setGuardians(prev => ({
+              ...prev,
+              ...g,
+              fatherName: g.fatherName || '',
+              fatherDocument: g.fatherDocument || '',
+              fatherPhone: g.fatherPhone || '',
+              fatherEmail: g.fatherEmail || '',
+              fatherOccupation: g.fatherOccupation || '',
+              motherName: g.motherName || '',
+              motherDocument: g.motherDocument || '',
+              motherPhone: g.motherPhone || '',
+              motherEmail: g.motherEmail || '',
+              motherOccupation: g.motherOccupation || '',
+              guardianEmail: g.guardianEmail || '',
+              guardianAddress: g.guardianAddress || '',
+              guardianOccupation: g.guardianOccupation || ''
+            }))
+          }
+          const med = res.medical
+          if (med) {
+            setMedical(prev => ({
+              ...prev,
+              ...med,
+              ips: med.ips || '',
+              allergies: med.allergies || '',
+              diseases: med.diseases || '',
+              medicines: med.medicines || '',
+              observations: med.observations || ''
+            }))
+          }
+          const en = res.enrollment
+          if (en) {
+            setEnrollment(prev => ({
+              ...prev,
+              ...en,
+              enrollmentNumber: en.enrollmentNumber || '',
+              sisben: en.sisben || '',
+              specialPopulation: en.specialPopulation || 'Ninguna',
+              previousInstitution: en.previousInstitution || '',
+              previousMunicipality: en.previousMunicipality || '',
+              previousDepartment: en.previousDepartment || '',
+              previousGrade: en.previousGrade || '',
+              observations: en.observations || ''
+            }))
+          }
           if (res.documents) setDocuments(res.documents)
           if (res.academicHistory) setAcademicHistory(res.academicHistory)
           if (res.courses) setSelectedCourses(res.courses)
@@ -588,7 +656,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                     <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase mb-1">Segundo Nombre</label>
                     <input 
                       type="text" 
-                      value={details.secondName}
+                      value={details.secondName || ''}
                       onChange={e => setDetails({ ...details, secondName: e.target.value })}
                       placeholder="Ej: María"
                       className="w-full px-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:text-white text-xs"
@@ -599,7 +667,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                     <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase mb-1">Primer Apellido *</label>
                     <input 
                       type="text" 
-                      value={details.firstSurname}
+                      value={details.firstSurname || ''}
                       onChange={e => setDetails({ ...details, firstSurname: e.target.value })}
                       placeholder="Ej: Torres"
                       className="w-full px-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:text-white text-xs"
@@ -610,7 +678,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                     <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase mb-1">Segundo Apellido</label>
                     <input 
                       type="text" 
-                      value={details.secondSurname}
+                      value={details.secondSurname || ''}
                       onChange={e => setDetails({ ...details, secondSurname: e.target.value })}
                       placeholder="Ej: Herrera"
                       className="w-full px-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:text-white text-xs"

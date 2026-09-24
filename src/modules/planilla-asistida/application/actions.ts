@@ -359,6 +359,81 @@ function formatCanonicalStudentName(lastName?: string | null, firstName?: string
   return `${last} ${first}`
 }
 
+function buildPlanillaGradeVariants(grade?: number | string | null): string[] {
+  const gradeStr = String(grade || '').trim()
+  if (!gradeStr) return []
+  const gradeDigits = gradeStr.replace(/\D/g, '')
+  const variants = new Set<string>([
+    gradeStr,
+    `${gradeStr}°`,
+    gradeDigits,
+    `${gradeDigits}°`,
+    `${gradeDigits} °`
+  ])
+  if (gradeDigits === '12' || /pfc[\s\-_]?12/i.test(gradeStr)) {
+    variants.add('PFC-12')
+    variants.add('PFC 12')
+    variants.add('PFC-12°')
+    variants.add('PFC')
+    variants.add('12')
+    variants.add('12°')
+    variants.add('12 °')
+  }
+  if (gradeDigits === '13' || /pfc[\s\-_]?13/i.test(gradeStr)) {
+    variants.add('PFC-13')
+    variants.add('PFC 13')
+    variants.add('PFC-13°')
+    variants.add('PFC')
+    variants.add('13')
+    variants.add('13°')
+    variants.add('13 °')
+  }
+  return Array.from(variants).filter(Boolean)
+}
+
+function buildPlanillaGroupVariants(groupNumber?: number | string | null, grade?: number | string | null): string[] {
+  const groupStr = String(groupNumber ?? '').trim()
+  const gradeStr = String(grade ?? '').trim()
+  const gradeDigits = gradeStr.replace(/\D/g, '')
+
+  if (!groupStr || groupStr === 'null' || groupStr === 'undefined') {
+    return []
+  }
+
+  const groupDigits = groupStr.replace(/\D/g, '')
+  const variants = new Set<string>([
+    groupStr,
+    groupDigits,
+    groupDigits ? `0${groupDigits}` : '',
+    gradeDigits && groupDigits ? `${gradeDigits}-${groupDigits}` : '',
+    gradeDigits && groupDigits ? `${gradeDigits}°-${groupDigits}` : '',
+    gradeDigits && groupDigits ? `${gradeDigits}° ${groupDigits}` : ''
+  ])
+
+  if (gradeDigits === '12' || /pfc[\s\-_]?12/i.test(gradeStr)) {
+    variants.add('PFC-12')
+    variants.add('PFC 12')
+    variants.add('1')
+    variants.add('01')
+    variants.add('UNICO')
+    variants.add('ÚNICO')
+  }
+  if (gradeDigits === '13' || /pfc[\s\-_]?13/i.test(gradeStr)) {
+    variants.add('PFC-13')
+    variants.add('PFC 13')
+    variants.add('1')
+    variants.add('01')
+    variants.add('2')
+    variants.add('02')
+    variants.add('3')
+    variants.add('03')
+    variants.add('UNICO')
+    variants.add('ÚNICO')
+  }
+
+  return Array.from(variants).filter(Boolean)
+}
+
 export async function syncAssistedStudentsForCandidate(
   profileId: string | null | undefined,
   directoryId: string | null | undefined,
@@ -452,9 +527,9 @@ export async function getAssistedStudents(subjectId: string) {
       let profQuery = adminClient.from('profiles').select('id, first_name, last_name, grade_level, group_name, roles!inner(name)').eq('roles.name', 'student')
 
       if (subData?.grade) {
-        const gradeStr = String(subData.grade)
-        dirQuery = dirQuery.or(`grade_level.ilike.%${gradeStr}%,grade_level.eq.${gradeStr}`)
-        profQuery = profQuery.or(`grade_level.ilike.%${gradeStr}%,grade_level.eq.${gradeStr}`)
+        const gradeVariants = buildPlanillaGradeVariants(subData.grade)
+        dirQuery = dirQuery.in('grade_level', gradeVariants)
+        profQuery = profQuery.in('grade_level', gradeVariants)
       }
 
       const [allDirRes, allProfRes] = await Promise.all([
@@ -903,37 +978,25 @@ export async function getPlanillaDirectoryCandidates(
     (existingStudents || []).map(s => [normalizeStudentName(s.full_name), s.number])
   )
 
-  // 3. Normalizar variantes de Grado y Grupo para compatibilidad con Gestión de Estudiantes
+  // 3. Normalizar variantes de Grado y Grupo para compatibilidad con Gestión de Estudiantes y PFC
   const gradeStr = String(grade || '').trim()
   const groupStr = String(groupNumber || '').trim()
-  const gradeDigits = gradeStr.replace(/\D/g, '')
-  const groupDigits = groupStr.replace(/\D/g, '')
-
-  const gradeVariants = Array.from(new Set([
-    gradeStr,
-    `${gradeStr}°`,
-    gradeDigits,
-    `${gradeDigits}°`,
-    `${gradeDigits} °`
-  ].filter(Boolean)))
-
-  const groupVariants = Array.from(new Set([
-    groupStr,
-    groupDigits,
-    `0${groupDigits}`,
-    `${gradeDigits}-${groupDigits}`,
-    `${gradeDigits}°-${groupDigits}`,
-    `${gradeDigits}° ${groupDigits}`
-  ].filter(Boolean)))
+  const gradeVariants = buildPlanillaGradeVariants(grade)
+  const groupVariants = buildPlanillaGroupVariants(groupNumber, grade)
 
   // 4. Obtener perfiles de estudiantes (con cuenta en campus)
-  const { data: profiles, error: pError } = await adminClient
+  let profQuery = adminClient
     .from('profiles')
     .select('id, first_name, last_name, grade_level, group_name, status, roles!inner(name)')
     .eq('roles.name', 'student')
     .in('grade_level', gradeVariants)
-    .in('group_name', groupVariants)
     .eq('status', 'active')
+
+  if (groupVariants.length > 0) {
+    profQuery = profQuery.in('group_name', groupVariants)
+  }
+
+  const { data: profiles, error: pError } = await profQuery
 
   if (pError) {
     console.error('Error al obtener perfiles:', pError)
@@ -954,13 +1017,18 @@ export async function getPlanillaDirectoryCandidates(
   }
 
   // 5. Obtener del directorio (sin cuenta en campus: profile_id IS NULL)
-  const { data: directory, error: dError } = await adminClient
+  let dirQuery = adminClient
     .from('student_directory')
     .select('id, first_name, last_name, document_id, grade_level, group_name, status, profile_id')
     .in('grade_level', gradeVariants)
-    .in('group_name', groupVariants)
     .is('profile_id', null)
     .eq('status', 'active')
+
+  if (groupVariants.length > 0) {
+    dirQuery = dirQuery.in('group_name', groupVariants)
+  }
+
+  const { data: directory, error: dError } = await dirQuery
 
   if (dError) {
     console.error('Error al obtener directorio:', dError)
@@ -1080,26 +1148,37 @@ export async function getStudentsFromDirectory(grade: number | string, groupNumb
 
   const adminClient = createAdminClient()
 
-  const grades = [String(grade), `${grade}°`, `${grade} °`]
-  const groups = [String(groupNumber), `0${groupNumber}`]
+  const gradeVariants = buildPlanillaGradeVariants(grade)
+  const groupVariants = buildPlanillaGroupVariants(groupNumber, grade)
 
   // 1. Obtener de perfiles (estudiantes ya registrados)
-  const { data: profiles, error: pError } = await adminClient
+  let profQuery = adminClient
     .from('profiles')
     .select('id, first_name, last_name, roles!inner(name)')
     .eq('roles.name', 'student')
-    .in('grade_level', grades)
-    .in('group_name', groups)
+    .in('grade_level', gradeVariants)
     .eq('status', 'active')
 
+  if (groupVariants.length > 0) {
+    profQuery = profQuery.in('group_name', groupVariants)
+  }
+
   // 2. Obtener del directorio (estudiantes sin cuenta)
-  const { data: directory, error: dError } = await adminClient
+  let dirQuery = adminClient
     .from('student_directory')
     .select('id, first_name, last_name')
-    .in('grade_level', grades)
-    .in('group_name', groups)
+    .in('grade_level', gradeVariants)
     .is('profile_id', null)
     .eq('status', 'active')
+
+  if (groupVariants.length > 0) {
+    dirQuery = dirQuery.in('group_name', groupVariants)
+  }
+
+  const [{ data: profiles, error: pError }, { data: directory, error: dError }] = await Promise.all([
+    profQuery,
+    dirQuery
+  ])
 
   if (pError || dError) {
     console.error('Error fetching students:', pError, dError)

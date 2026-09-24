@@ -1,19 +1,25 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { Users, BookOpen, Activity, FileText, GraduationCap, TrendingUp, ArrowUpRight, AlertTriangle, BarChart2, Loader2, Calendar, ClipboardList, UserCheck } from 'lucide-react'
+import {
+  Users, BookOpen, Activity, FileText, GraduationCap, TrendingUp,
+  ArrowUpRight, AlertTriangle, BarChart2, Loader2, Calendar, ClipboardList,
+  UserCheck, Link as LinkIcon, CheckCircle2
+} from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts'
+import { toast } from 'sonner'
 import { getAdminDashboardStats } from '../../application/actions'
 
 // Datos Mock de Respaldo / Modo Demo
 const mockKpis = [
-  { title: 'Total Estudiantes', value: '312', change: '+12 este mes', icon: GraduationCap, color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-950/30' },
-  { title: 'Total Docentes', value: '18', change: 'Estable', icon: Users, color: 'text-violet-600', bg: 'bg-violet-50 dark:bg-violet-950/30' },
-  { title: 'Cursos Activos', value: '45', change: '+3 nuevos', icon: BookOpen, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-950/30' },
-  { title: 'Quizzes Realizados', value: '1,240', change: 'Esta semana', icon: Activity, color: 'text-orange-600', bg: 'bg-orange-50 dark:bg-orange-950/30' },
-  { title: 'Recursos Cargados', value: '386', change: 'PDFs y Videos', icon: FileText, color: 'text-pink-600', bg: 'bg-pink-50 dark:bg-pink-950/30' },
-  { title: 'Promedio Académico', value: '4.1', change: '↑ vs período anterior', icon: TrendingUp, color: 'text-teal-600', bg: 'bg-teal-50 dark:bg-teal-950/30' },
+  { title: 'Total Estudiantes', value: '370', change: 'Matrícula institucional', icon: GraduationCap, color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-950/30' },
+  { title: 'Con Cuenta Virtual', value: '141', change: '38% con acceso', icon: UserCheck, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-950/30' },
+  { title: 'Sin Acceso Virtual', value: '229', change: '62% pendientes', icon: Users, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-950/30' },
+  { title: 'Total Docentes', value: '18', change: 'Cuerpo docente', icon: Users, color: 'text-violet-600', bg: 'bg-violet-50 dark:bg-violet-950/30' },
+  { title: 'Cursos Activos', value: '45', change: 'Clases publicadas', icon: BookOpen, color: 'text-indigo-600', bg: 'bg-indigo-50 dark:bg-indigo-950/30' },
+  { title: 'Promedio Académico', value: '4.1', change: 'Media institucional', icon: TrendingUp, color: 'text-teal-600', bg: 'bg-teal-50 dark:bg-teal-950/30' },
 ]
 
 const defaultEmptyActivityData = [
@@ -54,6 +60,13 @@ export function AdminDashboardScreen() {
   const [rectorName, setRectorName] = useState<string>('')
   const [isDemoData, setIsDemoData] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [studentStats, setStudentStats] = useState({
+    total: 370,
+    withAccount: 141,
+    withoutAccount: 229,
+    withAccountPct: 38,
+    withoutAccountPct: 62
+  })
   const [kpiData, setKpiData] = useState<any[]>(mockKpis)
   const [accessData, setAccessData] = useState<any[]>(defaultEmptyActivityData)
   const [perfData, setPerfData] = useState<any[]>(mockPerformanceData)
@@ -180,13 +193,20 @@ export function AdminDashboardScreen() {
 
         if (stats) {
           setIsDemoData(false)
+          setStudentStats({
+            total: stats.studentCount,
+            withAccount: stats.studentsWithAccount,
+            withoutAccount: stats.studentsWithoutAccount,
+            withAccountPct: stats.withAccountPct,
+            withoutAccountPct: stats.withoutAccountPct
+          })
           // Map real KPIs
           const updatedKpis = [
             { title: 'Total Estudiantes', value: String(stats.studentCount), change: 'Matrícula institucional', icon: GraduationCap, color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-950/30' },
+            { title: 'Con Cuenta Virtual', value: String(stats.studentsWithAccount), change: `${stats.withAccountPct}% con acceso`, icon: UserCheck, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-950/30' },
+            { title: 'Sin Acceso Virtual', value: String(stats.studentsWithoutAccount), change: `${stats.withoutAccountPct}% pendientes`, icon: Users, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-950/30' },
             { title: 'Total Docentes', value: String(stats.teacherCount), change: 'Cuerpo docente', icon: Users, color: 'text-violet-600', bg: 'bg-violet-50 dark:bg-violet-950/30' },
-            { title: 'Cursos Activos', value: String(stats.activeCoursesCount), change: 'Clases publicadas', icon: BookOpen, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-950/30' },
-            { title: 'Quizzes Realizados', value: String(stats.quizzesCount), change: 'Evaluaciones entregadas', icon: Activity, color: 'text-orange-600', bg: 'bg-orange-50 dark:bg-orange-950/30' },
-            { title: 'Recursos Cargados', value: String(stats.resourcesCount), change: 'Biblioteca digital', icon: FileText, color: 'text-pink-600', bg: 'bg-pink-50 dark:bg-pink-950/30' },
+            { title: 'Cursos Activos', value: String(stats.activeCoursesCount), change: 'Clases publicadas', icon: BookOpen, color: 'text-indigo-600', bg: 'bg-indigo-50 dark:bg-indigo-950/30' },
             { title: 'Promedio Académico', value: stats.avgGradeVal, change: 'Media institucional', icon: TrendingUp, color: 'text-teal-600', bg: 'bg-teal-50 dark:bg-teal-950/30' },
           ]
           setKpiData(updatedKpis)
@@ -342,6 +362,97 @@ export function AdminDashboardScreen() {
           )
         })}
       </div>
+
+      {/* Student Virtual Account Coverage Card */}
+      <motion.div
+        initial={{ opacity: 0, y: 14 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm dark:border-slate-800/60 dark:bg-slate-900"
+      >
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400">
+                <GraduationCap className="h-4 w-4" />
+              </span>
+              <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                Acceso y Cobertura de Cuentas Virtuales de Estudiantes
+              </h2>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              Monitoreo en tiempo real de alumnos con cuenta virtual activa vs. estudiantes pre-matriculados sin acceso
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => {
+                const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://aula.ensuny.edu.co'
+                navigator.clipboard.writeText(`${baseUrl}/register/student`)
+                toast.success('¡Enlace de autoregistro copiado al portapapeles!')
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition-all cursor-pointer"
+            >
+              <LinkIcon className="h-3.5 w-3.5" />
+              <span>Copiar Enlace de Registro</span>
+            </button>
+            <Link
+              href="/admin/students"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-900/40 transition-all"
+            >
+              <Users className="h-3.5 w-3.5" />
+              <span>Gestionar Estudiantes</span>
+            </Link>
+          </div>
+        </div>
+
+        {/* Progress Bar */}
+        <div className="mt-5 space-y-2">
+          <div className="flex items-center justify-between text-xs font-semibold">
+            <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
+              Con Cuenta Virtual: {studentStats.withAccount} ({studentStats.withAccountPct}%)
+            </span>
+            <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-amber-500"></span>
+              Sin Acceso Virtual: {studentStats.withoutAccount} ({studentStats.withoutAccountPct}%)
+            </span>
+          </div>
+
+          <div className="h-3 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden flex">
+            <div
+              style={{ width: `${studentStats.withAccountPct}%` }}
+              className="bg-emerald-500 h-full rounded-l-full transition-all duration-500"
+              title={`Con cuenta virtual: ${studentStats.withAccount} (${studentStats.withAccountPct}%)`}
+            />
+            <div
+              style={{ width: `${studentStats.withoutAccountPct}%` }}
+              className="bg-amber-400 dark:bg-amber-500 h-full rounded-r-full transition-all duration-500"
+              title={`Sin acceso virtual: ${studentStats.withoutAccount} (${studentStats.withoutAccountPct}%)`}
+            />
+          </div>
+        </div>
+
+        {/* Breakdown 3 Columns */}
+        <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3 pt-4 border-t border-slate-100 dark:border-slate-800/60">
+          <div className="p-3.5 rounded-2xl bg-slate-50/70 dark:bg-slate-950/40 border border-slate-100 dark:border-slate-800/50">
+            <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Total Estudiantes</p>
+            <p className="text-2xl font-black text-slate-900 dark:text-white mt-0.5">{studentStats.total}</p>
+            <p className="text-[10px] text-slate-400 mt-0.5">Matrícula institucional consolidada</p>
+          </div>
+          <div className="p-3.5 rounded-2xl bg-emerald-50/40 dark:bg-emerald-950/20 border border-emerald-100/60 dark:border-emerald-900/30">
+            <p className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">Con Cuenta Virtual</p>
+            <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-0.5">{studentStats.withAccount}</p>
+            <p className="text-[10px] text-emerald-600/70 dark:text-emerald-400/70 mt-0.5">Usuarios activos con acceso al campus y cursos</p>
+          </div>
+          <div className="p-3.5 rounded-2xl bg-amber-50/40 dark:bg-amber-950/20 border border-amber-100/60 dark:border-amber-900/30">
+            <p className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">Sin Acceso Virtual</p>
+            <p className="text-2xl font-black text-amber-600 dark:text-amber-400 mt-0.5">{studentStats.withoutAccount}</p>
+            <p className="text-[10px] text-amber-600/70 dark:text-amber-400/70 mt-0.5">En directorio escolar pendientes de registro</p>
+          </div>
+        </div>
+      </motion.div>
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">

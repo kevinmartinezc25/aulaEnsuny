@@ -1051,16 +1051,52 @@ export async function getAdminDashboardStats() {
 
     // 9. Obtener estudiantes del directorio sin cuenta virtual
     // (estos son los matriculados importados por CSV que aún no tienen acceso a la plataforma)
-    const { count: directoryOnlyCount } = await adminClient
+    const { data: directoryStudents } = await adminClient
       .from('student_directory')
-      .select('id', { count: 'exact', head: true })
+      .select('id, document_id, first_name, last_name, profile_id')
       .is('profile_id', null)
       .eq('status', 'active')
 
-    const totalStudentCount = students.length + (directoryOnlyCount || 0)
+    // Consultar student_details para identificar documentos de los estudiantes ya registrados
+    const { data: registeredDetails } = await adminClient
+      .from('student_details')
+      .select('student_id, document_number')
+
+    const registeredDocSet = new Set<string>()
+    for (const d of registeredDetails || []) {
+      if (d.document_number) registeredDocSet.add(d.document_number.trim().toLowerCase())
+    }
+
+    const norm = (s: string) =>
+      (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim()
+
+    const registeredNameSet = new Set<string>()
+    for (const p of students) {
+      const n1 = norm(`${p.first_name || ''} ${p.last_name || ''}`)
+      const n2 = norm(`${p.last_name || ''} ${p.first_name || ''}`)
+      if (n1) registeredNameSet.add(n1)
+      if (n2) registeredNameSet.add(n2)
+    }
+
+    const unregisteredStudents = (directoryStudents || []).filter(d => {
+      if (d.document_id && registeredDocSet.has(d.document_id.trim().toLowerCase())) return false
+      const dirName = norm(`${d.first_name || ''} ${d.last_name || ''}`)
+      if (dirName && registeredNameSet.has(dirName)) return false
+      return true
+    })
+
+    const studentsWithAccount = students.length
+    const studentsWithoutAccount = unregisteredStudents.length
+    const totalStudentCount = studentsWithAccount + studentsWithoutAccount
+    const withAccountPct = totalStudentCount > 0 ? Math.round((studentsWithAccount / totalStudentCount) * 100) : 0
+    const withoutAccountPct = totalStudentCount > 0 ? Math.round((studentsWithoutAccount / totalStudentCount) * 100) : 0
 
     return {
       studentCount: totalStudentCount,
+      studentsWithAccount,
+      studentsWithoutAccount,
+      withAccountPct,
+      withoutAccountPct,
       teacherCount: teachers.length,
       activeCoursesCount,
       quizzesCount,
@@ -1246,19 +1282,19 @@ export async function getAdminStudentById(id: string): Promise<FullStudentData |
         mappedDetails = {
           documentType: details.document_type || 'TI',
           documentNumber: details.document_number || dirStudent?.document_id || '',
-          expeditionDate: details.expedition_date || undefined,
-          expeditionPlace: details.expedition_place || undefined,
+          expeditionDate: details.expedition_date || '',
+          expeditionPlace: details.expedition_place || '',
           firstName: details.first_name || profile.first_name,
-          secondName: details.second_name || undefined,
+          secondName: details.second_name || '',
           firstSurname: details.first_surname || profile.last_name,
-          secondSurname: details.second_surname || undefined,
+          secondSurname: details.second_surname || '',
           birthDate: details.birth_date || '',
           gender: details.gender || 'M',
-          bloodType: details.blood_type || undefined,
-          rh: details.rh || undefined,
+          bloodType: details.blood_type || 'O',
+          rh: details.rh || '+',
           nationality: details.nationality || 'Colombiana',
-          birthMunicipality: details.birth_municipality || undefined,
-          birthDepartment: details.birth_department || undefined
+          birthMunicipality: details.birth_municipality || '',
+          birthDepartment: details.birth_department || ''
         }
       } else {
         const fnParts = (profile.first_name || dirStudent?.first_name || '').trim().split(/\s+/)
@@ -1267,9 +1303,9 @@ export async function getAdminStudentById(id: string): Promise<FullStudentData |
           documentType: 'TI',
           documentNumber: dirStudent?.document_id || '',
           firstName: fnParts[0] || '',
-          secondName: fnParts.slice(1).join(' ') || undefined,
+          secondName: fnParts.slice(1).join(' ') || '',
           firstSurname: lnParts[0] || '',
-          secondSurname: lnParts.slice(1).join(' ') || undefined,
+          secondSurname: lnParts.slice(1).join(' ') || '',
           birthDate: '',
           gender: 'M',
           bloodType: 'O',
@@ -1283,13 +1319,13 @@ export async function getAdminStudentById(id: string): Promise<FullStudentData |
       if (contact) {
         mappedContact = {
           address: contact.address || '',
-          neighborhood: contact.neighborhood || undefined,
+          neighborhood: contact.neighborhood || '',
           municipality: contact.municipality || '',
           department: contact.department || '',
           zone: (contact.zone || 'Urbana') as 'Urbana' | 'Rural',
-          phone: contact.phone || undefined,
-          studentCellphone: contact.student_cellphone || undefined,
-          studentEmail: contact.student_email || email || undefined
+          phone: contact.phone || '',
+          studentCellphone: contact.student_cellphone || '',
+          studentEmail: contact.student_email || email || ''
         }
       } else {
         mappedContact = {
@@ -1305,23 +1341,23 @@ export async function getAdminStudentById(id: string): Promise<FullStudentData |
       let mappedGuardians: StudentGuardians
       if (guardians) {
         mappedGuardians = {
-          fatherName: guardians.father_name || undefined,
-          fatherDocument: guardians.father_document || undefined,
-          fatherPhone: guardians.father_phone || undefined,
-          fatherEmail: guardians.father_email || undefined,
-          fatherOccupation: guardians.father_occupation || undefined,
-          motherName: guardians.mother_name || undefined,
-          motherDocument: guardians.mother_document || undefined,
-          motherPhone: guardians.mother_phone || undefined,
-          motherEmail: guardians.mother_email || undefined,
-          motherOccupation: guardians.mother_occupation || undefined,
+          fatherName: guardians.father_name || '',
+          fatherDocument: guardians.father_document || '',
+          fatherPhone: guardians.father_phone || '',
+          fatherEmail: guardians.father_email || '',
+          fatherOccupation: guardians.father_occupation || '',
+          motherName: guardians.mother_name || '',
+          motherDocument: guardians.mother_document || '',
+          motherPhone: guardians.mother_phone || '',
+          motherEmail: guardians.mother_email || '',
+          motherOccupation: guardians.mother_occupation || '',
           guardianName: guardians.guardian_name || '',
           guardianDocument: guardians.guardian_document || '',
           guardianRelationship: guardians.guardian_relationship || 'Madre',
           guardianPhone: guardians.guardian_phone || '',
-          guardianEmail: guardians.guardian_email || undefined,
-          guardianAddress: guardians.guardian_address || undefined,
-          guardianOccupation: guardians.guardian_occupation || undefined
+          guardianEmail: guardians.guardian_email || '',
+          guardianAddress: guardians.guardian_address || '',
+          guardianOccupation: guardians.guardian_occupation || ''
         }
       } else {
         mappedGuardians = {
@@ -1338,11 +1374,11 @@ export async function getAdminStudentById(id: string): Promise<FullStudentData |
         mappedMedical = {
           eps: medical.eps || '',
           affiliationType: medical.affiliation_type || 'Contributivo',
-          ips: medical.ips || undefined,
-          allergies: medical.allergies || undefined,
-          diseases: medical.diseases || undefined,
-          medicines: medical.medicines || undefined,
-          observations: medical.observations || undefined
+          ips: medical.ips || '',
+          allergies: medical.allergies || '',
+          diseases: medical.diseases || '',
+          medicines: medical.medicines || '',
+          observations: medical.observations || ''
         }
       } else {
         mappedMedical = {
@@ -1459,9 +1495,9 @@ export async function getAdminStudentById(id: string): Promise<FullStudentData |
         documentType: 'TI',
         documentNumber: cleanDoc,
         firstName,
-        secondName: secondName || undefined,
+        secondName: secondName || '',
         firstSurname,
-        secondSurname: secondSurname || undefined,
+        secondSurname: secondSurname || '',
         birthDate: '',
         gender: 'M',
         bloodType: 'O',

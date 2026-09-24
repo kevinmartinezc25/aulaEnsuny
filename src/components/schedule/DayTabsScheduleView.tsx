@@ -105,7 +105,11 @@ function parseTimeToMinutes(timeStr: string): number {
 function isClassOngoing(item: ScheduleItem, isToday: boolean, currentMinutes: number): boolean {
   if (!isToday) return false
   const startMin = parseTimeToMinutes(item.startTime)
-  const endMin = parseTimeToMinutes(item.endTime)
+  let endMin = parseTimeToMinutes(item.endTime)
+  if (startMin === 0 && endMin === 0) return false
+  if (endMin <= startMin) {
+    endMin = startMin + 55
+  }
   return currentMinutes >= startMin && currentMinutes < endMin
 }
 
@@ -292,8 +296,8 @@ export default function DayTabsScheduleView({
             )}
           </div>
           {isSelectedDayToday && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200/50 dark:border-indigo-800/40">
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/50">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               Hoy
             </span>
           )}
@@ -358,7 +362,6 @@ export default function DayTabsScheduleView({
           /* TARJETAS DE CLASES Y HUECOS */
           dayClasses.map((item, index) => {
             const isOngoing = isClassOngoing(item, isSelectedDayToday, currentMinutes)
-            const accentColor = item.color || '#4f46e5'
             const hourLabel = item.period ? `${item.period}ª Hora` : `${index + 1}ª Hora`
 
             // CARD VACÍA / HUECO: Período sin clase asignada (Verde Pastel)
@@ -368,55 +371,66 @@ export default function DayTabsScheduleView({
                   key={item.id}
                   className={`relative group rounded-2xl border transition-all duration-200 overflow-hidden shadow-xs hover:shadow-md cursor-default ${
                     isOngoing
-                      ? 'bg-emerald-100/60 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 ring-2 ring-emerald-500/20'
+                      ? 'bg-gradient-to-r from-emerald-100/95 via-emerald-50/95 to-emerald-100/90 dark:from-emerald-950/85 dark:via-emerald-900/50 dark:to-emerald-950/70 border-emerald-500 dark:border-emerald-400 ring-2 ring-emerald-500/30 shadow-md'
                       : 'bg-emerald-50/70 dark:bg-emerald-950/25 border-emerald-200/80 dark:border-emerald-800/60'
                   }`}
                 >
-                  {/* Acento lateral verde pastel */}
-                  <div
-                    className="absolute left-0 top-0 bottom-0 w-1.5 bg-emerald-400 dark:bg-emerald-500"
-                    aria-hidden="true"
-                  />
-
-                  <div className="p-4 sm:p-5 pl-5 sm:pl-6 flex items-center justify-between gap-3 min-h-[110px]">
+                  <div className="p-4 sm:p-5 flex items-center justify-between gap-3 min-h-[110px]">
                     <div className="flex-1 flex flex-col justify-between gap-2 min-w-0">
                       {/* Fila Superior: Badge Hora + Rango Horario + Estado */}
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-black uppercase tracking-tight bg-emerald-100/90 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200/90 dark:border-emerald-700/60 shrink-0 shadow-xs">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-black uppercase tracking-tight shrink-0 shadow-xs ${
+                          isOngoing
+                            ? 'bg-emerald-600 text-white border border-emerald-700'
+                            : 'bg-emerald-100/90 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200/90 dark:border-emerald-700/60'
+                        }`}>
                           {hourLabel}
                         </span>
 
-                        <div className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-emerald-700/80 dark:text-emerald-400/80">
-                          <Clock className="w-3.5 h-3.5 text-emerald-600/70 dark:text-emerald-400/70 shrink-0" />
+                        <div className={`flex items-center gap-1.5 text-xs sm:text-sm font-bold ${
+                          isOngoing ? 'text-emerald-900 dark:text-emerald-200' : 'text-emerald-700/80 dark:text-emerald-400/80'
+                        }`}>
+                          <Clock className={`w-3.5 h-3.5 shrink-0 ${isOngoing ? 'text-emerald-600 dark:text-emerald-400' : 'text-emerald-600/70 dark:text-emerald-400/70'}`} />
                           <span>{item.startTime}{item.endTime ? ` – ${item.endTime}` : ''}</span>
                         </div>
 
                         {isOngoing && (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-200/90 dark:bg-emerald-900/70 text-emerald-900 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700 animate-pulse">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 dark:bg-emerald-400" />
+                          <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-600 text-white border border-emerald-700 shadow-xs animate-pulse">
+                            <span className="relative flex h-2 w-2">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
+                            </span>
                             Hora Libre Actual
                           </span>
                         )}
                       </div>
 
                       {/* Título: Sin clase Asignada */}
-                      <h2 className="text-base sm:text-lg font-black text-emerald-900 dark:text-emerald-100 leading-snug tracking-tight truncate">
+                      <h2 className="text-base sm:text-lg font-black text-emerald-950 dark:text-emerald-100 leading-snug tracking-tight truncate">
                         Sin clase Asignada
                       </h2>
 
                       {/* Subtítulo informativo */}
-                      <div className="flex items-center gap-1.5 text-xs text-emerald-700/80 dark:text-emerald-400/80 pt-0.5">
-                        <Coffee className="w-3.5 h-3.5 text-emerald-600/70 dark:text-emerald-400/70 shrink-0" />
+                      <div className="flex items-center gap-1.5 text-xs text-emerald-800 dark:text-emerald-200 pt-0.5">
+                        <Coffee className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                         <span className="font-semibold">Disponibilidad / Tiempo Libre</span>
                       </div>
                     </div>
 
-                    {/* Badge derecho: Simétrico al badge de grupo */}
-                    <div className="shrink-0 flex flex-col items-center justify-center px-3.5 py-2 rounded-2xl bg-emerald-100/80 dark:bg-emerald-900/40 border border-emerald-200/80 dark:border-emerald-800/60 shadow-xs min-w-[76px]">
-                      <span className="text-[9px] font-black uppercase tracking-widest text-emerald-700/80 dark:text-emerald-300/80 leading-none">
-                        Estado
+                    {/* Badge derecho */}
+                    <div className={`shrink-0 flex flex-col items-center justify-center px-3.5 py-2 rounded-2xl shadow-xs min-w-[76px] ${
+                      isOngoing
+                        ? 'bg-emerald-600 text-white border border-emerald-700 shadow-md'
+                        : 'bg-emerald-100/80 dark:bg-emerald-900/40 border border-emerald-200/80 dark:border-emerald-800/60'
+                    }`}>
+                      <span className={`text-[9px] font-black uppercase tracking-widest leading-none ${
+                        isOngoing ? 'text-emerald-100' : 'text-emerald-700/80 dark:text-emerald-300/80'
+                      }`}>
+                        {isOngoing ? 'Actual' : 'Estado'}
                       </span>
-                      <span className="text-base sm:text-lg font-black text-emerald-800 dark:text-emerald-200 leading-tight mt-1 tracking-tight">
+                      <span className={`text-base sm:text-lg font-black leading-tight mt-1 tracking-tight ${
+                        isOngoing ? 'text-white' : 'text-emerald-800 dark:text-emerald-200'
+                      }`}>
                         Libre
                       </span>
                     </div>
@@ -431,29 +445,28 @@ export default function DayTabsScheduleView({
                 key={item.id}
                 onClick={() => onClassClick && onClassClick(item)}
                 tabIndex={0}
-                className={`relative group bg-white dark:bg-slate-900 rounded-2xl border transition-all duration-200 overflow-hidden shadow-xs hover:shadow-md cursor-default ${
+                className={`relative group rounded-2xl border transition-all duration-200 overflow-hidden shadow-xs hover:shadow-md cursor-default ${
                   isOngoing 
-                    ? 'border-indigo-400 dark:border-indigo-600 ring-2 ring-indigo-500/20 bg-indigo-50/10' 
-                    : 'border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                    ? 'bg-gradient-to-r from-emerald-100/90 via-emerald-50/95 to-emerald-100/80 dark:from-emerald-950/85 dark:via-emerald-900/50 dark:to-emerald-950/70 border-emerald-500 dark:border-emerald-400 ring-2 ring-emerald-500/30 shadow-md' 
+                    : 'bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
                 }`}
               >
-                {/* Acento lateral izquierdo (identificación sobria) */}
-                <div 
-                  className="absolute left-0 top-0 bottom-0 w-1.5" 
-                  style={{ backgroundColor: accentColor }} 
-                  aria-hidden="true"
-                />
-
-                <div className="p-4 sm:p-5 pl-5 sm:pl-6 flex items-center justify-between gap-3 min-h-[110px]">
+                <div className="p-4 sm:p-5 flex items-center justify-between gap-3 min-h-[110px]">
                   <div className="flex-1 flex flex-col justify-between gap-2 min-w-0">
                     {/* Fila Superior: Badge Hora + Rango Horario + Badge Estado + Badge Novedad */}
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-black uppercase tracking-tight bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200/70 dark:border-indigo-800/70 shrink-0 shadow-xs">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-black uppercase tracking-tight shrink-0 shadow-xs ${
+                        isOngoing
+                          ? 'bg-emerald-600 text-white border border-emerald-700'
+                          : 'bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200/70 dark:border-indigo-800/70'
+                      }`}>
                         {hourLabel}
                       </span>
                       
-                      <div className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-slate-500 dark:text-slate-400">
-                        <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <div className={`flex items-center gap-1.5 text-xs sm:text-sm font-bold ${
+                        isOngoing ? 'text-emerald-900 dark:text-emerald-200 font-extrabold' : 'text-slate-500 dark:text-slate-400'
+                      }`}>
+                        <Clock className={`w-3.5 h-3.5 shrink-0 ${isOngoing ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`} />
                         <span>{item.startTime}{item.endTime ? ` – ${item.endTime}` : ''}</span>
                       </div>
 
@@ -463,17 +476,21 @@ export default function DayTabsScheduleView({
                         </span>
                       )}
 
-
                       {isOngoing && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 animate-pulse">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                          En Curso
+                        <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-600 text-white border border-emerald-700 shadow-xs animate-pulse">
+                          <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
+                          </span>
+                          Hora en Curso
                         </span>
                       )}
                     </div>
 
                     {/* Materia (Elemento dominante) */}
-                    <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white leading-snug tracking-tight text-center break-words whitespace-normal w-full">
+                    <h2 className={`text-base sm:text-lg font-black leading-snug tracking-tight text-center break-words whitespace-normal w-full ${
+                      isOngoing ? 'text-emerald-950 dark:text-emerald-50' : 'text-slate-900 dark:text-white'
+                    }`}>
                       {item.subject}
                     </h2>
 
@@ -481,49 +498,74 @@ export default function DayTabsScheduleView({
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400 pt-0.5">
                       {item.location && (
                         <div className="flex items-center gap-1.5">
-                          <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span className="font-semibold text-slate-700 dark:text-slate-300">{item.location}</span>
+                          <MapPin className={`w-3.5 h-3.5 shrink-0 ${isOngoing ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`} />
+                          <span className={`font-semibold ${isOngoing ? 'text-emerald-900 dark:text-emerald-200' : 'text-slate-700 dark:text-slate-300'}`}>{item.location}</span>
                         </div>
                       )}
 
                       {/* Según el contexto: mostramos docente (para estudiante o grupo) */}
                       {context.type === 'student' && item.teacher && (
                         <div className="flex items-center gap-1.5">
-                          <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span>Prof. {item.teacher}</span>
+                          <User className={`w-3.5 h-3.5 shrink-0 ${isOngoing ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`} />
+                          <span className={isOngoing ? 'text-emerald-900 dark:text-emerald-200 font-semibold' : ''}>Prof. {item.teacher}</span>
                         </div>
                       )}
 
                       {context.type === 'group' && item.teacher && (
                         <div className="flex items-center gap-1.5">
-                          <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span>{item.teacher}</span>
+                          <User className={`w-3.5 h-3.5 shrink-0 ${isOngoing ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`} />
+                          <span className={isOngoing ? 'text-emerald-900 dark:text-emerald-200 font-semibold' : ''}>{item.teacher}</span>
                         </div>
                       )}
 
                       {!item.location && !item.teacher && (
-                        <span className="text-slate-400 dark:text-slate-500 font-medium">Clase Programada</span>
+                        <span className={`font-medium ${isOngoing ? 'text-emerald-800 dark:text-emerald-300' : 'text-slate-400 dark:text-slate-500'}`}>Clase Programada</span>
                       )}
                     </div>
                   </div>
 
-                  {/* A la derecha: Badge del Grupo (solo si no es vista de grupo ni se oculta), o Jornada para consulta estudiante */}
+                  {/* A la derecha: Badge del Grupo o Jornada / Actual */}
                   {hideGroupBadge && context.type === 'student' ? (
-                    <div className="shrink-0 flex flex-col items-center justify-center px-3.5 py-2 rounded-2xl bg-emerald-500/10 dark:bg-emerald-950/50 border border-emerald-500/20 dark:border-emerald-800/40 shadow-xs min-w-[76px]">
-                      <span className="text-[9px] font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-400 leading-none">
-                        Jornada
+                    <div className={`shrink-0 flex flex-col items-center justify-center px-3.5 py-2 rounded-2xl shadow-xs min-w-[76px] ${
+                      isOngoing
+                        ? 'bg-emerald-600 text-white border border-emerald-700 shadow-md'
+                        : 'bg-emerald-500/10 dark:bg-emerald-950/50 border border-emerald-500/20 dark:border-emerald-800/40'
+                    }`}>
+                      <span className={`text-[9px] font-black uppercase tracking-wider leading-none ${
+                        isOngoing ? 'text-emerald-100' : 'text-emerald-700 dark:text-emerald-400'
+                      }`}>
+                        {isOngoing ? 'En Curso' : 'Jornada'}
                       </span>
-                      <span className="text-xs sm:text-sm font-black text-[#1F4E31] dark:text-emerald-300 leading-tight mt-1 tracking-tight whitespace-nowrap">
+                      <span className={`text-xs sm:text-sm font-black leading-tight mt-1 tracking-tight whitespace-nowrap ${
+                        isOngoing ? 'text-white' : 'text-[#1F4E31] dark:text-emerald-300'
+                      }`}>
                         {hourLabel}
                       </span>
                     </div>
                   ) : !hideGroupBadge && context.type !== 'group' && Boolean(item.group) && item.group !== 'Jornada Institucional' ? (
-                    <div className="shrink-0 flex flex-col items-center justify-center px-3 sm:px-3.5 py-2 rounded-2xl bg-indigo-50/90 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-900/60 shadow-xs min-w-[76px] max-w-[45%] sm:max-w-[35%]">
-                      <span className="text-[9px] font-black uppercase tracking-widest text-indigo-400 dark:text-indigo-400 leading-none mb-1">
-                        Grupo
+                    <div className={`shrink-0 flex flex-col items-center justify-center px-3 sm:px-3.5 py-2 rounded-2xl shadow-xs min-w-[76px] max-w-[45%] sm:max-w-[35%] ${
+                      isOngoing
+                        ? 'bg-emerald-600 text-white border border-emerald-700 shadow-md'
+                        : 'bg-indigo-50/90 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-900/60'
+                    }`}>
+                      <span className={`text-[9px] font-black uppercase tracking-widest leading-none mb-1 ${
+                        isOngoing ? 'text-emerald-100' : 'text-indigo-400 dark:text-indigo-400'
+                      }`}>
+                        {isOngoing ? 'En Curso' : 'Grupo'}
                       </span>
-                      <span className={`font-black text-indigo-700 dark:text-indigo-300 leading-tight tracking-tight text-center break-words whitespace-normal w-full ${(item.group?.length || 0) > 8 ? 'text-xs sm:text-sm' : 'text-xl sm:text-2xl'}`}>
+                      <span className={`font-black leading-tight tracking-tight text-center break-words whitespace-normal w-full ${(item.group?.length || 0) > 8 ? 'text-xs sm:text-sm' : 'text-xl sm:text-2xl'} ${
+                        isOngoing ? 'text-white' : 'text-indigo-700 dark:text-indigo-300'
+                      }`}>
                         {item.group}
+                      </span>
+                    </div>
+                  ) : isOngoing ? (
+                    <div className="shrink-0 flex flex-col items-center justify-center px-3.5 py-2 rounded-2xl bg-emerald-600 text-white border border-emerald-700 shadow-md min-w-[76px]">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-emerald-100 leading-none mb-1">
+                        Actual
+                      </span>
+                      <span className="text-xs sm:text-sm font-black text-white leading-tight mt-0.5 tracking-tight whitespace-nowrap">
+                        {hourLabel}
                       </span>
                     </div>
                   ) : null}

@@ -111,7 +111,12 @@ export function StudentRegistrationScreen() {
       if (res.found && res.student) {
         setValue('firstName', res.student.firstName, { shouldValidate: true })
         setValue('lastName', res.student.lastName, { shouldValidate: true })
-        setValue('gradeLevel', res.student.gradeLevel, { shouldValidate: true })
+
+        let normalizedGrade = res.student.gradeLevel || ''
+        if (/^(pfc[\s\-_]?12|12°?)$/i.test(normalizedGrade)) normalizedGrade = 'PFC-12'
+        else if (/^(pfc[\s\-_]?13|13°?)$/i.test(normalizedGrade)) normalizedGrade = 'PFC-13'
+
+        setValue('gradeLevel', normalizedGrade, { shouldValidate: true })
         setValue('groupName', res.student.groupName, { shouldValidate: true })
         setIsPreloaded(true)
       } else {
@@ -485,7 +490,8 @@ export function StudentRegistrationScreen() {
                           <option value="9°">9°</option>
                           <option value="10°">10°</option>
                           <option value="11°">11°</option>
-                          <option value="PFC">PFC</option>
+                          <option value="PFC-12">PFC-12</option>
+                          <option value="PFC-13">PFC-13</option>
                         </select>
                         {errors.gradeLevel && (
                           <p className="text-[11px] text-red-500 mt-1">{errors.gradeLevel.message}</p>

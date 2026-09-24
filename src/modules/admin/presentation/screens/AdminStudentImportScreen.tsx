@@ -18,6 +18,7 @@ import {
   type ImportRowValidated,
   type ImportResult,
 } from '../../application/studentImportActions'
+import { normalizeGradeLevel } from '@/lib/gradeUtils'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TIPOS
@@ -89,7 +90,7 @@ function parseFileToRows(file: File): Promise<StudentImportRow[]> {
 
           const obj: Partial<StudentImportRow> = {
             documentId: rawObj.documentId,
-            gradeLevel: rawObj.gradeLevel,
+            gradeLevel: normalizeGradeLevel(rawObj.gradeLevel),
             groupName: rawObj.groupName,
             email: rawObj.email,
           }
