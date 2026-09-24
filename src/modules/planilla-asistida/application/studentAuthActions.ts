@@ -4,6 +4,7 @@ import { cookies } from 'next/headers'
 import { SignJWT, jwtVerify } from 'jose'
 import { createAdminClient } from '@/core/config/supabase/server'
 import { resolveOfficialGroup } from './groupResolver'
+import { formatCapitalizedWords } from '@/lib/utils'
 
 // Mantenemos el secreto en las variables de entorno, o usamos uno fallback (en dev)
 const JWT_SECRET = process.env.JWT_SECRET || 'aulaensuny_planilla_super_secret_key_12345'
@@ -138,7 +139,8 @@ export async function authenticatePlanillaStudent(documentId: string) {
 
   // 3. Vincular con sch_groups para obtener el ID de horario
   let groupId: string | null = null
-  const fullName = `${directoryData.last_name} ${directoryData.first_name}`.trim()
+  const rawFullName = `${directoryData.last_name || ''} ${directoryData.first_name || ''}`.trim()
+  const formattedFullName = formatCapitalizedWords(rawFullName) || rawFullName
   const { data: allGroups } = await supabase.from('sch_groups').select('id, name')
 
   if (allGroups && allGroups.length > 0) {
@@ -163,11 +165,11 @@ export async function authenticatePlanillaStudent(documentId: string) {
         .limit(5)
       if (byDir) assistedSubIds.push(...byDir.map(r => r.subject_id).filter(Boolean))
 
-      if (assistedSubIds.length === 0 && fullName) {
+      if (assistedSubIds.length === 0 && rawFullName) {
         const { data: byName } = await supabase
           .from('assisted_students')
           .select('subject_id')
-          .ilike('full_name', fullName)
+          .ilike('full_name', rawFullName)
           .limit(5)
         if (byName) assistedSubIds.push(...byName.map(r => r.subject_id).filter(Boolean))
       }
@@ -202,9 +204,9 @@ export async function authenticatePlanillaStudent(documentId: string) {
   const payload: PlanillaStudentSession = {
     directoryId: directoryData.id,
     documentId: directoryData.document_id,
-    firstName: directoryData.first_name,
-    lastName: directoryData.last_name,
-    fullName,
+    firstName: formatCapitalizedWords(directoryData.first_name) || directoryData.first_name,
+    lastName: formatCapitalizedWords(directoryData.last_name) || directoryData.last_name,
+    fullName: formattedFullName,
     groupName: activeGroupName,
     groupId,
     gradeLevel: activeGradeLevel,
@@ -231,7 +233,7 @@ export async function authenticatePlanillaStudent(documentId: string) {
 
   return { 
     success: true, 
-    studentName: fullName,
+    studentName: formattedFullName,
     groupName: activeGroupName,
     academicYear
   }
@@ -248,7 +250,19 @@ export async function getPlanillaStudentSession(): Promise<PlanillaStudentSessio
 
   try {
     const { payload } = await jwtVerify(token, encodedSecret)
-    return payload as unknown as PlanillaStudentSession
+    const session = payload as unknown as PlanillaStudentSession
+    if (session) {
+      if (session.fullName) {
+        session.fullName = formatCapitalizedWords(session.fullName) || session.fullName
+      }
+      if (session.firstName) {
+        session.firstName = formatCapitalizedWords(session.firstName) || session.firstName
+      }
+      if (session.lastName) {
+        session.lastName = formatCapitalizedWords(session.lastName) || session.lastName
+      }
+    }
+    return session
   } catch (error) {
     return null
   }

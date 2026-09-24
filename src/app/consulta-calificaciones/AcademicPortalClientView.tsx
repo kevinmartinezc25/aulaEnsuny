@@ -16,36 +16,46 @@ import {
   AlertCircle,
   ShieldCheck,
   ShieldAlert,
-  CheckCircle2
+  CheckCircle2,
+  CalendarCheck2
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { PlanillaStudentSession } from '@/modules/planilla-asistida/application/studentAuthActions'
 import { StudentSubjectView, StudentScheduleResponse } from '@/modules/planilla-asistida/application/studentQueries'
 import { StudentPortalDisciplinaryData } from '@/modules/disciplinary/application/studentDisciplinaryActions'
+import { StudentAttendanceOverview } from '@/modules/planilla-asistida/application/studentAttendanceQueries'
 import { StudentSubjectsClientView } from './StudentSubjectsClientView'
 import { StudentDisciplinaryClientView } from './components/StudentDisciplinaryClientView'
+import { StudentAttendanceClientView } from './components/StudentAttendanceClientView'
 import DayTabsScheduleView from '@/components/schedule/DayTabsScheduleView'
+import { formatCapitalizedWords } from '@/lib/utils'
 
 interface AcademicPortalClientViewProps {
   session: PlanillaStudentSession
   subjects: StudentSubjectView[]
   scheduleData: StudentScheduleResponse
   disciplinaryData?: StudentPortalDisciplinaryData
+  attendanceData?: StudentAttendanceOverview
   resolvedGrade?: string
   resolvedGroup?: string
 }
 
-type ActiveView = 'dashboard' | 'grades' | 'schedule' | 'disciplinary'
+type ActiveView = 'dashboard' | 'grades' | 'schedule' | 'disciplinary' | 'attendance'
 
 export function AcademicPortalClientView({
   session,
   subjects,
   scheduleData,
   disciplinaryData,
+  attendanceData,
   resolvedGrade,
   resolvedGroup
 }: AcademicPortalClientViewProps) {
   const [activeView, setActiveView] = useState<ActiveView>('dashboard')
+
+  // Formatear nombre del estudiante con Primera Letra en Mayúscula en cada palabra
+  const studentDisplayName = formatCapitalizedWords(session.fullName) || session.fullName
+
 
   // Resolver Grado y Grupo de forma consistente
   const rawGrade = session.gradeLevel || ''
@@ -128,6 +138,22 @@ export function AcademicPortalClientView({
         ? 'bg-amber-600 hover:bg-amber-700 dark:bg-amber-600 dark:hover:bg-amber-700 shadow-amber-950/20'
         : 'bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700 shadow-blue-950/20',
       onClick: () => setActiveView('disciplinary')
+    },
+    {
+      id: 'attendance' as const,
+      title: 'Asistencia Escolar',
+      description: 'Reporte y trazabilidad de asistencia por fechas de las materias en Planilla Asistida.',
+      icon: CalendarCheck2,
+      iconClass: 'bg-emerald-500/15 dark:bg-emerald-500/25 text-emerald-800 dark:text-emerald-300 border-emerald-500/30',
+      borderHover: 'hover:border-emerald-500/60',
+      statusDotClass: attendanceData && attendanceData.subjects.length > 0 ? 'bg-emerald-500' : 'bg-slate-400',
+      statusText: attendanceData && attendanceData.subjects.length > 0
+        ? `${attendanceData.subjects.length} materias · ${attendanceData.summary.overallPercentage}% asist.`
+        : 'Sin planillas registradas',
+      buttonDesktopText: 'Consultar Asistencia',
+      buttonMobileText: 'Entrar',
+      buttonClass: 'bg-[#1b3d28] hover:bg-[#132c1d] dark:bg-emerald-700 dark:hover:bg-emerald-800 shadow-emerald-950/20',
+      onClick: () => setActiveView('attendance')
     }
   ]
 
@@ -168,8 +194,11 @@ export function AcademicPortalClientView({
                   <Sparkles className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-emerald-600 dark:text-emerald-400" />
                   <span>Portal de Consulta Académica</span>
                 </div>
-                <h1 className="text-xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
-                  {session.fullName}
+                <h1 
+                  suppressHydrationWarning
+                  className="text-xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-tight leading-tight"
+                >
+                  {studentDisplayName}
                 </h1>
                 <p className="text-[11px] sm:text-sm text-slate-500 dark:text-slate-400">
                   Estudiante regular · Documento No. <span className="font-semibold text-slate-700 dark:text-slate-200">{session.documentId}</span>
@@ -274,7 +303,7 @@ export function AcademicPortalClientView({
         >
           <StudentSubjectsClientView
             subjects={subjects}
-            studentName={session.fullName}
+            studentName={studentDisplayName}
           />
         </motion.div>
       )}
@@ -342,8 +371,34 @@ export function AcademicPortalClientView({
               recentReports: []
             }}
             reports={disciplinaryData?.reports || []}
-            studentName={session.fullName}
+            studentName={studentDisplayName}
             groupName={groupDisplay}
+          />
+        </motion.div>
+      )}
+
+      {/* ── Subvista 4: Asistencia Escolar y Trazabilidad de Fechas ── */}
+      {activeView === 'attendance' && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2 }}
+        >
+          <StudentAttendanceClientView
+            attendanceData={attendanceData || {
+              summary: {
+                totalSubjects: 0,
+                totalSessions: 0,
+                totalAttended: 0,
+                totalUnjustified: 0,
+                totalExcused: 0,
+                overallPercentage: 100
+              },
+              subjects: []
+            }}
+            studentName={studentDisplayName}
+            groupName={groupDisplay}
+            resolvedGrade={gradeDisplay}
           />
         </motion.div>
       )}

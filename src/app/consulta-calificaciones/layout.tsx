@@ -1,9 +1,10 @@
 import React from 'react'
 import Link from 'next/link'
-import { GraduationCap, LogOut, ArrowLeft, Home } from 'lucide-react'
+import { GraduationCap, LogOut, ArrowLeft, Home, User } from 'lucide-react'
 import { getPlanillaStudentSession, logoutPlanillaStudent } from '@/modules/planilla-asistida/application/studentAuthActions'
 import { redirect } from 'next/navigation'
 import { ThemeToggleClient } from './ThemeToggleClient'
+import { formatCapitalizedWords } from '@/lib/utils'
 
 export const metadata = {
   title: 'Portal de Consulta Académica - aulaEnsuny',
@@ -66,8 +67,20 @@ export default async function ConsultaCalificacionesLayout({
             )}
           </div>
           
-          {/* Derecha: Acciones (ThemeToggle y Logout) */}
-          <div className="flex items-center gap-1 sm:gap-2 z-10 shrink-0">
+          {/* Derecha: Acciones (Nombre del estudiante, ThemeToggle y Logout) */}
+          <div className="flex items-center gap-1.5 sm:gap-2.5 z-10 shrink-0">
+            {session && (
+              <div 
+                suppressHydrationWarning
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100/80 dark:bg-slate-800/80 text-xs font-semibold text-slate-700 dark:text-slate-200 border border-slate-200/60 dark:border-white/5 shadow-2xs"
+              >
+                <User className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <span className="truncate max-w-[160px] md:max-w-[220px]" title={formatCapitalizedWords(session.fullName)}>
+                  {formatCapitalizedWords(session.fullName)}
+                </span>
+              </div>
+            )}
+
             <ThemeToggleClient />
             
             {session && (
@@ -87,6 +100,7 @@ export default async function ConsultaCalificacionesLayout({
               </form>
             )}
           </div>
+
         </div>
       </header>
 
