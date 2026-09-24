@@ -149,8 +149,8 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
   }
 
   const handleLoadFromDirectory = async () => {
-    if (!subjectData?.grade || !subjectData?.group_number) {
-      toast.error('La materia no tiene un grado o grupo asignado válido.')
+    if (!subjectData?.grade) {
+      toast.error('La materia no tiene un grado asignado válido.')
       return
     }
     
@@ -168,7 +168,9 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
       setSelectedCandidateIds(missingIds)
 
       if (result.candidates.length === 0) {
-        toast.info(`No se encontraron estudiantes para el grado ${subjectData.grade}° grupo ${subjectData.group_number} en el sistema.`)
+        const gradeLabel = subjectData.grade === 12 ? 'PFC-12' : subjectData.grade === 13 ? 'PFC-13' : `grado ${subjectData.grade}°`
+        const groupLabel = subjectData.group_number ? ` grupo ${subjectData.group_number}` : ''
+        toast.info(`No se encontraron estudiantes para el ${gradeLabel}${groupLabel} en el sistema.`)
         return
       }
 
@@ -391,10 +393,10 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
                 {/* Badges de Información de la Asignatura */}
                 <div className="flex flex-wrap items-center gap-2 shrink-0">
                   <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                    Grado {subjectData?.grade}°
+                    {subjectData?.grade === 12 ? 'PFC-12 (12°)' : subjectData?.grade === 13 ? 'PFC-13 (13°)' : `Grado ${subjectData?.grade}°`}
                   </span>
                   <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                    Grupo {subjectData?.group_number}
+                    {subjectData?.group_number ? `Grupo ${subjectData.group_number}` : 'Grupo 1 (Único)'}
                   </span>
                   <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800">
                     {storeState.students.length} en planilla
@@ -446,7 +448,9 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
                     <div className="text-2xl font-black text-slate-900 dark:text-white mt-1">
                       {candidates.length}
                     </div>
-                    <div className="text-[11px] text-slate-400 mt-0.5">Grado {subjectData?.grade}° - Grupo {subjectData?.group_number}</div>
+                    <div className="text-[11px] text-slate-400 mt-0.5">
+                      {subjectData?.grade === 12 ? 'PFC-12' : subjectData?.grade === 13 ? 'PFC-13' : `Grado ${subjectData?.grade}°`} - {subjectData?.group_number ? `Grupo ${subjectData.group_number}` : 'Grupo 1'}
+                    </div>
                   </div>
 
                   <div className="bg-white dark:bg-slate-900 rounded-xl border border-emerald-200/70 dark:border-emerald-900/40 p-4">

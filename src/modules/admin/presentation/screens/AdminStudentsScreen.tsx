@@ -13,6 +13,7 @@ import { toast } from 'sonner'
 import { getAcademicLevels, getAdminStudents, deleteAdminUser } from '../../application/actions'
 import { getDirectoryStats, syncDirectoryWithProfiles } from '../../application/studentImportActions'
 import { AcademicLevel } from '../../application/types'
+import { normalizeGradeLevel } from '@/lib/gradeUtils'
 
 interface Student {
   id: string
@@ -83,7 +84,7 @@ export function AdminStudentsScreen() {
   const filteredStudents = useMemo(() => {
     const filtered = students.filter(s => {
       const matchSearch = s.name.toLowerCase().includes(search.toLowerCase()) || s.email.toLowerCase().includes(search.toLowerCase())
-      const matchGrade = filterGrade === 'all' || s.gradeLevel === filterGrade
+      const matchGrade = filterGrade === 'all' || s.gradeLevel === filterGrade || normalizeGradeLevel(s.gradeLevel) === normalizeGradeLevel(filterGrade)
       const matchGroup = filterGroup === 'all' || s.groupName === filterGroup
       const matchStatus = filterStatus === 'all' || s.status === filterStatus
       return matchSearch && matchGrade && matchGroup && matchStatus
@@ -233,7 +234,7 @@ export function AdminStudentsScreen() {
           <div>
             <p className="text-xs font-semibold text-slate-400 dark:text-slate-500">Total Matriculados</p>
             <p className="text-2xl font-bold text-slate-900 dark:text-white mt-0.5">
-              {loading ? '—' : (directoryStats?.totalDirectory ?? students.length)}
+              {loading ? '—' : students.length}
             </p>
           </div>
         </div>
@@ -246,7 +247,7 @@ export function AdminStudentsScreen() {
           <div>
             <p className="text-xs font-semibold text-emerald-500 dark:text-emerald-400">Con Cuenta Virtual</p>
             <p className="text-2xl font-bold text-slate-900 dark:text-white mt-0.5">
-              {loading ? '—' : (directoryStats?.withAccount ?? students.filter(s => s.status === 'active').length)}
+              {loading ? '—' : students.filter(s => (s as any).source === 'profiles' || (s.email && s.email !== 'Sin cuenta virtual')).length}
             </p>
           </div>
         </div>
@@ -259,7 +260,7 @@ export function AdminStudentsScreen() {
           <div>
             <p className="text-xs font-semibold text-amber-500 dark:text-amber-400">Sin Acceso Virtual</p>
             <p className="text-2xl font-bold text-slate-900 dark:text-white mt-0.5">
-              {loading ? '—' : (directoryStats?.withoutAccount ?? 0)}
+              {loading ? '—' : students.filter(s => (s as any).source === 'directory' || s.email === 'Sin cuenta virtual').length}
             </p>
           </div>
         </div>
@@ -302,7 +303,7 @@ export function AdminStudentsScreen() {
             >
               <option value="all">Todos los Grados</option>
               {academicLevels.map(lvl => (
-                <option key={lvl.id} value={lvl.name}>Grado {lvl.name}</option>
+                <option key={lvl.id} value={lvl.name}>{lvl.name.startsWith('PFC') ? lvl.name : `Grado ${lvl.name}`}</option>
               ))}
             </select>
           </div>

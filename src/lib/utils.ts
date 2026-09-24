@@ -19,3 +19,4 @@ export function formatCapitalizedWords(str?: string | null): string {
     .join(' ')
 }
 
+export { normalizeGradeLevel } from './gradeUtils'

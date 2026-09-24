@@ -38,8 +38,31 @@ export function resolveOfficialGroup(
     }
   }
 
-  // 2. Extraer dígitos de grado y grupo (ej: Grado "10°" -> "10", Grupo "1" -> "1")
+  // 1.5 Manejo especial para ciclos complementarios PFC (12 y 13)
   const gradeDigits = gradeStr.replace(/\D/g, '')
+  if (gradeDigits === '12' || /pfc[\s\-_]?12/i.test(gradeStr) || /pfc[\s\-_]?12/i.test(groupStr)) {
+    const pfc12Match = allGroups.find(g => /pfc[\s\-_]?12/i.test(g.name))
+    if (pfc12Match) {
+      return {
+        groupId: pfc12Match.id,
+        groupName: pfc12Match.name,
+        gradeLevel: gradeStr || 'PFC-12'
+      }
+    }
+  }
+
+  if (gradeDigits === '13' || /pfc[\s\-_]?13/i.test(gradeStr) || /pfc[\s\-_]?13/i.test(groupStr)) {
+    const pfc13Match = allGroups.find(g => /pfc[\s\-_]?13/i.test(g.name))
+    if (pfc13Match) {
+      return {
+        groupId: pfc13Match.id,
+        groupName: pfc13Match.name,
+        gradeLevel: gradeStr || 'PFC-13'
+      }
+    }
+  }
+
+  // 2. Extraer dígitos de grado y grupo (ej: Grado "10°" -> "10", Grupo "1" -> "1")
   const groupDigits = groupStr.replace(/\D/g, '')
 
   if (gradeDigits && groupDigits) {
