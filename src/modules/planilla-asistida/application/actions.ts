@@ -388,6 +388,13 @@ function buildPlanillaGradeVariants(grade?: number | string | null): string[] {
     variants.add('13°')
     variants.add('13 °')
   }
+  if (/nivelat/i.test(gradeStr) || gradeStr === '0') {
+    variants.add('Nivelatorio')
+    variants.add('NIVELATORIO')
+    variants.add('nivelatorio')
+    variants.add('0')
+    variants.add('0°')
+  }
   return Array.from(variants).filter(Boolean)
 }
 
@@ -427,6 +434,13 @@ function buildPlanillaGroupVariants(groupNumber?: number | string | null, grade?
     variants.add('02')
     variants.add('3')
     variants.add('03')
+    variants.add('UNICO')
+    variants.add('ÚNICO')
+  }
+  if (/nivelat/i.test(gradeStr) || gradeStr === '0' || /nivelat/i.test(groupStr)) {
+    variants.add('1')
+    variants.add('01')
+    variants.add('Nivelatorio')
     variants.add('UNICO')
     variants.add('ÚNICO')
   }

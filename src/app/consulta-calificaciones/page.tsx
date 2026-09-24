@@ -51,9 +51,18 @@ export default async function ConsultaDashboardPage() {
   // Resolver grado y grupo oficial en el servidor
   const rawGrade = session.gradeLevel || ''
   const resolvedGroupName = scheduleData.groupName || session.groupName || ''
-  const gradeFromSubjects = subjects && subjects.length > 0 && subjects[0]?.grade ? `${subjects[0].grade}°` : ''
+  const isPfc12 = /pfc[\s\-_]?12/i.test(rawGrade) || /pfc[\s\-_]?12/i.test(resolvedGroupName)
+  const isPfc13 = /pfc[\s\-_]?13/i.test(rawGrade) || /pfc[\s\-_]?13/i.test(resolvedGroupName)
+  const isNiv = /nivelat/i.test(rawGrade) || /nivelat/i.test(resolvedGroupName)
 
-  let resolvedGrade = rawGrade || gradeFromSubjects
+  let resolvedGrade = rawGrade
+  if (isPfc12) resolvedGrade = 'PFC-12'
+  else if (isPfc13) resolvedGrade = 'PFC-13'
+  else if (isNiv) resolvedGrade = 'Nivelatorio'
+  else if (!resolvedGrade && subjects && subjects.length > 0 && subjects[0]?.grade) {
+    resolvedGrade = `${subjects[0].grade}°`
+  }
+
   if (!resolvedGrade && resolvedGroupName.includes('-')) {
     resolvedGrade = resolvedGroupName.split('-')[0].trim()
   }
@@ -63,7 +72,10 @@ export default async function ConsultaDashboardPage() {
   if (!resolvedGrade) resolvedGrade = 'Registrado'
 
   let resolvedGroup = resolvedGroupName || 'Sin grupo asignado'
-  if (resolvedGroupName && !resolvedGroupName.includes('-') && resolvedGrade && resolvedGrade !== 'Registrado') {
+  if (isPfc12) resolvedGroup = 'PFC-12'
+  else if (isPfc13) resolvedGroup = session.groupName && !session.groupName.includes('PFC') ? `PFC-13-${session.groupName}` : 'PFC-13'
+  else if (isNiv) resolvedGroup = 'Nivelatorio'
+  else if (resolvedGroupName && !resolvedGroupName.includes('-') && resolvedGrade && resolvedGrade !== 'Registrado') {
     resolvedGroup = `${resolvedGrade}-${resolvedGroupName}`
   }
 

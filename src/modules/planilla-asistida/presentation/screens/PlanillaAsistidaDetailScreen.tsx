@@ -168,7 +168,7 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
       setSelectedCandidateIds(missingIds)
 
       if (result.candidates.length === 0) {
-        const gradeLabel = subjectData.grade === 12 ? 'PFC-12' : subjectData.grade === 13 ? 'PFC-13' : `grado ${subjectData.grade}°`
+        const gradeLabel = subjectData.grade === 12 ? 'PFC-12' : subjectData.grade === 13 ? 'PFC-13' : subjectData.grade === 0 ? 'Nivelatorio' : `grado ${subjectData.grade}°`
         const groupLabel = subjectData.group_number ? ` grupo ${subjectData.group_number}` : ''
         toast.info(`No se encontraron estudiantes para el ${gradeLabel}${groupLabel} en el sistema.`)
         return
@@ -393,7 +393,7 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
                 {/* Badges de Información de la Asignatura */}
                 <div className="flex flex-wrap items-center gap-2 shrink-0">
                   <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                    {subjectData?.grade === 12 ? 'PFC-12 (12°)' : subjectData?.grade === 13 ? 'PFC-13 (13°)' : `Grado ${subjectData?.grade}°`}
+                    {subjectData?.grade === 12 ? 'PFC-12 (12°)' : subjectData?.grade === 13 ? 'PFC-13 (13°)' : subjectData?.grade === 0 ? 'Nivelatorio' : `Grado ${subjectData?.grade}°`}
                   </span>
                   <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                     {subjectData?.group_number ? `Grupo ${subjectData.group_number}` : 'Grupo 1 (Único)'}
@@ -449,7 +449,7 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
                       {candidates.length}
                     </div>
                     <div className="text-[11px] text-slate-400 mt-0.5">
-                      {subjectData?.grade === 12 ? 'PFC-12' : subjectData?.grade === 13 ? 'PFC-13' : `Grado ${subjectData?.grade}°`} - {subjectData?.group_number ? `Grupo ${subjectData.group_number}` : 'Grupo 1'}
+                      {subjectData?.grade === 12 ? 'PFC-12' : subjectData?.grade === 13 ? 'PFC-13' : subjectData?.grade === 0 ? 'Nivelatorio' : `Grado ${subjectData?.grade}°`} - {subjectData?.group_number ? `Grupo ${subjectData.group_number}` : 'Grupo 1'}
                     </div>
                   </div>
 

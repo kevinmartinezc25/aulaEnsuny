@@ -1340,7 +1340,9 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                         className="w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 focus:outline-none dark:text-white text-sm"
                       >
                         {academicLevels.map(lvl => (
-                          <option key={lvl.id} value={lvl.name}>Grado {lvl.name}</option>
+                          <option key={lvl.id} value={lvl.name}>
+                            {lvl.name.startsWith('PFC') || lvl.name.toLowerCase().includes('nivelat') ? lvl.name : `Grado ${lvl.name}`}
+                          </option>
                         ))}
                       </select>
                     </div>

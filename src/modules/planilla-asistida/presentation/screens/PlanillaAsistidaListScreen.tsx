@@ -88,16 +88,18 @@ export function PlanillaAsistidaListScreen() {
   const filteredSubjects = subjects.filter(subject => {
     const isPfc12 = subject.grade === 12
     const isPfc13 = subject.grade === 13
+    const isNivelatorio = subject.grade === 0 || subject.name.toLowerCase().includes('nivelat')
     const matchesSearch = subject.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (subject.grade && subject.grade.toString().includes(searchQuery)) ||
+      (subject.grade !== undefined && subject.grade !== null && subject.grade.toString().includes(searchQuery)) ||
       (isPfc12 && 'pfc-12'.includes(searchQuery.toLowerCase())) ||
       (isPfc13 && 'pfc-13'.includes(searchQuery.toLowerCase())) ||
+      (isNivelatorio && 'nivelatorio'.includes(searchQuery.toLowerCase())) ||
       subject.period?.toLowerCase().includes(searchQuery.toLowerCase())
       
     const matchesGrade = selectedGrade === 'all' || subject.grade?.toString() === selectedGrade
     const matchesGroup = selectedGroup === 'all' || 
       subject.group_number?.toString() === selectedGroup || 
-      (!subject.group_number && selectedGroup === '1' && (isPfc12 || isPfc13))
+      (!subject.group_number && selectedGroup === '1' && (isPfc12 || isPfc13 || isNivelatorio))
     const matchesSubject = selectedSubject === 'all' || subject.name === selectedSubject
     const matchesPeriod = selectedPeriod === 'all' || subject.period?.toString() === selectedPeriod
 
@@ -181,7 +183,7 @@ export function PlanillaAsistidaListScreen() {
               <option value="all">Todos los grados</option>
               {uniqueGrades.map(g => (
                 <option key={g} value={g}>
-                  {g === '12' ? 'PFC-12 (12°)' : g === '13' ? 'PFC-13 (13°)' : `Grado ${g}°`}
+                  {g === '12' ? 'PFC-12 (12°)' : g === '13' ? 'PFC-13 (13°)' : g === '0' ? 'Nivelatorio' : `Grado ${g}°`}
                 </option>
               ))}
             </select>
@@ -261,7 +263,7 @@ export function PlanillaAsistidaListScreen() {
                       <span>Grupo:</span>
                     </div>
                     <div className="text-[34px] leading-none font-extrabold text-teal-700 dark:text-teal-400 tracking-tighter">
-                      {subject.grade === 12 ? 'PFC-12' : subject.grade === 13 ? 'PFC-13' : (subject.grade || '-')}
+                      {subject.grade === 12 ? 'PFC-12' : subject.grade === 13 ? 'PFC-13' : subject.grade === 0 ? 'Nivelatorio' : (subject.grade || '-')}
                       <span className="text-teal-600/50 mx-2.5 font-light">-</span>
                       {subject.group_number || '1'}
                     </div>

@@ -32,9 +32,14 @@ export function CreateSubjectModal({ isOpen, onClose, onSuccess, initialData, ex
   // Cargar datos iniciales cuando se abre en modo edición
   React.useEffect(() => {
     if (isOpen && initialData) {
+      let displayGrade = initialData.grade?.toString() || ''
+      if (initialData.grade === 0) displayGrade = 'Nivelatorio'
+      else if (initialData.grade === 12) displayGrade = '12'
+      else if (initialData.grade === 13) displayGrade = '13'
+
       setFormData({
         name: initialData.name,
-        grade: initialData.grade?.toString() || '',
+        grade: displayGrade,
         group_number: initialData.group_number?.toString() || '',
         period: initialData.period || '',
         description: initialData.description || ''
@@ -52,7 +57,21 @@ export function CreateSubjectModal({ isOpen, onClose, onSuccess, initialData, ex
       return
     }
 
-    const newGrade = formData.grade ? parseInt(formData.grade) : undefined
+    let newGrade: number | undefined = undefined
+    if (formData.grade) {
+      const gStr = formData.grade.trim()
+      if (/^nivelat/i.test(gStr)) {
+        newGrade = 0
+      } else if (/pfc[\s\-_]?12/i.test(gStr)) {
+        newGrade = 12
+      } else if (/pfc[\s\-_]?13/i.test(gStr)) {
+        newGrade = 13
+      } else {
+        const num = parseInt(gStr.replace(/\D/g, ''), 10)
+        if (!isNaN(num)) newGrade = num
+      }
+    }
+
     const newGroup = formData.group_number ? parseInt(formData.group_number) : undefined
 
     const isDuplicate = existingSubjects.some(s => 
@@ -134,12 +153,23 @@ export function CreateSubjectModal({ isOpen, onClose, onSuccess, initialData, ex
                 <Label htmlFor="grade">Grado</Label>
                 <Input
                   id="grade"
-                  type="number"
-                  min="1"
-                  placeholder="Ej: 7"
+                  type="text"
+                  list="assisted-grade-options"
+                  placeholder="Ej: 7, 12, Nivelatorio"
                   value={formData.grade}
                   onChange={(e) => setFormData(prev => ({ ...prev, grade: e.target.value }))}
                 />
+                <datalist id="assisted-grade-options">
+                  <option value="6">6°</option>
+                  <option value="7">7°</option>
+                  <option value="8">8°</option>
+                  <option value="9">9°</option>
+                  <option value="10">10°</option>
+                  <option value="11">11°</option>
+                  <option value="12">PFC-12 (12°)</option>
+                  <option value="13">PFC-13 (13°)</option>
+                  <option value="Nivelatorio">Nivelatorio</option>
+                </datalist>
               </div>
               
               <div className="space-y-2">
