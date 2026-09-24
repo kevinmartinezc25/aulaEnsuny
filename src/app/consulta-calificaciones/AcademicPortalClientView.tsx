@@ -15,28 +15,33 @@ import {
   BookOpen, 
   AlertCircle,
   ShieldCheck,
+  ShieldAlert,
   CheckCircle2
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { PlanillaStudentSession } from '@/modules/planilla-asistida/application/studentAuthActions'
 import { StudentSubjectView, StudentScheduleResponse } from '@/modules/planilla-asistida/application/studentQueries'
+import { StudentPortalDisciplinaryData } from '@/modules/disciplinary/application/studentDisciplinaryActions'
 import { StudentSubjectsClientView } from './StudentSubjectsClientView'
+import { StudentDisciplinaryClientView } from './components/StudentDisciplinaryClientView'
 import DayTabsScheduleView from '@/components/schedule/DayTabsScheduleView'
 
 interface AcademicPortalClientViewProps {
   session: PlanillaStudentSession
   subjects: StudentSubjectView[]
   scheduleData: StudentScheduleResponse
+  disciplinaryData?: StudentPortalDisciplinaryData
   resolvedGrade?: string
   resolvedGroup?: string
 }
 
-type ActiveView = 'dashboard' | 'grades' | 'schedule'
+type ActiveView = 'dashboard' | 'grades' | 'schedule' | 'disciplinary'
 
 export function AcademicPortalClientView({
   session,
   subjects,
   scheduleData,
+  disciplinaryData,
   resolvedGrade,
   resolvedGroup
 }: AcademicPortalClientViewProps) {
@@ -68,23 +73,24 @@ export function AcademicPortalClientView({
 
   const academicYear = session.academicYear || new Date().getFullYear().toString()
   const jornada = session.jornada || 'Mañana'
+  const reportsCount = disciplinaryData?.reports?.length || 0
 
-  // Catálogo modular de módulos del portal para cuadrícula de 2 columnas escalable
+  // Catálogo modular de módulos del portal para cuadrícula responsiva (máx 2 en móvil)
   const portalCards = [
     {
       id: 'grades' as const,
       title: 'Calificaciones',
-      description: 'Consulta tus resultados académicos por período, área, asignatura y logro.',
+      description: 'Consulta tus resultados académicos por período, área, asignatura y logro formativo.',
       icon: GraduationCap,
-      iconClass: 'bg-emerald-500/10 dark:bg-emerald-500/20 text-[#1F4E31] dark:text-emerald-400 border-emerald-500/20',
-      borderHover: 'hover:border-emerald-500/40',
+      iconClass: 'bg-emerald-500/15 dark:bg-emerald-500/25 text-[#1F4E31] dark:text-emerald-400 border-emerald-500/30',
+      borderHover: 'hover:border-emerald-500/60',
       statusDotClass: 'bg-emerald-500',
       statusText: subjects.length > 0
-        ? `${subjects.length} asignaturas registradas`
-        : 'Sin materias asignadas aún',
+        ? `${subjects.length} asignaturas`
+        : 'Sin materias asignadas',
       buttonDesktopText: 'Consultar Calificaciones',
-      buttonMobileText: 'Ver Notas',
-      buttonClass: 'bg-[#1F4E31] hover:bg-[#183e27] dark:bg-emerald-600 dark:hover:bg-emerald-700 shadow-emerald-950/15',
+      buttonMobileText: 'Entrar',
+      buttonClass: 'bg-[#1F4E31] hover:bg-[#163a24] dark:bg-emerald-600 dark:hover:bg-emerald-700 shadow-emerald-950/20',
       onClick: () => setActiveView('grades')
     },
     {
@@ -92,16 +98,36 @@ export function AcademicPortalClientView({
       title: 'Mi Horario',
       description: 'Consulta el horario correspondiente al grupo en el que estás matriculado.',
       icon: Calendar,
-      iconClass: 'bg-teal-500/10 dark:bg-teal-500/20 text-teal-700 dark:text-teal-400 border-teal-500/20',
-      borderHover: 'hover:border-teal-500/40',
+      iconClass: 'bg-teal-500/15 dark:bg-teal-500/25 text-teal-700 dark:text-teal-400 border-teal-500/30',
+      borderHover: 'hover:border-teal-500/60',
       statusDotClass: scheduleData.isPublished ? 'bg-teal-500' : 'bg-amber-500',
       statusText: scheduleData.isPublished
-        ? `Oficial: ${groupDisplay}`
+        ? `Grupo: ${groupDisplay}`
         : 'Aún no publicado',
       buttonDesktopText: 'Ver Mi Horario',
-      buttonMobileText: 'Ver Horario',
-      buttonClass: 'bg-teal-700 hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-700 shadow-teal-950/15',
+      buttonMobileText: 'Entrar',
+      buttonClass: 'bg-teal-700 hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-700 shadow-teal-950/20',
       onClick: () => setActiveView('schedule')
+    },
+    {
+      id: 'disciplinary' as const,
+      title: 'Convivencia',
+      description: 'Consulta tu seguimiento convivencial, acuerdos formativos y debido proceso.',
+      icon: reportsCount > 0 ? ShieldAlert : ShieldCheck,
+      iconClass: reportsCount > 0
+        ? 'bg-amber-500/15 dark:bg-amber-500/25 text-amber-700 dark:text-amber-400 border-amber-500/30'
+        : 'bg-blue-500/15 dark:bg-blue-500/25 text-blue-700 dark:text-blue-400 border-blue-500/30',
+      borderHover: reportsCount > 0 ? 'hover:border-amber-500/60' : 'hover:border-blue-500/60',
+      statusDotClass: reportsCount > 0 ? 'bg-amber-500' : 'bg-emerald-500',
+      statusText: reportsCount === 0
+        ? '0 reportes (Ejemplar)'
+        : `${reportsCount} ${reportsCount === 1 ? 'novedad' : 'novedades'}`,
+      buttonDesktopText: 'Consultar Convivencia',
+      buttonMobileText: 'Entrar',
+      buttonClass: reportsCount > 0
+        ? 'bg-amber-600 hover:bg-amber-700 dark:bg-amber-600 dark:hover:bg-amber-700 shadow-amber-950/20'
+        : 'bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700 shadow-blue-950/20',
+      onClick: () => setActiveView('disciplinary')
     }
   ]
 
@@ -112,19 +138,15 @@ export function AcademicPortalClientView({
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex items-center justify-between pb-3 border-b border-slate-200/80 dark:border-slate-800"
+          className="flex items-center pb-3 border-b border-slate-200/80 dark:border-slate-800"
         >
           <button
             onClick={() => setActiveView('dashboard')}
-            className="group inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-200 hover:text-[#1F4E31] dark:hover:text-emerald-400 shadow-xs hover:shadow-sm active:scale-95 transition-all cursor-pointer"
+            className="group inline-flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-2xl bg-emerald-500/10 hover:bg-emerald-500/20 dark:bg-emerald-500/15 dark:hover:bg-emerald-500/25 border-2 border-emerald-500/30 hover:border-emerald-500/60 text-xs sm:text-sm font-extrabold text-[#1F4E31] dark:text-emerald-300 shadow-xs hover:shadow-sm active:scale-95 transition-all cursor-pointer"
           >
             <ArrowLeft className="h-4 w-4 transition-transform duration-150 group-hover:-translate-x-1" />
             <span>Volver al Menú Principal</span>
           </button>
-
-          <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-            {activeView === 'grades' ? 'Calificaciones' : 'Mi Horario'}
-          </span>
         </motion.div>
       )}
 
@@ -174,33 +196,49 @@ export function AcademicPortalClientView({
             </div>
           </motion.div>
 
-          {/* ── Cuadrícula de Tarjetas Académicas (Siempre 2 columnas por fila para evitar scroll excesivo) ── */}
-          <div className="grid grid-cols-2 gap-3 sm:gap-5 lg:gap-6">
+          {/* ── Cuadrícula de Tarjetas Académicas (Móvil: 2 columnas exactas / Desktop: 3 columnas) ── */}
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-5 lg:gap-6">
             {portalCards.map((card, idx) => {
               const Icon = card.icon
               return (
                 <motion.div
                   key={card.id}
+                  onClick={card.onClick}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      card.onClick()
+                    }
+                  }}
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.05 * (idx + 1), type: 'spring', damping: 24, stiffness: 240 }}
-                  className={`group relative flex flex-col justify-between rounded-2xl sm:rounded-[28px] bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-white/10 p-3.5 sm:p-7 shadow-[0_4px_20px_rgba(0,0,0,0.03)] sm:shadow-[0_10px_30px_rgba(0,0,0,0.03)] hover:shadow-lg dark:shadow-none transition-all duration-200 ${card.borderHover}`}
+                  className={`group relative flex flex-col justify-between rounded-2xl sm:rounded-[28px] bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-white/10 p-3 sm:p-6 shadow-[0_4px_20px_rgba(0,0,0,0.04)] hover:shadow-xl dark:shadow-none hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99] transition-all duration-200 cursor-pointer ${card.borderHover}`}
                 >
-                  <div className="space-y-2 sm:space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-                      <div className={`shrink-0 w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl border flex items-center justify-center transition-transform duration-200 group-hover:scale-105 ${card.iconClass}`}>
-                        <Icon className="w-5 h-5 sm:w-7 sm:h-7" />
+                  <div className="space-y-2 sm:space-y-3.5">
+                    {/* Fila de Encabezado: Icono + Indicador 'Entrar' */}
+                    <div className="flex items-center justify-between gap-1.5">
+                      <div className={`shrink-0 w-8 h-8 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl border flex items-center justify-center transition-transform duration-200 group-hover:scale-105 ${card.iconClass}`}>
+                        <Icon className="w-4 h-4 sm:w-6 sm:h-6" />
                       </div>
-                      <h2 className="text-sm sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
-                        {card.title}
-                      </h2>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-[10px] font-bold text-slate-600 dark:text-slate-300 group-hover:bg-slate-900 group-hover:text-white dark:group-hover:bg-white dark:group-hover:text-slate-900 transition-colors shadow-2xs">
+                        <span>Entrar</span>
+                        <ArrowRight className="w-2.5 h-2.5 transition-transform group-hover:translate-x-0.5" />
+                      </span>
                     </div>
 
-                    <p className="text-[11px] sm:text-sm text-slate-500 dark:text-slate-400 leading-snug sm:leading-relaxed line-clamp-2 sm:line-clamp-none">
-                      {card.description}
-                    </p>
+                    <div>
+                      <h2 className="text-xs sm:text-xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+                        {card.title}
+                      </h2>
+                      <p className="mt-1 text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 leading-snug line-clamp-2">
+                        {card.description}
+                      </p>
+                    </div>
 
-                    <div className="pt-0.5 sm:pt-1 flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs text-slate-600 dark:text-slate-300 font-medium">
+                    <div className="pt-0.5 flex items-center gap-1 text-[9px] sm:text-xs text-slate-600 dark:text-slate-300 font-medium">
                       <span className={`inline-block w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full shrink-0 ${card.statusDotClass}`} />
                       <span className="truncate">
                         {card.statusText}
@@ -208,15 +246,17 @@ export function AcademicPortalClientView({
                     </div>
                   </div>
 
-                  <div className="pt-3 sm:pt-6">
-                    <Button
-                      onClick={card.onClick}
-                      className={`w-full h-9 sm:h-12 rounded-xl sm:rounded-2xl text-white font-bold text-xs sm:text-sm shadow-md flex items-center justify-center gap-1.5 sm:gap-2 active:scale-[0.98] transition-all cursor-pointer ${card.buttonClass}`}
+                  {/* Botón de Entrada Principal (Visible y Prominente) */}
+                  <div className="pt-2.5 sm:pt-5 mt-auto">
+                    <div
+                      className={`w-full py-2 sm:py-2.5 px-2.5 sm:px-4 rounded-xl sm:rounded-2xl text-white font-extrabold text-[11px] sm:text-sm shadow-md flex items-center justify-center gap-1.5 active:scale-[0.98] transition-all group-hover:shadow-lg ${card.buttonClass}`}
                     >
-                      <span className="hidden sm:inline">{card.buttonDesktopText}</span>
-                      <span className="sm:hidden">{card.buttonMobileText}</span>
-                      <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 transition-transform group-hover:translate-x-0.5" />
-                    </Button>
+                      <span className="truncate">
+                        <span className="hidden sm:inline">{card.buttonDesktopText}</span>
+                        <span className="sm:hidden">{card.buttonMobileText}</span>
+                      </span>
+                      <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 transition-transform group-hover:translate-x-1" />
+                    </div>
                   </div>
                 </motion.div>
               )
@@ -281,6 +321,30 @@ export function AcademicPortalClientView({
               />
             </div>
           )}
+        </motion.div>
+      )}
+
+      {/* ── Subvista 3: Convivencia Escolar (Solo Lectura) ── */}
+      {activeView === 'disciplinary' && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2 }}
+        >
+          <StudentDisciplinaryClientView
+            summary={disciplinaryData?.summary || {
+              totalReports: 0,
+              tipoI: 0,
+              tipoII: 0,
+              tipoIII: 0,
+              openCases: 0,
+              closedCases: 0,
+              recentReports: []
+            }}
+            reports={disciplinaryData?.reports || []}
+            studentName={session.fullName}
+            groupName={groupDisplay}
+          />
         </motion.div>
       )}
     </div>
