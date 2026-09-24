@@ -196,28 +196,29 @@ export function exportPlanillaToExcel(
       header2.push(session.topic || '')
     })
     
-    header1.push('A', 'I', 'E', '% Asistencia')
-    header2.push('', '', '', '')
+    header1.push('A', 'I', 'E', 'T', '% Asistencia')
+    header2.push('', '', '', '', '')
     
     wsAsistenciaData.push(header1, header2)
     
     // Datos de asistencia por estudiante
     students.forEach(student => {
       const row: any[] = [student.number, student.full_name]
-      let aCount = 0, iCount = 0, eCount = 0
+      let aCount = 0, iCount = 0, eCount = 0, tCount = 0
       
       sessions.forEach(session => {
         const status = attendance[student.id]?.[session.id]
         if (status === 'A') aCount++
-        if (status === 'I') iCount++
-        if (status === 'E') eCount++
+        else if (status === 'I') iCount++
+        else if (status === 'E') eCount++
+        else if (status === 'T') tCount++
         row.push(status || '')
       })
       
-      const total = aCount + iCount + eCount
-      const aPercentage = total > 0 ? Math.round((aCount / total) * 100) : 0
+      const total = aCount + iCount + eCount + tCount
+      const aPercentage = total > 0 ? Math.round(((aCount + tCount) / total) * 100) : 0
       
-      row.push(aCount, iCount, eCount, `${aPercentage}%`)
+      row.push(aCount, iCount, eCount, tCount, `${aPercentage}%`)
       wsAsistenciaData.push(row)
     })
     

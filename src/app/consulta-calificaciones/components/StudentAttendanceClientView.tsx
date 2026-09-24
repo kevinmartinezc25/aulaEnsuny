@@ -58,6 +58,7 @@ export function StudentAttendanceClientView({
     summary: {
       totalSessions: number
       attendedCount: number
+      tardyCount?: number
       unjustifiedAbsences: number
       excusedAbsences: number
       attendancePercentage: number
@@ -72,7 +73,7 @@ export function StudentAttendanceClientView({
   const [selectedPeriod, setSelectedPeriod] = useState<string>('all')
 
   // Filtros de Nivel 2 (Trazabilidad)
-  const [traceFilter, setTraceFilter] = useState<'all' | 'A' | 'I' | 'E'>('all')
+  const [traceFilter, setTraceFilter] = useState<'all' | 'A' | 'T' | 'I' | 'E'>('all')
 
   // Períodos disponibles
   const availablePeriods = useMemo(() => {
@@ -238,6 +239,18 @@ export function StudentAttendanceClientView({
               </div>
 
               <div className="bg-white dark:bg-slate-900 p-3.5 sm:p-4 rounded-2xl border border-slate-200/70 dark:border-white/10 shadow-sm flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                  <Clock className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Llegó Tarde</div>
+                  <div className="text-lg font-black text-amber-600 dark:text-amber-400">
+                    {selectedSubjectSummary.tardyCount || 0}
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white dark:bg-slate-900 p-3.5 sm:p-4 rounded-2xl border border-slate-200/70 dark:border-white/10 shadow-sm flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-rose-500/15 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
                   <XCircle className="h-5 w-5" />
                 </div>
@@ -277,6 +290,28 @@ export function StudentAttendanceClientView({
               Todas ({traceabilityData?.sessions.length || 0})
             </button>
             <button
+              onClick={() => setTraceFilter('A')}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                traceFilter === 'A'
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50/50'
+              }`}
+            >
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              Asistió ({selectedSubjectSummary?.attendedCount || 0})
+            </button>
+            <button
+              onClick={() => setTraceFilter('T')}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                traceFilter === 'T'
+                  ? 'bg-amber-600 text-white shadow-sm'
+                  : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-amber-600 dark:text-amber-400 hover:bg-amber-50/50'
+              }`}
+            >
+              <Clock className="h-3.5 w-3.5" />
+              Llegó Tarde ({selectedSubjectSummary?.tardyCount || 0})
+            </button>
+            <button
               onClick={() => setTraceFilter('I')}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
                 traceFilter === 'I'
@@ -297,17 +332,6 @@ export function StudentAttendanceClientView({
             >
               <AlertCircle className="h-3.5 w-3.5" />
               Excusas ({selectedSubjectSummary?.excusedAbsences || 0})
-            </button>
-            <button
-              onClick={() => setTraceFilter('A')}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                traceFilter === 'A'
-                  ? 'bg-emerald-600 text-white shadow-sm'
-                  : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50/50'
-              }`}
-            >
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              Asistió ({selectedSubjectSummary?.attendedCount || 0})
             </button>
           </div>
 
@@ -348,6 +372,7 @@ export function StudentAttendanceClientView({
             <div className="space-y-3">
               {filteredSessions.map((session, index) => {
                 const isPresent = session.status === 'A'
+                const isTardy = session.status === 'T'
                 const isAbsent = session.status === 'I'
                 const isExcused = session.status === 'E'
                 const isPending = session.status === 'NONE'
@@ -361,6 +386,8 @@ export function StudentAttendanceClientView({
                     className={`p-4 sm:p-5 rounded-2xl border transition-all duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
                       isPresent
                         ? 'bg-white dark:bg-slate-900 border-slate-200/80 dark:border-white/10 hover:border-emerald-500/40'
+                        : isTardy
+                        ? 'bg-amber-50/50 dark:bg-amber-950/20 border-amber-200/80 dark:border-amber-900/50 hover:border-amber-500/40'
                         : isAbsent
                         ? 'bg-rose-50/40 dark:bg-rose-950/20 border-rose-200/70 dark:border-rose-900/40 hover:border-rose-400/60'
                         : isExcused
@@ -373,6 +400,8 @@ export function StudentAttendanceClientView({
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
                         isPresent
                           ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                          : isTardy
+                          ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
                           : isAbsent
                           ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
                           : isExcused
@@ -380,9 +409,10 @@ export function StudentAttendanceClientView({
                           : 'bg-slate-200/60 dark:bg-slate-800 text-slate-400'
                       }`}>
                         {isPresent && <CheckCircle2 className="h-5 w-5" />}
+                        {isTardy && <Clock className="h-5 w-5" />}
                         {isAbsent && <XCircle className="h-5 w-5" />}
                         {isExcused && <AlertCircle className="h-5 w-5" />}
-                        {isPending && <Clock className="h-5 w-5" />}
+                        {isPending && <Clock className="h-5 w-5 opacity-40" />}
                       </div>
 
                       <div className="space-y-1">
@@ -411,6 +441,12 @@ export function StudentAttendanceClientView({
                         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
                           <CheckCircle2 className="h-3.5 w-3.5" />
                           Asistió
+                        </span>
+                      )}
+                      {isTardy && (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/20">
+                          <Clock className="h-3.5 w-3.5" />
+                          Llegó Tarde
                         </span>
                       )}
                       {isAbsent && (
@@ -480,7 +516,7 @@ export function StudentAttendanceClientView({
             </div>
 
             {/* Micro-estadísticas del estudiante */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-4 mt-6 pt-5 border-t border-white/10">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-4 mt-6 pt-5 border-t border-white/10">
               <div>
                 <div className="text-white/60 text-xs font-medium">Materias en Planilla</div>
                 <div className="text-lg sm:text-xl font-black text-white mt-0.5">{summary.totalSubjects}</div>
@@ -492,6 +528,10 @@ export function StudentAttendanceClientView({
               <div>
                 <div className="text-white/60 text-xs font-medium">Asistencias Confirmadas</div>
                 <div className="text-lg sm:text-xl font-black text-emerald-300 mt-0.5">{summary.totalAttended}</div>
+              </div>
+              <div>
+                <div className="text-white/60 text-xs font-medium">Llegadas Tarde</div>
+                <div className="text-lg sm:text-xl font-black text-amber-300 mt-0.5">{summary.totalTardy || 0}</div>
               </div>
               <div>
                 <div className="text-white/60 text-xs font-medium">Inasistencias / Faltas</div>
@@ -644,6 +684,12 @@ export function StudentAttendanceClientView({
                           <CheckCircle2 className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" />
                           {sub.attendedCount} <span className="hidden sm:inline">Asist.</span>
                         </span>
+                        {sub.tardyCount > 0 && (
+                          <span className="inline-flex items-center gap-0.5 sm:gap-1 px-1.5 py-0.5 rounded-md text-[9px] sm:text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300">
+                            <Clock className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" />
+                            {sub.tardyCount} <span className="hidden sm:inline">Tardes</span>
+                          </span>
+                        )}
                         <span className={`inline-flex items-center gap-0.5 sm:gap-1 px-1.5 py-0.5 rounded-md text-[9px] sm:text-[10px] font-bold ${
                           hasAbsences
                             ? 'bg-rose-500/15 text-rose-700 dark:text-rose-300'

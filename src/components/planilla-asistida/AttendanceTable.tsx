@@ -117,15 +117,13 @@ export function AttendanceTable({ subjectId }: AttendanceTableProps) {
 
     const currentStatus = attendance[studentId]?.[session.id]
     
-    // Ciclo: undefined -> A -> I -> E -> A
-    let nextStatus: 'A' | 'I' | 'E'
+    // Ciclo: undefined -> A -> T -> I -> E -> A
+    let nextStatus: 'A' | 'I' | 'E' | 'T'
     if (!currentStatus) nextStatus = 'A'
-    else if (currentStatus === 'A') nextStatus = 'I'
+    else if (currentStatus === 'A') nextStatus = 'T'
+    else if (currentStatus === 'T') nextStatus = 'I'
     else if (currentStatus === 'I') nextStatus = 'E'
-    else nextStatus = 'A' // Si es E, pasa a A de nuevo (o se podría añadir un null/vacío)
-    
-    // Si quisieramos poder dejarlo vacío:
-    // else if (currentStatus === 'E') nextStatus = null
+    else nextStatus = 'A'
     
     setAttendance(studentId, session.id, nextStatus)
   }
@@ -154,10 +152,11 @@ export function AttendanceTable({ subjectId }: AttendanceTableProps) {
   }
 
   // Estilos y labels para los estados
-  const getStatusDisplay = (status?: 'A' | 'I' | 'E', locked?: boolean) => {
+  const getStatusDisplay = (status?: 'A' | 'I' | 'E' | 'T', locked?: boolean) => {
     if (locked && status) {
       let text = '-'
       if (status === 'A') text = 'Asiste'
+      if (status === 'T') text = 'Tarde'
       if (status === 'I') text = 'Inasistencia'
       if (status === 'E') text = 'Excusa'
       return <span className="text-slate-500 font-bold bg-slate-200/50 dark:bg-slate-700/50 px-1 py-1 rounded w-full h-full flex items-center justify-center text-[11px]" title={text}>{text}</span>
@@ -165,6 +164,7 @@ export function AttendanceTable({ subjectId }: AttendanceTableProps) {
 
     switch (status) {
       case 'A': return <span className="text-emerald-600 font-bold bg-emerald-50 px-1 py-1 rounded w-full h-full flex items-center justify-center text-[11px]" title="Asiste">Asiste</span>
+      case 'T': return <span className="text-amber-700 dark:text-amber-300 font-bold bg-amber-100 dark:bg-amber-900/40 px-1 py-1 rounded w-full h-full flex items-center justify-center text-[11px]" title="Llega Tarde">Tarde</span>
       case 'I': return <span className="text-red-600 font-bold bg-red-50 px-1 py-1 rounded w-full h-full flex items-center justify-center text-[11px]" title="Inasistencia">Inasistencia</span>
       case 'E': return <span className="text-amber-600 font-bold bg-amber-50 px-1 py-1 rounded w-full h-full flex items-center justify-center text-[11px]" title="Excusa">Excusa</span>
       default: return <span className="text-slate-300 w-full h-full flex items-center justify-center">-</span>
@@ -258,15 +258,17 @@ export function AttendanceTable({ subjectId }: AttendanceTableProps) {
             {students.map((student) => {
               
               // Calcular resumen del estudiante
-              let aCount = 0, iCount = 0, eCount = 0
+              let aCount = 0, iCount = 0, eCount = 0, tCount = 0
               sessions.forEach(session => {
                 const status = attendance[student.id]?.[session.id]
                 if (status === 'A') aCount++
-                if (status === 'I') iCount++
-                if (status === 'E') eCount++
+                else if (status === 'I') iCount++
+                else if (status === 'E') eCount++
+                else if (status === 'T') tCount++
               })
-              const totalMarcadas = aCount + iCount + eCount
+              const totalMarcadas = aCount + iCount + eCount + tCount
               const aPercentage = totalMarcadas > 0 ? Math.round((aCount / totalMarcadas) * 100) : 0
+              const tPercentage = totalMarcadas > 0 ? Math.round((tCount / totalMarcadas) * 100) : 0
               const iPercentage = totalMarcadas > 0 ? Math.round((iCount / totalMarcadas) * 100) : 0
               const ePercentage = totalMarcadas > 0 ? Math.round((eCount / totalMarcadas) * 100) : 0
 
@@ -302,12 +304,13 @@ export function AttendanceTable({ subjectId }: AttendanceTableProps) {
                     )
                   })}
 
-                  <td className="px-2 py-2 text-center text-[11px] font-medium border-l-2 border-slate-100 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-900/30">
+                  <td className="px-2 py-2 text-center text-[11px] font-medium border-l-2 border-slate-100 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-900/30 min-w-[140px]">
                      <div className="flex flex-col items-center justify-center gap-1">
-                       <div className="flex gap-2">
-                         <span className="text-emerald-600" title="Asistencias">{aCount}A {totalMarcadas > 0 ? `${aPercentage}%` : ''}</span>
-                         <span className="text-red-600" title="Inasistencias">{iCount}I {totalMarcadas > 0 ? `${iPercentage}%` : ''}</span>
-                         <span className="text-amber-600" title="Excusas">{eCount}E {totalMarcadas > 0 ? `${ePercentage}%` : ''}</span>
+                       <div className="flex gap-1.5 flex-wrap justify-center">
+                         <span className="text-emerald-600 font-semibold" title="Asistencias">{aCount}A {totalMarcadas > 0 ? `${aPercentage}%` : ''}</span>
+                         <span className="text-amber-600 font-semibold" title="Llegadas Tarde">{tCount}T {totalMarcadas > 0 ? `${tPercentage}%` : ''}</span>
+                         <span className="text-red-600 font-semibold" title="Inasistencias">{iCount}I {totalMarcadas > 0 ? `${iPercentage}%` : ''}</span>
+                         <span className="text-amber-700 dark:text-amber-400 font-semibold" title="Excusas">{eCount}E {totalMarcadas > 0 ? `${ePercentage}%` : ''}</span>
                        </div>
                      </div>
                   </td>

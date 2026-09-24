@@ -1,7 +1,7 @@
 'use server'
 
 import { createClient, createAdminClient } from '@/core/config/supabase/server'
-import { AscParsedData } from '../utils/AscXmlParser'
+import { AscParsedData, SIN_DOCENTE_ID } from '../utils/AscXmlParser'
 
 export interface ScheduleImportMappings {
   teachers?: Record<string, string> // xmlTeacherId -> dbTeacherId
@@ -300,11 +300,12 @@ export async function commitImportedSchedule(
     // 6. Preparar Asignaciones Académicas únicas (Carga Académica)
     const assignmentMap = new Map<string, any>()
     data.slots.forEach(slot => {
-      const tDbId = teacherXmlToDbIdMap.get(slot.teacher_id)
+      const isAutonomous = !slot.teacher_id || slot.teacher_id === SIN_DOCENTE_ID
+      const tDbId = isAutonomous ? null : (teacherXmlToDbIdMap.get(slot.teacher_id) || null)
       const sDbId = subjectXmlToDbIdMap.get(slot.subject_id)
       const gDbId = groupXmlToDbIdMap.get(slot.group_id)
 
-      const key = `${tDbId}-${sDbId}-${gDbId}`
+      const key = `${tDbId || 'TA'}-${sDbId}-${gDbId}`
       if (!assignmentMap.has(key)) {
         assignmentMap.set(key, {
           import_id: importId,
@@ -318,8 +319,8 @@ export async function commitImportedSchedule(
       }
     })
 
-    // Solo se excluyen los slots cuyas IDs de docente o materia no se resolvieron
-    const assignmentsPayload = Array.from(assignmentMap.values()).filter(a => a.teacher_id && a.subject_id)
+    // Se incluyen asignaciones válidas: materias con docente, o materias autónomas de grupo
+    const assignmentsPayload = Array.from(assignmentMap.values()).filter(a => a.subject_id && (a.teacher_id || a.group_id))
 
     
     // Desactivamos temporalmente las foreign keys estrictas si la limpieza no se hace por CASCADE, 
@@ -352,10 +353,15 @@ export async function commitImportedSchedule(
 
     // 7. Insertar Slots Horarios
     const rawSlotsPayload = data.slots.map(slot => {
-      const tId = teacherXmlToDbIdMap.get(slot.teacher_id)
+      const isAutonomous = !slot.teacher_id || slot.teacher_id === SIN_DOCENTE_ID
+      const tId = isAutonomous ? null : (teacherXmlToDbIdMap.get(slot.teacher_id) || null)
       const sId = subjectXmlToDbIdMap.get(slot.subject_id)
       const gId = groupXmlToDbIdMap.get(slot.group_id)
-      const assignment = dbAssignments?.find(a => a.teacher_id === tId && a.subject_id === sId && a.group_id === gId)
+      const assignment = dbAssignments?.find(a => 
+        (isAutonomous ? a.teacher_id === null : a.teacher_id === tId) && 
+        a.subject_id === sId && 
+        a.group_id === gId
+      )
       
       return {
         import_id: importId,
@@ -367,7 +373,7 @@ export async function commitImportedSchedule(
         period_id: slot.period,
         duration: 1
       }
-    }).filter(s => s.assignment_id && s.teacher_id && s.subject_id)
+    }).filter(s => s.assignment_id && s.subject_id && (s.teacher_id || s.group_id))
 
 
     // Deduplicación para evitar el error de constraint único
@@ -377,7 +383,7 @@ export async function commitImportedSchedule(
 
     for (const s of rawSlotsPayload) {
       const gKey = `G-${s.group_id}-${s.day_of_week}-${s.period_id}`
-      const tKey = `T-${s.teacher_id}-${s.day_of_week}-${s.period_id}`
+      const tKey = s.teacher_id ? `T-${s.teacher_id}-${s.day_of_week}-${s.period_id}` : null
       
       const isVirtualGroup = s.group_id === virtualGroupDbId;
       
@@ -385,11 +391,11 @@ export async function commitImportedSchedule(
       // (Excepción: el grupo virtual de Jornada Institucional permite a varios docentes al mismo tiempo)
       // aSc a veces duplica cards si hay semanas A/B o co-enseñanza. Filtramos el primero.
       const groupTaken = !isVirtualGroup && seenGroupSlots.has(gKey);
-      const teacherTaken = seenTeacherSlots.has(tKey);
+      const teacherTaken = tKey ? seenTeacherSlots.has(tKey) : false;
 
       if (!groupTaken && !teacherTaken) {
         if (!isVirtualGroup) seenGroupSlots.add(gKey);
-        seenTeacherSlots.add(tKey);
+        if (tKey) seenTeacherSlots.add(tKey);
         slotsPayload.push(s)
       }
     }

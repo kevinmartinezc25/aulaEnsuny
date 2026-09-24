@@ -258,6 +258,18 @@ export async function updateAdminUser(
       console.warn(`Usuario ${id} no encontrado en Supabase Auth. Detalles del error:`, getAuthError)
     }
 
+    if (data.role === 'student') {
+      try {
+        const canonicalName = `${lastName.toUpperCase()} ${firstName.toUpperCase()}`.trim()
+        await adminClient
+          .from('assisted_students')
+          .update({ full_name: canonicalName })
+          .in('directory_id', [`prof-${id}`, `dir-${id}`, id])
+      } catch (syncErr) {
+        console.warn('Advertencia al sincronizar con Planilla Asistida:', syncErr)
+      }
+    }
+
     revalidatePath('/admin/users')
     revalidatePath('/admin/teachers')
     return { success: true }
@@ -1866,6 +1878,17 @@ export async function updateStudent(id: string, data: FullStudentData) {
 
       // Si no se creó profileId (no tenía correo válido o solo se editó directorio)
       if (!profileId) {
+        if (directoryId) {
+          try {
+            const canonicalName = `${lastName.toUpperCase()} ${firstName.toUpperCase()}`.trim()
+            await adminClient
+              .from('assisted_students')
+              .update({ full_name: canonicalName })
+              .in('directory_id', [`dir-${directoryId}`, directoryId])
+          } catch (syncErr) {
+            console.warn('Advertencia sincronizando con Planilla Asistida:', syncErr)
+          }
+        }
         revalidatePath('/admin/students')
         return { success: true }
       }
@@ -2062,6 +2085,25 @@ export async function updateStudent(id: string, data: FullStudentData) {
           course_id: courseId
         }))
         await adminClient.from('student_courses').insert(courseInserts)
+      }
+      // Sincronizar automáticamente el nombre en Planilla Asistida sin afectar notas ni asistencia
+      try {
+        const canonicalName = `${lastName.toUpperCase()} ${firstName.toUpperCase()}`.trim()
+        const candidateDirIds = [
+          profileId ? `prof-${profileId}` : null,
+          directoryId ? `dir-${directoryId}` : null,
+          profileId,
+          directoryId
+        ].filter(Boolean) as string[]
+
+        if (candidateDirIds.length > 0 && canonicalName) {
+          await adminClient
+            .from('assisted_students')
+            .update({ full_name: canonicalName })
+            .in('directory_id', candidateDirIds)
+        }
+      } catch (syncPlanillaErr) {
+        console.warn('Advertencia al sincronizar nombre con Planilla Asistida:', syncPlanillaErr)
       }
     }
 

@@ -5,7 +5,7 @@ import { AssistedSession, AssistedAttendance, saveAssistedAttendance } from '@/m
 import { toast } from 'sonner'
 
 export type GradeMap = Record<string, Record<string, number>> // student_id -> activity_id -> grade_value
-export type AttendanceMap = Record<string, Record<string, 'A' | 'I' | 'E'>> // student_id -> session_id -> status
+export type AttendanceMap = Record<string, Record<string, 'A' | 'I' | 'E' | 'T'>> // student_id -> session_id -> status
 interface PlanillaState {
   subjectId: string | null
   students: { id: string, number: number, full_name: string }[]
@@ -19,7 +19,7 @@ interface PlanillaState {
   isSaving: boolean
   hasUnsavedChanges: boolean
   dirtyGrades: { student_id: string, activity_id: string, grade_value: number }[]
-  dirtyAttendance: { session_id: string, student_id: string, status: 'A' | 'I' | 'E' }[]
+  dirtyAttendance: { session_id: string, student_id: string, status: 'A' | 'I' | 'E' | 'T' }[]
 
   // Setters
   initialize: (subjectId: string, data: {
@@ -32,7 +32,7 @@ interface PlanillaState {
   }) => void
   
   setGrade: (studentId: string, activityId: string, value: number | null) => void
-  setAttendance: (studentId: string, sessionId: string, status: 'A' | 'I' | 'E' | null) => void
+  setAttendance: (studentId: string, sessionId: string, status: 'A' | 'I' | 'E' | 'T' | null) => void
   saveChanges: () => Promise<void>
   
   setSessions: (sessions: AssistedSession[]) => void

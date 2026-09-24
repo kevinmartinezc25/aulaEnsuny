@@ -39,6 +39,7 @@ export default async function ConsultaDashboardPage() {
         totalSubjects: 0,
         totalSessions: 0,
         totalAttended: 0,
+        totalTardy: 0,
         totalUnjustified: 0,
         totalExcused: 0,
         overallPercentage: 100

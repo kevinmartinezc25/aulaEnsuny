@@ -334,7 +334,7 @@ export default function StaticScheduleGrid({
       } else {
         // Grupo: Materia en grande (arriba), Docente en pequeño (abajo)
         labelSubtitle = item.subject
-        labelTitle = item.teachers.join(', ') || 'Sin asignar'
+        labelTitle = item.teachers.length > 0 ? item.teachers.join(', ') : 'Trabajo Autónomo'
       }
 
       return {

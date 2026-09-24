@@ -387,7 +387,7 @@ export default function DailyImpactCanvas({ selectedDate }: DailyImpactCanvasPro
                       slotClass = "slot slot-pending"
                       statusLabel = "⚠ Sin cubrir"
                     } else {
-                      statusLabel = teacher?.name?.split(' ')[0] || ''
+                      statusLabel = teacher?.name?.split(' ')[0] || (slot.teacher_id ? '' : 'Trab. Autónomo')
                     }
 
                     return (

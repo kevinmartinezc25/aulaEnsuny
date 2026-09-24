@@ -15,7 +15,7 @@ export interface AssistedAttendance {
   id: string
   session_id: string
   student_id: string
-  status: 'A' | 'I' | 'E'
+  status: 'A' | 'I' | 'E' | 'T'
   created_at: string
 }
 
@@ -148,7 +148,7 @@ export async function getAssistedAttendance(subjectId: string): Promise<Assisted
   return attendance as AssistedAttendance[]
 }
 
-export async function saveAssistedAttendance(records: { session_id: string, student_id: string, status: 'A' | 'I' | 'E' | null }[]): Promise<boolean> {
+export async function saveAssistedAttendance(records: { session_id: string, student_id: string, status: 'A' | 'I' | 'E' | 'T' | null }[]): Promise<boolean> {
   const supabase = await createClient()
   const { data: userData, error: authError } = await supabase.auth.getUser()
   if (authError || !userData?.user) throw new Error('No autorizado')

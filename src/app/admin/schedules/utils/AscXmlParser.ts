@@ -35,6 +35,9 @@ export interface AscSlot {
 /** Sentinel value used when a lesson has no classids (administrative/non-classroom duties) */
 export const JORNADA_INSTITUCIONAL_ID = '__JORNADA_INSTITUCIONAL__'
 
+/** Sentinel value used when a lesson has no teacherids (autonomous work / TA) */
+export const SIN_DOCENTE_ID = '__SIN_DOCENTE__'
+
 export interface AscParsedData {
   teachers: AscTeacher[]
   subjects: AscSubject[]
@@ -175,26 +178,15 @@ export class AscXmlParser {
         const dayOfWeek = parseAscDays(days)
         const mainClassroomId = classroomids.length > 0 && classroomids[0] !== "" ? classroomids[0] : ''
 
-        lesson.teacherids.forEach((teacherId: string) => {
-          if (!teacherId) return
+        const effectiveTeachers = lesson.teacherids.filter((id: string) => id.trim() !== '')
+        const effectiveClassIds = lesson.classids.filter((id: string) => id.trim() !== '')
 
-          const effectiveClassIds = lesson.classids.filter((id: string) => id.trim() !== '')
-
-          if (effectiveClassIds.length === 0) {
-            // Lesson sin grupo asignado: asesoría, coordinación, directivo, etc.
-            // Se representa con el centinela __JORNADA_INSTITUCIONAL__ para no perderla.
-            data.slots.push({
-              teacher_id: teacherId,
-              subject_id: lesson.subjectid,
-              group_id: '__JORNADA_INSTITUCIONAL__',
-              classroom_id: mainClassroomId,
-              day_of_week: dayOfWeek,
-              period: period
-            })
-          } else {
+        if (effectiveTeachers.length === 0) {
+          // Lesson sin docente asignado pero con grupo(s) (ej. Trabajo Autónomo TA)
+          if (effectiveClassIds.length > 0) {
             effectiveClassIds.forEach((groupId: string) => {
               data.slots.push({
-                teacher_id: teacherId,
+                teacher_id: SIN_DOCENTE_ID,
                 subject_id: lesson.subjectid,
                 group_id: groupId,
                 classroom_id: mainClassroomId,
@@ -203,10 +195,37 @@ export class AscXmlParser {
               })
             })
           }
-        })
+        } else {
+          effectiveTeachers.forEach((teacherId: string) => {
+            if (effectiveClassIds.length === 0) {
+              // Lesson sin grupo asignado: asesoría, coordinación, directivo, etc.
+              // Se representa con el centinela __JORNADA_INSTITUCIONAL__ para no perderla.
+              data.slots.push({
+                teacher_id: teacherId,
+                subject_id: lesson.subjectid,
+                group_id: JORNADA_INSTITUCIONAL_ID,
+                classroom_id: mainClassroomId,
+                day_of_week: dayOfWeek,
+                period: period
+              })
+            } else {
+              effectiveClassIds.forEach((groupId: string) => {
+                data.slots.push({
+                  teacher_id: teacherId,
+                  subject_id: lesson.subjectid,
+                  group_id: groupId,
+                  classroom_id: mainClassroomId,
+                  day_of_week: dayOfWeek,
+                  period: period
+                })
+              })
+            }
+          })
+        }
       }
     })
 
     return data
   }
 }
+
