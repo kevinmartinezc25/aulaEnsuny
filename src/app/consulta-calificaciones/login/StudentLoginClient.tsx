@@ -12,10 +12,42 @@ export default function StudentLoginClient() {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Sanitizar en tiempo real: eliminar cualquier caracter no numérico
+    const digitsOnly = e.target.value.replace(/\D/g, '')
+    setDocumentId(digitsOnly)
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Permitir teclas de control/navegación
+    const allowedKeys = ['Backspace', 'Tab', 'Enter', 'Delete', 'ArrowLeft', 'ArrowRight', 'Home', 'End']
+    if (allowedKeys.includes(e.key)) return
+
+    // Permitir combinaciones de teclado como Ctrl+A, Ctrl+C, Ctrl+V, etc.
+    if (e.ctrlKey || e.metaKey) return
+
+    // Bloquear cualquier tecla que no sea un dígito 0-9
+    if (!/^[0-9]$/.test(e.key)) {
+      e.preventDefault()
+    }
+  }
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault()
+    const text = e.clipboardData.getData('text')
+    // Extraer exclusivamente los dígitos numéricos
+    const digitsOnly = text.replace(/\D/g, '')
+    if (digitsOnly) {
+      setDocumentId(digitsOnly.slice(0, 15))
+    } else {
+      toast.error('Solo se aceptan números en este campo.')
+    }
+  }
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    const docClean = documentId.trim()
+    const docClean = documentId.trim().replace(/\D/g, '')
     if (!docClean) {
       toast.error('Por favor, ingresa tu número de documento de identidad.')
       return
@@ -72,14 +104,22 @@ export default function StudentLoginClient() {
                 <input
                   type="text"
                   value={documentId}
-                  onChange={(e) => setDocumentId(e.target.value)}
+                  onChange={handleInputChange}
+                  onKeyDown={handleKeyDown}
+                  onPaste={handlePaste}
                   placeholder="Ej: 1045234567"
                   autoFocus
                   inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={15}
+                  autoComplete="off"
                   className="block w-full pl-11 pr-4 py-3.5 border border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-[#1F4E31] dark:focus:ring-emerald-500 focus:border-transparent transition-all text-base outline-none font-medium"
                   disabled={isLoading}
                 />
               </div>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                Solo se admiten números (sin puntos, guiones, espacios ni letras).
+              </p>
             </div>
 
             <Button

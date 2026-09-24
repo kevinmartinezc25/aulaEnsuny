@@ -138,8 +138,12 @@ export function StudentSubjectClientView({ subject, achievements, activities, gr
   if (achievements.length === 0) {
     return (
       <div className="space-y-6">
-        <Link href="/consulta-calificaciones" className="inline-flex items-center text-sm font-medium text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors">
-          <ArrowLeft className="h-4 w-4 mr-1" /> Volver a mis materias
+        <Link 
+          href="/consulta-calificaciones" 
+          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 dark:bg-emerald-500/15 dark:hover:bg-emerald-500/25 border-2 border-emerald-500/30 text-xs sm:text-sm font-bold text-[#1F4E31] dark:text-emerald-300 transition-all active:scale-95 shadow-xs"
+        >
+          <ArrowLeft className="h-4 w-4" /> 
+          <span>Volver a Mis Materias</span>
         </Link>
         <div className="bg-white dark:bg-slate-900 rounded-3xl p-12 text-center border border-slate-200 dark:border-slate-800">
           <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Materia sin logros configurados</h2>
@@ -151,8 +155,12 @@ export function StudentSubjectClientView({ subject, achievements, activities, gr
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
-      <Link href="/consulta-calificaciones" className="inline-flex items-center text-sm font-medium text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors">
-        <ArrowLeft className="h-4 w-4 mr-1" /> Volver a mis materias
+      <Link 
+        href="/consulta-calificaciones" 
+        className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 dark:bg-emerald-500/15 dark:hover:bg-emerald-500/25 border-2 border-emerald-500/30 text-xs sm:text-sm font-bold text-[#1F4E31] dark:text-emerald-300 transition-all active:scale-95 shadow-xs"
+      >
+        <ArrowLeft className="h-4 w-4" /> 
+        <span>Volver a Mis Materias</span>
       </Link>
 
       {/* Header Materia */}

@@ -211,6 +211,7 @@ export async function createDisciplinaryReport(
       })
 
     revalidatePath('/teacher/disciplinary')
+    revalidatePath('/consulta-calificaciones')
 
     return { success: true, reportId: data.id }
   } catch (error: any) {
@@ -441,6 +442,7 @@ export async function updateReportStatus(
     revalidatePath('/admin/disciplinary')
     revalidatePath(`/admin/disciplinary/${reportId}`)
     revalidatePath('/teacher/disciplinary')
+    revalidatePath('/consulta-calificaciones')
 
     return { success: true }
   } catch (error: unknown) {
@@ -472,6 +474,7 @@ export async function softDeleteReport(
 
     revalidatePath('/admin/disciplinary')
     revalidatePath('/teacher/disciplinary')
+    revalidatePath('/consulta-calificaciones')
 
     return { success: true }
   } catch (error: unknown) {

@@ -189,10 +189,10 @@ export default function LandingPage() {
             className="space-y-6 sm:space-y-8 w-full"
           >
             {/* Titular Principal Display */}
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-[-0.03em] leading-[1.1] text-slate-900 dark:text-white max-w-3xl mx-auto">
-              Aprender, gestionar y crecer en{' '}
+            <h1 className="text-5xl sm:text-6xl lg:text-7xl font-extrabold tracking-[-0.03em] leading-[1.1] text-slate-900 dark:text-white max-w-3xl mx-auto">
+              aula
               <span className="bg-gradient-to-r from-emerald-600 via-[#1F4E31] to-teal-700 dark:from-emerald-400 dark:via-emerald-300 dark:to-teal-400 bg-clip-text text-transparent">
-                un solo lugar.
+                Ensuny
               </span>
             </h1>
 
