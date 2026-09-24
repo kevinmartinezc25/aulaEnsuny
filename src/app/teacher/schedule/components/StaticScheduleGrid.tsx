@@ -19,6 +19,35 @@ interface StaticScheduleGridProps {
 
 const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes']
 
+const SUBJECT_PALETTE = [
+  '#059669', // emerald-600
+  '#ea580c', // orange-600
+  '#db2777', // pink-600
+  '#0284c7', // sky-600
+  '#9333ea', // purple-600
+  '#dc2626', // red-600
+  '#ca8a04', // yellow-600
+  '#16a34a', // green-600
+  '#0d9488', // teal-600
+  '#e11d48', // rose-600
+  '#7c3aed', // violet-600
+  '#0891b2', // cyan-600
+];
+
+export const getSubjectColor = (subjectName: string | undefined) => {
+  if (!subjectName || subjectName === 'Jornada Institucional' || subjectName === 'Libre' || subjectName === 'Sin clase Asignada') {
+    return '#f59e0b'; // amber-500
+  }
+  
+  let hash = 0;
+  for (let i = 0; i < subjectName.length; i++) {
+    hash = subjectName.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  
+  const index = Math.abs(hash) % SUBJECT_PALETTE.length;
+  return SUBJECT_PALETTE[index];
+}
+
 export default function StaticScheduleGrid({ 
   entityType, 
   entityId, 
@@ -124,7 +153,7 @@ export default function StaticScheduleGrid({
                 subject: cls.subject || 'Clase',
                 group: cls.labelSubtitle === 'Jornada Institucional' ? 'Jornada Institucional' : cls.labelSubtitle,
                 location: cls.room || '',
-                color: cls.isJornada ? '#f59e0b' : (cls.color || '#4f46e5'),
+            color: cls.isJornada ? '#f59e0b' : getSubjectColor(cls.subject),
                 isFree: false,
                 isNovedad: cls.isNovedad
               })
@@ -271,7 +300,7 @@ export default function StaticScheduleGrid({
           subject: d.subject?.name || 'Libre',
           teachers: [],
           groups: [],
-          color: d.subject?.color || '#ffffff',
+          color: getSubjectColor(d.subject?.name),
           room: d.classroom?.name || '',
           isNovedad: d.isNovedad || false
         })
@@ -449,8 +478,8 @@ export default function StaticScheduleGrid({
                         : ''
                     }`}
                     style={cls.isJornada ? {} : {
-                      backgroundColor: `${cls.color}18`,
-                      borderColor: `${cls.color}50`,
+                      backgroundColor: `${cls.color}22`,
+                      borderColor: `${cls.color}70`,
                     }}
                   >
                     <div
@@ -469,12 +498,13 @@ export default function StaticScheduleGrid({
                             className={`font-black tracking-tighter select-none text-center break-words w-full ${
                               cls.isJornada
                                 ? 'text-amber-700 dark:text-amber-300 text-[10px] sm:text-[11px] leading-tight'
-                                : `text-indigo-700 dark:text-indigo-300 ${
+                                : `${
                                     cls.labelSubtitle.length <= 6
                                       ? (visualSettings.density === 'compact' ? 'text-[16px] sm:text-[18px] leading-tight' : 'text-[20px] sm:text-[22px] xl:text-[24px] leading-tight')
                                       : (visualSettings.density === 'compact' ? 'text-[10px] sm:text-[11px] leading-tight' : 'text-[11px] sm:text-[13px] leading-tight')
                                   }`
                             }`}
+                            style={cls.isJornada ? {} : { color: '#1e293b' }}
                           >
                             {cls.labelSubtitle}
                           </h4>
@@ -489,7 +519,7 @@ export default function StaticScheduleGrid({
                         </div>
                       ) : (
                         <div className="w-full flex flex-col justify-center items-center gap-0.5">
-                          <h4 className={`font-black text-indigo-700 dark:text-indigo-300 ${visualSettings.density === 'compact' ? 'text-[10px] sm:text-[11px]' : 'text-[11px] sm:text-[13px]'} leading-tight tracking-tight text-center break-words w-full px-0.5`}>
+                          <h4 className={`font-black ${visualSettings.density === 'compact' ? 'text-[10px] sm:text-[11px]' : 'text-[11px] sm:text-[13px]'} leading-tight tracking-tight text-center break-words w-full px-0.5`} style={{ color: '#1e293b' }}>
                             {cls.labelSubtitle}
                           </h4>
                           <span className={`text-slate-500 dark:text-slate-400 ${visualSettings.density === 'compact' ? 'text-[8px]' : 'text-[9px]'} font-semibold leading-tight text-center break-words w-full px-0.5`}>

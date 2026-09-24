@@ -613,6 +613,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [isAdminSidebarVisible, setIsAdminSidebarVisible] = useState(true)
   const [isDark, setIsDark] = useState(false)
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
   const [user, setUser] = useState<UserSessionInfo | null>(null)
   const [enabledModules, setEnabledModules] = useState<string[]>([])
   const [pendingAlertModal, setPendingAlertModal] = useState<{ isOpen: boolean; count: number }>({
@@ -802,6 +803,31 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }
 
+  const deleteNotification = async (id: any) => {
+    if (!user?.id) return;
+    const updated = notifications.filter(n => n.id !== id)
+    setNotifications(updated)
+    const supabase = createClient();
+    await supabase.from('push_notification_deliveries').delete().eq('id', id);
+    const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+                       process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
+    if (isDemoMode && typeof window !== 'undefined') {
+      localStorage.setItem('aulaensuny-demo-notifications', JSON.stringify(updated))
+    }
+  }
+
+  const clearAllNotifications = async () => {
+    if (!user?.id) return;
+    setNotifications([])
+    const supabase = createClient();
+    await supabase.from('push_notification_deliveries').delete().eq('user_id', user.id);
+    const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+                       process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
+    if (isDemoMode && typeof window !== 'undefined') {
+      localStorage.setItem('aulaensuny-demo-notifications', JSON.stringify([]))
+    }
+  }
+
   useEffect(() => {
     const syncTheme = () => {
       const theme = localStorage.getItem('theme')
@@ -818,6 +844,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     syncTheme()
     window.addEventListener('theme-changed', syncTheme)
     return () => window.removeEventListener('theme-changed', syncTheme)
+  }, [])
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 640)
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
   // Cargar perfil del usuario actual de manera reactiva/dinámica
@@ -1060,27 +1093,64 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   {unreadCount > 0 && <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-blue-500 ring-2 ring-white dark:ring-slate-900" />}
                 </button>
                 <AnimatePresence>
-                  {isNotificationsOpen && (
-                    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }}
-                      className="absolute right-0 mt-2 w-80 rounded-2xl border border-slate-100 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900 overflow-hidden z-50">
+                {isNotificationsOpen && (
+                  <>
+                    {/* Backdrop */}
+                    <div
+                      className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[1px] sm:bg-transparent"
+                      onClick={() => setIsNotificationsOpen(false)}
+                    />
+                    {/* Panel dropdown */}
+                    <motion.div
+                      initial={{ opacity: 0, y: -6, scale: 0.98 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -6, scale: 0.98 }}
+                      transition={{ duration: 0.15 }}
+                      className={`z-50 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900 ${
+                        isMobile
+                          ? 'fixed top-14 right-2 w-[calc(100vw-1rem)] max-w-[360px]'
+                          : 'absolute right-0 top-full mt-2 w-80 shadow-xl'
+                      }`}
+                    >
                       <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-800/60">
                         <h3 className="text-sm font-bold text-slate-900 dark:text-white">Notificaciones</h3>
-                        {unreadCount > 0 && (
-                          <button onClick={markAllNotificationsAsRead} className="text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400">
-                            Marcar todo leído
-                          </button>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {unreadCount > 0 && (
+                            <button onClick={markAllNotificationsAsRead} className="text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400">
+                              Marcar leídas
+                            </button>
+                          )}
+                          {notifications.length > 0 && (
+                            <button onClick={clearAllNotifications} className="text-xs font-semibold text-red-500 hover:text-red-600 dark:text-red-400">
+                              Limpiar todo
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <div className="max-h-72 overflow-y-auto">
-                        {notifications.map(notif => (
-                          <div key={notif.id} onClick={() => markNotificationAsRead(notif.id)}
-                            className={`flex flex-col gap-1 border-b border-slate-50 px-4 py-3 last:border-0 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 dark:border-slate-800/30 transition-colors ${!notif.read ? 'bg-blue-50/40 dark:bg-blue-900/10' : 'opacity-70'}`}>
-                            <div className="flex items-center justify-between">
-                              <h4 className="text-sm font-bold text-slate-900 dark:text-white">{notif.title}</h4>
-                              {!notif.read && <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />}
+                      <div className="max-h-72 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/40">
+                        {notifications.length === 0 ? (
+                          <div className="flex flex-col items-center justify-center py-8 text-slate-400">
+                            <Bell className="h-8 w-8 mb-2 opacity-30" />
+                            <p className="text-xs">Sin notificaciones</p>
+                          </div>
+                        ) : notifications.map(notif => (
+                          <div key={notif.id}
+                            className={`group flex items-start gap-2 px-3 py-3 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50 ${!notif.read ? 'bg-blue-50/40 dark:bg-blue-900/10' : 'opacity-70'}`}>
+                            <div className="flex-1 min-w-0 cursor-pointer" onClick={() => markNotificationAsRead(notif.id)}>
+                              <div className="flex items-center gap-1.5">
+                                {!notif.read && <span className="h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0" />}
+                                <h4 className="text-sm font-bold text-slate-900 dark:text-white truncate">{notif.title}</h4>
+                              </div>
+                              <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mt-0.5">{notif.message}</p>
+                              <span className="text-[10px] text-slate-400">{notif.time}</span>
                             </div>
-                            <p className="text-xs text-slate-500 line-clamp-2">{notif.message}</p>
-                            <span className="text-[10px] text-slate-400">{notif.time}</span>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); deleteNotification(notif.id); }}
+                              className="shrink-0 p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                              title="Eliminar"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
                           </div>
                         ))}
                       </div>
@@ -1088,8 +1158,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         <button onClick={() => setIsNotificationsOpen(false)} className="text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400">Cerrar</button>
                       </div>
                     </motion.div>
-                  )}
-                </AnimatePresence>
+                  </>
+                )}
+              </AnimatePresence>
               </div>
               <button onClick={handleLogout} className="flex items-center gap-2 rounded-xl border border-red-100 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100 hover:border-red-200 transition-all dark:border-red-900/30 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20">
                 <LogOut className="h-3.5 w-3.5" />
@@ -1180,33 +1251,71 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </button>
               <AnimatePresence>
                 {isNotificationsOpen && (
-                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
-                    className="absolute right-0 mt-2 w-80 rounded-2xl border border-slate-100 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900 overflow-hidden z-50">
-                    <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-800/60">
-                      <h3 className="text-sm font-bold text-slate-900 dark:text-white">Notificaciones</h3>
-                      {unreadCount > 0 && (
-                        <button onClick={markAllNotificationsAsRead} className="text-xs font-semibold text-blue-600 dark:text-blue-400">
-                          Marcar todo leído
-                        </button>
-                      )}
-                    </div>
-                    <div className="max-h-[300px] overflow-y-auto">
-                      {notifications.map(notif => (
-                        <div key={notif.id} onClick={() => markNotificationAsRead(notif.id)}
-                          className={`flex flex-col gap-1 border-b border-slate-50 px-4 py-3 last:border-0 dark:border-slate-800/30 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer ${notif.read ? 'opacity-70' : 'bg-blue-50/30 dark:bg-blue-900/10'}`}>
-                          <div className="flex items-center justify-between">
-                            <h4 className={`text-sm font-bold ${notif.read ? 'text-slate-700 dark:text-slate-300' : 'text-slate-900 dark:text-white'}`}>{notif.title}</h4>
-                            {!notif.read && <span className="h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0" />}
-                          </div>
-                          <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">{notif.message}</p>
-                          <span className="text-[10px] font-medium text-slate-400 mt-1">{notif.time}</span>
+                  <>
+                    {/* Backdrop */}
+                    <div
+                      className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[1px] sm:bg-transparent"
+                      onClick={() => setIsNotificationsOpen(false)}
+                    />
+                    {/* Panel dropdown */}
+                    <motion.div
+                      initial={{ opacity: 0, y: -6, scale: 0.98 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -6, scale: 0.98 }}
+                      transition={{ duration: 0.15 }}
+                      className={`z-50 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900 ${
+                        isMobile
+                          ? 'fixed top-16 right-2 w-[calc(100vw-1rem)] max-w-[360px]'
+                          : 'absolute right-0 top-full mt-2 w-80 shadow-xl'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-800/60">
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-white">Notificaciones</h3>
+                        <div className="flex items-center gap-2">
+                          {unreadCount > 0 && (
+                            <button onClick={markAllNotificationsAsRead} className="text-xs font-semibold text-blue-600 dark:text-blue-400">
+                              Marcar leídas
+                            </button>
+                          )}
+                          {notifications.length > 0 && (
+                            <button onClick={clearAllNotifications} className="text-xs font-semibold text-red-500 hover:text-red-600 dark:text-red-400">
+                              Limpiar todo
+                            </button>
+                          )}
                         </div>
-                      ))}
-                    </div>
-                    <div className="border-t border-slate-100 p-2 dark:border-slate-800/60 text-center">
-                      <button onClick={() => setIsNotificationsOpen(false)} className="text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors">Cerrar</button>
-                    </div>
-                  </motion.div>
+                      </div>
+                      <div className="max-h-[60vh] sm:max-h-[300px] overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/40">
+                        {notifications.length === 0 ? (
+                          <div className="flex flex-col items-center justify-center py-10 text-slate-400">
+                            <Bell className="h-9 w-9 mb-2 opacity-30" />
+                            <p className="text-xs">Sin notificaciones</p>
+                          </div>
+                        ) : notifications.map(notif => (
+                          <div key={notif.id}
+                            className={`group flex items-start gap-2 px-3 py-3 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50 ${notif.read ? 'opacity-70' : 'bg-blue-50/30 dark:bg-blue-900/10'}`}>
+                            <div className="flex-1 min-w-0 cursor-pointer" onClick={() => markNotificationAsRead(notif.id)}>
+                              <div className="flex items-center gap-1.5">
+                                {!notif.read && <span className="h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0" />}
+                                <h4 className={`text-sm font-bold truncate ${notif.read ? 'text-slate-700 dark:text-slate-300' : 'text-slate-900 dark:text-white'}`}>{notif.title}</h4>
+                              </div>
+                              <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mt-0.5">{notif.message}</p>
+                              <span className="text-[10px] font-medium text-slate-400 mt-1 block">{notif.time}</span>
+                            </div>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); deleteNotification(notif.id); }}
+                              className="shrink-0 p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                              title="Eliminar"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="border-t border-slate-100 p-3 dark:border-slate-800/60 text-center">
+                        <button onClick={() => setIsNotificationsOpen(false)} className="text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors">Cerrar</button>
+                      </div>
+                    </motion.div>
+                  </>
                 )}
               </AnimatePresence>
             </div>
