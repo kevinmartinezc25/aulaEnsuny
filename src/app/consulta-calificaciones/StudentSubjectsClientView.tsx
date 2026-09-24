@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { BookOpen, Calendar, ChevronRight, RotateCcw, Filter, Award, Sparkles, GraduationCap } from 'lucide-react'
 import { StudentSubjectView } from '@/modules/planilla-asistida/application/studentQueries'
 import { motion, Variants } from 'framer-motion'
+import { formatCapitalizedWords } from '@/lib/utils'
 
 interface StudentSubjectsClientViewProps {
   subjects: StudentSubjectView[]
@@ -51,7 +52,7 @@ export function StudentSubjectsClientView({ subjects, studentName }: StudentSubj
     setSelectedPeriod('all')
   }
 
-  const displayFirstName = studentName ? studentName.split(' ')[0] : 'Estudiante'
+  const displayFirstName = studentName ? formatCapitalizedWords(studentName.split(' ')[0]) : 'Estudiante'
 
   const containerVariants: Variants = {
     hidden: { opacity: 0 },

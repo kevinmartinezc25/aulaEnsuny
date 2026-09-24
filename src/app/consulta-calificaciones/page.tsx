@@ -2,6 +2,7 @@ import React from 'react'
 import { getPlanillaStudentSession } from '@/modules/planilla-asistida/application/studentAuthActions'
 import { getStudentSubjects, getStudentGroupSchedule } from '@/modules/planilla-asistida/application/studentQueries'
 import { getStudentPortalDisciplinaryData } from '@/modules/disciplinary/application/studentDisciplinaryActions'
+import { getStudentAttendanceOverview } from '@/modules/planilla-asistida/application/studentAttendanceQueries'
 import { redirect } from 'next/navigation'
 import { AcademicPortalClientView } from './AcademicPortalClientView'
 
@@ -11,7 +12,7 @@ export default async function ConsultaDashboardPage() {
     redirect('/consulta-calificaciones/login')
   }
 
-  const [subjects, scheduleData, disciplinaryData] = await Promise.all([
+  const [subjects, scheduleData, disciplinaryData, attendanceData] = await Promise.all([
     getStudentSubjects().catch(() => []),
     getStudentGroupSchedule().catch(() => ({
       success: false,
@@ -32,6 +33,17 @@ export default async function ConsultaDashboardPage() {
         recentReports: []
       },
       reports: []
+    })),
+    getStudentAttendanceOverview().catch(() => ({
+      summary: {
+        totalSubjects: 0,
+        totalSessions: 0,
+        totalAttended: 0,
+        totalUnjustified: 0,
+        totalExcused: 0,
+        overallPercentage: 100
+      },
+      subjects: []
     }))
   ])
 
@@ -60,8 +72,10 @@ export default async function ConsultaDashboardPage() {
       subjects={subjects}
       scheduleData={scheduleData}
       disciplinaryData={disciplinaryData}
+      attendanceData={attendanceData}
       resolvedGrade={resolvedGrade}
       resolvedGroup={resolvedGroup}
     />
   )
 }
+
