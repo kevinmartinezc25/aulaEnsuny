@@ -1,5 +1,4 @@
-import React from 'react'
-import { TimeSlot } from '../utils/timeCalculator'
+import { TimeSlot, generateTimeSlots, formatTimeString, PeriodTimeConfig } from '../utils/timeCalculator'
 import { Calendar, Clock, GraduationCap, Quote, School, Users, User, CalendarDays } from 'lucide-react'
 import { isOfficialGradeGroup } from '../utils/groupFilters'
 
@@ -58,17 +57,64 @@ const normalizeDay = (d: any): string => {
 
 export default function PrintableSchedule({ groupName, directorName, classes, timeSlots, groupMax, isTeacherView = false }: PrintableScheduleProps) {
   const maxPeriod = Number(groupMax) || 7
-  const defaultFallback: TimeSlot[] = Array.from({ length: maxPeriod }, (_, i) => ({
-    type: 'period',
-    id: i + 1,
-    startTime: '',
-    endTime: ''
-  }))
 
-  let allSlots = (timeSlots || []).filter(s => s.type !== 'break' && (s.id == null || Number(s.id) <= maxPeriod))
-  if (allSlots.length === 0) {
-    allSlots = defaultFallback
+  // Leer ajustes institucionales de inicio/fin de cada hora
+  let customPeriodsFromSettings: PeriodTimeConfig[] = []
+  let settingsTimeFormat = '12h'
+  let settingsStartHour = '07:00'
+  let settingsBlockDuration = 55
+
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = localStorage.getItem('sch_settings')
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (Array.isArray(parsed.customPeriods) && parsed.customPeriods.length > 0) {
+          customPeriodsFromSettings = parsed.customPeriods
+        }
+        if (parsed.timeFormat) {
+          settingsTimeFormat = parsed.timeFormat
+        }
+        if (parsed.startHour) settingsStartHour = parsed.startHour
+        if (parsed.blockDuration) settingsBlockDuration = parseInt(parsed.blockDuration, 10) || 55
+      }
+    } catch {
+      // Ignorar fallback
+    }
   }
+
+  // Generar slots oficiales con inicio y fin calculados/personalizados
+  const resolvedTimeSlots = generateTimeSlots(
+    settingsStartHour,
+    settingsBlockDuration,
+    maxPeriod,
+    [],
+    settingsTimeFormat !== '24h',
+    customPeriodsFromSettings.length > 0 ? customPeriodsFromSettings : undefined
+  ).filter(s => s.type === 'period')
+
+  // Garantizar que todos los periodos a imprimir tengan su startTime y endTime
+  const allSlots: TimeSlot[] = resolvedTimeSlots.map((resolvedSlot, idx) => {
+    const periodNum = resolvedSlot.id || (idx + 1)
+    const custom = customPeriodsFromSettings.find(cp => cp.period === periodNum)
+    const passed = (timeSlots || []).find(s => s.type !== 'break' && s.id === periodNum)
+
+    const startTime = custom 
+      ? formatTimeString(custom.startTime, settingsTimeFormat !== '24h') 
+      : (passed?.startTime || resolvedSlot.startTime)
+
+    const endTime = custom 
+      ? formatTimeString(custom.endTime, settingsTimeFormat !== '24h') 
+      : (passed?.endTime || resolvedSlot.endTime)
+
+    return {
+      type: 'period',
+      id: periodNum,
+      name: custom?.name || passed?.name || resolvedSlot.name || `${periodNum}ª`,
+      startTime,
+      endTime
+    }
+  })
 
   // Filter classes for student group view so non-academic / multi-teacher meetings do not appear
   const filteredClasses = isTeacherView
@@ -126,7 +172,9 @@ export default function PrintableSchedule({ groupName, directorName, classes, ti
                 </div>
                 <div className="flex items-center gap-1.5 justify-end text-xs font-black text-[#1e293b]">
                   <Clock className="w-3.5 h-3.5 text-indigo-600" />
-                  <span>Jornada Mañana</span>
+                  <span>
+                    Jornada {allSlots[0]?.startTime && allSlots[allSlots.length - 1]?.endTime ? `(${allSlots[0].startTime} a ${allSlots[allSlots.length - 1].endTime})` : 'Mañana'}
+                  </span>
                 </div>
               </div>
             </div>
@@ -163,11 +211,13 @@ export default function PrintableSchedule({ groupName, directorName, classes, ti
                     <span className="text-sm font-black tracking-widest uppercase">Día</span>
                   </th>
                   {allSlots.map((slot, i) => (
-                    <th key={`head-${i}`} className="bg-slate-100 text-[#1e293b] border-b border-r border-[#334155] last:border-r-0 py-2">
-                      <div className="flex flex-col items-center">
-                        <span className="text-lg font-bold">{slot.id}ª</span>
+                    <th key={`head-${i}`} className="bg-slate-100 text-[#1e293b] border-b border-r border-[#334155] last:border-r-0 py-1.5 px-0.5">
+                      <div className="flex flex-col items-center justify-center text-center">
+                        <span className="text-base font-black text-[#1e293b] leading-tight">
+                          {slot.name || `${slot.id}ª`}
+                        </span>
                         {slot.startTime ? (
-                          <span className="text-[9px] font-bold text-slate-500 mt-0.5 tracking-wider">
+                          <span className="text-[8.5px] font-bold text-slate-700 print:text-black mt-0.5 tracking-tight whitespace-nowrap">
                             {slot.startTime}{slot.endTime ? ` - ${slot.endTime}` : ''}
                           </span>
                         ) : null}
@@ -236,8 +286,8 @@ export default function PrintableSchedule({ groupName, directorName, classes, ti
                                     <span className="font-bold text-[12px] leading-tight text-center break-words" style={{ color: '#000000' }}>
                                       {cls.subject}
                                     </span>
-                                    <span className="text-[10px] mt-1 text-center break-words" style={{ color: '#1a1a1a' }}>
-                                      {cls.teacher}
+                                    <span className="text-[10px] mt-1 text-center break-words font-medium" style={{ color: '#1a1a1a' }}>
+                                      {cls.teacher || 'Trabajo Autónomo'}
                                     </span>
                                   </>
                                 )}

@@ -580,9 +580,17 @@ export function PremiumScheduleViewer() {
                                             <div className="text-[10px] font-bold text-slate-800 dark:text-slate-200 line-clamp-2 leading-tight" title={slot.subject?.name}>
                                               {slot.subject?.name}
                                             </div>
-                                            <div className="text-[9px] text-slate-500 dark:text-slate-400 truncate mt-0.5 font-medium" title={slot.teacher?.full_name}>
-                                              {slot.teacher?.full_name?.split(' ').slice(0, 2).join(' ')}
-                                            </div>
+                                            {slot.teacher?.full_name ? (
+                                              <div className="text-[9px] text-slate-500 dark:text-slate-400 truncate mt-0.5 font-medium" title={slot.teacher.full_name}>
+                                                {slot.teacher.full_name.split(' ').slice(0, 2).join(' ')}
+                                              </div>
+                                            ) : (
+                                              <div className="mt-0.5">
+                                                <span className="inline-block px-1 py-0.2 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-semibold text-[8px] uppercase tracking-wider">
+                                                  Trab. Autónomo
+                                                </span>
+                                              </div>
+                                            )}
                                           </div>
                                         )}
                                       </div>

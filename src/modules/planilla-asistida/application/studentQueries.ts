@@ -341,10 +341,27 @@ export async function getStudentGroupSchedule(): Promise<StudentScheduleResponse
     }
   }
 
-  // Generar franjas horarias estándar de la institución (07:00 a 13:55 con recreo de 30min tras el bloque 4)
-  const defaultTimeSlots = generateTimeSlots('07:00', 55, 7, [
-    { id: '1', name: 'Recreo', afterPeriod: 4, durationMinutes: 30 }
-  ], true).filter(s => s.type === 'period')
+  // Obtener franjas horarias configuradas en Ajustes (o estándar institucional)
+  const { data: periodConstraint } = await supabase
+    .from('sch_constraints')
+    .select('parameters')
+    .eq('rule_type', 'GENERAL_SCHEDULE_PERIODS')
+    .eq('is_active', true)
+    .maybeSingle()
+
+  const customPeriods = periodConstraint?.parameters?.periods
+  const startHour = periodConstraint?.parameters?.startHour || '07:00'
+  const blockDuration = periodConstraint?.parameters?.blockDuration || 55
+  const periodsPerDay = periodConstraint?.parameters?.periodsPerDay || 7
+
+  const defaultTimeSlots = generateTimeSlots(
+    startHour, 
+    blockDuration, 
+    periodsPerDay, 
+    [], 
+    true, 
+    customPeriods
+  ).filter(s => s.type === 'period')
 
   const dayKeyMap: Record<number, ScheduleDayKey> = {
     1: 'lunes',
@@ -375,7 +392,7 @@ export async function getStudentGroupSchedule(): Promise<StudentScheduleResponse
       startTime: startSlot?.startTime || `Bloque ${slot.period_id}`,
       endTime: endSlot?.endTime || startSlot?.endTime || '',
       subject: slot.subject?.name || 'Materia sin asignar',
-      teacher: slot.teacher?.full_name || undefined,
+      teacher: slot.teacher?.full_name || 'Trabajo Autónomo',
       location: slot.classroom?.name || undefined,
       group: slot.group?.name || session.groupName || undefined,
       period: slot.period_id,

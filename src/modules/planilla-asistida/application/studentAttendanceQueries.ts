@@ -12,6 +12,7 @@ export interface StudentAttendanceSubjectSummary {
   teacherName?: string
   totalSessions: number
   attendedCount: number
+  tardyCount: number
   unjustifiedAbsences: number
   excusedAbsences: number
   unrecordedCount: number
@@ -24,7 +25,7 @@ export interface StudentSessionAttendanceTrace {
   sessionId: string
   date: string
   topic?: string | null
-  status: 'A' | 'I' | 'E' | 'NONE'
+  status: 'A' | 'I' | 'E' | 'T' | 'NONE'
   statusLabel: string
   isLocked?: boolean
 }
@@ -34,6 +35,7 @@ export interface StudentAttendanceOverview {
     totalSubjects: number
     totalSessions: number
     totalAttended: number
+    totalTardy: number
     totalUnjustified: number
     totalExcused: number
     overallPercentage: number
@@ -97,6 +99,7 @@ export async function getStudentAttendanceOverview(): Promise<StudentAttendanceO
         totalSubjects: 0,
         totalSessions: 0,
         totalAttended: 0,
+        totalTardy: 0,
         totalUnjustified: 0,
         totalExcused: 0,
         overallPercentage: 100
@@ -173,6 +176,7 @@ export async function getStudentAttendanceOverview(): Promise<StudentAttendanceO
         totalSubjects: 0,
         totalSessions: 0,
         totalAttended: 0,
+        totalTardy: 0,
         totalUnjustified: 0,
         totalExcused: 0,
         overallPercentage: 100
@@ -191,6 +195,7 @@ export async function getStudentAttendanceOverview(): Promise<StudentAttendanceO
         totalSubjects: 0,
         totalSessions: 0,
         totalAttended: 0,
+        totalTardy: 0,
         totalUnjustified: 0,
         totalExcused: 0,
         overallPercentage: 100
@@ -275,7 +280,7 @@ export async function getStudentAttendanceOverview(): Promise<StudentAttendanceO
 
   // 6. Obtener los registros de asistencia para el estudiante
   const myStudentIds = Array.from(new Set(Array.from(studentIdMap.values())))
-  let attendanceRecords: Array<{ session_id: string; student_id: string; status: 'A' | 'I' | 'E' }> = []
+  let attendanceRecords: Array<{ session_id: string; student_id: string; status: 'A' | 'I' | 'E' | 'T' }> = []
 
   if (myStudentIds.length > 0 && allSessionIds.length > 0) {
     const { data: attData } = await supabase
@@ -290,7 +295,7 @@ export async function getStudentAttendanceOverview(): Promise<StudentAttendanceO
   }
 
   // Mapeo session_id -> status
-  const attendanceMap = new Map<string, 'A' | 'I' | 'E'>()
+  const attendanceMap = new Map<string, 'A' | 'I' | 'E' | 'T'>()
   attendanceRecords.forEach(att => {
     attendanceMap.set(att.session_id, att.status)
   })
@@ -298,6 +303,7 @@ export async function getStudentAttendanceOverview(): Promise<StudentAttendanceO
   // 7. Compilar resúmenes por materia
   let totalAllSessions = 0
   let totalAllAttended = 0
+  let totalAllTardy = 0
   let totalAllUnjustified = 0
   let totalAllExcused = 0
 
@@ -307,6 +313,7 @@ export async function getStudentAttendanceOverview(): Promise<StudentAttendanceO
     totalAllSessions += totalSessions
 
     let attended = 0
+    let tardy = 0
     let unjustified = 0
     let excused = 0
     let unrecorded = 0
@@ -314,20 +321,22 @@ export async function getStudentAttendanceOverview(): Promise<StudentAttendanceO
     sessions.forEach(sess => {
       const status = attendanceMap.get(sess.id)
       if (status === 'A') attended++
+      else if (status === 'T') tardy++
       else if (status === 'I') unjustified++
       else if (status === 'E') excused++
       else unrecorded++
     })
 
     totalAllAttended += attended
+    totalAllTardy += tardy
     totalAllUnjustified += unjustified
     totalAllExcused += excused
 
-    // Porcentaje: asistencias / sesiones con registro (o total de sesiones)
-    const evaluatedSessions = attended + unjustified + excused
+    // Porcentaje: (asistencias + tardanzas) / sesiones evaluadas con registro
+    const evaluatedSessions = attended + tardy + unjustified + excused
     let percentage = 100
     if (evaluatedSessions > 0) {
-      percentage = Math.round((attended / evaluatedSessions) * 100)
+      percentage = Math.round(((attended + tardy) / evaluatedSessions) * 100)
     }
 
     const lastSession = sessions.length > 0 ? sessions[0].date : null
@@ -341,6 +350,7 @@ export async function getStudentAttendanceOverview(): Promise<StudentAttendanceO
       teacherName: subject.teacher_id ? teacherMap.get(subject.teacher_id) : undefined,
       totalSessions,
       attendedCount: attended,
+      tardyCount: tardy,
       unjustifiedAbsences: unjustified,
       excusedAbsences: excused,
       unrecordedCount: unrecorded,
@@ -350,9 +360,9 @@ export async function getStudentAttendanceOverview(): Promise<StudentAttendanceO
     }
   })
 
-  const totalEvaluated = totalAllAttended + totalAllUnjustified + totalAllExcused
+  const totalEvaluated = totalAllAttended + totalAllTardy + totalAllUnjustified + totalAllExcused
   const overallPercentage = totalEvaluated > 0
-    ? Math.round((totalAllAttended / totalEvaluated) * 100)
+    ? Math.round(((totalAllAttended + totalAllTardy) / totalEvaluated) * 100)
     : 100
 
   return {
@@ -360,6 +370,7 @@ export async function getStudentAttendanceOverview(): Promise<StudentAttendanceO
       totalSubjects: subjectsData.length,
       totalSessions: totalAllSessions,
       totalAttended: totalAllAttended,
+      totalTardy: totalAllTardy,
       totalUnjustified: totalAllUnjustified,
       totalExcused: totalAllExcused,
       overallPercentage
@@ -387,6 +398,7 @@ export async function getStudentSubjectAttendanceTraceability(
   summary: {
     totalSessions: number
     attendedCount: number
+    tardyCount: number
     unjustifiedAbsences: number
     excusedAbsences: number
     attendancePercentage: number
@@ -461,7 +473,7 @@ export async function getStudentSubjectAttendanceTraceability(
   const sessionIds = sessions.map(s => s.id)
 
   // 5. Obtener asistencia del estudiante
-  const attendanceMap = new Map<string, 'A' | 'I' | 'E'>()
+  const attendanceMap = new Map<string, 'A' | 'I' | 'E' | 'T'>()
 
   if (myStudentId && sessionIds.length > 0) {
     const { data: attRows } = await supabase
@@ -472,25 +484,30 @@ export async function getStudentSubjectAttendanceTraceability(
 
     if (attRows) {
       attRows.forEach(row => {
-        if (row.status) attendanceMap.set(row.session_id, row.status as 'A' | 'I' | 'E')
+        if (row.status) attendanceMap.set(row.session_id, row.status as 'A' | 'I' | 'E' | 'T')
       })
     }
   }
 
   // 6. Formatear sesiones
   let attended = 0
+  let tardy = 0
   let unjustified = 0
   let excused = 0
 
   const traceSessions: StudentSessionAttendanceTrace[] = sessions.map(sess => {
     const status = attendanceMap.get(sess.id)
-    let finalStatus: 'A' | 'I' | 'E' | 'NONE' = 'NONE'
+    let finalStatus: 'A' | 'I' | 'E' | 'T' | 'NONE' = 'NONE'
     let statusLabel = 'Sin registrar'
 
     if (status === 'A') {
       finalStatus = 'A'
       statusLabel = 'Asistió'
       attended++
+    } else if (status === 'T') {
+      finalStatus = 'T'
+      statusLabel = 'Llegó Tarde'
+      tardy++
     } else if (status === 'I') {
       finalStatus = 'I'
       statusLabel = 'Inasistencia'
@@ -511,9 +528,9 @@ export async function getStudentSubjectAttendanceTraceability(
     }
   })
 
-  const totalEvaluated = attended + unjustified + excused
+  const totalEvaluated = attended + tardy + unjustified + excused
   const attendancePercentage = totalEvaluated > 0
-    ? Math.round((attended / totalEvaluated) * 100)
+    ? Math.round(((attended + tardy) / totalEvaluated) * 100)
     : 100
 
   return {
@@ -528,6 +545,7 @@ export async function getStudentSubjectAttendanceTraceability(
     summary: {
       totalSessions: sessions.length,
       attendedCount: attended,
+      tardyCount: tardy,
       unjustifiedAbsences: unjustified,
       excusedAbsences: excused,
       attendancePercentage

@@ -225,3 +225,94 @@ export async function saveBlockSubjectsAction(subjectIds: string[]): Promise<{
   }
 }
 
+export interface GeneralSchedulePeriodsConfig {
+  periods: Array<{
+    period: number
+    name: string
+    startTime: string
+    endTime: string
+  }>
+  startHour?: string
+  blockDuration?: number
+  periodsPerDay?: number
+  breaks?: Array<{
+    id: string
+    name: string
+    afterPeriod: number
+    durationMinutes: number
+  }>
+}
+
+/**
+ * Obtiene la configuración de horas y periodos del horario general desde sch_constraints.
+ */
+export async function getGeneralSchedulePeriodsAction(): Promise<{
+  success: boolean
+  config?: GeneralSchedulePeriodsConfig
+  error?: string
+}> {
+  try {
+    const adminClient = createAdminClient()
+    const { data, error } = await adminClient
+      .from('sch_constraints')
+      .select('parameters')
+      .eq('rule_type', 'GENERAL_SCHEDULE_PERIODS')
+      .eq('is_active', true)
+      .maybeSingle()
+
+    if (error) return { success: false, error: error.message }
+    if (data?.parameters) {
+      return { success: true, config: data.parameters as GeneralSchedulePeriodsConfig }
+    }
+    return { success: true, config: undefined }
+  } catch (e: any) {
+    return { success: false, error: e.message }
+  }
+}
+
+/**
+ * Guarda la configuración de inicio y fin de horas del horario general en sch_constraints.
+ */
+export async function saveGeneralSchedulePeriodsAction(
+  config: GeneralSchedulePeriodsConfig
+): Promise<{
+  success: boolean
+  error?: string
+}> {
+  try {
+    const adminClient = createAdminClient()
+    const { data: existing } = await adminClient
+      .from('sch_constraints')
+      .select('id')
+      .eq('rule_type', 'GENERAL_SCHEDULE_PERIODS')
+      .maybeSingle()
+
+    if (existing) {
+      const { error: updErr } = await adminClient
+        .from('sch_constraints')
+        .update({ parameters: config, is_active: true })
+        .eq('id', existing.id)
+
+      if (updErr) return { success: false, error: updErr.message }
+    } else {
+      const { error: insErr } = await adminClient
+        .from('sch_constraints')
+        .insert({
+          rule_type: 'GENERAL_SCHEDULE_PERIODS',
+          target_entity_type: 'GLOBAL',
+          target_entity_id: null,
+          parameters: config,
+          weight: 'STRICT',
+          is_active: true
+        })
+
+      if (insErr) return { success: false, error: insErr.message }
+    }
+
+    return { success: true }
+  } catch (e: any) {
+    return { success: false, error: e.message }
+  }
+}
+
+

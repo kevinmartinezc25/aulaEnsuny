@@ -350,6 +350,43 @@ export async function getAssistedGrades(subjectId: string): Promise<AssistedGrad
   return grades as AssistedGrade[]
 }
 
+function formatCanonicalStudentName(lastName?: string | null, firstName?: string | null): string {
+  const last = (lastName || '').trim().toUpperCase()
+  const first = (firstName || '').trim().toUpperCase()
+  if (!last && !first) return ''
+  if (!last) return first
+  if (!first) return last
+  return `${last} ${first}`
+}
+
+export async function syncAssistedStudentsForCandidate(
+  profileId: string | null | undefined,
+  directoryId: string | null | undefined,
+  canonicalName: string
+): Promise<number> {
+  const adminClient = createAdminClient()
+  const candidateIds = [
+    profileId ? `prof-${profileId}` : null,
+    directoryId ? `dir-${directoryId}` : null,
+    profileId || null,
+    directoryId || null
+  ].filter(Boolean) as string[]
+
+  if (candidateIds.length === 0 || !canonicalName) return 0
+
+  const { data, error } = await adminClient
+    .from('assisted_students')
+    .update({ full_name: canonicalName })
+    .in('directory_id', candidateIds)
+    .select('id')
+
+  if (error) {
+    console.warn('Error al sincronizar nombre en assisted_students:', error)
+    return 0
+  }
+  return data?.length || 0
+}
+
 export async function getAssistedStudents(subjectId: string) {
   const supabase = await createClient()
   const { data, error } = await supabase
@@ -359,6 +396,175 @@ export async function getAssistedStudents(subjectId: string) {
     .order('number', { ascending: true })
 
   if (error) throw new Error('Error al obtener los estudiantes')
+  if (!data || data.length === 0) return []
+
+  try {
+    const adminClient = createAdminClient()
+
+    // Extraer identificadores del directorio o perfil
+    const dirIds: string[] = []
+    const profIds: string[] = []
+    const needsFallback: typeof data = []
+
+    data.forEach(s => {
+      if (s.directory_id) {
+        if (s.directory_id.startsWith('dir-')) {
+          dirIds.push(s.directory_id.replace('dir-', ''))
+        } else if (s.directory_id.startsWith('prof-')) {
+          profIds.push(s.directory_id.replace('prof-', ''))
+        } else {
+          dirIds.push(s.directory_id)
+          profIds.push(s.directory_id)
+        }
+      } else {
+        needsFallback.push(s)
+      }
+    })
+
+    // Consultar directorios y perfiles
+    const [dirRes, profRes] = await Promise.all([
+      dirIds.length > 0
+        ? adminClient.from('student_directory').select('id, first_name, last_name, profile_id').in('id', dirIds)
+        : Promise.resolve({ data: [] }),
+      profIds.length > 0
+        ? adminClient.from('profiles').select('id, first_name, last_name').in('id', profIds)
+        : Promise.resolve({ data: [] })
+    ])
+
+    const dirMap = new Map<string, { id: string; first_name: string; last_name: string; profile_id?: string | null }>()
+    ;(dirRes.data || []).forEach(d => dirMap.set(d.id, d))
+
+    const profMap = new Map<string, { id: string; first_name: string; last_name: string }>()
+    ;(profRes.data || []).forEach(p => profMap.set(p.id, p))
+
+    // Fallback inteligente para estudiantes sin directory_id
+    let fallbackDirMap: Map<string, { id: string; canonicalName: string }> | null = null
+    let fallbackProfMap: Map<string, { id: string; canonicalName: string }> | null = null
+
+    if (needsFallback.length > 0) {
+      const { data: subData } = await adminClient
+        .from('assisted_subjects')
+        .select('grade, group_number')
+        .eq('id', subjectId)
+        .maybeSingle()
+
+      let dirQuery = adminClient.from('student_directory').select('id, first_name, last_name, grade_level, group_name')
+      let profQuery = adminClient.from('profiles').select('id, first_name, last_name, grade_level, group_name, roles!inner(name)').eq('roles.name', 'student')
+
+      if (subData?.grade) {
+        const gradeStr = String(subData.grade)
+        dirQuery = dirQuery.or(`grade_level.ilike.%${gradeStr}%,grade_level.eq.${gradeStr}`)
+        profQuery = profQuery.or(`grade_level.ilike.%${gradeStr}%,grade_level.eq.${gradeStr}`)
+      }
+
+      const [allDirRes, allProfRes] = await Promise.all([
+        dirQuery.limit(500),
+        profQuery.limit(500)
+      ])
+
+      fallbackDirMap = new Map()
+      ;(allDirRes.data || []).forEach(d => {
+        const canonical = formatCanonicalStudentName(d.last_name, d.first_name)
+        const n1 = normalizeStudentName(canonical)
+        const n2 = normalizeStudentName(`${d.first_name} ${d.last_name}`)
+        if (n1) fallbackDirMap!.set(n1, { id: `dir-${d.id}`, canonicalName: canonical })
+        if (n2) fallbackDirMap!.set(n2, { id: `dir-${d.id}`, canonicalName: canonical })
+      })
+
+      fallbackProfMap = new Map()
+      ;(allProfRes.data || []).forEach(p => {
+        const canonical = formatCanonicalStudentName(p.last_name, p.first_name)
+        const n1 = normalizeStudentName(canonical)
+        const n2 = normalizeStudentName(`${p.first_name} ${p.last_name}`)
+        if (n1) fallbackProfMap!.set(n1, { id: `prof-${p.id}`, canonicalName: canonical })
+        if (n2) fallbackProfMap!.set(n2, { id: `prof-${p.id}`, canonicalName: canonical })
+      })
+    }
+
+    const pendingUpdates: { id: string; full_name: string; directory_id?: string }[] = []
+
+    for (const student of data) {
+      let canonicalName: string | null = null
+      let resolvedDirId: string | null = null
+
+      if (student.directory_id) {
+        if (student.directory_id.startsWith('dir-')) {
+          const rawId = student.directory_id.replace('dir-', '')
+          const dirItem = dirMap.get(rawId)
+          if (dirItem) {
+            canonicalName = formatCanonicalStudentName(dirItem.last_name, dirItem.first_name)
+          }
+        } else if (student.directory_id.startsWith('prof-')) {
+          const rawId = student.directory_id.replace('prof-', '')
+          const profItem = profMap.get(rawId)
+          if (profItem) {
+            canonicalName = formatCanonicalStudentName(profItem.last_name, profItem.first_name)
+          }
+        } else {
+          const dirItem = dirMap.get(student.directory_id)
+          const profItem = profMap.get(student.directory_id)
+          if (dirItem) {
+            canonicalName = formatCanonicalStudentName(dirItem.last_name, dirItem.first_name)
+            resolvedDirId = `dir-${dirItem.id}`
+          } else if (profItem) {
+            canonicalName = formatCanonicalStudentName(profItem.last_name, profItem.first_name)
+            resolvedDirId = `prof-${profItem.id}`
+          }
+        }
+      }
+
+      // Si no se resolvió por directory_id, usar fallback
+      if (!canonicalName && (fallbackDirMap || fallbackProfMap)) {
+        const norm = normalizeStudentName(student.full_name)
+        const dirMatch = fallbackDirMap?.get(norm)
+        const profMatch = fallbackProfMap?.get(norm)
+        if (dirMatch) {
+          canonicalName = dirMatch.canonicalName
+          resolvedDirId = dirMatch.id
+        } else if (profMatch) {
+          canonicalName = profMatch.canonicalName
+          resolvedDirId = profMatch.id
+        }
+      }
+
+      const needsNameUpdate = canonicalName && canonicalName !== student.full_name
+      const needsDirUpdate = resolvedDirId && resolvedDirId !== student.directory_id
+
+      if (needsNameUpdate || needsDirUpdate) {
+        const updatedName = canonicalName || student.full_name
+        const updatedDirId = resolvedDirId || student.directory_id
+
+        student.full_name = updatedName
+        if (resolvedDirId) student.directory_id = updatedDirId
+
+        pendingUpdates.push({
+          id: student.id,
+          full_name: updatedName,
+          ...(resolvedDirId ? { directory_id: updatedDirId } : {})
+        })
+      }
+    }
+
+    // Persistir las discrepancias encontradas en segundo plano
+    if (pendingUpdates.length > 0) {
+      Promise.all(
+        pendingUpdates.map(u =>
+          adminClient
+            .from('assisted_students')
+            .update({
+              full_name: u.full_name,
+              ...(u.directory_id ? { directory_id: u.directory_id } : {})
+            })
+            .eq('id', u.id)
+        )
+      ).catch(err => {
+        console.warn('Error al persistir sincronización en assisted_students:', err)
+      })
+    }
+  } catch (syncError) {
+    console.warn('Error durante la resolución de nombres de Gestión de Estudiantes:', syncError)
+  }
+
   return data
 }
 

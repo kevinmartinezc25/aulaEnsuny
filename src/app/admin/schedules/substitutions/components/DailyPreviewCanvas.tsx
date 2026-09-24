@@ -170,7 +170,7 @@ export default function DailyPreviewCanvas({ targetDate }: DailyPreviewCanvasPro
                   // Texto secundario (el profe para los grupos, o el grupo para los profes)
                   let secondaryText = ''
                   if (viewMode === 'group') {
-                    secondaryText = teachers[slot.teacher_id]?.name || ''
+                    secondaryText = (slot.teacher_id && teachers[slot.teacher_id]?.name) ? teachers[slot.teacher_id]?.name : 'Trabajo Autónomo'
                   } else {
                     secondaryText = groups.find(g => g.id === slot.group_id)?.name || ''
                   }

@@ -151,7 +151,7 @@ export default function MasterScheduleCanvas({ viewMode, onNavigate }: MasterSch
           if (slot) {
             const sub = subjects[slot.subject_id]?.name || '?'
             const secondaryText = viewMode === 'group' 
-              ? (teachers[slot.teacher_id]?.name || '')
+              ? (teachers[slot.teacher_id]?.name || 'Trab. Autónomo')
               : (groups.find(g => g.id === slot.group_id)?.name || '')
             csvContent += `"${sub} ${secondaryText ? '('+secondaryText+')' : ''}",`
           } else {
@@ -811,7 +811,7 @@ export default function MasterScheduleCanvas({ viewMode, onNavigate }: MasterSch
                             const tNames = matchingSlots
                               .map(s => teachers[s.teacher_id]?.name ? (teachers[s.teacher_id]?.alias || teachers[s.teacher_id]?.name.split(' ')[0]) : null)
                               .filter(Boolean)
-                            secondaryText = Array.from(new Set(tNames)).join(', ')
+                            secondaryText = tNames.length > 0 ? Array.from(new Set(tNames)).join(', ') : 'Trab. Autónomo'
                           } else {
                             const gNames = matchingSlots
                               .map(s => groups.find(g => g.id === s.group_id)?.name)

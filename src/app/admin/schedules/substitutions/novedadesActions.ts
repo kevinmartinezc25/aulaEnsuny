@@ -1,7 +1,7 @@
 'use server'
 
 import { createClient, createAdminClient } from '@/core/config/supabase/server'
-import { AscParsedData } from '../utils/AscXmlParser'
+import { AscParsedData, SIN_DOCENTE_ID } from '../utils/AscXmlParser'
 
 export async function importDailyNovedadesXML(parsedData: AscParsedData, targetDateStr: string) {
   const supabase = await createClient()
@@ -61,11 +61,16 @@ export async function importDailyNovedadesXML(parsedData: AscParsedData, targetD
     let unmappedSubjects = 0
 
     for (const slot of daySlots) {
+      const isAutonomous = !slot.teacher_id || slot.teacher_id === SIN_DOCENTE_ID
+
       // Intentar mapear Docente
-      let tDbId = tchByExtId.get(slot.teacher_id)
-      if (!tDbId) {
-        const teacherXmlName = parsedData.teachers.find(t => t.id === slot.teacher_id)?.name
-        if (teacherXmlName) tDbId = tchByName.get(teacherXmlName.trim().toLowerCase())
+      let tDbId: string | null = null
+      if (!isAutonomous) {
+        tDbId = tchByExtId.get(slot.teacher_id) || null
+        if (!tDbId) {
+          const teacherXmlName = parsedData.teachers.find(t => t.id === slot.teacher_id)?.name
+          if (teacherXmlName) tDbId = tchByName.get(teacherXmlName.trim().toLowerCase()) || null
+        }
       }
       
       // Intentar mapear Materia
@@ -96,15 +101,15 @@ export async function importDailyNovedadesXML(parsedData: AscParsedData, targetD
         }
       }
 
-      // Validar integridad mínima: Si no encontramos al docente o materia, contamos el error pero omitimos el slot o lo insertamos nulo
-      // Para un horario de Novedad es crítico tener al docente.
-      if (!tDbId) unmappedTeachers++
+      // Solo si requiere docente y no se encontró, sumamos a unmappedTeachers
+      if (!isAutonomous && !tDbId) unmappedTeachers++
       if (!sDbId) unmappedSubjects++
 
-      if (tDbId && sDbId && gDbId) {
+      // Permitir la inserción si tiene materia y grupo, y (tiene docente O es clase autónoma de grupo)
+      if ((tDbId || isAutonomous) && sDbId && gDbId) {
         overridesToInsert.push({
           target_date: targetDateStr,
-          teacher_id: tDbId,
+          teacher_id: tDbId || null,
           subject_id: sDbId,
           group_id: gDbId,
           day_of_week: slot.day_of_week,
