@@ -3,6 +3,23 @@ import { TimeSlot } from '../utils/timeCalculator'
 import { Calendar, Clock, GraduationCap, Quote, School, Users, User, CalendarDays } from 'lucide-react'
 import { isOfficialGradeGroup } from '../utils/groupFilters'
 
+const PRINT_PALETTE = [
+  '#059669', '#ea580c', '#db2777', '#0284c7',
+  '#9333ea', '#dc2626', '#ca8a04', '#16a34a',
+  '#0d9488', '#e11d48', '#7c3aed', '#0891b2',
+];
+
+const getColor = (subjectName: string | undefined) => {
+  if (!subjectName || subjectName === 'Jornada Institucional' || subjectName === 'Libre') {
+    return '#f59e0b';
+  }
+  let hash = 0;
+  for (let i = 0; i < subjectName.length; i++) {
+    hash = subjectName.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return PRINT_PALETTE[Math.abs(hash) % PRINT_PALETTE.length];
+}
+
 interface PrintableScheduleProps {
   groupName: string
   directorName?: string
@@ -63,17 +80,7 @@ export default function PrintableSchedule({ groupName, directorName, classes, ti
         return true
       })
 
-  const isCoveredByPreviousBlock = (day: string, period: number) => {
-    const targetDay = cleanStr(day)
-    const p = Number(period)
-    return filteredClasses.some(c => {
-      const cDay = cleanStr(normalizeDay(c.day))
-      const cPeriod = parseInt(String(c.period), 10)
-      const cDuration = parseInt(String(c.duration || 1), 10) || 1
-      return cDay === targetDay && p > cPeriod && p < cPeriod + cDuration
-    })
-  }
-
+  // Helper para buscar clase exacta por día y período
   const getStartingClass = (day: string, period: number) => {
     const targetDay = cleanStr(day)
     const p = Number(period)
@@ -86,9 +93,20 @@ export default function PrintableSchedule({ groupName, directorName, classes, ti
 
   return (
     <>
-      <style type="text/css" media="print" dangerouslySetInnerHTML={{ __html: '@page { margin: 0; size: A4 landscape; } @media print { body, html { margin: 0 !important; padding: 0 !important; height: auto !important; overflow: visible !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } .print-page-wrapper { break-after: page !important; page-break-after: always !important; height: 100vh !important; max-height: 100vh !important; overflow: hidden !important; } }' }} />
+      <style type="text/css" media="print" dangerouslySetInnerHTML={{ __html: `
+        @page { margin: 0; size: 297mm 210mm landscape; }
+        @page :first { margin: 0; size: 297mm 210mm landscape; }
+        @media print {
+          body, html { margin: 0 !important; padding: 0 !important; height: 100% !important; overflow: visible !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+          .print-page-wrapper { width: 297mm !important; height: 205mm !important; max-height: 205mm !important; break-inside: avoid !important; page-break-inside: avoid !important; overflow: hidden !important; margin: 0 auto !important; page-break-after: auto !important; }
+          table { border-collapse: separate !important; border-spacing: 0 !important; border: 1px solid #334155 !important; }
+          td, th { border: 1px solid #334155 !important; outline: 1px solid #334155 !important; background-color: white !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+          td span, th span { color: #000000 !important; }
+          td > div[style], th > div[style] { background-color: transparent !important; }
+        }
+      ` }} />
       
-      <div id="printable-schedule-container" className="print-page-wrapper w-[297mm] h-[209mm] bg-white text-slate-800 p-6 font-sans mx-auto relative overflow-hidden flex flex-col justify-between box-border print:w-full print:h-screen print:max-h-screen">
+      <div id="printable-schedule-container" className="print-page-wrapper w-[297mm] h-[209mm] bg-white text-slate-800 p-6 font-sans mx-auto relative overflow-hidden flex flex-col justify-between box-border">
         <div className="relative z-10 h-full flex flex-col">
           {/* Header Section Oficial de Convivencia Escolar / Institucional */}
           <div className="mb-4">
@@ -137,15 +155,15 @@ export default function PrintableSchedule({ groupName, directorName, classes, ti
           </div>
 
           {/* Grid Section */}
-          <div className="flex-1 w-full bg-white rounded-xl shadow-sm border-2 border-[#1e293b] overflow-hidden flex flex-col">
+          <div className="flex-1 w-full bg-white rounded-xl shadow-sm border border-[#334155] overflow-hidden flex flex-col">
             <table className="w-full table-fixed border-collapse h-full">
               <thead>
                 <tr>
-                  <th className="bg-white text-[#1e293b] border-b-2 border-r border-slate-200 w-32 py-2">
+                  <th className="bg-slate-100 text-[#1e293b] border-b border-r border-[#334155] w-32 py-2">
                     <span className="text-sm font-black tracking-widest uppercase">Día</span>
                   </th>
                   {allSlots.map((slot, i) => (
-                    <th key={`head-${i}`} className="bg-white text-[#1e293b] border-b-2 border-r border-slate-200 last:border-r-0 py-2">
+                    <th key={`head-${i}`} className="bg-slate-100 text-[#1e293b] border-b border-r border-[#334155] last:border-r-0 py-2">
                       <div className="flex flex-col items-center">
                         <span className="text-lg font-bold">{slot.id}ª</span>
                         {slot.startTime ? (
@@ -159,9 +177,11 @@ export default function PrintableSchedule({ groupName, directorName, classes, ti
                 </tr>
               </thead>
               <tbody>
-                {DAYS.map((day, dIdx) => (
-                  <tr key={day.id} className="border-b border-slate-200 last:border-b-0">
-                    <td className="border-r border-slate-200 bg-white">
+                {DAYS.map((day, dIdx) => {
+                  let skipUntil = 0;
+                  return (
+                  <tr key={day.id} className="border-b border-[#334155] last:border-b-0">
+                    <td className="border-r border-[#334155] bg-slate-50">
                       <div className="flex items-center justify-center gap-2 w-full h-full">
                         <div className={`p-1.5 rounded-lg ${day.bgColor}`}>
                           <CalendarDays className={`w-5 h-5 ${day.iconColor}`} />
@@ -171,33 +191,52 @@ export default function PrintableSchedule({ groupName, directorName, classes, ti
                     </td>
                     {allSlots.map((slot, sIdx) => {
                       const p = slot.id!
-                      if (isCoveredByPreviousBlock(day.id, p)) return null;
+                      if (p < skipUntil) return null;
 
                       const cls = getStartingClass(day.id, p)
                       if (cls) {
+                        let span = parseInt(String(cls.duration || 1), 10) || 1;
+
+                        // Lookahead para buscar bloques consecutivos idénticos
+                        for (let i = p + span; i <= maxPeriod; i++) {
+                          const nextCls = getStartingClass(day.id, i);
+                          if (nextCls && 
+                              nextCls.subject === cls.subject && 
+                              nextCls.teacher === cls.teacher && 
+                              nextCls.group === cls.group) {
+                            const nextDuration = parseInt(String(nextCls.duration || 1), 10) || 1;
+                            span += nextDuration;
+                            i += nextDuration - 1; // Avanzar el índice en caso de que este bloque también tenga duration > 1
+                          } else {
+                            break;
+                          }
+                        }
+
+                        skipUntil = p + span;
+
                         return (
                           <td 
                             key={`${day.id}-${p}`} 
-                            colSpan={parseInt(String(cls.duration || 1), 10) || 1} 
-                            className="border-r border-slate-200 last:border-r-0 relative p-0" 
+                            colSpan={span} 
+                            className="border-r border-[#334155] last:border-r-0 relative p-0" 
                           >
-                            <div className="absolute inset-0" style={{ backgroundColor: `${cls.color || '#4f46e5'}15` }}>
-                              <div className="w-full h-full flex flex-col justify-center items-center text-center px-1.5 py-1">
+                            <div className="absolute inset-0" style={{ backgroundColor: `${getColor(cls.subject)}28` }}>
+                              <div className="w-full h-full flex flex-col justify-center items-center text-center px-2 py-1">
                                 {isTeacherView ? (
                                   <>
-                                    <span className="font-black text-xl text-[#1e293b] leading-tight tracking-tight text-center break-words">
+                                    <span className={`font-black ${(!cls.group || cls.group.trim() === '' || cls.group === cls.subject || cls.group === 'Jornada Institucional') ? 'text-xs' : 'text-lg'} leading-tight tracking-tight text-center break-words`} style={{ color: '#000000' }}>
                                       {cls.group === 'Jornada Institucional' ? cls.subject : (cls.group || cls.teacher)}
                                     </span>
-                                    <span className="text-[9px] font-semibold text-slate-600 mt-0.5 text-center break-words">
-                                      {cls.group === 'Jornada Institucional' ? '' : cls.subject}
+                                    <span className="text-[10px] font-semibold mt-0.5 text-center break-words" style={{ color: '#1a1a1a' }}>
+                                      {cls.group === 'Jornada Institucional' || cls.group === cls.subject ? '' : cls.subject}
                                     </span>
                                   </>
                                 ) : (
                                   <>
-                                    <span className="font-bold text-[12px] text-[#1e293b] leading-tight text-center break-words">
+                                    <span className="font-bold text-[12px] leading-tight text-center break-words" style={{ color: '#000000' }}>
                                       {cls.subject}
                                     </span>
-                                    <span className="text-[10px] text-slate-600 mt-1 text-center break-words">
+                                    <span className="text-[10px] mt-1 text-center break-words" style={{ color: '#1a1a1a' }}>
                                       {cls.teacher}
                                     </span>
                                   </>
@@ -215,7 +254,8 @@ export default function PrintableSchedule({ groupName, directorName, classes, ti
                       }
                     })}
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           </div>

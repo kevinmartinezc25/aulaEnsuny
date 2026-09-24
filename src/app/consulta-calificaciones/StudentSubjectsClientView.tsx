@@ -67,13 +67,13 @@ export function StudentSubjectsClientView({ subjects, studentName }: StudentSubj
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5 sm:space-y-8">
       {/* Banner Principal con Framer Motion */}
       <motion.div
         initial={{ opacity: 0, y: -20, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ type: 'spring', stiffness: 200, damping: 20 }}
-        className="relative overflow-hidden bg-gradient-to-br from-[#1F4E31] via-[#153a23] to-[#0a1e12] rounded-3xl p-5 sm:p-6 shadow-xl shadow-[#1F4E31]/20 text-white"
+        className="relative overflow-hidden bg-gradient-to-br from-[#1F4E31] via-[#153a23] to-[#0a1e12] rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-xl shadow-[#1F4E31]/20 text-white"
       >
         {/* Decoración de fondo */}
         <div className="absolute -top-24 -right-24 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl pointer-events-none" />
@@ -181,7 +181,7 @@ export function StudentSubjectsClientView({ subjects, studentName }: StudentSubj
               variants={containerVariants}
               initial="hidden"
               animate="show"
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5"
+              className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-4 md:gap-5"
             >
               {filteredSubjects.map((subject, index) => {
                 const cardColors = [
@@ -221,31 +221,33 @@ export function StudentSubjectsClientView({ subjects, studentName }: StudentSubj
                       href={`/consulta-calificaciones/materia/${subject.id}`}
                       className="block group focus:outline-none h-full"
                     >
-                      <div className={`${themeColor} rounded-3xl border p-6 hover:shadow-xl transition-all duration-300 h-full flex flex-col relative overflow-hidden active:scale-[0.98]`}>
+                      <div className={`${themeColor} rounded-2xl sm:rounded-3xl border p-3.5 sm:p-5 md:p-6 hover:shadow-xl transition-all duration-300 h-full flex flex-col justify-between relative overflow-hidden active:scale-[0.98]`}>
                         <div className="absolute top-0 left-0 w-full h-1 bg-white/40 dark:bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                         
-                        <div className="flex items-start justify-between mb-4">
-                          <h3 className={`font-bold text-lg lg:text-xl text-slate-900 dark:text-white leading-tight transition-colors ${textHover}`}>
-                            {subject.name}
-                          </h3>
-                          <div className={`h-8 w-8 rounded-full bg-white/60 dark:bg-black/20 flex items-center justify-center transition-colors shrink-0 ${iconBg}`}>
-                            <ChevronRight className="h-4 w-4" />
+                        <div>
+                          <div className="flex items-start justify-between gap-1.5 sm:gap-2 mb-2 sm:mb-4">
+                            <h3 className={`font-bold text-xs sm:text-base md:text-lg lg:text-xl text-slate-900 dark:text-white leading-tight transition-colors line-clamp-2 ${textHover}`}>
+                              {subject.name}
+                            </h3>
+                            <div className={`h-6 w-6 sm:h-8 sm:w-8 rounded-full bg-white/60 dark:bg-black/20 flex items-center justify-center transition-colors shrink-0 ${iconBg}`}>
+                              <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
+                            </div>
                           </div>
                         </div>
 
-                        <div className="space-y-3 mt-auto pt-2">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="bg-white/60 dark:bg-black/20 px-3 py-1 rounded-full font-semibold text-xs text-slate-700 dark:text-slate-300">
+                        <div className="space-y-1.5 sm:space-y-3 mt-auto pt-1 sm:pt-2">
+                          <div className="flex flex-wrap items-center gap-1 sm:gap-2">
+                            <span className="bg-white/70 dark:bg-black/30 px-2 py-0.5 sm:px-3 sm:py-1 rounded-md sm:rounded-full font-semibold text-[10px] sm:text-xs text-slate-700 dark:text-slate-300 shrink-0">
                               {subject.grade}° - {subject.group_number}
                             </span>
-                            <span className="inline-flex items-center gap-1 bg-white/60 dark:bg-black/20 px-3 py-1 rounded-full text-xs font-bold text-slate-700 dark:text-slate-300">
-                              <Award className="h-3.5 w-3.5" />
-                              {subject.achievementsCount} {subject.achievementsCount === 1 ? 'logro' : 'logros'}
+                            <span className="inline-flex items-center gap-1 bg-white/70 dark:bg-black/30 px-2 py-0.5 sm:px-3 sm:py-1 rounded-md sm:rounded-full text-[10px] sm:text-xs font-bold text-slate-700 dark:text-slate-300 shrink-0">
+                              <Award className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />
+                              <span>{subject.achievementsCount} {subject.achievementsCount === 1 ? 'logro' : 'logros'}</span>
                             </span>
                           </div>
-                          <div className="flex items-center text-xs font-medium text-slate-500 dark:text-slate-400 pl-1">
-                            <Calendar className="h-3.5 w-3.5 mr-1.5 opacity-70" />
-                            <span>Periodo: <strong className="text-slate-700 dark:text-slate-300">{subject.period}</strong></span>
+                          <div className="flex items-center text-[10px] sm:text-xs font-medium text-slate-500 dark:text-slate-400 pl-0.5">
+                            <Calendar className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1 sm:mr-1.5 opacity-70 shrink-0" />
+                            <span className="truncate">Periodo: <strong className="text-slate-700 dark:text-slate-300">{subject.period}</strong></span>
                           </div>
                         </div>
                       </div>

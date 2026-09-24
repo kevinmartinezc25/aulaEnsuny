@@ -10,6 +10,34 @@ import {
 } from 'lucide-react'
 import { clearAllScheduleSlotsAction } from '@/modules/admin/application/actions'
 
+const SUBJECT_PALETTE = [
+  '#059669', // emerald-600
+  '#ea580c', // orange-600
+  '#db2777', // pink-600
+  '#0284c7', // sky-600
+  '#9333ea', // purple-600
+  '#dc2626', // red-600
+  '#ca8a04', // yellow-600
+  '#16a34a', // green-600
+  '#0d9488', // teal-600
+  '#e11d48', // rose-600
+  '#7c3aed', // violet-600
+  '#0891b2', // cyan-600
+];
+
+const getSubjectColor = (subjectName: string | undefined) => {
+  if (!subjectName || subjectName === 'Jornada Institucional' || subjectName === 'Libre' || subjectName === 'Sin clase Asignada') {
+    return '#f59e0b'; // amber-500
+  }
+  
+  let hash = 0;
+  for (let i = 0; i < subjectName.length; i++) {
+    hash = subjectName.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  
+  const index = Math.abs(hash) % SUBJECT_PALETTE.length;
+  return SUBJECT_PALETTE[index];
+}
 interface Slot {
   id: string
   day_of_week: number
@@ -238,7 +266,7 @@ export function PremiumScheduleViewer() {
       subject: s.subject?.name || 'Clase',
       teacher: s.teacher?.full_name || '',
       group: s.group?.name || '',
-      color: s.subject?.color || '#4f46e5'
+      color: getSubjectColor(s.subject?.name)
     }))
   }
 
