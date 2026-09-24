@@ -172,7 +172,7 @@ export function StudentSubjectClientView({ subject, achievements, activities, gr
         <div className="mt-4 flex flex-wrap gap-3">
           <span className="inline-flex items-center bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm px-3 py-1 rounded-full font-medium border border-slate-200 dark:border-slate-700">
             <BookOpen className="h-4 w-4 mr-1.5 opacity-70" />
-            {subject.grade}° - {subject.group_number}
+            {subject.grade === 0 ? 'Nivelatorio' : subject.grade === 12 ? 'PFC-12' : subject.grade === 13 ? 'PFC-13' : `${subject.grade}°`}{subject.group_number ? ` - ${subject.group_number}` : ''}
           </span>
           <span className="inline-flex items-center bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-sm px-3 py-1 rounded-full font-medium border border-emerald-200 dark:border-emerald-800/50">
             <Calendar className="h-4 w-4 mr-1.5 opacity-70" />

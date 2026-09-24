@@ -66,24 +66,84 @@ export async function getStudentSubjects(): Promise<StudentSubjectView[]> {
     }
   }
 
-  if (enrollments.length === 0) return []
+  // 1.5 Si no hay inscripciones o para garantizar que vea todas las materias creadas de su grado y grupo:
+  let gradeNum: number | undefined = undefined
+  let groupNum: number | undefined = undefined
 
-  const subjectIds = Array.from(new Set(enrollments.map(e => e.subject_id)))
+  const cleanGrade = (session.gradeLevel || '').trim()
+  const cleanGroup = (session.groupName || '').trim()
 
-  // 2. Obtener los detalles de las materias
-  const { data: subjects, error: subjError } = await supabase
-    .from('assisted_subjects')
-    .select('id, name, grade, group_number, period')
-    .in('id', subjectIds)
-    .order('period', { ascending: false })
+  if (/pfc[\s\-_]?12/i.test(cleanGrade) || /pfc[\s\-_]?12/i.test(cleanGroup)) {
+    gradeNum = 12
+    groupNum = 1
+  } else if (/pfc[\s\-_]?13/i.test(cleanGrade) || /pfc[\s\-_]?13/i.test(cleanGroup)) {
+    gradeNum = 13
+    const explicitGrp = cleanGroup.replace(/\D/g, '')
+    groupNum = explicitGrp && explicitGrp !== '13' ? parseInt(explicitGrp, 10) : 1
+  } else if (/nivelat/i.test(cleanGrade) || /nivelat/i.test(cleanGroup)) {
+    gradeNum = 0
+    groupNum = 1
+  } else {
+    if (cleanGrade) {
+      const d = cleanGrade.replace(/\D/g, '')
+      if (d) gradeNum = parseInt(d, 10)
+    }
+    if (cleanGroup) {
+      const d = cleanGroup.replace(/\D/g, '')
+      if (d) groupNum = parseInt(d, 10)
+    }
+  }
 
-  if (subjError) throw new Error('Error al cargar datos de materias')
+  let cohortSubjectList: Array<{ id: string; name: string; grade: number; group_number: number; period: string }> = []
+  if (gradeNum !== undefined) {
+    let q = supabase
+      .from('assisted_subjects')
+      .select('id, name, grade, group_number, period')
+      .eq('grade', gradeNum)
+      .order('period', { ascending: false })
+
+    if (groupNum !== undefined) {
+      q = q.or(`group_number.eq.${groupNum},group_number.is.null`)
+    }
+    const { data: cData } = await q
+    if (cData) cohortSubjectList = cData as typeof cohortSubjectList
+  }
+
+  // Unificar materias por ID
+  const allSubjectMap = new Map<string, { id: string; name: string; grade: number; group_number: number; period: string; studentIdInSubject: string }>()
+
+  // A. Primero las materias con inscripción confirmada
+  if (enrollments.length > 0) {
+    const enrolledIds = Array.from(new Set(enrollments.map(e => e.subject_id)))
+    const { data: explicitSubs } = await supabase
+      .from('assisted_subjects')
+      .select('id, name, grade, group_number, period')
+      .in('id', enrolledIds)
+      .order('period', { ascending: false })
+
+    for (const sub of explicitSubs || []) {
+      const enId = enrollments.find(e => e.subject_id === sub.id)?.id || ''
+      allSubjectMap.set(sub.id, { ...sub, studentIdInSubject: enId })
+    }
+  }
+
+  // B. Luego incorporar materias de la cohorte institucional (12, 13, Nivelatorio, etc.)
+  for (const sub of cohortSubjectList) {
+    if (!allSubjectMap.has(sub.id)) {
+      allSubjectMap.set(sub.id, { ...sub, studentIdInSubject: '' })
+    }
+  }
+
+  if (allSubjectMap.size === 0) return []
+
+  const finalSubjects = Array.from(allSubjectMap.values())
+  const finalSubjectIds = finalSubjects.map(s => s.id)
 
   // 3. Obtener el conteo de logros para estas materias
   const { data: achievements } = await supabase
     .from('assisted_achievements')
     .select('id, subject_id')
-    .in('subject_id', subjectIds)
+    .in('subject_id', finalSubjectIds)
 
   const achievementCounts = new Map<string, number>()
   if (achievements) {
@@ -92,9 +152,8 @@ export async function getStudentSubjects(): Promise<StudentSubjectView[]> {
     })
   }
 
-  return (subjects || []).map(sub => ({
+  return finalSubjects.map(sub => ({
     ...sub,
-    studentIdInSubject: enrollments.find(e => e.subject_id === sub.id)!.id,
     achievementsCount: achievementCounts.get(sub.id) || 0
   }))
 }
@@ -151,6 +210,19 @@ export async function getStudentGradesView(subjectId: string) {
 
     if (byFuzzy && byFuzzy.length > 0) {
       enrollment = byFuzzy[0]
+    }
+  }
+
+  // Si no está explícitamente en assisted_students, validar si la materia es de su cohorte
+  if (!enrollment) {
+    const { data: targetSub } = await supabase
+      .from('assisted_subjects')
+      .select('id, grade, group_number')
+      .eq('id', subjectId)
+      .maybeSingle()
+
+    if (targetSub) {
+      enrollment = { id: `pending-${session.directoryId || 'temp'}`, number: 0 }
     }
   }
 

@@ -7,6 +7,7 @@ export function normalizeGradeLevel(grade?: string | null): string {
   if (!grade) return ''
   const clean = grade.trim()
   if (!clean) return ''
+  if (/^nivelat/i.test(clean)) return 'Nivelatorio'
   if (/^(pfc[\s\-_]?12|12°?)$/i.test(clean)) return 'PFC-12'
   if (/^(pfc[\s\-_]?13|13°?)$/i.test(clean)) return 'PFC-13'
   if (/^([6-9]|1[0-1])$/.test(clean)) return `${clean}°`

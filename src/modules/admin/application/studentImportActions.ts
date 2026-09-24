@@ -487,7 +487,7 @@ export async function generateImportTemplate(): Promise<string> {
       ['APELLIDOS Y NOMBRES: Requerido. Ej: MARTÍNEZ LÓPEZ JUAN CARLOS'],
       ['(El sistema asignará las dos primeras palabras como apellidos y el resto como nombres)'],
       ['Documento: Opcional. Número de cédula o TI. Debe ser único.'],
-      ['Grado: Requerido. Ej: 10°, 11°, PFC-12, PFC-13'],
+      ['Grado: Requerido. Ej: 10°, 11°, PFC-12, PFC-13, Nivelatorio'],
       ['Grupo: Requerido. Ej: 1, 2, A, B'],
       [''],
       ['Límite: 500 estudiantes por importación.'],

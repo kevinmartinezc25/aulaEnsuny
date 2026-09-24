@@ -62,6 +62,18 @@ export function resolveOfficialGroup(
     }
   }
 
+  // 1.6 Manejo especial para cohorte Nivelatorio
+  if (/nivelat/i.test(gradeStr) || /nivelat/i.test(groupStr)) {
+    const nivMatch = allGroups.find(g => /nivelat/i.test(g.name))
+    if (nivMatch) {
+      return {
+        groupId: nivMatch.id,
+        groupName: nivMatch.name,
+        gradeLevel: 'Nivelatorio'
+      }
+    }
+  }
+
   // 2. Extraer dígitos de grado y grupo (ej: Grado "10°" -> "10", Grupo "1" -> "1")
   const groupDigits = groupStr.replace(/\D/g, '')
 

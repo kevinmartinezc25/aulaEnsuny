@@ -303,7 +303,9 @@ export function AdminStudentsScreen() {
             >
               <option value="all">Todos los Grados</option>
               {academicLevels.map(lvl => (
-                <option key={lvl.id} value={lvl.name}>{lvl.name.startsWith('PFC') ? lvl.name : `Grado ${lvl.name}`}</option>
+                <option key={lvl.id} value={lvl.name}>
+                  {lvl.name.startsWith('PFC') || lvl.name.toLowerCase().includes('nivelat') ? lvl.name : `Grado ${lvl.name}`}
+                </option>
               ))}
             </select>
           </div>

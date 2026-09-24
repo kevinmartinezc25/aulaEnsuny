@@ -62,22 +62,28 @@ export function AcademicPortalClientView({
   const resolvedGroupName = scheduleData.groupName || session.groupName || ''
   
   // Deducir grado a partir de las materias si no viene en sesión
-  const gradeFromSubjects = subjects && subjects.length > 0 && subjects[0]?.grade ? `${subjects[0].grade}°` : ''
+  const gradeFromSubjects = subjects && subjects.length > 0 && subjects[0]?.grade !== undefined
+    ? (subjects[0].grade === 0 ? 'Nivelatorio' : subjects[0].grade === 12 ? 'PFC-12' : subjects[0].grade === 13 ? 'PFC-13' : `${subjects[0].grade}°`)
+    : ''
   
   let gradeDisplay = resolvedGrade || rawGrade || gradeFromSubjects
   if (!gradeDisplay && resolvedGroupName.includes('-')) {
     gradeDisplay = resolvedGroupName.split('-')[0].trim()
   }
   if (gradeDisplay && !gradeDisplay.includes('°') && !isNaN(Number(gradeDisplay))) {
-    gradeDisplay = `${gradeDisplay}°`
+    const num = Number(gradeDisplay)
+    if (num === 0) gradeDisplay = 'Nivelatorio'
+    else if (num === 12) gradeDisplay = 'PFC-12'
+    else if (num === 13) gradeDisplay = 'PFC-13'
+    else gradeDisplay = `${gradeDisplay}°`
   }
   if (!gradeDisplay) {
     gradeDisplay = 'Registrado'
   }
 
-  // Grupo oficial a mostrar: Si solo era un número (ej "1") y tenemos grado (ej "10°"), combinarlos como "10°-1"
+  // Grupo oficial a mostrar
   let groupDisplay = resolvedGroup || resolvedGroupName || 'Sin grupo asignado'
-  if (resolvedGroupName && !resolvedGroupName.includes('-') && gradeDisplay && gradeDisplay !== 'Registrado') {
+  if (!resolvedGroup && resolvedGroupName && !resolvedGroupName.includes('-') && gradeDisplay && gradeDisplay !== 'Registrado') {
     groupDisplay = `${gradeDisplay}-${resolvedGroupName}`
   }
 

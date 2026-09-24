@@ -492,6 +492,7 @@ export function StudentRegistrationScreen() {
                           <option value="11°">11°</option>
                           <option value="PFC-12">PFC-12</option>
                           <option value="PFC-13">PFC-13</option>
+                          <option value="Nivelatorio">Nivelatorio</option>
                         </select>
                         {errors.gradeLevel && (
                           <p className="text-[11px] text-red-500 mt-1">{errors.gradeLevel.message}</p>

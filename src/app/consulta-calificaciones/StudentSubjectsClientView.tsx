@@ -239,7 +239,7 @@ export function StudentSubjectsClientView({ subjects, studentName }: StudentSubj
                         <div className="space-y-1.5 sm:space-y-3 mt-auto pt-1 sm:pt-2">
                           <div className="flex flex-wrap items-center gap-1 sm:gap-2">
                             <span className="bg-white/70 dark:bg-black/30 px-2 py-0.5 sm:px-3 sm:py-1 rounded-md sm:rounded-full font-semibold text-[10px] sm:text-xs text-slate-700 dark:text-slate-300 shrink-0">
-                              {subject.grade}° - {subject.group_number}
+                              {subject.grade === 0 ? 'Nivelatorio' : subject.grade === 12 ? 'PFC-12' : subject.grade === 13 ? 'PFC-13' : `${subject.grade}°`}{subject.group_number ? ` - ${subject.group_number}` : ''}
                             </span>
                             <span className="inline-flex items-center gap-1 bg-white/70 dark:bg-black/30 px-2 py-0.5 sm:px-3 sm:py-1 rounded-md sm:rounded-full text-[10px] sm:text-xs font-bold text-slate-700 dark:text-slate-300 shrink-0">
                               <Award className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />

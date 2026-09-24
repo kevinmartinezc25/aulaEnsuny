@@ -64,14 +64,38 @@ function parseGradeAndGroup(gradeLevel?: string, groupName?: string): { gradeNum
   let gradeNum: number | undefined = undefined
   let groupNum: number | undefined = undefined
 
-  if (gradeLevel) {
-    const clean = gradeLevel.replace(/\D/g, '')
+  const cleanGrade = (gradeLevel || '').trim()
+  const cleanGroup = (groupName || '').trim()
+
+  // 1. Cohortes especiales: PFC-12, PFC-13, Nivelatorio
+  if (/pfc[\s\-_]?12/i.test(cleanGrade) || /pfc[\s\-_]?12/i.test(cleanGroup)) {
+    gradeNum = 12
+    groupNum = 1
+    return { gradeNum, groupNum }
+  }
+
+  if (/pfc[\s\-_]?13/i.test(cleanGrade) || /pfc[\s\-_]?13/i.test(cleanGroup)) {
+    gradeNum = 13
+    const explicitGrp = cleanGroup.replace(/\D/g, '')
+    groupNum = explicitGrp && explicitGrp !== '13' ? parseInt(explicitGrp, 10) : 1
+    return { gradeNum, groupNum }
+  }
+
+  if (/nivelat/i.test(cleanGrade) || /nivelat/i.test(cleanGroup)) {
+    gradeNum = 0
+    groupNum = 1
+    return { gradeNum, groupNum }
+  }
+
+  // 2. Grados regulares (6° a 11°)
+  if (cleanGrade) {
+    const clean = cleanGrade.replace(/\D/g, '')
     if (clean) gradeNum = parseInt(clean, 10)
   }
 
-  if (groupName) {
-    if (groupName.includes('-')) {
-      const parts = groupName.split('-')
+  if (cleanGroup) {
+    if (cleanGroup.includes('-')) {
+      const parts = cleanGroup.split('-')
       if (!gradeNum) {
         const cleanG = parts[0].replace(/\D/g, '')
         if (cleanG) gradeNum = parseInt(cleanG, 10)
@@ -79,7 +103,7 @@ function parseGradeAndGroup(gradeLevel?: string, groupName?: string): { gradeNum
       const cleanGrp = parts[1].replace(/\D/g, '')
       if (cleanGrp) groupNum = parseInt(cleanGrp, 10)
     } else {
-      const cleanGrp = groupName.replace(/\D/g, '')
+      const cleanGrp = cleanGroup.replace(/\D/g, '')
       if (cleanGrp) groupNum = parseInt(cleanGrp, 10)
     }
   }
@@ -141,7 +165,7 @@ export async function getStudentAttendanceOverview(): Promise<StudentAttendanceO
   }
 
   // Si no teníamos gradeNum o groupNum, intentar deducirlo de las materias inscritas
-  if ((!gradeNum || !groupNum) && enrollments.length > 0) {
+  if ((gradeNum === undefined || groupNum === undefined) && enrollments.length > 0) {
     const enrolledSubjectIds = Array.from(new Set(enrollments.map(e => e.subject_id)))
     const { data: enrolledSubs } = await supabase
       .from('assisted_subjects')
@@ -151,20 +175,27 @@ export async function getStudentAttendanceOverview(): Promise<StudentAttendanceO
       .maybeSingle()
 
     if (enrolledSubs) {
-      if (!gradeNum && enrolledSubs.grade) gradeNum = enrolledSubs.grade
-      if (!groupNum && enrolledSubs.group_number) groupNum = enrolledSubs.group_number
+      if (gradeNum === undefined && enrolledSubs.grade !== undefined && enrolledSubs.grade !== null) gradeNum = enrolledSubs.grade
+      if (groupNum === undefined && enrolledSubs.group_number !== undefined && enrolledSubs.group_number !== null) groupNum = enrolledSubs.group_number
     }
   }
+
+  const gradeDisplay = gradeNum === 12 ? 'PFC-12' : gradeNum === 13 ? 'PFC-13' : gradeNum === 0 ? 'Nivelatorio' : (gradeNum !== undefined ? `${gradeNum}°` : session.gradeLevel)
+  const groupDisplay = (gradeNum === 12 || gradeNum === 13 || gradeNum === 0) ? (session.groupName && !session.groupName.includes('PFC') ? session.groupName : '1') : (groupNum !== undefined ? `${groupNum}` : session.groupName)
 
   // 2. Consultar materias de Planilla Asistida por Grado y Grupo
   let subjectQuery = supabase
     .from('assisted_subjects')
     .select('id, name, grade, group_number, period, teacher_id, created_at')
 
-  if (gradeNum !== undefined && groupNum !== undefined) {
-    subjectQuery = subjectQuery
-      .eq('grade', gradeNum)
-      .eq('group_number', groupNum)
+  if (gradeNum !== undefined) {
+    if (groupNum !== undefined) {
+      subjectQuery = subjectQuery
+        .eq('grade', gradeNum)
+        .or(`group_number.eq.${groupNum},group_number.is.null`)
+    } else {
+      subjectQuery = subjectQuery.eq('grade', gradeNum)
+    }
   } else if (enrollments.length > 0) {
     // Si no se puede deducir grupo exacto, usar las materias donde está inscrito
     const enrolledSubjectIds = Array.from(new Set(enrollments.map(e => e.subject_id)))
@@ -182,8 +213,8 @@ export async function getStudentAttendanceOverview(): Promise<StudentAttendanceO
         overallPercentage: 100
       },
       subjects: [],
-      resolvedGrade: gradeNum ? `${gradeNum}°` : session.gradeLevel,
-      resolvedGroup: groupNum ? `${groupNum}` : session.groupName
+      resolvedGrade: gradeDisplay,
+      resolvedGroup: groupDisplay
     }
   }
 
@@ -201,8 +232,8 @@ export async function getStudentAttendanceOverview(): Promise<StudentAttendanceO
         overallPercentage: 100
       },
       subjects: [],
-      resolvedGrade: gradeNum ? `${gradeNum}°` : session.gradeLevel,
-      resolvedGroup: groupNum ? `${groupNum}` : session.groupName
+      resolvedGrade: gradeDisplay,
+      resolvedGroup: groupDisplay
     }
   }
 
