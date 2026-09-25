@@ -236,7 +236,7 @@ export default function StaticScheduleGrid({
             name: p.name || `${p.period}ª Hora`,
             startTime: p.startTime,
             endTime: p.endTime,
-            type: 'academic'
+            type: 'period' as const
           }))
           setTimeSlots(activeSlots)
         }

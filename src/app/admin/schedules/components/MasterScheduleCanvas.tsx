@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { createClient } from '@/core/config/supabase/client'
 import { getAdminUsers, getScheduleSlotsAction, clearAllScheduleSlotsAction, saveScheduleSlotsAction } from '@/modules/admin/application/actions'
-import { getCurriculumAction } from '../actions'
+import { getCurriculumAction, getGeneralSchedulePeriodsAction } from '../actions'
 import { generateTimeSlots, TimeSlot } from '../utils/timeCalculator'
 import { Loader2, Download, Printer, Sparkles, Trash2, AlertTriangle, Coffee } from 'lucide-react'
 import { toast } from 'sonner'
@@ -54,22 +54,29 @@ export default function MasterScheduleCanvas({ viewMode, onNavigate }: MasterSch
     setPortalNode(document.getElementById('canvas-actions-portal'))
   }, [])
 
-  const loadSettings = () => {
+  const loadSettings = async () => {
     try {
+      const res = await getGeneralSchedulePeriodsAction()
+      if (res.success && res.config && res.config.periods && res.config.periods.length > 0) {
+        const slots = res.config.periods.map((p, idx) => ({
+          id: p.period || idx + 1,
+          name: p.name || `${p.period}ª Hora`,
+          startTime: p.startTime,
+          endTime: p.endTime,
+          type: 'period' as const
+        }))
+        setTimeSlots(slots)
+        return
+      }
+
       const settings = JSON.parse(localStorage.getItem('sch_settings') || '{}')
       const startHour = settings.startHour || '07:00'
       const blockDuration = parseInt(settings.blockDuration || '55', 10)
       const periodsPerDay = parseInt(settings.periodsPerDay || '7', 10)
-      const use12h = settings.timeFormat !== '24h'
-      let breaks = settings.breaks
+      const use12h = settings.visualSettings?.timeFormat !== '24h'
+      let breaks = settings.breaks || []
       
-      if (!breaks && settings.breakPeriod) {
-        breaks = [{ id: '1', name: 'Recreo', afterPeriod: parseInt(settings.breakPeriod, 10), durationMinutes: 30 }]
-      } else if (!breaks) {
-        breaks = []
-      }
-
-      setTimeSlots(generateTimeSlots(startHour, blockDuration, periodsPerDay, breaks, use12h))
+      setTimeSlots(generateTimeSlots(startHour, blockDuration, periodsPerDay, breaks, use12h).filter(s => s.type !== 'break'))
     } catch(e) {
       console.error(e)
     }

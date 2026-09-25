@@ -41,7 +41,7 @@ export default function EmergencyScheduleView({ profileId, academicTeacherId }: 
           name: p.name || `${p.period}ª Hora`,
           startTime: p.startTime,
           endTime: p.endTime,
-          type: 'academic'
+          type: 'period' as const
         }))
         setTimeSlots(slots)
         return

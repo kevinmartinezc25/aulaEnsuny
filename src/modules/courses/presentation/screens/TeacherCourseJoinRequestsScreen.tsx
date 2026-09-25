@@ -13,6 +13,7 @@ export function TeacherCourseJoinRequestsScreen({ courseId }: Props) {
   const [requests, setRequests] = useState<CourseJoinRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [processingId, setProcessingId] = useState<string | null>(null)
+  const [processingAction, setProcessingAction] = useState<'approved' | 'rejected' | null>(null)
   const [commentMap, setCommentMap] = useState<Record<string, string>>({})
 
   const load = async () => {
@@ -33,6 +34,7 @@ export function TeacherCourseJoinRequestsScreen({ courseId }: Props) {
 
   const handleReview = async (requestId: string, action: 'approved' | 'rejected') => {
     setProcessingId(requestId)
+    setProcessingAction(action)
     try {
       await reviewJoinRequest({
         requestId,
@@ -45,6 +47,7 @@ export function TeacherCourseJoinRequestsScreen({ courseId }: Props) {
       toast.error(err?.message || 'No se pudo procesar la solicitud.')
     } finally {
       setProcessingId(null)
+      setProcessingAction(null)
     }
   }
 
@@ -108,7 +111,7 @@ export function TeacherCourseJoinRequestsScreen({ courseId }: Props) {
                       disabled={processingId === request.id}
                       className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-60"
                     >
-                      {processingId === request.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                      {processingId === request.id && processingAction === 'approved' ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
                       Aprobar
                     </button>
                     <button
@@ -116,7 +119,7 @@ export function TeacherCourseJoinRequestsScreen({ courseId }: Props) {
                       disabled={processingId === request.id}
                       className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-rose-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:opacity-60"
                     >
-                      {processingId === request.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
+                      {processingId === request.id && processingAction === 'rejected' ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
                       Rechazar
                     </button>
                   </div>

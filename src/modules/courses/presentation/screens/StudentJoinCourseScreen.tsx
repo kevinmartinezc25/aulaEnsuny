@@ -23,6 +23,11 @@ export function StudentJoinCourseScreen() {
       }
 
       const result = await createJoinRequest({ courseId, code })
+      
+      if (!result.success) {
+        throw new Error(result.error || 'No se pudo enviar la solicitud')
+      }
+
       setMessage('Esperando confirmación de Docente')
       setCode('')
     } catch (err: any) {

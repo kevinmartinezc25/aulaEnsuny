@@ -9,6 +9,7 @@ import {
   Trash2, AlertTriangle
 } from 'lucide-react'
 import { clearAllScheduleSlotsAction } from '@/modules/admin/application/actions'
+import { getGeneralSchedulePeriodsAction } from '@/app/admin/schedules/actions'
 
 const SUBJECT_PALETTE = [
   '#059669', // emerald-600
@@ -155,28 +156,55 @@ export function PremiumScheduleViewer() {
       }
       
       try {
-        const settings = JSON.parse(localStorage.getItem('sch_settings') || '{}')
-        const startHour = settings.startHour || '07:00'
-        const blockDuration = parseInt(settings.blockDuration || '55', 10)
-        const maxP = parseInt(settings.periodsPerDay || '7', 10)
-        const pArr = Array.from({length: maxP}, (_, i) => i + 1)
-        setPeriods(pArr)
+        const res = await getGeneralSchedulePeriodsAction()
+        let settings: any = {}
+        let activeSlots: any[] = []
 
-        const use12h = settings.timeFormat !== '24h'
-        let breaks = settings.breaks || []
-        if (!breaks.length && settings.breakPeriod) {
-          breaks = [{ id: '1', name: 'Recreo', afterPeriod: parseInt(settings.breakPeriod, 10), durationMinutes: 30 }]
-        }
-        const generated = generateTimeSlots(startHour, blockDuration, maxP, breaks, use12h)
-        const activeSlots = generated.filter(s => s.type !== 'break')
-        setTimeSlotsList(activeSlots)
-        const pTimes: Record<number, string> = {}
-        activeSlots.forEach(s => {
-          if (s.id != null) {
-            pTimes[Number(s.id)] = s.startTime
+        if (res.success && res.config) {
+          settings = res.config
+
+          if (res.config.periods && res.config.periods.length > 0) {
+            activeSlots = res.config.periods.map((p, idx) => ({
+              id: p.period || idx + 1,
+              name: p.name || `${p.period}ª Hora`,
+              startTime: p.startTime,
+              endTime: p.endTime,
+              type: 'period' as const
+            }))
+            setTimeSlotsList(activeSlots)
+            const pTimes: Record<number, string> = {}
+            activeSlots.forEach(s => {
+              if (s.id != null) {
+                pTimes[Number(s.id)] = s.startTime
+              }
+            })
+            setPeriodTimes(pTimes)
+            setPeriods(activeSlots.map((s: any) => s.id))
           }
-        })
-        setPeriodTimes(pTimes)
+        }
+
+        if (activeSlots.length === 0) {
+          const localSettings = JSON.parse(localStorage.getItem('sch_settings') || '{}')
+          const startHour = localSettings.startHour || '07:00'
+          const blockDuration = parseInt(localSettings.blockDuration || '55', 10)
+          const maxP = parseInt(localSettings.periodsPerDay || '7', 10)
+          const pArr = Array.from({length: maxP}, (_, i) => i + 1)
+          setPeriods(pArr)
+
+          const use12h = localSettings.visualSettings?.timeFormat !== '24h'
+          let breaks = localSettings.breaks || []
+          
+          const generated = generateTimeSlots(startHour, blockDuration, maxP, breaks, use12h)
+          activeSlots = generated.filter(s => s.type !== 'break')
+          setTimeSlotsList(activeSlots)
+          const pTimes: Record<number, string> = {}
+          activeSlots.forEach(s => {
+            if (s.id != null) {
+              pTimes[Number(s.id)] = s.startTime
+            }
+          })
+          setPeriodTimes(pTimes)
+        }
       } catch (e) {
         setPeriods([1, 2, 3, 4, 5, 6, 7])
       }
