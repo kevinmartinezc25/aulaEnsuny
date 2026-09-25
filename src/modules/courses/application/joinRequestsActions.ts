@@ -66,104 +66,101 @@ export async function regenerateCourseJoinCode(courseId: string): Promise<string
   return joinCode
 }
 
-export async function createJoinRequest(input: CreateJoinRequestInput): Promise<CourseJoinRequest> {
-  const supabase = await createClient()
-  const { data: { user }, error: userError } = await supabase.auth.getUser()
+export async function createJoinRequest(input: CreateJoinRequestInput): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = await createClient()
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
 
-  if (userError || !user?.id) {
-    throw new Error('Debes iniciar sesión para solicitar ingreso')
+    if (userError || !user?.id) {
+      return { success: false, error: 'Debes iniciar sesión para solicitar ingreso' }
+    }
+
+    const normalizedCode = input.code?.trim().toUpperCase() || ''
+    const normalizedCourseId = input.courseId?.trim() || ''
+    const lookupValue = normalizedCode || normalizedCourseId
+
+    if (!lookupValue) {
+      return { success: false, error: 'El código o el curso es obligatorio' }
+    }
+
+    const admin = createAdminClient()
+
+    let courseQuery
+    let courseError
+
+    if (normalizedCode) {
+      ;({ data: courseQuery, error: courseError } = await admin
+        .from('courses')
+        .select('id, join_enabled, join_code, teacher_id')
+        .eq('join_code', normalizedCode)
+        .maybeSingle())
+    } else {
+      ;({ data: courseQuery, error: courseError } = await admin
+        .from('courses')
+        .select('id, join_enabled, join_code, teacher_id')
+        .eq('id', normalizedCourseId)
+        .maybeSingle())
+    }
+
+    const course = courseQuery
+
+    if (courseError || !course) {
+      return { success: false, error: 'No se encontró el curso o el código de invitación no es válido' }
+    }
+
+    if (!course.join_enabled) {
+      return { success: false, error: 'Este curso no acepta solicitudes de ingreso' }
+    }
+
+    if (normalizedCode && course.join_code && normalizedCode !== course.join_code) {
+      return { success: false, error: 'El código de invitación no es válido' }
+    }
+
+    const { data: existingEnrollment } = await admin
+      .from('student_courses')
+      .select('id')
+      .eq('student_id', user.id)
+      .eq('course_id', course.id)
+      .maybeSingle()
+
+    if (existingEnrollment) {
+      return { success: false, error: 'Ya estás matriculado en este curso' }
+    }
+
+    const { data: existingRequest } = await admin
+      .from('course_join_requests')
+      .select('id')
+      .eq('student_id', user.id)
+      .eq('course_id', course.id)
+      .eq('status', 'pending')
+      .maybeSingle()
+
+    if (existingRequest) {
+      return { success: false, error: 'Ya tienes una solicitud pendiente para este curso' }
+    }
+
+    const { data, error } = await admin
+      .from('course_join_requests')
+      .insert({
+        course_id: course.id,
+        student_id: user.id,
+        status: 'pending',
+        requested_at: new Date().toISOString(),
+        comments: null
+      })
+      .select('id')
+      .single()
+
+    if (error || !data) {
+      return { success: false, error: 'No se pudo crear la solicitud' }
+    }
+
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Error interno al procesar la solicitud' }
   }
 
-  const normalizedCode = input.code?.trim().toUpperCase() || ''
-  const normalizedCourseId = input.courseId?.trim() || ''
-  const lookupValue = normalizedCode || normalizedCourseId
-
-  if (!lookupValue) {
-    throw new Error('El código o el curso es obligatorio')
-  }
-
-  const admin = createAdminClient()
-
-  let courseQuery
-  let courseError
-
-  if (normalizedCode) {
-    ;({ data: courseQuery, error: courseError } = await admin
-      .from('courses')
-      .select('id, join_enabled, join_code, teacher_id')
-      .eq('join_code', normalizedCode)
-      .maybeSingle())
-  } else {
-    ;({ data: courseQuery, error: courseError } = await admin
-      .from('courses')
-      .select('id, join_enabled, join_code, teacher_id')
-      .eq('id', normalizedCourseId)
-      .maybeSingle())
-  }
-
-  const course = courseQuery
-
-  if (courseError || !course) {
-    throw new Error('No se encontró el curso o el código de invitación no es válido')
-  }
-
-  if (!course.join_enabled) {
-    throw new Error('Este curso no acepta solicitudes de ingreso')
-  }
-
-  if (normalizedCode && course.join_code && normalizedCode !== course.join_code) {
-    throw new Error('El código de invitación no es válido')
-  }
-
-  const { data: existingEnrollment } = await admin
-    .from('student_courses')
-    .select('id')
-    .eq('student_id', user.id)
-    .eq('course_id', course.id)
-    .maybeSingle()
-
-  if (existingEnrollment) {
-    throw new Error('Ya estás matriculado en este curso')
-  }
-
-  const { data: existingRequest } = await admin
-    .from('course_join_requests')
-    .select('id')
-    .eq('student_id', user.id)
-    .eq('course_id', course.id)
-    .eq('status', 'pending')
-    .maybeSingle()
-
-  if (existingRequest) {
-    throw new Error('Ya tienes una solicitud pendiente para este curso')
-  }
-
-  const { data, error } = await admin
-    .from('course_join_requests')
-    .insert({
-      course_id: course.id,
-      student_id: user.id,
-      status: 'pending',
-      requested_at: new Date().toISOString(),
-      comments: null
-    })
-    .select('*')
-    .single()
-
-  if (error || !data) {
-    throw new Error('No se pudo crear la solicitud')
-  }
-
-  return {
-    id: data.id,
-    course_id: data.course_id,
-    student_id: data.student_id,
-    status: data.status,
-    requested_at: data.requested_at,
-    reviewed_at: data.reviewed_at ?? null,
-    reviewed_by: data.reviewed_by ?? null,
-    comments: data.comments ?? null
-  }
+  return { success: true }
 }
 
 export async function listCourseJoinRequests(courseId: string): Promise<CourseJoinRequest[]> {
