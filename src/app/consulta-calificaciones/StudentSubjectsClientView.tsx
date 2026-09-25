@@ -69,39 +69,15 @@ export function StudentSubjectsClientView({ subjects, studentName }: StudentSubj
 
   return (
     <div className="space-y-5 sm:space-y-8">
-      {/* Banner Principal con Framer Motion */}
-      <motion.div
-        initial={{ opacity: 0, y: -20, scale: 0.98 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ type: 'spring', stiffness: 200, damping: 20 }}
-        className="relative overflow-hidden bg-gradient-to-br from-[#1F4E31] via-[#153a23] to-[#0a1e12] rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-xl shadow-[#1F4E31]/20 text-white"
-      >
-        {/* Decoración de fondo */}
-        <div className="absolute -top-24 -right-24 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-emerald-400 opacity-10 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="relative z-10 flex flex-col items-start justify-between gap-3">
-          <div>
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.2 }}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/20 border border-white/30 backdrop-blur-md text-white text-xs font-semibold mb-2 shadow-sm"
-            >
-              <Sparkles className="h-3.5 w-3.5 text-white" />
-              <span>Portal de Calificaciones</span>
-            </motion.div>
-
-            <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight mb-1 flex items-center gap-2 text-white drop-shadow-md">
-              ¡Hola, {displayFirstName}!
-
-            </h1>
-            <p className="text-white text-sm md:text-base max-w-2xl leading-snug mt-1 font-medium drop-shadow-sm">
-              Aquí está tu progreso académico. Explora tus materias y mantente al día con tus calificaciones.
-            </p>
-          </div>
-        </div>
-      </motion.div>
+      {/* Título Simple */}
+      <div className="px-2">
+        <h1 className="text-[28px] sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight leading-tight mb-1">
+          Reporte de Calificaciones
+        </h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          Aquí está tu progreso académico. Explora tus materias y mantente al día con tus calificaciones.
+        </p>
+      </div>
 
       {subjects.length === 0 ? (
         <motion.div

@@ -3,7 +3,6 @@
 import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
-  GraduationCap, 
   Calendar, 
   ArrowRight, 
   ArrowLeft, 
@@ -17,7 +16,9 @@ import {
   ShieldCheck,
   ShieldAlert,
   CheckCircle2,
-  CalendarCheck2
+  CalendarCheck2,
+  ChevronRight,
+  ClipboardList
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { PlanillaStudentSession } from '@/modules/planilla-asistida/application/studentAuthActions'
@@ -91,74 +92,45 @@ export function AcademicPortalClientView({
   const jornada = session.jornada || 'Mañana'
   const reportsCount = disciplinaryData?.reports?.length || 0
 
-  // Catálogo modular de módulos del portal para cuadrícula responsiva (máx 2 en móvil)
   const portalCards = [
     {
       id: 'grades' as const,
       title: 'Calificaciones',
-      description: 'Consulta tus resultados académicos por período, área, asignatura y logro formativo.',
-      icon: GraduationCap,
-      iconClass: 'bg-emerald-500/15 dark:bg-emerald-500/25 text-[#1F4E31] dark:text-emerald-400 border-emerald-500/30',
-      borderHover: 'hover:border-emerald-500/60',
-      statusDotClass: 'bg-emerald-500',
-      statusText: subjects.length > 0
-        ? `${subjects.length} asignaturas`
-        : 'Sin materias asignadas',
-      buttonDesktopText: 'Consultar Calificaciones',
-      buttonMobileText: 'Entrar',
-      buttonClass: 'bg-[#1F4E31] hover:bg-[#163a24] dark:bg-emerald-600 dark:hover:bg-emerald-700 shadow-emerald-950/20',
+      description: 'Desempeño y logros',
+      icon: ClipboardList,
+      iconBg: 'bg-emerald-50 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400',
+      cardClass: 'bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800',
+      arrowBg: 'bg-emerald-100/60 dark:bg-emerald-500/30 text-emerald-700 dark:text-emerald-300',
       onClick: () => setActiveView('grades')
     },
     {
       id: 'schedule' as const,
-      title: 'Mi Horario',
-      description: 'Consulta el horario correspondiente al grupo en el que estás matriculado.',
+      title: 'Horario',
+      description: 'Clases y horarios',
       icon: Calendar,
-      iconClass: 'bg-teal-500/15 dark:bg-teal-500/25 text-teal-700 dark:text-teal-400 border-teal-500/30',
-      borderHover: 'hover:border-teal-500/60',
-      statusDotClass: scheduleData.isPublished ? 'bg-teal-500' : 'bg-amber-500',
-      statusText: scheduleData.isPublished
-        ? `Grupo: ${groupDisplay}`
-        : 'Aún no publicado',
-      buttonDesktopText: 'Ver Mi Horario',
-      buttonMobileText: 'Entrar',
-      buttonClass: 'bg-teal-700 hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-700 shadow-teal-950/20',
+      iconBg: 'bg-blue-50 dark:bg-blue-500/20 text-blue-500 dark:text-blue-400',
+      cardClass: 'bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800',
+      arrowBg: 'bg-slate-50 dark:bg-slate-800 text-slate-400',
       onClick: () => setActiveView('schedule')
     },
     {
       id: 'disciplinary' as const,
       title: 'Convivencia',
-      description: 'Consulta tu seguimiento convivencial, acuerdos formativos y debido proceso.',
-      icon: reportsCount > 0 ? ShieldAlert : ShieldCheck,
-      iconClass: reportsCount > 0
-        ? 'bg-amber-500/15 dark:bg-amber-500/25 text-amber-700 dark:text-amber-400 border-amber-500/30'
-        : 'bg-blue-500/15 dark:bg-blue-500/25 text-blue-700 dark:text-blue-400 border-blue-500/30',
-      borderHover: reportsCount > 0 ? 'hover:border-amber-500/60' : 'hover:border-blue-500/60',
-      statusDotClass: reportsCount > 0 ? 'bg-amber-500' : 'bg-emerald-500',
-      statusText: reportsCount === 0
-        ? '0 reportes (Ejemplar)'
-        : `${reportsCount} ${reportsCount === 1 ? 'novedad' : 'novedades'}`,
-      buttonDesktopText: 'Consultar Convivencia',
-      buttonMobileText: 'Entrar',
-      buttonClass: reportsCount > 0
-        ? 'bg-amber-600 hover:bg-amber-700 dark:bg-amber-600 dark:hover:bg-amber-700 shadow-amber-950/20'
-        : 'bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700 shadow-blue-950/20',
+      description: 'Seguimiento institucional',
+      icon: Users,
+      iconBg: 'bg-purple-50 dark:bg-purple-500/20 text-purple-500 dark:text-purple-400',
+      cardClass: 'bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800',
+      arrowBg: 'bg-slate-50 dark:bg-slate-800 text-slate-400',
       onClick: () => setActiveView('disciplinary')
     },
     {
       id: 'attendance' as const,
       title: 'Asistencia Escolar',
-      description: 'Reporte y trazabilidad de asistencia por fechas de las materias en Planilla Asistida.',
+      description: 'Registro de asistencia',
       icon: CalendarCheck2,
-      iconClass: 'bg-emerald-500/15 dark:bg-emerald-500/25 text-emerald-800 dark:text-emerald-300 border-emerald-500/30',
-      borderHover: 'hover:border-emerald-500/60',
-      statusDotClass: attendanceData && attendanceData.subjects.length > 0 ? 'bg-emerald-500' : 'bg-slate-400',
-      statusText: attendanceData && attendanceData.subjects.length > 0
-        ? `${attendanceData.subjects.length} materias · ${attendanceData.summary.overallPercentage}% asist.`
-        : 'Sin planillas registradas',
-      buttonDesktopText: 'Consultar Asistencia',
-      buttonMobileText: 'Entrar',
-      buttonClass: 'bg-[#1b3d28] hover:bg-[#132c1d] dark:bg-emerald-700 dark:hover:bg-emerald-800 shadow-emerald-950/20',
+      iconBg: 'bg-emerald-50 dark:bg-emerald-500/20 text-emerald-500 dark:text-emerald-400',
+      cardClass: 'bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800',
+      arrowBg: 'bg-slate-50 dark:bg-slate-800 text-slate-400',
       onClick: () => setActiveView('attendance')
     }
   ]
@@ -185,54 +157,36 @@ export function AcademicPortalClientView({
       {/* ── Vista Principal: Menú del Portal ── */}
       {activeView === 'dashboard' && (
         <div className="space-y-4 sm:space-y-7">
-          {/* Cabecera de Identidad Académica */}
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ type: 'spring', damping: 24, stiffness: 260 }}
-            className="relative overflow-hidden rounded-2xl sm:rounded-[32px] bg-gradient-to-br from-white via-emerald-50/20 to-teal-50/30 dark:from-slate-900 dark:via-slate-900/90 dark:to-emerald-950/20 p-4 sm:p-8 border border-emerald-500/20 dark:border-emerald-500/10 shadow-sm"
-          >
-            <div className="pointer-events-none absolute -top-24 -right-24 w-60 h-60 rounded-full bg-emerald-500/10 blur-[80px]" />
+          {/* Cabecera y Tarjeta de Identidad */}
+          <div className="space-y-6">
+            <div className="px-2">
+              <h1 className="text-[28px] sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight leading-tight mb-1">
+                Consulta Académica
+              </h1>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Consulta tu información institucional
+              </p>
+            </div>
 
-            <div className="relative z-10 flex flex-col items-center justify-center text-center gap-3 sm:gap-6">
-              <div className="space-y-2 sm:space-y-3 flex flex-col items-center">
-                <div className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[#1F4E31] dark:text-emerald-300 text-[10px] sm:text-xs font-bold uppercase tracking-wider">
-                  <Sparkles className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-emerald-600 dark:text-emerald-400" />
-                  <span>Portal de Consulta Académica</span>
+            <div className="bg-white dark:bg-slate-900 rounded-[20px] p-4 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.04)] border border-slate-100 dark:border-slate-800 flex items-center justify-between mx-2 sm:mx-0">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full overflow-hidden bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center shrink-0">
+                  <User className="w-6 h-6 text-blue-500 dark:text-blue-400" />
                 </div>
-                <h1 
-                  suppressHydrationWarning
-                  className="text-xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-tight leading-tight"
-                >
-                  {studentDisplayName}
-                </h1>
-                <p className="text-[11px] sm:text-sm text-slate-500 dark:text-slate-400">
-                  Estudiante regular · Documento No. <span className="font-semibold text-slate-700 dark:text-slate-200">{session.documentId}</span>
-                </p>
-              </div>
-
-              {/* Fichas informativas de matrícula (Grupo, Jornada, Año) */}
-              <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2.5" suppressHydrationWarning>
-                <div className="flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl bg-white/80 dark:bg-slate-800/80 border border-slate-200/60 dark:border-white/5 text-[11px] sm:text-xs font-semibold text-slate-700 dark:text-slate-200 shadow-xs">
-                  <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-[#1F4E31] dark:text-emerald-400 shrink-0" />
-                  <span>Grupo: <strong className="text-slate-900 dark:text-white">{groupDisplay}</strong></span>
-                </div>
-
-                <div className="flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl bg-white/80 dark:bg-slate-800/80 border border-slate-200/60 dark:border-white/5 text-[11px] sm:text-xs font-semibold text-slate-700 dark:text-slate-200 shadow-xs">
-                  <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-teal-600 dark:text-teal-400 shrink-0" />
-                  <span>Jornada: <strong className="text-slate-900 dark:text-white">{jornada}</strong></span>
-                </div>
-
-                <div className="flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl bg-white/80 dark:bg-slate-800/80 border border-slate-200/60 dark:border-white/5 text-[11px] sm:text-xs font-semibold text-slate-700 dark:text-slate-200 shadow-xs">
-                  <CalendarDays className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                  <span>Año: <strong className="text-slate-900 dark:text-white">{academicYear}</strong></span>
+                <div>
+                  <h2 className="font-bold text-slate-900 dark:text-white text-base leading-tight">
+                    {studentDisplayName}
+                  </h2>
+                  <p className="text-slate-500 dark:text-slate-400 text-[13px] mt-0.5">
+                    {groupDisplay}
+                  </p>
                 </div>
               </div>
             </div>
-          </motion.div>
+          </div>
 
-          {/* ── Cuadrícula de Tarjetas Académicas (Móvil: 2 columnas exactas / Desktop: 3 columnas) ── */}
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-5 lg:gap-6">
+          {/* ── Cuadrícula de Tarjetas Académicas ── */}
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 px-2 sm:px-0">
             {portalCards.map((card, idx) => {
               const Icon = card.icon
               return (
@@ -250,48 +204,24 @@ export function AcademicPortalClientView({
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.05 * (idx + 1), type: 'spring', damping: 24, stiffness: 240 }}
-                  className={`group relative flex flex-col justify-between rounded-2xl sm:rounded-[28px] bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-white/10 p-3 sm:p-6 shadow-[0_4px_20px_rgba(0,0,0,0.04)] hover:shadow-xl dark:shadow-none hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99] transition-all duration-200 cursor-pointer ${card.borderHover}`}
+                  className={`group relative flex flex-col justify-between rounded-[24px] p-4 sm:p-5 cursor-pointer shadow-[0_2px_12px_-4px_rgba(0,0,0,0.04)] hover:shadow-md transition-all duration-300 active:scale-[0.98] ${card.cardClass}`}
                 >
-                  <div className="space-y-2 sm:space-y-3.5">
-                    {/* Fila de Encabezado: Icono + Indicador 'Entrar' */}
-                    <div className="flex items-center justify-between gap-1.5">
-                      <div className={`shrink-0 w-8 h-8 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl border flex items-center justify-center transition-transform duration-200 group-hover:scale-105 ${card.iconClass}`}>
-                        <Icon className="w-4 h-4 sm:w-6 sm:h-6" />
-                      </div>
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-[10px] font-bold text-slate-600 dark:text-slate-300 group-hover:bg-slate-900 group-hover:text-white dark:group-hover:bg-white dark:group-hover:text-slate-900 transition-colors shadow-2xs">
-                        <span>Entrar</span>
-                        <ArrowRight className="w-2.5 h-2.5 transition-transform group-hover:translate-x-0.5" />
-                      </span>
+                  <div className="flex justify-between items-start mb-6">
+                    <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-[14px] flex items-center justify-center transition-transform duration-300 group-hover:scale-105 ${card.iconBg}`}>
+                      <Icon className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={2} />
                     </div>
-
-                    <div>
-                      <h2 className="text-xs sm:text-xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
-                        {card.title}
-                      </h2>
-                      <p className="mt-1 text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 leading-snug line-clamp-2">
-                        {card.description}
-                      </p>
-                    </div>
-
-                    <div className="pt-0.5 flex items-center gap-1 text-[9px] sm:text-xs text-slate-600 dark:text-slate-300 font-medium">
-                      <span className={`inline-block w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full shrink-0 ${card.statusDotClass}`} />
-                      <span className="truncate">
-                        {card.statusText}
-                      </span>
+                    <div className={`w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center transition-colors group-hover:bg-slate-200 dark:group-hover:bg-slate-700 ${card.arrowBg}`}>
+                      <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     </div>
                   </div>
 
-                  {/* Botón de Entrada Principal (Visible y Prominente) */}
-                  <div className="pt-2.5 sm:pt-5 mt-auto">
-                    <div
-                      className={`w-full py-2 sm:py-2.5 px-2.5 sm:px-4 rounded-xl sm:rounded-2xl text-white font-extrabold text-[11px] sm:text-sm shadow-md flex items-center justify-center gap-1.5 active:scale-[0.98] transition-all group-hover:shadow-lg ${card.buttonClass}`}
-                    >
-                      <span className="truncate">
-                        <span className="hidden sm:inline">{card.buttonDesktopText}</span>
-                        <span className="sm:hidden">{card.buttonMobileText}</span>
-                      </span>
-                      <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 transition-transform group-hover:translate-x-1" />
-                    </div>
+                  <div>
+                    <h2 className="text-base sm:text-[17px] font-bold text-slate-900 dark:text-white tracking-tight leading-tight">
+                      {card.title}
+                    </h2>
+                    <p className="mt-0.5 sm:mt-1 text-[11px] sm:text-[13px] text-slate-500 dark:text-slate-400 leading-snug truncate sm:whitespace-normal">
+                      {card.description}
+                    </p>
                   </div>
                 </motion.div>
               )

@@ -63,69 +63,57 @@ export function StudentDisciplinaryClientView({
 
   return (
     <div className="space-y-6 sm:space-y-8 animate-in fade-in duration-200">
-      {/* ── Encabezado informativo ── */}
-      <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br from-white via-slate-50 to-blue-50/30 dark:from-slate-900 dark:via-slate-900/90 dark:to-blue-950/20 p-5 sm:p-7 border border-slate-200/80 dark:border-white/10 shadow-sm">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="space-y-1 sm:space-y-1.5">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-700 dark:text-blue-300 text-[11px] sm:text-xs font-bold uppercase tracking-wider">
-              <ShieldCheck className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-              <span>Convivencia Escolar Institucional</span>
-            </div>
-            <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-              Seguimiento Convivencial y Pedagógico
-            </h2>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-              Estudiante: <strong className="text-slate-800 dark:text-slate-200">{studentName}</strong>
-              {groupName && (
-                <span> · Grupo: <strong className="text-slate-800 dark:text-slate-200">{groupName}</strong></span>
-              )}
-            </p>
-          </div>
+      {/* Título Simple */}
+      <div className="px-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h1 className="text-[28px] sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight leading-tight mb-1">
+            Seguimiento Convivencial
+          </h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Reportes y novedades de convivencia de <strong className="text-slate-700 dark:text-slate-300">{studentName}</strong>
+          </p>
+        </div>
+        <span className="self-start sm:self-center px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 shadow-sm">
+          Modo Solo Lectura
+        </span>
+      </div>
 
-          <div className="flex items-center gap-2 self-stretch sm:self-auto justify-end">
-            <span className="px-3.5 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 shadow-xs">
-              Modo Solo Lectura
-            </span>
-          </div>
+      {/* ── Métricas de resumen rápido ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-4 px-2 sm:px-0">
+        <div className="rounded-xl sm:rounded-2xl bg-white dark:bg-slate-900 p-3.5 sm:p-5 border border-slate-200 dark:border-slate-800 shadow-sm">
+          <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500">
+            Total Novedades
+          </p>
+          <p className="text-xl sm:text-3xl font-black text-slate-900 dark:text-white mt-1">
+            {summary.totalReports}
+          </p>
         </div>
 
-        {/* ── Métricas de resumen rápido ── */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3.5 mt-5 pt-5 border-t border-slate-200/70 dark:border-slate-800">
-          <div className="rounded-xl sm:rounded-2xl bg-white/70 dark:bg-slate-800/60 p-3 border border-slate-200/60 dark:border-white/5">
-            <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-              Total Novedades
-            </p>
-            <p className="text-lg sm:text-2xl font-black text-slate-900 dark:text-white mt-0.5">
-              {summary.totalReports}
-            </p>
-          </div>
+        <div className="rounded-xl sm:rounded-2xl bg-sky-50 dark:bg-sky-900/10 p-3.5 sm:p-5 border border-sky-100 dark:border-sky-900/30">
+          <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-sky-600 dark:text-sky-400">
+            Tipo I (Leves)
+          </p>
+          <p className="text-xl sm:text-3xl font-black text-sky-700 dark:text-sky-300 mt-1">
+            {summary.tipoI}
+          </p>
+        </div>
 
-          <div className="rounded-xl sm:rounded-2xl bg-sky-500/5 dark:bg-sky-500/10 p-3 border border-sky-500/20">
-            <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-sky-700 dark:text-sky-300">
-              Tipo I (Leves)
-            </p>
-            <p className="text-lg sm:text-2xl font-black text-sky-700 dark:text-sky-300 mt-0.5">
-              {summary.tipoI}
-            </p>
-          </div>
+        <div className="rounded-xl sm:rounded-2xl bg-amber-50 dark:bg-amber-900/10 p-3.5 sm:p-5 border border-amber-100 dark:border-amber-900/30">
+          <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+            Tipo II (Graves)
+          </p>
+          <p className="text-xl sm:text-3xl font-black text-amber-700 dark:text-amber-300 mt-1">
+            {summary.tipoII}
+          </p>
+        </div>
 
-          <div className="rounded-xl sm:rounded-2xl bg-amber-500/5 dark:bg-amber-500/10 p-3 border border-amber-500/20">
-            <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300">
-              Tipo II (Graves)
-            </p>
-            <p className="text-lg sm:text-2xl font-black text-amber-700 dark:text-amber-300 mt-0.5">
-              {summary.tipoII}
-            </p>
-          </div>
-
-          <div className="rounded-xl sm:rounded-2xl bg-rose-500/5 dark:bg-rose-500/10 p-3 border border-rose-500/20">
-            <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-rose-700 dark:text-rose-300">
-              Tipo III (Gravísimas)
-            </p>
-            <p className="text-lg sm:text-2xl font-black text-rose-700 dark:text-rose-300 mt-0.5">
-              {summary.tipoIII}
-            </p>
-          </div>
+        <div className="rounded-xl sm:rounded-2xl bg-rose-50 dark:bg-rose-900/10 p-3.5 sm:p-5 border border-rose-100 dark:border-rose-900/30">
+          <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-rose-600 dark:text-rose-400">
+            Tipo III (Gravísimas)
+          </p>
+          <p className="text-xl sm:text-3xl font-black text-rose-700 dark:text-rose-300 mt-1">
+            {summary.tipoIII}
+          </p>
         </div>
       </div>
 
