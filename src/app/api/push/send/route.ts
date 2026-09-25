@@ -99,7 +99,11 @@ export async function POST(req: NextRequest) {
       };
 
       try {
-        await webPush.sendNotification(pushSubscription, payload);
+        const options = {
+          urgency: type === 'URGENTE' ? 'high' : 'normal',
+          TTL: 86400 // 24 hours
+        } as const;
+        await webPush.sendNotification(pushSubscription, payload, options);
         successCount++;
         
         // Registrar delivery (si la tabla de deliveries se requiere llenarla)

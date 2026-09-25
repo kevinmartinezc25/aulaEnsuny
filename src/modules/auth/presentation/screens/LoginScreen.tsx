@@ -258,7 +258,7 @@ export function LoginScreen() {
                       id="password"
                       type={showPassword ? 'text' : 'password'}
                       autoComplete="current-password"
-                      placeholder="••••••••"
+                      placeholder=""
                       className={`h-11 rounded-2xl border-slate-200/90 bg-slate-100/60 px-3.5 pr-11 text-sm transition-all duration-150 hover:bg-slate-100/90 focus:bg-white focus:ring-2 focus:ring-[#1F4E31]/20 focus:border-[#1F4E31] dark:border-white/10 dark:bg-slate-800/50 dark:hover:bg-slate-800/80 dark:focus:bg-slate-900 dark:focus:ring-emerald-500/25 dark:focus:border-emerald-500 ${
                         errors.password ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' : ''
                       }`}

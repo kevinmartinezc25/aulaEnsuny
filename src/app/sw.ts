@@ -36,6 +36,7 @@ self.addEventListener("push", (event: any) => {
       icon: "/icons/icon-192x192.png", // Asumiendo que existe un icono en public/icons
       badge: "/icons/icon-192x192.png",
       vibrate: [200, 100, 200],
+      requireInteraction: true,
       data: {
         url: data.url || "/", 
       },

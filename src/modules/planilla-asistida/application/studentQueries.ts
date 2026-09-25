@@ -12,6 +12,7 @@ export interface StudentSubjectView {
   period: string
   studentIdInSubject: string
   achievementsCount: number
+  teacherName?: string
 }
 
 function getCandidateDirectoryIds(session: { directoryId?: string; profileId?: string | null }): string[] {
@@ -93,12 +94,11 @@ export async function getStudentSubjects(): Promise<StudentSubjectView[]> {
       if (d) groupNum = parseInt(d, 10)
     }
   }
-
-  let cohortSubjectList: Array<{ id: string; name: string; grade: number; group_number: number; period: string }> = []
+  let cohortSubjectList: Array<{ id: string; name: string; grade: number; group_number: number; period: string; teacher_id: string }> = []
   if (gradeNum !== undefined) {
     let q = supabase
       .from('assisted_subjects')
-      .select('id, name, grade, group_number, period')
+      .select('id, name, grade, group_number, period, teacher_id')
       .eq('grade', gradeNum)
       .order('period', { ascending: false })
 
@@ -110,14 +110,14 @@ export async function getStudentSubjects(): Promise<StudentSubjectView[]> {
   }
 
   // Unificar materias por ID
-  const allSubjectMap = new Map<string, { id: string; name: string; grade: number; group_number: number; period: string; studentIdInSubject: string }>()
+  const allSubjectMap = new Map<string, { id: string; name: string; grade: number; group_number: number; period: string; teacher_id: string; studentIdInSubject: string }>()
 
   // A. Primero las materias con inscripción confirmada
   if (enrollments.length > 0) {
     const enrolledIds = Array.from(new Set(enrollments.map(e => e.subject_id)))
     const { data: explicitSubs } = await supabase
       .from('assisted_subjects')
-      .select('id, name, grade, group_number, period')
+      .select('id, name, grade, group_number, period, teacher_id')
       .in('id', enrolledIds)
       .order('period', { ascending: false })
 
@@ -152,9 +152,28 @@ export async function getStudentSubjects(): Promise<StudentSubjectView[]> {
     })
   }
 
+  // 4. Obtener nombres de docentes
+  const teacherIds = Array.from(new Set(finalSubjects.map(s => s.teacher_id).filter(Boolean)))
+  const teacherMap = new Map<string, string>()
+
+  if (teacherIds.length > 0) {
+    const { data: teachers } = await supabase
+      .from('profiles')
+      .select('id, first_name, last_name')
+      .in('id', teacherIds)
+
+    if (teachers) {
+      teachers.forEach(p => {
+        const full = [p.first_name, p.last_name].filter(Boolean).join(' ')
+        if (full) teacherMap.set(p.id, full)
+      })
+    }
+  }
+
   return finalSubjects.map(sub => ({
     ...sub,
-    achievementsCount: achievementCounts.get(sub.id) || 0
+    achievementsCount: achievementCounts.get(sub.id) || 0,
+    teacherName: sub.teacher_id ? teacherMap.get(sub.teacher_id) : undefined
   }))
 }
 
@@ -264,14 +283,18 @@ export async function getStudentGradesView(subjectId: string) {
   }
 
   // 5. Obtener Mis Notas (Solo mis notas)
-  const { data: grades, error: gradeError } = await supabase
-    .from('assisted_grades')
-    .select('*')
-    .eq('student_id', myStudentId)
+  let grades: any[] = []
+  if (!myStudentId.startsWith('pending-')) {
+    const { data: fetchGrades, error: gradeError } = await supabase
+      .from('assisted_grades')
+      .select('*')
+      .eq('student_id', myStudentId)
 
-  if (gradeError) throw new Error('Error al cargar calificaciones')
+    if (gradeError) throw new Error('Error al cargar calificaciones')
+    grades = fetchGrades || []
+  }
 
-  return { subject, achievements: achievements || [], activities, grades: grades || [] }
+  return { subject, achievements: achievements || [], activities, grades }
 }
 
 import { generateTimeSlots } from '@/app/admin/schedules/utils/timeCalculator'
