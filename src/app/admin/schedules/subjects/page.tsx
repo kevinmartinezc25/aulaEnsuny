@@ -115,8 +115,9 @@ export default function SubjectsPage() {
             <Loader2 className="h-8 w-8 text-purple-500 animate-spin" />
           </div>
         ) : (
-          <div className="overflow-auto max-h-[550px]">
-            <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800 relative">
+          <div className="overflow-auto max-h-[550px] custom-scrollbar">
+            {/* VISTA DESKTOP */}
+            <table className="hidden md:table min-w-full divide-y divide-slate-200 dark:divide-slate-800 relative">
               <thead className="bg-slate-50 dark:bg-slate-800/90 sticky top-0 z-10 backdrop-blur-sm shadow-sm">
                 <tr>
                   <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
@@ -164,6 +165,40 @@ export default function SubjectsPage() {
                 )}
               </tbody>
             </table>
+
+            {/* VISTA MOBILE */}
+            <div className="md:hidden flex flex-col divide-y divide-slate-100 dark:divide-slate-800/50">
+              {filteredSubjects.length > 0 ? (
+                filteredSubjects.map((subject) => (
+                  <div key={subject.id} className="p-4 flex items-center justify-between gap-4 bg-white dark:bg-slate-900 active:bg-slate-50 dark:active:bg-slate-800/50 transition-colors">
+                    <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 leading-tight">
+                      {subject.name}
+                    </div>
+                    <div className="shrink-0 flex items-center gap-3">
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          className="sr-only peer"
+                          checked={subject.is_academic_workload !== false}
+                          onChange={() => toggleWorkload(subject.name, subject.is_academic_workload !== false)}
+                          disabled={savingName === subject.name}
+                        />
+                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-purple-600"></div>
+                        {savingName === subject.name && (
+                          <span className="absolute -right-6 flex items-center justify-center">
+                            <Loader2 className="w-4 h-4 text-purple-500 animate-spin" />
+                          </span>
+                        )}
+                      </label>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="p-8 text-center text-slate-500 dark:text-slate-400 text-sm">
+                  No se encontraron materias que coincidan con la búsqueda.
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>

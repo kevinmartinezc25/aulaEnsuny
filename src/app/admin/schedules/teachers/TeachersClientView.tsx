@@ -211,7 +211,8 @@ export default function TeachersClientView({
       {/* Table (Scroll Nativo) */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
+          {/* VISTA DESKTOP */}
+          <table className="hidden md:table w-full text-sm text-left">
             <thead className="bg-slate-50 dark:bg-slate-950/50 text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800 font-medium">
               <tr>
                 <th className="px-6 py-4">Nombre en aSc TimeTables</th>
@@ -309,6 +310,93 @@ export default function TeachersClientView({
               ))}
             </tbody>
           </table>
+
+          {/* VISTA MOBILE */}
+          <div className="md:hidden flex flex-col divide-y divide-slate-100 dark:divide-slate-800">
+            {filteredTeachers.map((teacher) => (
+              <div key={teacher.id} className="p-4 flex flex-col gap-4 bg-white dark:bg-slate-900 active:bg-slate-50 dark:active:bg-slate-800/50 transition-colors">
+                <div className="flex justify-between items-start">
+                  <span className="font-semibold text-slate-900 dark:text-white text-base leading-tight pr-4">{teacher.full_name}</span>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => {
+                        setMergeSourceTeacher(teacher)
+                        setMergeTargetTeacherId('')
+                      }}
+                      disabled={loadingId === teacher.id}
+                      className="p-1.5 text-slate-400 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 dark:bg-slate-800/50 dark:hover:bg-indigo-950/30 rounded-lg transition-colors"
+                      title="Fusionar / Transferir clases"
+                    >
+                      <GitMerge className="h-4 w-4" />
+                    </button>
+                    {teacher.profile_id === null && (
+                      <button
+                        onClick={() => setDeleteConfirmTeacher(teacher)}
+                        disabled={loadingId === teacher.id}
+                        className="p-1.5 text-slate-400 hover:text-rose-600 bg-slate-50 hover:bg-rose-50 dark:bg-slate-800/50 dark:hover:bg-rose-950/30 rounded-lg transition-colors"
+                        title="Eliminar docente"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="w-full">
+                  {teacher.profile_id ? (
+                    <div className="flex items-center justify-between gap-2 p-3 bg-slate-50 dark:bg-slate-800/30 rounded-xl border border-slate-100 dark:border-slate-800">
+                      <div className="flex items-center gap-2 overflow-hidden">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                        <div className="truncate">
+                          <p className="text-slate-700 dark:text-slate-200 font-bold text-sm truncate">
+                            {teacher.profiles?.first_name} {teacher.profiles?.last_name}
+                          </p>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                            {teacher.profiles?.email}
+                          </p>
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => handleUnlink(teacher.id)}
+                        disabled={loadingId === teacher.id}
+                        className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-md transition-colors shrink-0"
+                      >
+                        <Unlink className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 relative w-full">
+                      <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-amber-500" />
+                      <select
+                        value="none"
+                        onChange={(e) => handleLink(teacher.id, e.target.value)}
+                        disabled={loadingId === teacher.id}
+                        className="w-full text-sm py-2 pl-9 pr-8 rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/20 text-amber-900 dark:text-amber-400 focus:outline-none focus:border-amber-400 transition-colors appearance-none cursor-pointer"
+                      >
+                        <option value="none">Vincular a Perfil Plataforma</option>
+                        {availableProfiles.map(p => (
+                          <option key={p.id} value={p.id}>
+                            {p.first_name} {p.last_name}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                          <div className="h-0 w-0 border-x-[5px] border-x-transparent border-t-[6px] border-t-amber-500"></div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <button 
+                  onClick={() => setSelectedTeacherModal(teacher)}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-emerald-50 dark:bg-emerald-500/10 text-sm font-bold text-emerald-600 dark:text-emerald-400 rounded-xl hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-colors"
+                >
+                  <Briefcase className="h-4 w-4" />
+                  Ver Carga Académica
+                </button>
+              </div>
+            ))}
+          </div>
 
           {filteredTeachers.length === 0 && (
             <div className="py-16 text-center">

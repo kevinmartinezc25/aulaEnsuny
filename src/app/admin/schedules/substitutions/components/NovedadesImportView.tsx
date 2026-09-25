@@ -7,7 +7,25 @@ import { importDailyNovedadesXML, deleteDailyNovedades, checkDailyNovedadesCount
 import { AscXmlParser, AscParsedData } from '../../utils/AscXmlParser'
 import DailyPreviewCanvas from './DailyPreviewCanvas'
 
-export function NovedadesImportView() {
+interface ExistingTeacher {
+  id: string
+  full_name: string
+  profile_id: string | null
+  profile_name: string | null
+  email: string | null
+}
+
+interface ExistingGroup {
+  id: string
+  name: string
+}
+
+interface NovedadesImportViewProps {
+  initialTeachers?: ExistingTeacher[]
+  initialGroups?: ExistingGroup[]
+}
+
+export function NovedadesImportView({ initialTeachers = [], initialGroups = [] }: NovedadesImportViewProps) {
   const [targetDate, setTargetDate] = useState<string>('')
   const [activeTab, setActiveTab] = useState<'import' | 'preview'>('import')
   const [isProcessing, setIsProcessing] = useState(false)
@@ -15,6 +33,37 @@ export function NovedadesImportView() {
   const [fileName, setFileName] = useState<string | null>(null)
   const [activeNovedades, setActiveNovedades] = useState<number | null>(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const [teacherMappings, setTeacherMappings] = useState<Record<string, string>>({})
+  const [groupMappings, setGroupMappings] = useState<Record<string, string>>({})
+  const [activeMappingTab, setActiveMappingTab] = useState<'summary' | 'teachers' | 'groups'>('summary')
+
+  const autoMatchTeacher = (xmlName: string): string => {
+    const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
+    const cleanXml = norm(xmlName)
+    const xmlTokens = cleanXml.split(/\s+/).filter(Boolean)
+
+    const exact = initialTeachers.find(t => norm(t.full_name) === cleanXml)
+    if (exact) return exact.id
+
+    const profileMatch = initialTeachers.find(t => t.profile_name && norm(t.profile_name) === cleanXml)
+    if (profileMatch) return profileMatch.id
+
+    const partial = initialTeachers.find(t => {
+      const dbTokens = norm(t.full_name).split(/\s+/).filter(Boolean)
+      const common = xmlTokens.filter(tok => dbTokens.includes(tok))
+      return common.length > 0 && common.some(c => c.length > 3)
+    })
+    if (partial) return partial.id
+    return ''
+  }
+
+  const autoMatchGroup = (xmlGroupName: string): string => {
+    const norm = (s: string) => s.toLowerCase().replace(/[\s\-_º°]/g, '').trim()
+    const cleanXml = norm(xmlGroupName)
+    const match = initialGroups.find(g => norm(g.name) === cleanXml)
+    return match ? match.id : ''
+  }
 
   React.useEffect(() => {
     if (targetDate) {
@@ -44,7 +93,23 @@ export function NovedadesImportView() {
       const data = AscXmlParser.parse(text)
       setParsedData(data)
       setFileName(file.name)
-      toast.success(`Archivo procesado correctamente. Listo para importar novedades (${data.slots.length} clases detectadas).`)
+      
+      const initialTeacherMap: Record<string, string> = {}
+      data.teachers.forEach(t => {
+        const matchedId = autoMatchTeacher(t.name)
+        if (matchedId) initialTeacherMap[t.id] = matchedId
+      })
+      setTeacherMappings(initialTeacherMap)
+
+      const initialGroupMap: Record<string, string> = {}
+      data.groups.forEach(g => {
+        const matchedId = autoMatchGroup(g.name)
+        if (matchedId) initialGroupMap[g.id] = matchedId
+      })
+      setGroupMappings(initialGroupMap)
+
+      setActiveMappingTab('summary')
+      toast.success(`Archivo procesado correctamente. Listo para revisar cotejos (${data.slots.length} clases detectadas).`)
     } catch (error: any) {
       toast.error('Error al parsear el archivo XML: ' + error.message)
     }
@@ -55,7 +120,7 @@ export function NovedadesImportView() {
 
     try {
       setIsProcessing(true)
-      const result = await importDailyNovedadesXML(parsedData, targetDate)
+      const result = await importDailyNovedadesXML(parsedData, targetDate, { teachers: teacherMappings, groups: groupMappings })
       
       toast.success(`Novedad aplicada exitosamente: ${result.count} clases sobreescritas para el ${targetDate}.`)
       if (result.unmappedTeachers > 0 || result.unmappedSubjects > 0) {
@@ -133,7 +198,7 @@ export function NovedadesImportView() {
         </button>
       </div>
 
-      <div className="mb-6 flex flex-col sm:flex-row gap-4 items-end bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm">
+      <div className={`mb-6 flex-col sm:flex-row gap-4 items-end bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm ${activeTab !== 'import' ? 'hidden md:flex' : 'flex'}`}>
         <div className="w-full max-w-sm">
           <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 flex items-center justify-between gap-2">
             <span>Fecha Objetivo</span>
@@ -214,6 +279,82 @@ export function NovedadesImportView() {
               </div>
             </div>
           </div>
+
+          {parsedData && (
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm max-w-4xl mx-auto mt-6">
+              <div className="flex items-center gap-4 mb-4">
+                <h3 className="font-bold text-slate-800 dark:text-slate-100">Lista de Cotejos (Mapeo)</h3>
+                <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+                  <button onClick={() => setActiveMappingTab('summary')} className={`px-3 py-1 text-xs font-bold rounded-lg ${activeMappingTab === 'summary' ? 'bg-white dark:bg-slate-700 shadow text-emerald-600' : 'text-slate-500'}`}>Resumen</button>
+                  <button onClick={() => setActiveMappingTab('teachers')} className={`px-3 py-1 text-xs font-bold rounded-lg ${activeMappingTab === 'teachers' ? 'bg-white dark:bg-slate-700 shadow text-emerald-600' : 'text-slate-500'}`}>Docentes</button>
+                  <button onClick={() => setActiveMappingTab('groups')} className={`px-3 py-1 text-xs font-bold rounded-lg ${activeMappingTab === 'groups' ? 'bg-white dark:bg-slate-700 shadow text-emerald-600' : 'text-slate-500'}`}>Grupos</button>
+                </div>
+              </div>
+              
+              {activeMappingTab === 'summary' && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 text-center"><p className="text-xl font-bold text-emerald-600">{parsedData.teachers.length}</p><p className="text-xs text-slate-500">Docentes</p></div>
+                  <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 text-center"><p className="text-xl font-bold text-blue-600">{parsedData.groups.length}</p><p className="text-xs text-slate-500">Grupos</p></div>
+                  <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 text-center"><p className="text-xl font-bold text-purple-600">{parsedData.subjects.length}</p><p className="text-xs text-slate-500">Materias</p></div>
+                  <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 text-center"><p className="text-xl font-bold text-orange-600">{parsedData.slots.length}</p><p className="text-xs text-slate-500">Clases detectadas</p></div>
+                </div>
+              )}
+
+              {activeMappingTab === 'teachers' && (
+                <div className="max-h-[300px] overflow-y-auto border border-slate-200 dark:border-slate-800 rounded-xl">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-slate-50 dark:bg-slate-800/70 text-slate-500 text-xs font-bold sticky top-0">
+                      <tr><th className="p-2">Nombre XML</th><th className="p-2">Docente Plataforma</th></tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {parsedData.teachers.map(t => (
+                        <tr key={t.id}>
+                          <td className="p-2 font-semibold">{t.name}</td>
+                          <td className="p-2">
+                            <select
+                              value={teacherMappings[t.id] || ''}
+                              onChange={e => setTeacherMappings(prev => ({ ...prev, [t.id]: e.target.value }))}
+                              className="w-full rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 py-1 px-2 text-xs"
+                            >
+                              <option value="">(No mapear / Automático)</option>
+                              {initialTeachers.map(opt => <option key={opt.id} value={opt.id}>{opt.full_name}</option>)}
+                            </select>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {activeMappingTab === 'groups' && (
+                <div className="max-h-[300px] overflow-y-auto border border-slate-200 dark:border-slate-800 rounded-xl">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-slate-50 dark:bg-slate-800/70 text-slate-500 text-xs font-bold sticky top-0">
+                      <tr><th className="p-2">Grupo XML</th><th className="p-2">Grupo Plataforma</th></tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {parsedData.groups.map(g => (
+                        <tr key={g.id}>
+                          <td className="p-2 font-semibold">{g.name}</td>
+                          <td className="p-2">
+                            <select
+                              value={groupMappings[g.id] || ''}
+                              onChange={e => setGroupMappings(prev => ({ ...prev, [g.id]: e.target.value }))}
+                              className="w-full rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 py-1 px-2 text-xs"
+                            >
+                              <option value="">(No mapear / Automático)</option>
+                              {initialGroups.map(opt => <option key={opt.id} value={opt.id}>{opt.name}</option>)}
+                            </select>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="flex flex-col gap-3">

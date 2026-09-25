@@ -6,6 +6,7 @@ import { getScheduleSlotsAction } from '@/modules/admin/application/actions'
 import { generateTimeSlots, TimeSlot } from '../../utils/timeCalculator'
 import { Loader2, AlertCircle } from 'lucide-react'
 import { isOfficialGradeGroup } from '../../utils/groupFilters'
+import MobilePremiumScheduleView from '@/app/admin/schedules/components/MobilePremiumScheduleView'
 
 interface DailyPreviewCanvasProps {
   targetDate: string
@@ -114,7 +115,7 @@ export default function DailyPreviewCanvas({ targetDate }: DailyPreviewCanvasPro
   }
 
   return (
-    <div className="flex flex-col h-[600px] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden bg-white dark:bg-slate-900 shadow-sm mt-6">
+    <div className="flex flex-col h-[calc(100vh-140px)] min-h-[600px] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden bg-white dark:bg-slate-900 shadow-sm mt-2 md:mt-6">
       <div className="flex flex-wrap items-center justify-between gap-4 p-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">
         <div className="flex items-center gap-2">
           <button onClick={() => setViewMode('group')} className={`px-5 py-2.5 text-sm font-bold rounded-xl transition-colors ${viewMode === 'group' ? 'bg-[#1F4E31] dark:bg-emerald-600 text-white shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800'}`}>Grupos</button>
@@ -127,8 +128,9 @@ export default function DailyPreviewCanvas({ targetDate }: DailyPreviewCanvasPro
       </div>
 
       <div className="flex-1 overflow-auto bg-slate-50/50 dark:bg-slate-900/50">
-        <table className="w-full text-left border-collapse min-w-max">
-          <thead>
+        <div className="hidden md:block">
+          <table className="w-full text-left border-collapse min-w-max">
+            <thead>
             <tr>
               <th className="sticky top-0 left-0 z-20 bg-white dark:bg-slate-800 border-b border-r border-slate-200 dark:border-slate-700 p-3 min-w-[150px] shadow-[1px_1px_5px_-2px_rgba(0,0,0,0.1)]">
                 <span className="text-xs font-black text-slate-500 uppercase tracking-widest">{viewMode === 'group' ? 'Grupos' : 'Docentes'}</span>
@@ -195,9 +197,26 @@ export default function DailyPreviewCanvas({ targetDate }: DailyPreviewCanvasPro
                   )
                 })}
               </tr>
-            ))}
-          </tbody>
-        </table>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="block md:hidden h-full">
+          <MobilePremiumScheduleView
+            groups={groups}
+            teachers={Object.values(teachers)}
+            slots={slots}
+            periods={activePeriods.map(p => Number(p.id))}
+            periodTimes={Object.fromEntries(activePeriods.map(p => [Number(p.id), p.startTime]))}
+            getSubjectColor={(name) => {
+              const matched = Object.values(subjects).find(s => s.name === name)
+              return matched?.color || '#94a3b8'
+            }}
+            defaultActiveDayId={new Date(`${targetDate}T12:00:00Z`).getUTCDay()}
+            hideDaySelector={true}
+          />
+        </div>
       </div>
     </div>
   )

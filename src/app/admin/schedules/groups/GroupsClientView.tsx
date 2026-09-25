@@ -160,7 +160,8 @@ export default function GroupsClientView({ initialGroups, levelsCount, available
       {/* Tabla con Scroll Nativo de Página */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
+          {/* VISTA DESKTOP */}
+          <table className="hidden md:table w-full text-sm text-left">
             <thead className="bg-slate-50 dark:bg-slate-950/50 text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800 font-medium">
               <tr>
                 <th className="px-6 py-4">Grupo</th>
@@ -251,6 +252,88 @@ export default function GroupsClientView({ initialGroups, levelsCount, available
               ))}
             </tbody>
           </table>
+
+          {/* VISTA MOBILE */}
+          <div className="md:hidden flex flex-col divide-y divide-slate-100 dark:divide-slate-800">
+            {filteredGroups.map((group) => (
+              <div key={group.id} className="p-4 flex flex-col gap-4 bg-white dark:bg-slate-900 active:bg-slate-50 dark:active:bg-slate-800/50 transition-colors">
+                <div className="flex justify-between items-start">
+                  <span className="font-bold text-slate-900 dark:text-white text-lg">{group.name}</span>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Link 
+                      href={`/admin/schedules?view=group&id=${group.id}&group=${encodeURIComponent(group.name)}`}
+                      className="p-1.5 text-orange-500 hover:text-orange-600 bg-orange-50 hover:bg-orange-100 dark:bg-orange-500/10 dark:hover:bg-orange-500/20 rounded-lg transition-colors"
+                      title="Ver Horario"
+                    >
+                      <ArrowUpRight className="h-5 w-5" />
+                    </Link>
+                    {!group.level && (
+                      <button
+                        onClick={() => handleDeleteGroup(group)}
+                        disabled={loadingGroupId === group.id}
+                        title="Eliminar grupo"
+                        className="p-1.5 text-red-400 hover:text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 rounded-lg transition-colors disabled:opacity-40"
+                      >
+                        <Trash2 className="h-5 w-5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-3 w-full">
+                  <div className="relative w-full">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Nivel Académico</label>
+                    <select
+                      value={group.level || 'none'}
+                      onChange={(e) => handleLevelChange(group.id, e.target.value)}
+                      disabled={loadingGroupId === group.id}
+                      className={`w-full text-sm py-2 px-3 rounded-xl border focus:outline-none transition-colors appearance-none font-bold uppercase tracking-wider ${
+                        group.level 
+                          ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                          : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/50 text-red-600 dark:text-red-400'
+                      } ${loadingGroupId === group.id ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                    >
+                      <option value="none">-- Sin Nivel --</option>
+                      {AVAILABLE_LEVELS.map(lvl => (
+                        <option key={lvl} value={lvl}>{lvl}</option>
+                      ))}
+                    </select>
+                    <div className="absolute right-3 bottom-3 pointer-events-none">
+                        <div className="h-0 w-0 border-x-[4px] border-x-transparent border-t-[5px] border-t-slate-400"></div>
+                    </div>
+                  </div>
+
+                  <div className="relative w-full">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Director de Grupo</label>
+                    <select
+                      value={group.director_id || 'none'}
+                      onChange={(e) => handleDirectorChange(group.id, e.target.value)}
+                      disabled={loadingGroupId === group.id}
+                      className={`w-full text-sm py-2 pl-3 pr-8 rounded-xl border focus:outline-none transition-colors appearance-none ${
+                        group.director_id 
+                          ? 'bg-orange-50 dark:bg-orange-950/30 border-orange-200 dark:border-orange-900/50 text-orange-900 dark:text-orange-200 font-medium' 
+                          : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
+                      } ${loadingGroupId === group.id ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                    >
+                      <option value="none">-- Sin Asignar --</option>
+                      {availableDirectors.map(d => (
+                        <option key={d.id} value={d.id}>
+                          {d.first_name} {d.last_name}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="absolute right-3 bottom-2.5 pointer-events-none">
+                        {group.director_id ? (
+                          <CheckCircle2 className="h-4 w-4 text-orange-500" />
+                        ) : (
+                          <div className="h-0 w-0 border-x-[5px] border-x-transparent border-t-[6px] border-t-slate-400"></div>
+                        )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
         {filteredGroups.length === 0 && (

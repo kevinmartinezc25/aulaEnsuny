@@ -1037,7 +1037,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const toggleSidebar = () => setIsSidebarCollapsed(!isSidebarCollapsed)
   const toggleAdminSidebar = () => setIsAdminSidebarVisible(prev => !prev)
   const handleAdminMenuToggle = () => {
-    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
       setIsMobileMenuOpen(true)
       return
     }
@@ -1048,13 +1048,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div className="flex min-h-screen max-w-full overflow-x-hidden min-w-0 bg-slate-50 dark:bg-slate-950">
         {/* Admin Sidebar Desktop */}
         {!isDocsPage && (
-          <aside className={`fixed inset-y-0 left-0 z-20 hidden md:flex flex-col transition-all duration-300 ${isAdminSidebarVisible ? 'w-60' : 'w-20'}`}>
+          <aside className={`fixed inset-y-0 left-0 z-20 hidden lg:flex flex-col transition-all duration-300 ${isAdminSidebarVisible ? 'w-60' : 'w-20'}`}>
             <AdminSidebar user={user} enabledModules={enabledModules} isCollapsed={!isAdminSidebarVisible} />
           </aside>
         )}
 
         {/* Admin Main */}
-        <div className={`flex flex-1 flex-col transition-all duration-300 min-w-0 max-w-full overflow-hidden ${!isDocsPage ? (isAdminSidebarVisible ? 'md:pl-60' : 'md:pl-20') : 'md:pl-0'}`}>
+        <div className={`flex flex-1 flex-col transition-all duration-300 min-w-0 max-w-full overflow-hidden ${!isDocsPage ? (isAdminSidebarVisible ? 'lg:pl-60' : 'lg:pl-20') : 'lg:pl-0'}`}>
           {/* Admin Header */}
           {!isDocsPage && (
             <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b border-slate-100 bg-white px-6 dark:border-slate-800/60 dark:bg-slate-900">
@@ -1062,7 +1062,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               
               <button
                 onClick={handleAdminMenuToggle}
-                className="rounded-full border border-slate-200 bg-white p-2 text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors"
+                className="rounded-full border border-slate-200 bg-white p-2 text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors lg:hidden"
+                title="Mostrar menú"
+                aria-label="Mostrar menú"
+              >
+                <Menu className="h-5 w-5" />
+              </button>
+              <button
+                onClick={handleAdminMenuToggle}
+                className="hidden lg:block rounded-full border border-slate-200 bg-white p-2 text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors"
                 title={isAdminSidebarVisible ? 'Ocultar menú' : 'Mostrar menú'}
                 aria-label={isAdminSidebarVisible ? 'Ocultar menú' : 'Mostrar menú'}
               >
@@ -1178,12 +1186,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {isMobileMenuOpen && (
             <>
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 0.4 }} exit={{ opacity: 0 }}
-                onClick={() => setIsMobileMenuOpen(false)} className="fixed inset-0 z-40 bg-black md:hidden" />
+                onClick={() => setIsMobileMenuOpen(false)} className="fixed inset-0 z-40 bg-black lg:hidden" />
               <motion.aside initial={{ x: '-100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }}
                 transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                className="fixed inset-y-0 left-0 z-50 w-60 md:hidden">
-                <AdminSidebar user={user} onClose={() => setIsMobileMenuOpen(false)} enabledModules={enabledModules} />
-                <button onClick={() => setIsMobileMenuOpen(false)} className="absolute top-4 right-4 rounded-lg p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400">
+                className="fixed inset-y-0 left-0 z-50 w-64 lg:hidden bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 shadow-2xl">
+                <AdminSidebar user={user} onClose={() => setIsMobileMenuOpen(false)} enabledModules={enabledModules} isCollapsed={false} />
+                <button onClick={() => setIsMobileMenuOpen(false)} className="absolute top-4 right-4 rounded-lg p-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 shadow-sm z-50 transition-colors">
                   <X className="h-5 w-5" />
                 </button>
               </motion.aside>
