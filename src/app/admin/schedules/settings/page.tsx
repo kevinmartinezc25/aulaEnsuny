@@ -126,8 +126,20 @@ export default function SettingsPage() {
 
         // 2. Sincronizar desde la base de datos institucional
         const res = await getGeneralSchedulePeriodsAction()
-        if (res.success && res.config?.periods && res.config.periods.length > 0) {
-          loadedPeriods = res.config.periods
+        if (res.success && res.config) {
+          if (res.config.periods && res.config.periods.length > 0) {
+            loadedPeriods = res.config.periods
+          }
+          if (res.config.visualSettings) {
+            setSettings({
+              showWeekends: res.config.visualSettings.showWeekends ?? defaultSettings.showWeekends,
+              themeColor: res.config.visualSettings.themeColor || defaultSettings.themeColor,
+              timeFormat: res.config.visualSettings.timeFormat || defaultSettings.timeFormat,
+              density: res.config.visualSettings.density || defaultSettings.density,
+              showClassrooms: res.config.visualSettings.showClassrooms ?? defaultSettings.showClassrooms,
+              hideEmptyPeriods: res.config.visualSettings.hideEmptyPeriods ?? defaultSettings.hideEmptyPeriods
+            })
+          }
         }
 
         if (loadedPeriods && loadedPeriods.length > 0) {
@@ -270,7 +282,8 @@ export default function SettingsPage() {
         periods,
         startHour,
         blockDuration,
-        periodsPerDay
+        periodsPerDay,
+        visualSettings: settings
       })
 
       if (!res.success) {

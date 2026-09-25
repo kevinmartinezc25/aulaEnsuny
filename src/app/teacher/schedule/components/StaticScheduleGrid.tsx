@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/core/config/supabase/client'
 import { getScheduleSlotsAction } from '@/modules/admin/application/actions'
+import { getGeneralSchedulePeriodsAction } from '@/app/admin/schedules/actions'
 import { Loader2, CalendarX2, AlertCircle } from 'lucide-react'
 import { generateTimeSlots } from '@/app/admin/schedules/utils/timeCalculator'
 import PrintableSchedule from '@/app/admin/schedules/components/PrintableSchedule'
@@ -215,16 +216,34 @@ export default function StaticScheduleGrid({
     let breaks: any[] = []
 
     try {
-      const settings = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('sch_settings') || '{}') : {}
+      const res = await getGeneralSchedulePeriodsAction()
+      let settings: any = {}
+      if (res.success && res.config) {
+        settings = res.config
+        
+        if (res.config.visualSettings) {
+          setVisualSettings({
+            density: res.config.visualSettings.density || 'relaxed',
+            showClassrooms: res.config.visualSettings.showClassrooms ?? false,
+            showWeekends: res.config.visualSettings.showWeekends ?? false,
+            hideEmptyPeriods: res.config.visualSettings.hideEmptyPeriods ?? false
+          })
+        }
+
+        if (res.config.periods && res.config.periods.length > 0) {
+          activeSlots = res.config.periods.map((p, idx) => ({
+            id: p.period || idx + 1,
+            name: p.name || `${p.period}ª Hora`,
+            startTime: p.startTime,
+            endTime: p.endTime,
+            type: 'academic'
+          }))
+          setTimeSlots(activeSlots)
+        }
+      }
+
       startHour = settings.startHour || '07:00'
       blockDuration = parseInt(settings.blockDuration || '55', 10)
-      
-      setVisualSettings({
-        density: settings.density || 'relaxed',
-        showClassrooms: settings.showClassrooms ?? false,
-        showWeekends: settings.showWeekends ?? false,
-        hideEmptyPeriods: settings.hideEmptyPeriods ?? false
-      })
       
       const groupPeriods = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('sch_group_periods') || '{}') : {}
       periodsPerDay = entityType === 'group' && groupPeriods[entityId] 
@@ -234,13 +253,15 @@ export default function StaticScheduleGrid({
       if (!periodsPerDay || periodsPerDay < 6) periodsPerDay = 7
       setMaxPeriods(periodsPerDay)
 
-      use12h = settings.timeFormat !== '24h'
+      use12h = settings.visualSettings?.timeFormat !== '24h'
       breaks = settings.breaks || []
 
-      const generated = generateTimeSlots(startHour, blockDuration, periodsPerDay, breaks, use12h)
-      // Solo tomamos los periodos académicos (ignorar recreos para la cuadrícula compacta)
-      activeSlots = generated.filter(s => s.type !== 'break')
-      setTimeSlots(activeSlots)
+      // Solo si no hay custom periods, generarlos:
+      if (activeSlots.length === 0) {
+        const generated = generateTimeSlots(startHour, blockDuration, periodsPerDay, breaks, use12h)
+        activeSlots = generated.filter(s => s.type !== 'break')
+        setTimeSlots(activeSlots)
+      }
     } catch(e) {
       console.error('Error cargando configuración:', e)
       const generated = generateTimeSlots('07:00', 55, 7, [{ id: '1', name: 'Recreo', afterPeriod: 3, durationMinutes: 30 }], true)
@@ -272,9 +293,11 @@ export default function StaticScheduleGrid({
     }
 
     setMaxPeriods(periodsPerDay)
-    const generated = generateTimeSlots(startHour, blockDuration, periodsPerDay, breaks, use12h)
-    activeSlots = generated.filter(s => s.type !== 'break')
-    setTimeSlots(activeSlots)
+    if (activeSlots.length === 0) {
+      const generated = generateTimeSlots(startHour, blockDuration, periodsPerDay, breaks, use12h)
+      activeSlots = generated.filter(s => s.type !== 'break')
+      setTimeSlots(activeSlots)
+    }
 
     // 3. Formatear y agrupar clases (por si hay bloques unidos o múltiples docentes)
     const groupedSlots = new Map<string, any>()

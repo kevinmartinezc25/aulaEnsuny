@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { createClient } from '@/core/config/supabase/client'
 import { Loader2, Calendar, AlertCircle } from 'lucide-react'
+import { getGeneralSchedulePeriodsAction } from '@/app/admin/schedules/actions'
 import { generateTimeSlots } from '@/app/admin/schedules/utils/timeCalculator'
 
 interface EmergencyScheduleViewProps {
@@ -30,22 +31,30 @@ export default function EmergencyScheduleView({ profileId, academicTeacherId }: 
     }
   }, [selectedDate, academicTeacherId])
 
-  const loadSettings = () => {
+  const loadSettings = async () => {
     try {
+      const res = await getGeneralSchedulePeriodsAction()
+      if (res.success && res.config && res.config.periods && res.config.periods.length > 0) {
+        const use12h = res.config.visualSettings?.timeFormat !== '24h'
+        const slots = res.config.periods.map((p, idx) => ({
+          id: p.period || idx + 1,
+          name: p.name || `${p.period}ª Hora`,
+          startTime: p.startTime,
+          endTime: p.endTime,
+          type: 'academic'
+        }))
+        setTimeSlots(slots)
+        return
+      }
+
       const settings = JSON.parse(localStorage.getItem('sch_settings') || '{}')
       const startHour = settings.startHour || '07:00'
       const blockDuration = parseInt(settings.blockDuration || '55', 10)
       const periodsPerDay = parseInt(settings.periodsPerDay || '7', 10)
-      const use12h = settings.timeFormat !== '24h'
-      let breaks = settings.breaks
+      const use12h = settings.visualSettings?.timeFormat !== '24h'
+      let breaks = settings.breaks || []
       
-      if (!breaks && settings.breakPeriod) {
-        breaks = [{ id: '1', name: 'Recreo', afterPeriod: parseInt(settings.breakPeriod, 10), durationMinutes: 30 }]
-      } else if (!breaks) {
-        breaks = []
-      }
-
-      setTimeSlots(generateTimeSlots(startHour, blockDuration, periodsPerDay, breaks, use12h))
+      setTimeSlots(generateTimeSlots(startHour, blockDuration, periodsPerDay, breaks, use12h).filter(s => s.type !== 'break'))
     } catch(e) {
       console.error(e)
     }
