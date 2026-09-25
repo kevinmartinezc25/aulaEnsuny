@@ -55,6 +55,28 @@ export const usePushNotifications = () => {
             }
           }),
         });
+      } else if (Notification.permission === 'granted') {
+        // Permiso concedido pero sin suscripción (p. ej. reinstalación de PWA o borrado de datos)
+        const applicationServerKey = urlB64ToUint8Array(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY as string);
+        const newSub = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey,
+        });
+        const subscriptionJSON = newSub.toJSON();
+        const res = await fetch('/api/push/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            endpoint: subscriptionJSON.endpoint,
+            keys: {
+              p256dh: subscriptionJSON.keys?.p256dh,
+              auth: subscriptionJSON.keys?.auth,
+            }
+          }),
+        });
+        if (res.ok) {
+          setIsSubscribed(true);
+        }
       }
     } catch (error) {
       console.error('Error verificando la suscripción:', error);
