@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react'
 import Link from 'next/link'
-import { BookOpen, Calendar, ChevronRight, RotateCcw, Filter, Award, Sparkles, GraduationCap } from 'lucide-react'
+import { BookOpen, Calendar, ChevronRight, RotateCcw, Filter, Award, Sparkles, GraduationCap, User } from 'lucide-react'
 import { StudentSubjectView } from '@/modules/planilla-asistida/application/studentQueries'
 import { motion, Variants } from 'framer-motion'
 import { formatCapitalizedWords } from '@/lib/utils'
@@ -246,9 +246,17 @@ export function StudentSubjectsClientView({ subjects, studentName }: StudentSubj
                               <span>{subject.achievementsCount} {subject.achievementsCount === 1 ? 'logro' : 'logros'}</span>
                             </span>
                           </div>
-                          <div className="flex items-center text-[10px] sm:text-xs font-medium text-slate-500 dark:text-slate-400 pl-0.5">
-                            <Calendar className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1 sm:mr-1.5 opacity-70 shrink-0" />
-                            <span className="truncate">Periodo: <strong className="text-slate-700 dark:text-slate-300">{subject.period}</strong></span>
+                          <div className="flex items-center text-[10px] sm:text-xs font-medium text-slate-500 dark:text-slate-400 pl-0.5 justify-between">
+                            <div className="flex items-center truncate mr-2">
+                              <Calendar className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1 sm:mr-1.5 opacity-70 shrink-0" />
+                              <span className="truncate">Periodo: <strong className="text-slate-700 dark:text-slate-300">{subject.period}</strong></span>
+                            </div>
+                            {subject.teacherName && (
+                              <div className="flex items-center truncate" title={subject.teacherName}>
+                                <User className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1 opacity-70 shrink-0" />
+                                <span className="truncate max-w-[100px] sm:max-w-[120px]">{subject.teacherName}</span>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
