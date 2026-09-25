@@ -62,6 +62,7 @@ const DAYS = [
 
 import StaticScheduleGrid from '@/app/teacher/schedule/components/StaticScheduleGrid'
 import PrintableSchedule from '@/app/admin/schedules/components/PrintableSchedule'
+import MobilePremiumScheduleView from '@/app/admin/schedules/components/MobilePremiumScheduleView'
 import { generateTimeSlots } from '@/app/admin/schedules/utils/timeCalculator'
 import { isOfficialGradeGroup } from '@/app/admin/schedules/utils/groupFilters'
 
@@ -370,7 +371,7 @@ export function PremiumScheduleViewer() {
           </h1>
         </div>
 
-        <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800/50 rounded-lg">
+        <div className="hidden md:flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800/50 rounded-lg">
           <button
             onClick={() => { setViewMode('general'); setSelectedEntity(null); }}
             className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-all ${viewMode === 'general' ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-300' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
@@ -412,15 +413,16 @@ export function PremiumScheduleViewer() {
             title="Imprimir horario individual o en lote"
           >
             <Printer className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
-            <span>Imprimir</span>
+            <span className="hidden sm:inline">Imprimir</span>
           </button>
 
           <a 
             href="/admin/schedules/import"
-            className="flex items-center gap-2 px-4 sm:px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-200 dark:shadow-indigo-900/20 transition-all hover:-translate-y-0.5 active:translate-y-0"
+            className="flex items-center gap-2 px-3 sm:px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-200 dark:shadow-indigo-900/20 transition-all hover:-translate-y-0.5 active:translate-y-0"
           >
             <Sparkles className="h-4 w-4 shrink-0" />
-            <span>Importar aSc XML</span>
+            <span className="hidden sm:inline">Importar aSc XML</span>
+            <span className="sm:hidden">Importar</span>
           </a>
         </div>
       </div>
@@ -485,8 +487,9 @@ export function PremiumScheduleViewer() {
               const totalTableWidth = GROUP_COL_WIDTH + (DAYS.length * dayWidth)
 
               return (
+                <>
                 <div 
-                  className="bg-white dark:bg-slate-900 flex flex-col relative border-b border-slate-300 dark:border-slate-700"
+                  className="hidden md:flex bg-white dark:bg-slate-900 flex-col relative border-b border-slate-300 dark:border-slate-700"
                   style={{ width: `${totalTableWidth}px`, minWidth: `${totalTableWidth}px` }}
                 >
                   {/* Header de la Sábana: Inmovilizado verticalmente (sticky top-0) */}
@@ -633,6 +636,18 @@ export function PremiumScheduleViewer() {
                     })}
                   </div>
                 </div>
+
+                <div className="block md:hidden flex-1 w-full bg-white dark:bg-slate-900">
+                  <MobilePremiumScheduleView
+                    groups={officialGroups}
+                    teachers={teachers}
+                    slots={slots}
+                    periods={periods}
+                    periodTimes={periodTimes}
+                    getSubjectColor={getSubjectColor}
+                  />
+                </div>
+                </>
               )
             })()
           ) : selectedEntity ? (

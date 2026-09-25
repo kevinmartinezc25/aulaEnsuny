@@ -14,6 +14,7 @@ import SlotEditorModal from './SlotEditorModal'
 import PrintableSchedule from './PrintableSchedule'
 import UnassignedBlocksModal from './UnassignedBlocksModal'
 import SavedConflictsModal from './SavedConflictsModal'
+import MobileScheduleView from './MobileScheduleView'
 
 import { isOfficialGradeGroup, isMeetingSubject } from '../utils/groupFilters'
 
@@ -735,7 +736,8 @@ export default function MasterScheduleCanvas({ viewMode, onNavigate }: MasterSch
           <Loader2 className="h-8 w-8 text-indigo-500 animate-spin" />
         </div>
       ) : (
-        <div className="flex-1 overflow-auto custom-scrollbar p-6 print:p-0 print:overflow-visible">
+        <>
+        <div className="hidden md:block flex-1 overflow-auto custom-scrollbar p-6 print:block print:p-0 print:overflow-visible">
           
           <table className="w-max border-collapse bg-white dark:bg-slate-800 shadow-sm rounded-lg overflow-hidden text-xs">
             <thead>
@@ -869,6 +871,19 @@ export default function MasterScheduleCanvas({ viewMode, onNavigate }: MasterSch
           </table>
 
         </div>
+        
+        <div className="block md:hidden flex-1 overflow-hidden h-full">
+          <MobileScheduleView 
+            viewMode={viewMode}
+            entities={entities}
+            slots={slots}
+            subjects={subjects}
+            teachers={teachers}
+            groups={groups}
+            timeSlots={timeSlots}
+          />
+        </div>
+        </>
       )}
 
       {/* OVERLAY DE PROGRESO */}

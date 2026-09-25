@@ -3,7 +3,11 @@
 import { createClient, createAdminClient } from '@/core/config/supabase/server'
 import { AscParsedData, SIN_DOCENTE_ID } from '../utils/AscXmlParser'
 
-export async function importDailyNovedadesXML(parsedData: AscParsedData, targetDateStr: string) {
+export async function importDailyNovedadesXML(
+  parsedData: AscParsedData, 
+  targetDateStr: string,
+  mappings?: { teachers?: Record<string, string>; groups?: Record<string, string> }
+) {
   const supabase = await createClient()
   const adminClient = await createAdminClient()
   
@@ -66,7 +70,15 @@ export async function importDailyNovedadesXML(parsedData: AscParsedData, targetD
       // Intentar mapear Docente
       let tDbId: string | null = null
       if (!isAutonomous) {
-        tDbId = tchByExtId.get(slot.teacher_id) || null
+        // 1. Usar mapping manual si existe
+        if (mappings?.teachers?.[slot.teacher_id]) {
+          tDbId = mappings.teachers[slot.teacher_id]
+        }
+        // 2. Usar external_id
+        if (!tDbId) {
+          tDbId = tchByExtId.get(slot.teacher_id) || null
+        }
+        // 3. Usar nombre
         if (!tDbId) {
           const teacherXmlName = parsedData.teachers.find(t => t.id === slot.teacher_id)?.name
           if (teacherXmlName) tDbId = tchByName.get(teacherXmlName.trim().toLowerCase()) || null
@@ -85,7 +97,15 @@ export async function importDailyNovedadesXML(parsedData: AscParsedData, targetD
       if (slot.group_id === VIRTUAL_GROUP_EXT_ID) {
         gDbId = virtualGroupId
       } else {
-        gDbId = grpByExtId.get(slot.group_id)
+        // 1. Usar mapping manual si existe
+        if (mappings?.groups?.[slot.group_id]) {
+          gDbId = mappings.groups[slot.group_id]
+        }
+        // 2. Usar external_id
+        if (!gDbId) {
+          gDbId = grpByExtId.get(slot.group_id)
+        }
+        // 3. Usar nombre
         if (!gDbId) {
           const groupXmlName = parsedData.groups.find(g => g.id === slot.group_id)?.name
           if (groupXmlName) gDbId = grpByName.get(groupXmlName.trim().toLowerCase())
