@@ -241,6 +241,14 @@ export interface GeneralSchedulePeriodsConfig {
     afterPeriod: number
     durationMinutes: number
   }>
+  visualSettings?: {
+    showWeekends: boolean;
+    themeColor: string;
+    timeFormat: '12h' | '24h';
+    density: 'compact' | 'relaxed';
+    showClassrooms: boolean;
+    hideEmptyPeriods: boolean;
+  }
 }
 
 /**
