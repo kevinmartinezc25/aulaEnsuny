@@ -479,71 +479,42 @@ export function StudentAttendanceClientView({
         /* NIVEL 1: LISTADO DE MATERIAS DE PLANILLA ASISTIDA             */
         /* ────────────────────────────────────────────────────────────── */
         <div className="space-y-6 sm:space-y-8">
-          {/* Banner Principal de Asistencia */}
-          <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br from-[#1b3d28] via-[#163a24] to-[#0d2215] p-5 sm:p-7 text-white shadow-xl shadow-[#1F4E31]/15">
-            <div className="absolute -top-24 -right-24 w-64 h-64 bg-emerald-400 opacity-10 rounded-full blur-3xl pointer-events-none" />
-            
-            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
-              <div className="space-y-2">
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-[11px] sm:text-xs font-bold uppercase tracking-wider">
-                  <CalendarCheck2 className="h-3.5 w-3.5 text-emerald-400" />
-                  <span>Módulo de Planilla Asistida</span>
-                </div>
-                <h2 className="text-xl sm:text-3xl font-black tracking-tight">
-                  Reporte de Asistencia Escolar
-                </h2>
-                <p className="text-xs sm:text-sm text-emerald-100/80 max-w-xl">
-                  Consulta de materias asociadas a tu matrícula oficial: <strong className="text-white">{studentName}</strong>
-                  {resolvedGrade && <span> · Grado <strong className="text-white">{resolvedGrade}</strong></span>}
-                  {groupName && <span> · Grupo <strong className="text-white">{groupName}</strong></span>}
-                </p>
-              </div>
-
-              {/* Indicador general de asistencia */}
-              <div className="flex items-center gap-4 bg-white/10 backdrop-blur-md px-5 py-3.5 rounded-2xl border border-white/15 self-start md:self-center shrink-0">
-                <div className="text-right">
-                  <div className="text-[10px] uppercase font-bold text-emerald-300 tracking-wider">
-                    Asistencia General
-                  </div>
-                  <div className="text-2xl font-black text-white">
-                    {summary.overallPercentage}%
-                  </div>
-                </div>
-                <div className="w-12 h-12 rounded-xl bg-emerald-500/25 border border-emerald-400/30 flex items-center justify-center font-bold text-lg text-emerald-200">
-                  <Percent className="h-6 w-6" />
-                </div>
-              </div>
+          {/* Título Simple */}
+          <div className="px-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h1 className="text-[28px] sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight leading-tight mb-1">
+                Asistencia Escolar
+              </h1>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Registro general de asistencia para <strong className="text-slate-700 dark:text-slate-300">{studentName}</strong>
+              </p>
             </div>
+            <span className="self-start sm:self-center px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 shadow-sm">
+              Módulo Planilla
+            </span>
+          </div>
 
-            {/* Micro-estadísticas del estudiante */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-4 mt-6 pt-5 border-t border-white/10">
-              <div>
-                <div className="text-white/60 text-xs font-medium">Materias en Planilla</div>
-                <div className="text-lg sm:text-xl font-black text-white mt-0.5">{summary.totalSubjects}</div>
-              </div>
-              <div>
-                <div className="text-white/60 text-xs font-medium">Clases Registradas</div>
-                <div className="text-lg sm:text-xl font-black text-white mt-0.5">{summary.totalSessions}</div>
-              </div>
-              <div>
-                <div className="text-white/60 text-xs font-medium">Asistencias Confirmadas</div>
-                <div className="text-lg sm:text-xl font-black text-emerald-300 mt-0.5">{summary.totalAttended}</div>
-              </div>
-              <div>
-                <div className="text-white/60 text-xs font-medium">Llegadas Tarde</div>
-                <div className="text-lg sm:text-xl font-black text-amber-300 mt-0.5">{summary.totalTardy || 0}</div>
-              </div>
-              <div>
-                <div className="text-white/60 text-xs font-medium">Inasistencias / Faltas</div>
-                <div className="text-lg sm:text-xl font-black text-rose-300 mt-0.5">
-                  {summary.totalUnjustified}
-                  {summary.totalExcused > 0 && (
-                    <span className="text-xs font-normal text-amber-300 ml-1.5">
-                      (+{summary.totalExcused} excusas)
-                    </span>
-                  )}
-                </div>
-              </div>
+          {/* ── Métricas de resumen rápido ── */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5 sm:gap-4 px-2 sm:px-0">
+            <div className="col-span-2 md:col-span-1 rounded-xl sm:rounded-2xl bg-emerald-50 dark:bg-emerald-900/10 p-3.5 sm:p-5 border border-emerald-100 dark:border-emerald-900/30 flex flex-col justify-between">
+              <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-1">General</span>
+              <span className="text-2xl sm:text-3xl font-black text-emerald-700 dark:text-emerald-300">{summary.overallPercentage}%</span>
+            </div>
+            <div className="rounded-xl sm:rounded-2xl bg-white dark:bg-slate-900 p-3.5 sm:p-5 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+              <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Materias</span>
+              <span className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">{summary.totalSubjects}</span>
+            </div>
+            <div className="rounded-xl sm:rounded-2xl bg-white dark:bg-slate-900 p-3.5 sm:p-5 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+              <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Asistencias</span>
+              <span className="text-2xl sm:text-3xl font-black text-emerald-500">{summary.totalAttended}</span>
+            </div>
+            <div className="rounded-xl sm:rounded-2xl bg-white dark:bg-slate-900 p-3.5 sm:p-5 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+              <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Faltas</span>
+              <span className="text-2xl sm:text-3xl font-black text-rose-500">{summary.totalUnjustified}</span>
+            </div>
+            <div className="rounded-xl sm:rounded-2xl bg-white dark:bg-slate-900 p-3.5 sm:p-5 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+              <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Exc / Ret</span>
+              <span className="text-2xl sm:text-3xl font-black text-amber-500">{summary.totalExcused + (summary.totalTardy || 0)}</span>
             </div>
           </div>
 
