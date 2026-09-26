@@ -373,8 +373,38 @@ function SidebarContent({ onClose, isCollapsed = false, user }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [isProfileOpen, setIsProfileOpen] = useState(false)
+  const [hasVirtualCourses, setHasVirtualCourses] = useState(true)
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({})
+
+  const toggleGroup = (groupLabel: string) => {
+    setCollapsedGroups(prev => ({
+      ...prev,
+      [groupLabel]: !prev[groupLabel]
+    }))
+  }
 
   const isTeacher = user?.role === 'teacher' || pathname.startsWith('/teacher')
+
+  useEffect(() => {
+    async function checkCourses() {
+      if (isTeacher && user?.id) {
+        const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+          process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
+        if (isDemoMode) {
+          setHasVirtualCourses(true)
+          return
+        }
+        try {
+          const supabase = createClient()
+          const { data } = await supabase.from('courses').select('id').eq('teacher_id', user.id).limit(1)
+          setHasVirtualCourses(data !== null && data.length > 0)
+        } catch (e) {
+          console.error(e)
+        }
+      }
+    }
+    checkCourses()
+  }, [isTeacher, user?.id])
 
   let menuGroups = [
     {
@@ -409,25 +439,31 @@ function SidebarContent({ onClose, isCollapsed = false, user }: SidebarProps) {
           { name: 'Panel Docente', href: '/teacher/dashboard', icon: BookOpen },
         ]
       },
-      {
-        label: 'Académico',
+      ...(hasVirtualCourses ? [{
+        label: 'AULA VIRTUAL',
         items: [
-          { name: 'Mis Estudiantes', href: '/teacher/students', icon: TrendingUp },
-          { name: 'Horario (Docente)', href: '/teacher/schedule', icon: CalendarDays },
+          { name: 'Mis Cursos', href: '/teacher/courses', icon: BookOpen },
+          { name: 'Mis Estudiantes', href: '/teacher/students', icon: Users },
           { name: 'Calificaciones', href: '/teacher/grades', icon: ClipboardList },
+          { name: 'Calendario', href: '/teacher/calendar', icon: Calendar },
+        ]
+      }] : []),
+      {
+        label: 'GESTIÓN ACADÉMICA',
+        items: [
           { name: 'Planilla Asistida', href: '/teacher/planilla-asistida', icon: FileSpreadsheet },
+          { name: 'Horario (Docente)', href: '/teacher/schedule', icon: CalendarDays },
         ]
       },
       {
-        label: 'Gestión de Aula',
+        label: 'GESTIÓN Y CONVIVENCIA',
         items: [
           { name: 'Convivencia Escolar', href: '/teacher/disciplinary', icon: ShieldAlert },
           { name: 'Agenda', href: '/teacher/institutional-agenda', icon: ClipboardList },
-          { name: 'Calendario', href: '/teacher/calendar', icon: Calendar },
         ]
       },
       {
-        label: 'Institucional',
+        label: 'INSTITUCIONAL',
         items: [
           { name: 'Permisos', href: '/teacher/permissions', icon: ClipboardList },
           { name: 'Jurado Electoral', href: '/juror/elections', icon: ShieldCheck },
@@ -483,39 +519,57 @@ function SidebarContent({ onClose, isCollapsed = false, user }: SidebarProps) {
       {/* Menu scrollable */}
       <div className={`flex-1 overflow-y-auto ${isCollapsed ? 'p-3' : 'p-4'} space-y-6 custom-scrollbar`}>
         <nav className="space-y-5">
-          {menuGroups.map((group, groupIdx) => (
+          {menuGroups.map((group, groupIdx) => {
+            const isGroupCollapsed = collapsedGroups[group.label || String(groupIdx)]
+            return (
             <div key={groupIdx} className="space-y-1">
               {group.label && !isCollapsed && (
-                <p className="px-4 text-[10px] font-bold tracking-widest text-slate-400 dark:text-slate-500 uppercase mb-2">
-                  {group.label}
-                </p>
+                <div 
+                  className="px-4 mb-2 flex items-center justify-between cursor-pointer group/label"
+                  onClick={() => toggleGroup(group.label || String(groupIdx))}
+                >
+                  <p className="text-[10px] font-bold tracking-widest text-slate-400 dark:text-slate-500 uppercase transition-colors group-hover/label:text-slate-600 dark:group-hover/label:text-slate-300">
+                    {group.label}
+                  </p>
+                  <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform ${isGroupCollapsed ? '-rotate-90' : ''}`} />
+                </div>
               )}
-              <div className="space-y-0.5">
-                {group.items.map((item) => {
-                  const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
-                  const Icon = item.icon
-                  return (
-                    <Link
-                      key={item.name}
-                      href={item.href}
-                      onClick={onClose}
-                      title={isCollapsed ? item.name : undefined}
-                      className={`group flex items-center rounded-xl transition-colors duration-200 ${
-                        isCollapsed ? 'justify-center p-3' : 'gap-3 px-4 py-2.5'
-                      } text-sm font-medium ${
-                        isActive
-                          ? 'bg-blue-500/10 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400'
-                          : 'text-slate-500 hover:bg-slate-50 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white'
-                      }`}
-                    >
-                      <Icon className={`h-5 w-5 shrink-0 ${isActive ? 'text-blue-700 dark:text-blue-400' : ''}`} />
-                      {!isCollapsed && <span className="truncate">{item.name}</span>}
-                    </Link>
-                  )
-                })}
-              </div>
+              <AnimatePresence initial={false}>
+                {(!isGroupCollapsed || isCollapsed) && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="space-y-0.5 overflow-hidden"
+                  >
+                    {group.items.map((item) => {
+                      const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
+                      const Icon = item.icon
+                      return (
+                        <Link
+                          key={item.name}
+                          href={item.href}
+                          onClick={onClose}
+                          title={isCollapsed ? item.name : undefined}
+                          className={`group flex items-center rounded-xl transition-colors duration-200 ${
+                            isCollapsed ? 'justify-center p-3' : 'gap-3 px-4 py-2.5'
+                          } text-sm font-medium ${
+                            isActive
+                              ? 'bg-blue-500/10 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400'
+                              : 'text-slate-500 hover:bg-slate-50 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white'
+                          }`}
+                        >
+                          <Icon className={`h-5 w-5 shrink-0 ${isActive ? 'text-blue-700 dark:text-blue-400' : ''}`} />
+                          {!isCollapsed && <span className="truncate">{item.name}</span>}
+                        </Link>
+                      )
+                    })}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
-          ))}
+          )})}
         </nav>
       </div>
 
