@@ -6,7 +6,14 @@ import { getStudentAttendanceOverview } from '@/modules/planilla-asistida/applic
 import { redirect } from 'next/navigation'
 import { AcademicPortalClientView } from './AcademicPortalClientView'
 
-export default async function ConsultaDashboardPage() {
+interface PageProps {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}
+
+export default async function ConsultaDashboardPage({ searchParams }: PageProps) {
+  const resolvedParams = await searchParams
+  const viewParam = (resolvedParams?.view as string) || 'dashboard'
+
   const session = await getPlanillaStudentSession()
   if (!session) {
     redirect('/consulta-calificaciones/login')
@@ -88,6 +95,7 @@ export default async function ConsultaDashboardPage() {
       attendanceData={attendanceData}
       resolvedGrade={resolvedGrade}
       resolvedGroup={resolvedGroup}
+      initialView={viewParam}
     />
   )
 }

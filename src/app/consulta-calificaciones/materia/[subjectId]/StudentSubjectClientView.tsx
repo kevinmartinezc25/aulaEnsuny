@@ -139,7 +139,7 @@ export function StudentSubjectClientView({ subject, achievements, activities, gr
     return (
       <div className="space-y-6">
         <Link 
-          href="/consulta-calificaciones" 
+          href="/consulta-calificaciones?view=grades" 
           className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 dark:bg-emerald-500/15 dark:hover:bg-emerald-500/25 border-2 border-emerald-500/30 text-xs sm:text-sm font-bold text-[#1F4E31] dark:text-emerald-300 transition-all active:scale-95 shadow-xs"
         >
           <ArrowLeft className="h-4 w-4" /> 
@@ -156,7 +156,7 @@ export function StudentSubjectClientView({ subject, achievements, activities, gr
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
       <Link 
-        href="/consulta-calificaciones" 
+        href="/consulta-calificaciones?view=grades" 
         className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 dark:bg-emerald-500/15 dark:hover:bg-emerald-500/25 border-2 border-emerald-500/30 text-xs sm:text-sm font-bold text-[#1F4E31] dark:text-emerald-300 transition-all active:scale-95 shadow-xs"
       >
         <ArrowLeft className="h-4 w-4" /> 
