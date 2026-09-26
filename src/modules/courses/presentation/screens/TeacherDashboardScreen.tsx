@@ -3,8 +3,9 @@
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
-import { BookOpen, Users, BrainCircuit, TrendingUp, FileText, Upload, Save, X, Edit, Eye, Play, Loader2, Calendar } from 'lucide-react'
+import { BookOpen, Users, BrainCircuit, TrendingUp, FileText, Upload, Save, X, Edit, Eye, Play, Loader2, Calendar, Clock, CheckCircle2 } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { createClient } from '@/core/config/supabase/client'
 
@@ -51,6 +52,11 @@ export function TeacherDashboardScreen() {
   })
   const [chartData, setChartData] = useState<any[]>(analyticsData)
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([])
+  const [todaySchedule, setTodaySchedule] = useState<any[]>([])
+  const [isWeekend, setIsWeekend] = useState(false)
+  const [nextClass, setNextClass] = useState<any | null>(null)
+  const [completedClasses, setCompletedClasses] = useState(0)
+  const [totalClasses, setTotalClasses] = useState(0)
 
   // Modales y Editores State
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null)
@@ -62,6 +68,19 @@ export function TeacherDashboardScreen() {
   const [youtubeEmbedId, setYoutubeEmbedId] = useState<string | null>(null)
   const [selectedPdfName, setSelectedPdfName] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+
+  // Tabs
+  const searchParams = useSearchParams()
+  const [activeTab, setActiveTab] = useState<'general' | 'virtual'>('general')
+
+  useEffect(() => {
+    const tab = searchParams.get('tab')
+    if (tab === 'virtual') {
+      setActiveTab('virtual')
+    } else if (tab === 'general') {
+      setActiveTab('general')
+    }
+  }, [searchParams])
 
   // Carga de datos dinámicos desde Supabase o fallback a Mock en Modo Demo
   useEffect(() => {
@@ -228,6 +247,140 @@ export function TeacherDashboardScreen() {
             avgGrade
           })
 
+          // 5. Cargar Horario de Hoy
+          try {
+            const currentDay = new Date().getDay()
+            setIsWeekend(currentDay === 0 || currentDay === 6)
+            
+            const { data: academicTeacher } = await supabase
+              .from('academic_teachers')
+              .select('id')
+              .eq('profile_id', user.id)
+              .single()
+
+            if (academicTeacher && currentDay >= 1 && currentDay <= 5) {
+              const { getScheduleSlotsAction } = await import('@/modules/admin/application/actions')
+              
+              // Verificar si hay Novedades (Horario sobreescrito) para HOY
+              // (Usamos la fecha real, aunque estemos forzando currentDay a 1 en Modo Prueba)
+              const todayDateStr = new Date().toISOString().split('T')[0]
+              const { data: overrides } = await supabase
+                .from('sch_daily_overrides')
+                .select('id, period_id, day_of_week, subject:academic_subjects(name), group:academic_groups(name)')
+                .eq('teacher_id', academicTeacher.id)
+                .eq('target_date', todayDateStr)
+
+              let daySlots: any[] = []
+              let hasNovedades = false
+              
+              if (overrides && overrides.length > 0) {
+                // El docente tiene un horario especial de novedades hoy
+                daySlots = overrides
+                hasNovedades = true
+              } else {
+                // Horario base normal
+                const allSlots = await getScheduleSlotsAction('teacher', academicTeacher.id)
+                if (allSlots) {
+                  daySlots = allSlots.filter((s: any) => parseInt(s.day_of_week) === currentDay)
+                }
+              }
+              
+              if (daySlots) {
+                daySlots.sort((a: any, b: any) => parseInt(a.period_id) - parseInt(b.period_id))
+                let periodsArray: any[] = []
+                let periodsMap: any = {}
+                try {
+                  const { getGeneralSchedulePeriodsAction } = await import('@/app/admin/schedules/actions')
+                  const configRes = await getGeneralSchedulePeriodsAction()
+                  if (configRes.success && configRes.config?.periods) {
+                    periodsArray = configRes.config.periods
+                    periodsMap = periodsArray.reduce((acc: any, p: any) => {
+                      acc[p.period] = p
+                      return acc
+                    }, {})
+                  }
+                } catch (e) {}
+
+                // Construir la jornada completa
+                let maxPeriodId = 6
+                if (periodsArray.length > 0) {
+                   const maxVal = Math.max(...periodsArray.map(p => parseInt(p.period || '0')))
+                   if (!isNaN(maxVal) && maxVal > 0) maxPeriodId = maxVal
+                } else if (daySlots.length > 0) {
+                   const maxVal = Math.max(...daySlots.map((s:any) => parseInt(s.period_id || '0')))
+                   if (!isNaN(maxVal) && maxVal > 0) maxPeriodId = Math.max(maxVal, 6)
+                }
+                
+                const fullDaySlots = []
+                for (let i = 1; i <= maxPeriodId; i++) {
+                   const slotForPeriod = daySlots.find((s:any) => parseInt(s.period_id) === i)
+                   const pInfo = periodsMap[i]
+                   
+                   if (slotForPeriod) {
+                     fullDaySlots.push({
+                        id: slotForPeriod.id,
+                        period: i,
+                        subject: slotForPeriod.subject?.name || 'Clase',
+                        group: slotForPeriod.group?.name || 'Grupo',
+                        startTime: pInfo?.startTime || `${i}ª Hora`,
+                        endTime: pInfo?.endTime || '',
+                        isCurrent: false,
+                        isFree: false,
+                        isNovedad: hasNovedades
+                     })
+                   } else {
+                     fullDaySlots.push({
+                        id: `free-${i}`,
+                        period: i,
+                        subject: 'Libre',
+                        group: '',
+                        startTime: pInfo?.startTime || `${i}ª Hora`,
+                        endTime: pInfo?.endTime || '',
+                        isCurrent: false,
+                        isFree: true,
+                        isNovedad: hasNovedades
+                     })
+                   }
+                }
+
+                // Calcular la clase actual o siguiente y progreso de la jornada
+                const now = new Date()
+                const currentMinutes = now.getHours() * 60 + now.getMinutes()
+                let next = null
+                let completed = 0
+
+                for (const cls of fullDaySlots) {
+                  if (cls.startTime && cls.startTime.includes(':')) {
+                     const [sh, sm] = cls.startTime.split(':')
+                     const startMins = parseInt(sh, 10) * 60 + parseInt(sm, 10)
+                     
+                     let endMins = startMins + 55
+                     if (cls.endTime && cls.endTime.includes(':')) {
+                       const [eh, em] = cls.endTime.split(':')
+                       endMins = parseInt(eh, 10) * 60 + parseInt(em, 10)
+                     }
+                     
+                     if (currentMinutes >= endMins) {
+                       if (!cls.isFree) completed++
+                     }
+                     
+                     if (currentMinutes < endMins && !next && !cls.isFree) {
+                       const isOngoing = currentMinutes >= startMins && currentMinutes <= endMins
+                       next = { ...cls, isOngoing }
+                     }
+                  }
+                }
+                
+                setTodaySchedule(fullDaySlots)
+                setNextClass(next)
+                setCompletedClasses(completed)
+                setTotalClasses(fullDaySlots.filter(s => !s.isFree).length)
+              }
+            }
+          } catch(e) {
+            console.error('Error cargando horario de hoy:', e)
+          }
+
           // Cargar próximos eventos institucionales
           try {
             const { getEvents } = await import('@/modules/institutional-agenda/application/actions')
@@ -317,193 +470,319 @@ export function TeacherDashboardScreen() {
             </span>
           </div>
           <p className="text-slate-500 dark:text-slate-400">
-            Aquí tienes el resumen y las herramientas de tus cursos activos.
+            Aquí tienes el resumen y las herramientas de tus clases activas.
           </p>
         </div>
       </div>
 
-      {/* Grid de Estadísticas */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        {[
-          { title: 'Cursos asignados', value: stats.coursesCount, icon: BookOpen, color: 'text-blue-500 bg-blue-50 dark:bg-blue-950/30' },
-          { title: 'Estudiantes activos', value: stats.studentsCount, icon: Users, color: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-950/30' },
-          { title: 'Quizzes evaluados', value: stats.quizzesCount, icon: BrainCircuit, color: 'text-purple-500 bg-purple-50 dark:bg-purple-950/30' },
-          { title: 'Rendimiento promedio', value: stats.avgGrade, icon: TrendingUp, color: 'text-amber-500 bg-amber-50 dark:bg-amber-950/30' },
-        ].map((stat) => {
-          const Icon = stat.icon
-          return (
-            <div
-              key={stat.title}
-              className="rounded-2xl border border-slate-100 bg-white p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] dark:border-slate-800/60 dark:bg-slate-900"
-            >
+      {courses.length > 0 && (
+        <div className="flex space-x-6 border-b border-slate-200 dark:border-slate-800">
+          <button
+            onClick={() => setActiveTab('general')}
+            className={`pb-3 text-sm font-bold border-b-2 transition-colors ${activeTab === 'general' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'}`}
+          >
+            Resumen General
+          </button>
+          <button
+            onClick={() => setActiveTab('virtual')}
+            className={`pb-3 text-sm font-bold border-b-2 transition-colors ${activeTab === 'virtual' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'}`}
+          >
+            Aula Virtual
+          </button>
+        </div>
+      )}
+
+      {/* Pestaña: Resumen General */}
+      {(courses.length === 0 || activeTab === 'general') && (
+        <div className="space-y-8">
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {/* Próxima clase */}
+            <div className="col-span-1 sm:col-span-2 rounded-2xl border border-blue-500 bg-gradient-to-r from-blue-600 to-indigo-700 p-6 shadow-[0_8px_30px_rgba(59,130,246,0.3)] text-white">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-blue-200 mb-2">
+                {nextClass?.isOngoing ? '🟢 Clase en Curso' : 'Siguiente Clase'}
+              </p>
               <div className="flex items-center gap-4">
-                <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${stat.color}`}>
-                  <Icon className="h-5 w-5" />
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm border border-white/20">
+                  <Calendar className="h-6 w-6 text-white" />
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-slate-400 dark:text-slate-500">
-                    {stat.title}
-                  </p>
-                  <p className="text-2xl font-bold text-slate-900 dark:text-white">
-                    {stat.value}
+                  <h3 className="text-2xl font-bold">
+                    {nextClass ? nextClass.subject : 'Sin clases pendientes'}
+                  </h3>
+                  <p className="text-sm text-blue-100 font-medium">
+                    {nextClass 
+                      ? `${nextClass.startTime}${nextClass.endTime ? ` - ${nextClass.endTime}` : ''} • Grupo ${nextClass.group}` 
+                      : (isWeekend ? 'Día libre por fin de semana' : 'Jornada completada o sin asignaciones hoy')}
                   </p>
                 </div>
               </div>
             </div>
-          )
-        })}
-      </div>
-
-      {/* Secciones del Dashboard */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-
-        {/* Columna Izquierda: Cursos creados */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="space-y-4">
-            <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-              Mis materias
-            </h2>
-            {courses.length === 0 ? (
-              <div className="rounded-3xl border border-dashed border-slate-200 dark:border-slate-800 p-12 text-center bg-white dark:bg-slate-900 shadow-sm">
-                <BookOpen className="h-10 w-10 text-slate-300 dark:text-slate-700 mx-auto mb-4" />
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-1">No tienes materias asignadas</h3>
-                <p className="text-xs text-slate-550 dark:text-slate-400 max-w-sm mx-auto">
-                  Crea tu primera asignatura con el botón de la esquina superior o solicita a un administrador que te asigne tus cursos correspondientes.
-                </p>
+            
+            {/* Progreso de Jornada */}
+            <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.02)] dark:border-slate-800/60 dark:bg-slate-900 flex flex-col justify-center relative overflow-hidden">
+              <div className="absolute -top-4 -right-4 p-4 opacity-[0.03] dark:opacity-[0.05] pointer-events-none">
+                <Clock className="h-28 w-28 text-slate-900 dark:text-white" />
               </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                {courses.map((course) => (
-                  <div
-                    key={course.id}
-                    className="group relative flex flex-col overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-[0_8px_30px_rgb(0,0,0,0.02)] transition-all duration-300 dark:border-slate-800/60 dark:bg-slate-900"
-                  >
-                    <div className="h-32 w-full overflow-hidden bg-slate-100 dark:bg-slate-800 relative">
-                      <img
-                        src={course.bannerUrl}
-                        alt={course.title}
-                        className="h-full w-full object-cover"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/35 to-transparent" />
-                      <span className="absolute top-4 left-4 rounded-lg bg-blue-600 px-2.5 py-1 text-[10px] font-bold tracking-wider text-white">
-                        {course.subject}
+              <div className="flex items-center gap-4 relative z-10">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl text-indigo-500 bg-indigo-50 dark:bg-indigo-950/30">
+                  <CheckCircle2 className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Progreso de Hoy</p>
+                  <p className="text-3xl font-bold text-slate-900 dark:text-white mt-1">
+                    {completedClasses} <span className="text-sm font-semibold text-slate-400 dark:text-slate-500">/ {totalClasses}</span>
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4 w-full bg-slate-100 rounded-full h-1.5 dark:bg-slate-800 relative z-10">
+                <div 
+                  className="bg-indigo-500 h-1.5 rounded-full transition-all duration-1000" 
+                  style={{ width: `${totalClasses > 0 ? (completedClasses / totalClasses) * 100 : 0}%` }}
+                ></div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Horario de Hoy */}
+            <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.02)] dark:border-slate-800/60 dark:bg-slate-900 text-left">
+              <div className="pb-4 border-b border-slate-50 dark:border-slate-800/40 flex items-center justify-between">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <h3 className="font-bold text-slate-900 dark:text-white text-base">Horario de Hoy</h3>
+                    <span className="text-xs font-bold uppercase tracking-wide text-indigo-600 bg-indigo-50 dark:bg-indigo-500/10 dark:text-indigo-400 px-3 py-1 rounded-full capitalize">
+                      {new Date().toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}
+                    </span>
+                    {todaySchedule.length > 0 && todaySchedule[0].isNovedad && (
+                      <span className="text-xs font-bold uppercase tracking-wide text-amber-600 bg-amber-50 dark:bg-amber-500/10 dark:text-amber-400 px-3 py-1 rounded-full">
+                        Novedad
                       </span>
-                    </div>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">Clases presenciales del día</p>
+                </div>
+                <Calendar className="h-5 w-5 text-indigo-500" />
+              </div>
+              <div className="mt-4 space-y-2.5">
+                {isWeekend ? (
+                  <div className="text-center py-6">
+                    <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">Hoy es fin de semana, no tienes clases programadas.</p>
+                  </div>
+                ) : todaySchedule.length === 0 ? (
+                  <div className="text-center py-6">
+                    <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">No tienes clases asignadas para el día de hoy.</p>
+                  </div>
+                ) : (
+                  todaySchedule.map((cls, idx) => {
+                    const isLast = idx === todaySchedule.length - 1
+                    return (
+                      <div key={cls.id}>
+                        {cls.isFree ? (
+                          <div className="rounded-xl bg-transparent border border-dashed border-slate-200 dark:border-slate-800 p-2.5 px-4 flex items-center justify-between">
+                            <p className="text-[13px] font-medium text-slate-400 dark:text-slate-500 italic">Sin Clase Asignada</p>
+                            <div className="text-right">
+                              <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500">{cls.period}ª Hora</p>
+                              <p className="text-[10px] font-medium text-slate-400 mt-0.5">{cls.startTime}{cls.endTime ? ` - ${cls.endTime}` : ''}</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="rounded-xl bg-slate-50 dark:bg-slate-800/50 p-2.5 px-4 border-l-4 border-emerald-500 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-between">
+                            <div>
+                              <h4 className="text-[13px] font-bold text-slate-800 dark:text-slate-200">{cls.subject}</h4>
+                              <p className="text-[11px] font-medium text-slate-500 mt-0.5 flex items-center gap-1.5">
+                                <Users className="h-3 w-3 text-slate-400" /> Grupo {cls.group}
+                              </p>
+                            </div>
+                            <div className="text-right shrink-0 ml-4">
+                              <p className="text-[11px] font-bold text-indigo-500 dark:text-indigo-400">{cls.period}ª Hora</p>
+                              <p className="text-[10px] font-medium text-slate-500 mt-0.5">{cls.startTime}{cls.endTime ? ` - ${cls.endTime}` : ''}</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            </div>
 
-                    <div className="flex flex-1 flex-col p-5 text-left">
-                      <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-                        {course.title}
-                      </h3>
-                      {course.joinCode ? (
-                        <div className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50/80 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-400">
-                          <span>Código</span>
-                          <span className="font-mono tracking-[0.18em]">{course.joinCode}</span>
+            {/* Próximas Actividades */}
+            <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.02)] dark:border-slate-800/60 dark:bg-slate-900 text-left">
+              <div className="pb-4 border-b border-slate-50 dark:border-slate-800/40 flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-slate-900 dark:text-white text-base">
+                    Próximas Actividades
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">Agenda Institucional</p>
+                </div>
+                <Calendar className="h-5 w-5 text-blue-500" />
+              </div>
+
+              <div className="mt-4 space-y-4">
+                {upcomingEvents.length === 0 ? (
+                  <p className="text-xs text-slate-400 italic py-2">No hay actividades próximas programadas.</p>
+                ) : (
+                  upcomingEvents.map((event) => {
+                    const dateStr = new Date(event.start_date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
+                    const timeStr = new Date(event.start_date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', hour12: true })
+                    
+                    return (
+                      <div key={event.id} className="flex items-start justify-between border-b border-slate-50 dark:border-slate-850 pb-3 last:border-0 last:pb-0 font-medium">
+                        <div>
+                          <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 line-clamp-1">{event.title}</h4>
+                          <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">{dateStr} • {timeStr}</p>
                         </div>
-                      ) : null}
-                      <div className="mt-3 flex items-center justify-between text-xs text-slate-400 dark:text-slate-500">
-                        <span>👤 {course.studentsCount} Alumnos</span>
-                        <span>📚 {course.modulesCount} Módulos</span>
+                        <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-lg">
+                          {event.event_categories?.name || 'General'}
+                        </span>
                       </div>
+                    )
+                  })
+                )}
+              </div>
 
-                      <div className="mt-6 flex gap-2">
-                        <Link
-                          href={`/teacher/courses/${course.slug || course.id}`}
-                          className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-slate-100 bg-white px-3 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300"
-                        >
-                          <Edit className="h-3.5 w-3.5" />
-                          <span>Gestionar Curso</span>
-                        </Link>
-                      </div>
+              <div className="mt-4 pt-3 border-t border-slate-50 dark:border-slate-800/40">
+                <Link 
+                  href="/teacher/institutional-agenda"
+                  className="text-xs font-bold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1"
+                >
+                  <span>Ver Agenda Completa</span>
+                  <span>→</span>
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pestaña: Aula Virtual */}
+      {courses.length > 0 && activeTab === 'virtual' && (
+        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          {/* Grid de Estadísticas */}
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              { title: 'Cursos virtuales', value: stats.coursesCount, icon: BookOpen, color: 'text-blue-500 bg-blue-50 dark:bg-blue-950/30' },
+              { title: 'Alumnos virtuales', value: stats.studentsCount, icon: Users, color: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-950/30' },
+              { title: 'Quizzes evaluados', value: stats.quizzesCount, icon: BrainCircuit, color: 'text-purple-500 bg-purple-50 dark:bg-purple-950/30' },
+              { title: 'Rendimiento promedio', value: stats.avgGrade, icon: TrendingUp, color: 'text-amber-500 bg-amber-50 dark:bg-amber-950/30' },
+            ].map((stat) => {
+              const Icon = stat.icon
+              return (
+                <div
+                  key={stat.title}
+                  className="rounded-2xl border border-slate-100 bg-white p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] dark:border-slate-800/60 dark:bg-slate-900"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${stat.color}`}>
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+                        {stat.title}
+                      </p>
+                      <p className="text-2xl font-bold text-slate-900 dark:text-white mt-0.5">
+                        {stat.value}
+                      </p>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Columna Derecha: Gráfico de Rendimiento & Próximas Actividades */}
-        <div className="space-y-6 self-start">
-          <div className="rounded-3xl border border-slate-100 bg-white p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] dark:border-slate-800/60 dark:bg-slate-900">
-            <div className="pb-4 border-b border-slate-50 dark:border-slate-800/40 text-left">
-              <h3 className="font-bold text-slate-900 dark:text-white text-base">
-                Rendimiento Histórico Promedio
-              </h3>
-              <p className="text-xs text-slate-400 mt-0.5">Evolución de notas de estudiantes</p>
-            </div>
-            <div className="h-64 mt-4 w-full flex items-center justify-center">
-              {chartData.length === 0 ? (
-                <div className="text-center p-4">
-                  <p className="text-xs font-semibold text-slate-400">Sin datos de calificaciones suficientes.</p>
                 </div>
-              ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="colorPromedio" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2} />
-                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" className="dark:stroke-slate-800" />
-                    <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} />
-                    <YAxis stroke="#94a3b8" fontSize={10} domain={[1.0, 5.0]} tickLine={false} />
-                    <Tooltip />
-                    <Area type="monotone" dataKey="promedio" stroke="#3b82f6" strokeWidth={2.5} fillOpacity={1} fill="url(#colorPromedio)" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              )}
-            </div>
+              )
+            })}
           </div>
 
-          {/* Tarjeta Próximas Actividades */}
-          <div className="rounded-3xl border border-slate-100 bg-white p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] dark:border-slate-800/60 dark:bg-slate-900 text-left">
-            <div className="pb-4 border-b border-slate-50 dark:border-slate-800/40 flex items-center justify-between">
-              <div>
-                <h3 className="font-bold text-slate-900 dark:text-white text-base">
-                  Próximas Actividades
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">Agenda Institucional</p>
-              </div>
-              <Calendar className="h-5 w-5 text-blue-500" />
-            </div>
-
-            <div className="mt-4 space-y-4">
-              {upcomingEvents.length === 0 ? (
-                <p className="text-xs text-slate-400 italic py-2">No hay actividades próximas programadas.</p>
-              ) : (
-                upcomingEvents.map((event) => {
-                  const dateStr = new Date(event.start_date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
-                  const timeStr = new Date(event.start_date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', hour12: true })
-                  
-                  return (
-                    <div key={event.id} className="flex items-start justify-between border-b border-slate-50 dark:border-slate-850 pb-3 last:border-0 last:pb-0 font-medium">
-                      <div>
-                        <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 line-clamp-1">{event.title}</h4>
-                        <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">{dateStr} • {timeStr}</p>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Columna Izquierda: Cursos creados */}
+            <div className="lg:col-span-2 space-y-6">
+              <div className="space-y-4">
+                <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+                  Mis Cursos
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  {courses.map((course) => (
+                    <div
+                      key={course.id}
+                      className="group relative flex flex-col overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-[0_8px_30px_rgb(0,0,0,0.02)] transition-all duration-300 hover:shadow-lg dark:border-slate-800/60 dark:bg-slate-900"
+                    >
+                      <div className="h-32 w-full overflow-hidden bg-slate-100 dark:bg-slate-800 relative">
+                        <img
+                          src={course.bannerUrl}
+                          alt={course.title}
+                          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent" />
+                        <span className="absolute top-4 left-4 rounded-lg bg-blue-600 px-2.5 py-1 text-[10px] font-bold tracking-wider text-white shadow-sm">
+                          {course.subject}
+                        </span>
                       </div>
-                      <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-lg">
-                        {event.event_categories?.name || 'General'}
-                      </span>
+
+                      <div className="flex flex-1 flex-col p-5 text-left">
+                        <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                          {course.title}
+                        </h3>
+                        {course.joinCode ? (
+                          <div className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50/80 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-400">
+                            <span>Código</span>
+                            <span className="font-mono tracking-[0.18em]">{course.joinCode}</span>
+                          </div>
+                        ) : null}
+                        <div className="mt-4 flex items-center justify-between text-xs text-slate-500 font-medium dark:text-slate-400 border-t border-slate-50 dark:border-slate-800 pt-3">
+                          <span className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5" /> {course.studentsCount} Alumnos</span>
+                          <span className="flex items-center gap-1.5"><BookOpen className="h-3.5 w-3.5" /> {course.modulesCount} Módulos</span>
+                        </div>
+
+                        <div className="mt-5 flex gap-2">
+                          <Link
+                            href={`/teacher/courses/${course.slug || course.id}`}
+                            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-3 py-2.5 text-xs font-semibold text-white hover:bg-slate-800 transition-colors dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 shadow-sm"
+                          >
+                            <Edit className="h-3.5 w-3.5" />
+                            <span>Gestionar Curso</span>
+                          </Link>
+                        </div>
+                      </div>
                     </div>
-                  )
-                })
-              )}
+                  ))}
+                </div>
+              </div>
             </div>
 
-            <div className="mt-4 pt-3 border-t border-slate-50 dark:border-slate-800/40">
-              <Link 
-                href="/teacher/institutional-agenda"
-                className="text-xs font-bold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1"
-              >
-                <span>Ver Agenda Completa</span>
-                <span>→</span>
-              </Link>
+            {/* Columna Derecha: Gráfico de Rendimiento */}
+            <div className="space-y-6 self-start">
+              <div className="rounded-3xl border border-slate-100 bg-white p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] dark:border-slate-800/60 dark:bg-slate-900">
+                <div className="pb-4 border-b border-slate-50 dark:border-slate-800/40 text-left">
+                  <h3 className="font-bold text-slate-900 dark:text-white text-base">
+                    Rendimiento Histórico
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">Evolución de notas de estudiantes</p>
+                </div>
+                <div className="h-64 mt-4 w-full flex items-center justify-center">
+                  {chartData.length === 0 ? (
+                    <div className="text-center p-4">
+                      <p className="text-xs font-semibold text-slate-400">Sin datos de calificaciones suficientes.</p>
+                    </div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="colorPromedio" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2} />
+                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" className="dark:stroke-slate-800" />
+                        <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} />
+                        <YAxis stroke="#94a3b8" fontSize={10} domain={[1.0, 5.0]} tickLine={false} />
+                        <Tooltip />
+                        <Area type="monotone" dataKey="promedio" stroke="#3b82f6" strokeWidth={2.5} fillOpacity={1} fill="url(#colorPromedio)" />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>
-
-      </div>
+      )}
 
       {/* Editor/Creador de Lecciones Estilo Notion */}
       <AnimatePresence>

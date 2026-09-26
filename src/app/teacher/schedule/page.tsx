@@ -305,58 +305,88 @@ export default function TeacherSchedulePage() {
               <h1 className="text-xl font-black uppercase tracking-wide text-slate-900 text-center mt-2">
                 Carga Académica Docente
               </h1>
-              <div className="flex items-center justify-between text-xs font-bold text-slate-800 bg-slate-100 p-2.5 rounded-lg border border-slate-300 mt-2">
-                <span>Docente: <b>{teacherProfile?.first_name} {teacherProfile?.last_name}</b></span>
-                <span>Total Horas Asignadas: <b>{totalAssignedHours}h</b></span>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs font-bold text-slate-800 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 p-3 rounded-lg border border-slate-300 dark:border-slate-700 mt-2">
+                <span>Docente: <b className="text-indigo-600 dark:text-indigo-400">{teacherProfile?.first_name} {teacherProfile?.last_name}</b></span>
+                <span>Total Horas Asignadas: <b className="text-indigo-600 dark:text-indigo-400">{totalAssignedHours}h</b></span>
               </div>
             </div>
 
             <div className="max-w-4xl mx-auto print:max-w-none print:w-full">
               {groupedWorkload.length > 0 ? (
-                <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 print:border-slate-300 print:rounded-none">
-                  <table className="w-full text-left border-collapse text-sm">
-                    <thead className="bg-slate-50 dark:bg-slate-800/50 print:bg-slate-100">
-                      <tr>
-                        <th className="px-4 py-3 font-bold text-slate-600 dark:text-slate-300 print:text-slate-900 border-b border-slate-200 dark:border-slate-700 print:border-slate-300">Materia</th>
-                        <th className="px-4 py-3 font-bold text-slate-600 dark:text-slate-300 print:text-slate-900 border-b border-slate-200 dark:border-slate-700 print:border-slate-300">Grupos Asignados</th>
-                        <th className="px-4 py-3 font-bold text-slate-600 dark:text-slate-300 print:text-slate-900 border-b border-slate-200 dark:border-slate-700 print:border-slate-300 text-center">Horas Totales</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {groupedWorkload.map((groupObj: any, idx: number) => (
-                        <tr key={idx} className="border-b border-slate-100 dark:border-slate-800/50 print:border-slate-200 hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
-                          <td className="px-4 py-3 text-slate-700 dark:text-slate-300 print:text-slate-900 font-medium align-middle">
-                            {groupObj.subject}
-                          </td>
-                          <td className="px-4 py-3 text-slate-600 dark:text-slate-400 print:text-slate-700">
-                            <div className="flex flex-wrap gap-2">
-                              {groupObj.groups.map((g: any, i: number) => (
-                                <span key={i} className="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 border border-slate-200 text-slate-600 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 print:border-slate-300 rounded-md text-xs">
-                                  <span className="font-semibold">{g.name}</span>
-                                  <span className="text-slate-400 dark:text-slate-500 print:text-slate-600">({g.hours}h)</span>
-                                </span>
-                              ))}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-center align-middle font-bold text-slate-900 dark:text-slate-100 print:text-slate-900">
-                            <span className="inline-flex items-center justify-center px-2.5 py-1 bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400 print:bg-transparent print:text-slate-900 font-bold rounded-lg text-sm">
-                              {groupObj.totalHours}
+                <div className="rounded-xl border border-slate-200 dark:border-slate-800 print:border-slate-300 print:rounded-none bg-white dark:bg-slate-900 overflow-hidden">
+                  
+                  {/* Vista Mobile (Tarjetas) */}
+                  <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800/60">
+                    {groupedWorkload.map((groupObj: any, idx: number) => (
+                      <div key={idx} className="p-4 flex flex-col gap-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                        <div className="flex justify-between items-start gap-4">
+                          <h4 className="font-bold text-slate-800 dark:text-slate-200 text-sm leading-snug">{groupObj.subject}</h4>
+                          <span className="inline-flex items-center justify-center px-2 py-0.5 bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400 font-bold rounded text-xs shrink-0 whitespace-nowrap border border-indigo-100 dark:border-indigo-500/20">
+                            {groupObj.totalHours} h
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 mt-1">
+                          {groupObj.groups.map((g: any, i: number) => (
+                            <span key={i} className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-slate-100 border border-slate-200 text-slate-600 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 rounded text-[11px]">
+                              <span className="font-semibold">{g.name}</span>
+                              <span className="text-slate-400 dark:text-slate-500">({g.hours}h)</span>
                             </span>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    <div className="p-4 bg-slate-50 dark:bg-slate-800/50 flex justify-between items-center border-t-2 border-slate-200 dark:border-slate-700">
+                      <span className="font-bold text-slate-700 dark:text-slate-300 text-sm">Total Horas Asignadas:</span>
+                      <span className="font-black text-indigo-600 dark:text-indigo-400 text-lg">{totalAssignedHours}h</span>
+                    </div>
+                  </div>
+
+                  {/* Vista Desktop (Tabla original) */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-sm">
+                      <thead className="bg-slate-50 dark:bg-slate-800/50 print:bg-slate-100">
+                        <tr>
+                          <th className="px-4 py-3 font-bold text-slate-600 dark:text-slate-300 print:text-slate-900 border-b border-slate-200 dark:border-slate-700 print:border-slate-300">Materia</th>
+                          <th className="px-4 py-3 font-bold text-slate-600 dark:text-slate-300 print:text-slate-900 border-b border-slate-200 dark:border-slate-700 print:border-slate-300">Grupos Asignados</th>
+                          <th className="px-4 py-3 font-bold text-slate-600 dark:text-slate-300 print:text-slate-900 border-b border-slate-200 dark:border-slate-700 print:border-slate-300 text-center">Horas Totales</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {groupedWorkload.map((groupObj: any, idx: number) => (
+                          <tr key={idx} className="border-b border-slate-100 dark:border-slate-800/50 print:border-slate-200 hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
+                            <td className="px-4 py-3 text-slate-700 dark:text-slate-300 print:text-slate-900 font-medium align-middle">
+                              {groupObj.subject}
+                            </td>
+                            <td className="px-4 py-3 text-slate-600 dark:text-slate-400 print:text-slate-700">
+                              <div className="flex flex-wrap gap-2">
+                                {groupObj.groups.map((g: any, i: number) => (
+                                  <span key={i} className="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 border border-slate-200 text-slate-600 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 print:border-slate-300 rounded-md text-xs">
+                                    <span className="font-semibold">{g.name}</span>
+                                    <span className="text-slate-400 dark:text-slate-500 print:text-slate-600">({g.hours}h)</span>
+                                  </span>
+                                ))}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-center align-middle font-bold text-slate-900 dark:text-slate-100 print:text-slate-900">
+                              <span className="inline-flex items-center justify-center px-2.5 py-1 bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400 print:bg-transparent print:text-slate-900 font-bold rounded-lg text-sm">
+                                {groupObj.totalHours}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot className="bg-slate-50 dark:bg-slate-800/50 print:bg-slate-100 border-t-2 border-slate-200 dark:border-slate-700 print:border-slate-300">
+                        <tr>
+                          <td colSpan={2} className="px-4 py-3 text-right font-bold text-slate-700 dark:text-slate-300 print:text-slate-900 text-base">
+                            Total Horas Asignadas:
+                          </td>
+                          <td className="px-4 py-3 text-center font-black text-indigo-600 dark:text-indigo-400 print:text-slate-900 text-xl">
+                            {totalAssignedHours}
                           </td>
                         </tr>
-                      ))}
-                    </tbody>
-                    <tfoot className="bg-slate-50 dark:bg-slate-800/50 print:bg-slate-100 border-t-2 border-slate-200 dark:border-slate-700 print:border-slate-300">
-                      <tr>
-                        <td colSpan={2} className="px-4 py-3 text-right font-bold text-slate-700 dark:text-slate-300 print:text-slate-900 text-base">
-                          Total Horas Asignadas:
-                        </td>
-                        <td className="px-4 py-3 text-center font-black text-indigo-600 dark:text-indigo-400 print:text-slate-900 text-xl">
-                          {totalAssignedHours}
-                        </td>
-                      </tr>
-                    </tfoot>
-                  </table>
+                      </tfoot>
+                    </table>
+                  </div>
                 </div>
               ) : (
                 <div className="text-center py-16 text-slate-500 dark:text-slate-400">
