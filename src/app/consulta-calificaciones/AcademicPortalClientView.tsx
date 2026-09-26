@@ -39,6 +39,7 @@ interface AcademicPortalClientViewProps {
   attendanceData?: StudentAttendanceOverview
   resolvedGrade?: string
   resolvedGroup?: string
+  initialView?: string
 }
 
 type ActiveView = 'dashboard' | 'grades' | 'schedule' | 'disciplinary' | 'attendance'
@@ -50,9 +51,10 @@ export function AcademicPortalClientView({
   disciplinaryData,
   attendanceData,
   resolvedGrade,
-  resolvedGroup
+  resolvedGroup,
+  initialView = 'dashboard'
 }: AcademicPortalClientViewProps) {
-  const [activeView, setActiveView] = useState<ActiveView>('dashboard')
+  const [activeView, setActiveView] = useState<ActiveView>(initialView as ActiveView)
 
   // Formatear nombre del estudiante con Primera Letra en Mayúscula en cada palabra
   const studentDisplayName = formatCapitalizedWords(session.fullName) || session.fullName
@@ -168,7 +170,7 @@ export function AcademicPortalClientView({
               </p>
             </div>
 
-            <div className="bg-white dark:bg-slate-900 rounded-[20px] p-4 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.04)] border border-slate-100 dark:border-slate-800 flex items-center justify-between mx-2 sm:mx-0">
+            <div className="bg-white dark:bg-slate-900 rounded-[20px] p-4 sm:p-5 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.04)] border border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4 mx-2 sm:mx-0">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-full overflow-hidden bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center shrink-0">
                   <User className="w-6 h-6 text-blue-500 dark:text-blue-400" />
@@ -177,9 +179,23 @@ export function AcademicPortalClientView({
                   <h2 className="font-bold text-slate-900 dark:text-white text-base leading-tight">
                     {studentDisplayName}
                   </h2>
-                  <p className="text-slate-500 dark:text-slate-400 text-[13px] mt-0.5">
-                    {groupDisplay}
+                  <p className="text-slate-500 dark:text-slate-400 text-[13px] mt-0.5 flex flex-wrap items-center gap-1.5 sm:gap-2">
+                    <span>{groupDisplay}</span>
+                    <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-600 hidden sm:block"></span>
+                    <span className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-[10px] sm:text-[11px] font-medium text-slate-600 dark:text-slate-400">Estudiante Regular</span>
                   </p>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-4 sm:gap-6 pl-16 sm:pl-0">
+                <div className="flex flex-col">
+                  <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400">Documento</span>
+                  <span className="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300">{session.documentId}</span>
+                </div>
+                <div className="w-px h-8 bg-slate-100 dark:bg-slate-800 hidden sm:block"></div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400">Año Lectivo</span>
+                  <span className="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300">{session.academicYear || new Date().getFullYear()}</span>
                 </div>
               </div>
             </div>
