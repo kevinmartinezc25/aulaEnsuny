@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS public.assisted_attendance (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     session_id UUID NOT NULL REFERENCES public.assisted_sessions(id) ON DELETE CASCADE,
     student_id UUID NOT NULL REFERENCES public.assisted_students(id) ON DELETE CASCADE,
-    status TEXT NOT NULL CHECK (status IN ('A', 'I', 'E')),
+    status TEXT NOT NULL CHECK (status IN ('A', 'I', 'E', 'T')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     UNIQUE(session_id, student_id) -- Un estudiante solo puede tener un registro de asistencia por sesión
 );
