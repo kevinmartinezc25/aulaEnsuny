@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import Link from 'next/link'
+import { toast } from 'sonner'
 import {
   Calendar as CalendarIcon,
   ChevronLeft,
@@ -13,9 +15,10 @@ import {
   ListTodo,
   CalendarCheck,
   CheckSquare,
+  ExternalLink,
   X
 } from 'lucide-react'
-import { createClient } from '@/core/config/supabase/client'
+import { getStudentCalendarOverview, toggleStudentTaskCompletion } from '@/modules/students/application/actions'
 
 interface CalendarEvent {
   id: string
@@ -25,6 +28,7 @@ interface CalendarEvent {
   courseName: string
   eventType: 'homework' | 'exam' | 'event'
   courseColor: string
+  completed?: boolean
 }
 
 interface Task {
@@ -35,6 +39,8 @@ interface Task {
   urgency: 'Urgente' | 'Próximo' | 'Pendiente'
   description?: string
   completed: boolean
+  href?: string
+  lessonId?: string
 }
 
 export function StudentCalendarScreen() {
@@ -46,6 +52,7 @@ export function StudentCalendarScreen() {
   const [eventTypeFilter, setEventTypeFilter] = useState<'all' | 'homework' | 'exam' | 'event'>('all')
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
   const [loading, setLoading] = useState(true)
+  const [studentId, setStudentId] = useState<string | null>(null)
 
   // Mocks fallback for Demo Mode — always relative to TODAY
   const _today = new Date()
@@ -163,274 +170,97 @@ export function StudentCalendarScreen() {
   useEffect(() => {
     async function loadData() {
       setLoading(true)
-      const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL ||
-        process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
-
-      if (isDemoMode) {
-        setTimeout(() => {
-          setEvents(mockEvents)
-          setTasks(mockTasks)
-          setLoading(false)
-        }, 600)
-        return
-      }
-
       try {
-        const supabase = createClient()
-        const { data: { user } } = await supabase.auth.getUser()
+        const result = await getStudentCalendarOverview()
+        setStudentId(result.studentId)
 
-        if (user) {
-          // 1. Obtener perfil
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', user.id)
-            .single()
-
-          // 2. Obtener cursos matriculados del estudiante
-          let dbCourses: any[] = []
+        // Sincronizar sobreescrituras de estado local
+        const localOverrides: Record<string, boolean> = {}
+        if (typeof window !== 'undefined') {
           try {
-            const { data: enrolledData } = await supabase
-              .from('student_courses')
-              .select('course_id')
-              .eq('student_id', user.id)
-
-            if (enrolledData && enrolledData.length > 0) {
-              const courseIds = enrolledData.map(e => e.course_id)
-              const { data: coursesData } = await supabase
-                .from('courses')
-                .select('*')
-                .in('id', courseIds)
-                .eq('status', 'active')
-              dbCourses = coursesData || []
-            } else if (profile?.grade_level) {
-              const { data: gradeCourses } = await supabase
-                .from('courses')
-                .select('*')
-                .eq('grade_level', profile.grade_level)
-                .eq('status', 'active')
-              dbCourses = gradeCourses || []
+            const prefix = result.studentId ? `completed_task_${result.studentId}_` : 'completed_task_'
+            for (let i = 0; i < localStorage.length; i++) {
+              const key = localStorage.key(i)
+              if (key && key.startsWith(prefix)) {
+                const taskId = key.replace(prefix, '')
+                localOverrides[taskId] = localStorage.getItem(key) === 'true'
+              }
             }
           } catch (e) {
-            console.warn('Error loading student courses:', e)
+            console.warn('Error reading localStorage overrides:', e)
           }
+        }
 
-          const courseIds = dbCourses.map(c => c.id)
-          let dbModules: any[] = []
-          let dbLessons: any[] = []
-          let completedLessonIds = new Set<string>()
+        if (result.tasks.length > 0 || result.events.length > 0) {
+          const mappedEvents: CalendarEvent[] = result.events.map(e => ({
+            ...e,
+            dueDate: new Date(e.dueDate)
+          }))
 
-          if (courseIds.length > 0) {
-            const { data: modulesData } = await supabase
-              .from('course_modules')
-              .select('id, course_id')
-              .in('course_id', courseIds)
-            dbModules = modulesData || []
+          const mappedTasks: Task[] = result.tasks.map(t => ({
+            ...t,
+            completed: localOverrides[t.id] !== undefined ? localOverrides[t.id] : t.completed
+          }))
 
-            const moduleIds = dbModules.map(m => m.id)
-            if (moduleIds.length > 0) {
-              const { data: lessonsData } = await supabase
-                .from('lessons')
-                .select('id, module_id, title, type, content, due_date')
-                .in('module_id', moduleIds)
-              dbLessons = lessonsData || []
-
-              const { data: progData } = await supabase
-                .from('student_progress')
-                .select('lesson_id')
-                .eq('student_id', user.id)
-                .eq('completed', true)
-                .in('lesson_id', dbLessons.map(l => l.id))
-              completedLessonIds = new Set((progData || []).map(p => p.lesson_id))
-
-              // Check forum participation
-              const lessonIds = dbLessons.map(l => l.id)
-              if (lessonIds.length > 0) {
-                const { data: forumsData } = await supabase
-                  .from('forums')
-                  .select('id, lesson_id')
-                  .in('lesson_id', lessonIds)
-                const courseForums = forumsData || []
-                const forumIds = courseForums.map(f => f.id)
-                if (forumIds.length > 0) {
-                  const { data: threads } = await supabase
-                    .from('forum_threads')
-                    .select('id, forum_id')
-                    .in('forum_id', forumIds)
-                  const threadIds = (threads || []).map(t => t.id)
-                  if (threadIds.length > 0) {
-                    const { data: replies } = await supabase
-                      .from('forum_replies')
-                      .select('thread_id')
-                      .eq('author_id', user.id)
-                      .in('thread_id', threadIds)
-                    if (replies) {
-                      replies.forEach(r => {
-                        const th = threads?.find(t => t.id === r.thread_id)
-                        const fo = courseForums.find(f => f.id === th?.forum_id)
-                        if (fo) completedLessonIds.add(fo.lesson_id)
-                      })
-                    }
-                  }
-                }
-              }
-            }
-          }
-
-          // 3. Obtener eventos de calendario
-          let query = supabase
-            .from('calendars')
-            .select('*, courses(title, subject)')
-
-          if (courseIds.length > 0) {
-            query = query.or(`course_id.in.(${courseIds.join(',')}),course_id.is.null`)
-          } else {
-            query = query.is('course_id', null)
-          }
-
-          const { data: dbEvents } = await query
-
-          const mapDbEvent = (e: any): CalendarEvent => {
-            const subject = (e.courses?.subject || 'general').toLowerCase()
-            let color = 'bg-blue-500 text-blue-600 dark:text-blue-400'
-            if (subject.includes('matem')) color = 'bg-purple-500 text-purple-600 dark:text-purple-400'
-            else if (subject.includes('tec') || subject.includes('prog')) color = 'bg-emerald-500 text-emerald-600 dark:text-emerald-400'
-            else if (subject.includes('ingl')) color = 'bg-amber-500 text-amber-600 dark:text-amber-400'
-
-            return {
-              id: e.id,
-              title: e.title,
-              description: e.description || 'Sin descripción adicional.',
-              dueDate: new Date(e.due_date),
-              courseName: e.courses?.title || 'Evento General',
-              eventType: e.event_type || 'homework',
-              courseColor: color
-            }
-          }
-
-          const mappedEvents = (dbEvents || []).map(mapDbEvent)
-
-          // Agregar lecciones con fecha límite a los eventos de calendario
-          const lessonEvents: CalendarEvent[] = dbLessons
-            .filter(l => l.due_date)
-            .map(l => {
-              const mod = dbModules.find(m => m.id === l.module_id)
-              const crs = dbCourses.find(c => c.id === mod?.course_id)
-              const subject = (crs?.subject || 'general').toLowerCase()
-              let color = 'bg-blue-500 text-blue-600 dark:text-blue-400'
-              if (subject.includes('matem')) color = 'bg-purple-500 text-purple-600 dark:text-purple-400'
-              else if (subject.includes('tec') || subject.includes('prog')) color = 'bg-emerald-500 text-emerald-600 dark:text-emerald-400'
-              else if (subject.includes('ingl')) color = 'bg-amber-500 text-amber-600 dark:text-amber-400'
-
-              return {
-                id: l.id,
-                title: l.title,
-                description: l.content ? l.content.replace(/<[^>]*>/g, '').trim().substring(0, 150) : '',
-                dueDate: new Date(l.due_date),
-                courseName: crs?.title || 'Curso',
-                eventType: l.type === 'quiz' ? 'exam' : 'homework',
-                courseColor: color
-              }
-            })
-
-          setEvents([...mappedEvents, ...lessonEvents])
-
-          // 4. Mapear tareas a partir de las lecciones del curso y los eventos de calendario
-          const ACTIONABLE_TYPES = new Set(['task', 'quiz', 'forum', 'assignment', 'homework'])
-          const courseTasks: Task[] = []
-
-          for (const l of dbLessons) {
-            if (ACTIONABLE_TYPES.has(l.type)) {
-              const mod = dbModules.find(m => m.id === l.module_id)
-              const crs = dbCourses.find(c => c.id === mod?.course_id)
-              const isCompleted = completedLessonIds.has(l.id)
-
-              let formattedDate = 'Sin fecha límite'
-              let urgency: 'Urgente' | 'Próximo' | 'Pendiente' = 'Pendiente'
-
-              if (l.due_date) {
-                const dueObj = new Date(l.due_date)
-                formattedDate = dueObj.toLocaleDateString('es-ES', {
-                  weekday: 'short',
-                  month: 'short',
-                  day: 'numeric',
-                  hour: 'numeric',
-                  minute: '2-digit'
-                })
-
-                const timeLeftMs = dueObj.getTime() - Date.now()
-                const hoursLeft = timeLeftMs / (1000 * 60 * 60)
-                if (hoursLeft < 24) {
-                  urgency = 'Urgente'
-                } else if (hoursLeft < 72) {
-                  urgency = 'Próximo'
-                }
-              }
-
-              let desc = 'Actividad del curso'
-              if (l.content) {
-                desc = l.content.replace(/<[^>]*>/g, '').trim().substring(0, 150)
-              }
-
-              courseTasks.push({
-                id: l.id,
-                title: l.title,
-                course: crs?.title || 'Curso',
-                dueDate: formattedDate,
-                urgency,
-                description: desc,
-                completed: isCompleted
-              })
-            }
-          }
-
-          const existingIds = new Set(courseTasks.map(t => t.id))
-          const calendarTasks: Task[] = (dbEvents || [])
-            .filter((e: any) => !existingIds.has(e.id) && (e.event_type === 'homework' || e.event_type === 'exam'))
-            .map((e: any) => {
-              const due = new Date(e.due_date)
-              const now = new Date()
-              const hoursDiff = (due.getTime() - now.getTime()) / (1000 * 60 * 60)
-              let urgency: 'Urgente' | 'Próximo' | 'Pendiente' = 'Pendiente'
-              if (hoursDiff > 0 && hoursDiff < 24) urgency = 'Urgente'
-              else if (hoursDiff > 0 && hoursDiff < 72) urgency = 'Próximo'
-
-              const formattedDate = due.toLocaleDateString('es-ES', {
-                weekday: 'short',
-                month: 'short',
-                day: 'numeric',
-                hour: 'numeric',
-                minute: '2-digit'
-              })
-
-              return {
-                id: e.id,
-                title: e.title,
-                course: e.courses?.title || 'Evento General',
-                dueDate: formattedDate,
-                urgency,
-                description: e.description || '',
-                completed: false
-              }
-            })
-
-          const allTasks = [...courseTasks, ...calendarTasks]
-          allTasks.sort((a, b) => {
-            if (a.completed !== b.completed) return a.completed ? 1 : -1
-            const urgencyWeight = { 'Urgente': 0, 'Próximo': 1, 'Pendiente': 2 }
-            return (urgencyWeight[a.urgency] ?? 2) - (urgencyWeight[b.urgency] ?? 2)
-          })
-
-          setTasks(allTasks)
+          setEvents(mappedEvents)
+          setTasks(mappedTasks)
+        } else {
+          // Fallback para modo demo o sin asignaturas
+          setEvents(mockEvents)
+          setTasks(mockTasks.map(t => ({
+            ...t,
+            completed: localOverrides[t.id] !== undefined ? localOverrides[t.id] : t.completed
+          })))
         }
       } catch (error) {
-        console.error('Error al cargar datos de calendario:', error)
+        console.error('Error al cargar datos del calendario:', error)
+        setEvents(mockEvents)
+        setTasks(mockTasks)
       } finally {
         setLoading(false)
       }
     }
     loadData()
   }, [])
+
+  const handleToggleTask = async (taskId: string, currentCompleted: boolean) => {
+    const nextCompleted = !currentCompleted
+
+    // 1. Actualización optimista inmediata en la UI
+    setTasks(prev =>
+      prev.map(t => (t.id === taskId ? { ...t, completed: nextCompleted } : t))
+    )
+
+    // 2. Persistencia en localStorage para inmediatez
+    if (typeof window !== 'undefined') {
+      try {
+        const key = studentId ? `completed_task_${studentId}_${taskId}` : `completed_task_${taskId}`
+        localStorage.setItem(key, String(nextCompleted))
+      } catch (e) {
+        console.warn('Error saving task to localStorage:', e)
+      }
+    }
+
+    // 3. Persistencia en base de datos vía Server Action
+    try {
+      const res = await toggleStudentTaskCompletion(taskId, nextCompleted)
+      if (res.success) {
+        if (nextCompleted) {
+          toast.success('¡Actividad completada! Se ha movido a actividades entregadas.')
+        } else {
+          toast.info('Actividad restablecida a pendientes.')
+        }
+      } else {
+        if (nextCompleted) {
+          toast.success('Actividad marcada como completada.')
+        }
+      }
+    } catch (err) {
+      if (nextCompleted) {
+        toast.success('Actividad marcada como completada.')
+      }
+    }
+  }
 
   // Calendario Helpers
   const getDaysInMonth = (year: number, month: number) => {
@@ -704,7 +534,12 @@ export function StudentCalendarScreen() {
                               <span className={`inline-flex rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${badgeColor}`}>
                                 {evt.eventType === 'homework' ? 'Tarea' : evt.eventType === 'exam' ? 'Examen' : 'Evento'}
                               </span>
-                              {isPast && (
+                              {evt.completed && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider border border-emerald-200/50 dark:border-emerald-800/40">
+                                  <CheckCircle className="h-3 w-3" /> Entregada
+                                </span>
+                              )}
+                              {!evt.completed && isPast && (
                                 <span className="inline-flex items-center rounded-full bg-slate-100 dark:bg-slate-800 text-slate-550 dark:text-slate-400 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
                                   Finalizado
                                 </span>
@@ -796,10 +631,30 @@ export function StudentCalendarScreen() {
                             </p>
                           )}
 
-                          <div className="mt-4 pt-4 border-t border-slate-50 dark:border-slate-800/40 flex items-center justify-between text-xs">
+                          <div className="mt-4 pt-4 border-t border-slate-50 dark:border-slate-800/40 flex flex-wrap items-center justify-between gap-2 text-xs">
                             <span className="text-slate-400 font-medium flex items-center gap-1.5">
                               <Clock className="h-3.5 w-3.5 text-slate-350" /> Vence: <strong className="text-slate-700 dark:text-slate-300 font-semibold">{task.dueDate}</strong>
                             </span>
+                            <div className="flex items-center gap-2">
+                              {task.href && (
+                                <Link
+                                  href={task.href}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-400 dark:hover:bg-blue-900/50 transition-colors"
+                                >
+                                  <span>Ir a la actividad</span>
+                                  <ExternalLink className="h-3 w-3" />
+                                </Link>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => handleToggleTask(task.id, task.completed)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 shadow-xs transition-all cursor-pointer"
+                                title="Marcar esta actividad como completada"
+                              >
+                                <CheckCircle className="h-3.5 w-3.5" />
+                                <span>Marcar completada</span>
+                              </button>
+                            </div>
                           </div>
                         </motion.div>
                       )
@@ -852,8 +707,16 @@ export function StudentCalendarScreen() {
 
                         <div className="mt-4 pt-4 border-t border-slate-50 dark:border-slate-800/40 flex items-center justify-between text-xs">
                           <span className="text-slate-400 font-medium">
-                            Estado: <strong className="text-emerald-600 dark:text-emerald-400 font-semibold">{task.dueDate}</strong>
+                            Estado: <strong className="text-emerald-600 dark:text-emerald-400 font-semibold">{task.dueDate.includes('Entregad') ? task.dueDate : `Entregada (${task.dueDate})`}</strong>
                           </span>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleTask(task.id, task.completed)}
+                            className="text-xs font-medium text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 underline underline-offset-2 transition-colors cursor-pointer"
+                            title="Volver a poner esta actividad en pendientes"
+                          >
+                            Volver a pendientes
+                          </button>
                         </div>
                       </motion.div>
                     ))

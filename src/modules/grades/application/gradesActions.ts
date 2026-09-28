@@ -539,6 +539,18 @@ export async function getStudentCourseGrades(courseId: string): Promise<StudentC
 // 5. STUDENT — boletín (all courses, current period)
 // ---------------------------------------------------------------------------
 
+export type ActivityGradeStatus = 'Pendiente' | 'Entregado' | 'Calificado'
+
+export interface StudentLessonGradeItem {
+  lessonId?: string
+  lessonTitle: string
+  gradeType: LessonGradeType
+  grade: number | null
+  maxGrade: number
+  status: ActivityGradeStatus
+  dueDate?: string | null
+}
+
 export interface StudentReportSubject {
   courseId: string
   courseTitle: string
@@ -546,12 +558,7 @@ export interface StudentReportSubject {
   teacherName: string
   finalGrade: number | null
   performanceLevel: string | null
-  lessonGrades: {
-    lessonTitle: string
-    gradeType: LessonGradeType
-    grade: number
-    maxGrade: number
-  }[]
+  lessonGrades: StudentLessonGradeItem[]
 }
 
 export interface StudentReportResult {
@@ -602,7 +609,26 @@ export async function getStudentPeriodReport(
     }
   })
 
-  // Sin fallback por grado: solo se muestran cursos explícitamente matriculados
+  // Fallback por grado si no hay matrículas explícitas
+  if (courses.length === 0 && profile.grade_level) {
+    const { data: gradeCourses } = await admin
+      .from('courses')
+      .select('id, title, subject, teacher:profiles!teacher_id(first_name, last_name)')
+      .eq('grade_level', profile.grade_level)
+      .eq('status', 'active')
+
+    if (gradeCourses && gradeCourses.length > 0) {
+      courses = gradeCourses.map((c: any) => {
+        const t = Array.isArray(c?.teacher) ? c.teacher[0] : c?.teacher
+        return {
+          id: c.id,
+          title: c.title ?? '',
+          subject: c.subject ?? '',
+          teacherName: t ? `${t.first_name} ${t.last_name}` : 'Sin docente'
+        }
+      })
+    }
+  }
 
   if (courses.length === 0) {
     return { subjects: [], generalAverage: 0, generalPerformanceLevel: 'Bajo' }
@@ -617,11 +643,13 @@ export async function getStudentPeriodReport(
     .eq('student_id', studentId)
     .in('course_id', courseIds)
 
-  // 5d. Fetch quiz attempts by first resolving the quizzes for these courses
+  // 5d. Fetch modules, lessons, quizzes, forums and student submissions
   let dbModules: any[] = []
   let lessonsInModules: any[] = []
   let dbQuizzes: any[] = []
   let quizAttempts: any[] = []
+  let dbForums: any[] = []
+  let dbProgress: any[] = []
 
   if (courseIds.length > 0) {
     const { data: modulesData } = await admin
@@ -629,85 +657,171 @@ export async function getStudentPeriodReport(
       .select('id, course_id')
       .in('course_id', courseIds)
     dbModules = modulesData || []
-    
+
     const moduleIds = dbModules.map(m => m.id)
     if (moduleIds.length > 0) {
       const { data: lessonsData } = await admin
         .from('lessons')
-        .select('id, title, module_id')
+        .select('id, title, module_id, type, due_date')
         .in('module_id', moduleIds)
       lessonsInModules = lessonsData || []
-      
+
       const lessonIds = lessonsInModules.map(l => l.id)
       if (lessonIds.length > 0) {
+        // Quizzes
         const { data: quizzesData } = await admin
           .from('quizzes')
-          .select('id, lesson_id')
+          .select('id, lesson_id, title, end_date')
           .in('lesson_id', lessonIds)
         dbQuizzes = quizzesData || []
-        
+
         const quizIds = dbQuizzes.map(q => q.id)
         if (quizIds.length > 0) {
           const { data: attemptsData } = await admin
             .from('quiz_attempts')
-            .select('quiz_id, score, completed_at')
+            .select('quiz_id, score, completed_at, status')
             .eq('student_id', studentId)
             .in('quiz_id', quizIds)
           quizAttempts = attemptsData || []
+        }
+
+        // Forums
+        try {
+          const { data: forumsData } = await admin
+            .from('forums')
+            .select('id, lesson_id, title, is_graded')
+            .in('lesson_id', lessonIds)
+          dbForums = forumsData || []
+        } catch (fErr) {
+          console.warn('Could not select forums in student report:', fErr)
+        }
+
+        // Student progress / submissions
+        try {
+          const { data: progData } = await admin
+            .from('student_progress')
+            .select('lesson_id, completed, submission_text, updated_at')
+            .eq('student_id', studentId)
+            .in('lesson_id', lessonIds)
+          dbProgress = progData || []
+        } catch (pErr) {
+          console.warn('Could not select student_progress in student report:', pErr)
         }
       }
     }
   }
 
-  let totalSum = 0; let totalCount = 0
+  let totalSum = 0
+  let totalCount = 0
+
+  const studentProgressMap = new Map(dbProgress.map(p => [p.lesson_id, p]))
+  const studentQuizAttemptsMap = new Map(quizAttempts.map(qa => [qa.quiz_id, qa]))
 
   const subjects: StudentReportSubject[] = courses.map(course => {
     const courseGrades = (allGrades || []).filter((g: any) => g.course_id === course.id)
-    
-    // Find quizzes and attempts for this specific course
+    const courseGradesMap = new Map(courseGrades.map((g: any) => [g.lesson_id, g]))
+
+    // Find modules and lessons for this course
     const courseModules = dbModules.filter(m => m.course_id === course.id)
     const courseModuleIds = new Set(courseModules.map(m => m.id))
     const courseLessons = lessonsInModules.filter(l => courseModuleIds.has(l.module_id))
     const courseLessonIds = new Set(courseLessons.map(l => l.id))
-    const courseQuizzesList = dbQuizzes.filter(q => courseLessonIds.has(q.lesson_id))
-    const courseQuizIds = new Set(courseQuizzesList.map(q => q.id))
-    const courseQuizAttempts = quizAttempts.filter(qa => courseQuizIds.has(qa.quiz_id))
 
-    const lessonGrades = [
-      ...courseGrades
-        .filter((g: any) => {
-          if (g.grade_type === 'forum') {
-            const lessonObj = Array.isArray(g.lessons) ? g.lessons[0] : g.lessons
-            const forums = lessonObj?.forums
-            const forumObj = Array.isArray(forums) ? forums[0] : forums
-            return forumObj && forumObj.is_graded === true
-          }
-          return true
-        })
-        .map((g: any) => ({
-          lessonTitle: (Array.isArray(g.lessons) ? g.lessons[0] : g.lessons)?.title ?? 'Lección',
-          gradeType: g.grade_type as LessonGradeType,
+    // Quizzes in this course
+    const courseQuizzes = dbQuizzes.filter(q => courseLessonIds.has(q.lesson_id))
+    const courseQuizMap = new Map(courseQuizzes.map(q => [q.lesson_id, q]))
+
+    // Forums in this course
+    const courseForums = dbForums.filter(f => courseLessonIds.has(f.lesson_id))
+    const courseForumMap = new Map(courseForums.map(f => [f.lesson_id, f]))
+
+    // Evaluable lessons: tasks, quizzes, workshops, activities, exams, graded forums, or any lesson with a grade
+    const evaluableLessons = courseLessons.filter(l => {
+      const isTypeEvaluable = ['task', 'quiz', 'workshop', 'activity', 'exam'].includes(l.type)
+      const hasQuiz = courseQuizMap.has(l.id)
+      const forumObj = courseForumMap.get(l.id)
+      const isGradedForum = forumObj ? forumObj.is_graded === true : false
+      const hasGrade = courseGradesMap.has(l.id)
+      return isTypeEvaluable || hasQuiz || isGradedForum || hasGrade
+    })
+
+    const activities: StudentLessonGradeItem[] = evaluableLessons.map(l => {
+      const gRecord = courseGradesMap.get(l.id)
+      const quizObj = courseQuizMap.get(l.id)
+      const quizAttempt = quizObj ? studentQuizAttemptsMap.get(quizObj.id) : null
+      const prog = studentProgressMap.get(l.id)
+
+      let gradeType: LessonGradeType = 'task'
+      if (l.type === 'quiz' || quizObj) gradeType = 'quiz'
+      else if (l.type === 'task') gradeType = 'task'
+      else if (l.type === 'workshop') gradeType = 'workshop'
+      else if (l.type === 'activity') gradeType = 'activity'
+      else if (l.type === 'forum' || courseForumMap.has(l.id)) gradeType = 'forum'
+      else if (gRecord?.grade_type) gradeType = gRecord.grade_type as LessonGradeType
+
+      let status: ActivityGradeStatus = 'Pendiente'
+      let grade: number | null = null
+      let maxGrade = Number(gRecord?.max_grade ?? 5)
+
+      if (gRecord && (gRecord.grade !== null || gRecord.score !== null)) {
+        status = 'Calificado'
+        grade = Number(gRecord.grade ?? gRecord.score)
+      } else if (quizAttempt && quizAttempt.score !== null && quizAttempt.score !== undefined) {
+        status = 'Calificado'
+        grade = Number(quizAttempt.score)
+        maxGrade = 5
+      } else if (
+        (prog && (prog.completed || (prog.submission_text && prog.submission_text.trim().length > 0))) ||
+        (quizAttempt && (quizAttempt.completed_at || quizAttempt.status === 'completed'))
+      ) {
+        status = 'Entregado'
+        grade = null
+        maxGrade = 5
+      } else {
+        status = 'Pendiente'
+        grade = null
+        maxGrade = 5
+      }
+
+      return {
+        lessonId: l.id,
+        lessonTitle: l.title || quizObj?.title || 'Actividad',
+        gradeType,
+        grade,
+        maxGrade,
+        status,
+        dueDate: l.due_date || quizObj?.end_date || null
+      }
+    })
+
+    // Also include any orphan grades that weren't in evaluableLessons
+    const coveredLessonIds = new Set(evaluableLessons.map(l => l.id))
+    courseGrades.forEach((g: any) => {
+      if (!coveredLessonIds.has(g.lesson_id)) {
+        activities.push({
+          lessonId: g.lesson_id,
+          lessonTitle: (Array.isArray(g.lessons) ? g.lessons[0] : g.lessons)?.title ?? 'Actividad Calificada',
+          gradeType: (g.grade_type as LessonGradeType) || 'task',
           grade: Number(g.grade ?? g.score ?? 0),
-          maxGrade: Number(g.max_grade ?? 5)
-        })),
-      ...courseQuizAttempts.map((q: any) => {
-        const quizObj = courseQuizzesList.find(cql => cql.id === q.quiz_id)
-        const lessonObj = courseLessons.find(cl => cl.id === quizObj?.lesson_id)
-        return {
-          lessonTitle: lessonObj?.title ?? 'Quiz',
-          gradeType: 'quiz' as LessonGradeType,
-          grade: Number(q.score ?? 0),
-          maxGrade: 5
-        }
-      })
-    ]
+          maxGrade: Number(g.max_grade ?? 5),
+          status: 'Calificado',
+          dueDate: null
+        })
+      }
+    })
 
-    const allScores = lessonGrades.map(g => (g.grade / g.maxGrade) * 5)
-    const finalGrade = allScores.length > 0
-      ? Number((allScores.reduce((a, v) => a + v, 0) / allScores.length).toFixed(2))
+    const gradedScores = activities
+      .filter(a => a.status === 'Calificado' && a.grade !== null)
+      .map(a => (a.grade! / a.maxGrade) * 5)
+
+    const finalGrade = gradedScores.length > 0
+      ? Number((gradedScores.reduce((a, v) => a + v, 0) / gradedScores.length).toFixed(1))
       : null
 
-    if (finalGrade !== null) { totalSum += finalGrade; totalCount++ }
+    if (finalGrade !== null) {
+      totalSum += finalGrade
+      totalCount++
+    }
 
     return {
       courseId: course.id,
@@ -716,11 +830,11 @@ export async function getStudentPeriodReport(
       teacherName: course.teacherName,
       finalGrade,
       performanceLevel: finalGrade !== null ? calcPerformanceLevel(finalGrade) : null,
-      lessonGrades
+      lessonGrades: activities
     }
   })
 
-  const generalAverage = totalCount > 0 ? Number((totalSum / totalCount).toFixed(2)) : 0
+  const generalAverage = totalCount > 0 ? Number((totalSum / totalCount).toFixed(1)) : 0
 
   return {
     subjects,

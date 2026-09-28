@@ -141,9 +141,9 @@ export function AdminStudentsScreen() {
 
   const copyRegistrationLink = () => {
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://aula.ensuny.edu.co'
-    const link = `${baseUrl}/register/student`
+    const link = `${baseUrl}/login`
     navigator.clipboard.writeText(link)
-    setSuccessMsg('¡Enlace de registro copiado al portapapeles!')
+    setSuccessMsg('¡Enlace de acceso copiado al portapapeles!')
     setTimeout(() => setSuccessMsg(''), 3000)
   }
 
@@ -195,7 +195,7 @@ export function AdminStudentsScreen() {
           <button
             onClick={copyRegistrationLink}
             className="flex items-center gap-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 px-4 py-2 text-sm font-semibold active:scale-[0.98] transition-all cursor-pointer"
-            title="Copiar enlace público de registro"
+            title="Copiar enlace de acceso"
           >
             <LinkIcon className="h-4 w-4" />
             <span className="hidden sm:inline whitespace-nowrap">Copiar Enlace</span>

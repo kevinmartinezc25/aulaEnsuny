@@ -103,7 +103,8 @@ function isStudentVirtualCampusRoute(pathname: string): boolean {
     pathname.startsWith('/student/courses/') ||
     pathname.startsWith('/student/requests') ||
     pathname.startsWith('/student/virtual-grades') ||
-    pathname.startsWith('/student/join-course')
+    pathname.startsWith('/student/join-course') ||
+    pathname.startsWith('/student/calendar')
   )
 }
 
@@ -557,7 +558,7 @@ function SidebarContent({ onClose, isCollapsed = false, user }: SidebarProps) {
   return (
     <div className="flex h-full flex-col justify-between">
       {/* Brand Header */}
-      <div className={`h-16 shrink-0 flex items-center border-b border-slate-100 dark:border-slate-800/60 ${isCollapsed ? 'justify-center px-1' : 'px-4 pr-10'}`}>
+      <div className={`h-16 shrink-0 flex items-center border-b border-slate-100 dark:border-slate-800/60 ${isCollapsed ? 'justify-center px-1' : 'px-4 pr-6'}`}>
         <Link href="/" className={`flex items-center ${isCollapsed ? 'justify-center gap-1.5' : 'gap-2.5'}`} onClick={onClose}>
           <img
             src="/escudo_ensuny.png"
@@ -571,7 +572,7 @@ function SidebarContent({ onClose, isCollapsed = false, user }: SidebarProps) {
               className="h-6 w-6 shrink-0 object-contain"
             />
           ) : (
-            <div className="relative w-[185px] h-10 flex items-center justify-start">
+            <div className="relative w-[155px] h-9 flex items-center justify-start">
               <img
                 src="/logo.svg?v=2"
                 alt="aulaEnsuny Logo"
@@ -1335,10 +1336,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className="flex min-h-screen bg-[#f9fafb] dark:bg-slate-950 transition-all duration-300">
       {/* Sidebar Desktop */}
       {!isStudentPortal && !isCourseSection && !isDocsPage && (
-        <aside className={`fixed inset-y-0 left-0 z-20 hidden border-r border-slate-100 bg-white/70 backdrop-blur-md dark:border-slate-800/60 dark:bg-slate-900/70 md:block transition-all duration-300 ${isSidebarCollapsed ? 'w-20' : 'w-64'}`}>
+        <aside className={`fixed inset-y-0 left-0 z-[45] hidden border-r border-slate-100 bg-white/70 backdrop-blur-md dark:border-slate-800/60 dark:bg-slate-900/70 md:block transition-all duration-300 ${isSidebarCollapsed ? 'w-20' : 'w-64'}`}>
           <SidebarContent user={user} isCollapsed={isSidebarCollapsed} />
           <button onClick={toggleSidebar}
-            className="absolute -right-4 top-8 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-900 shadow-md hover:shadow-lg transition-all dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:text-white z-50"
+            className="absolute -right-4 top-8 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-900 shadow-md hover:shadow-lg transition-all dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:text-white z-50 cursor-pointer"
             title={isSidebarCollapsed ? 'Expandir menú' : 'Ocultar menú'}>
             {isSidebarCollapsed ? <PanelLeftOpen className="h-4 w-4 ml-0.5" /> : <PanelLeftClose className="h-4 w-4" />}
           </button>

@@ -3,10 +3,22 @@
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence, Reorder } from 'framer-motion'
 import { Plus, GripVertical, ChevronDown, ChevronUp, Video, FileText, HelpCircle, File, Settings2, Trash2, FolderOpen, X, ClipboardList, BookOpen, MessageSquare, Link as LinkIcon } from 'lucide-react'
-import { getCourseModules, CourseModule, updateModuleItemsOrder } from '../../application/teacherActions'
+import { 
+  getCourseModules, 
+  CourseModule, 
+  updateModuleItemsOrder,
+  createCourseModule,
+  deleteCourseModule,
+  updateCourseModuleTitle,
+  deleteModuleItem,
+  linkQuizToModule,
+  linkResourceToModule,
+  linkForumToModule,
+  getCourseLinkableItems,
+  getLessonQuizOrForumRedirect
+} from '../../application/teacherActions'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { createClient } from '@/core/config/supabase/client'
 
 // MOCK Quizzes for linking
 const MOCK_QUIZZES = [
@@ -76,77 +88,10 @@ export function TeacherCourseModulesScreen({ courseId }: { courseId: string }) {
         }
 
         if (!isDemoMode) {
-          const supabase = createClient()
-          
-          // Fetch quizzes
-          const { data: dbModules } = await supabase
-            .from('course_modules')
-            .select('id')
-            .eq('course_id', courseId)
-          
-          if (dbModules && dbModules.length > 0) {
-            const mIds = dbModules.map(m => m.id)
-            const { data: dbLessons } = await supabase
-              .from('lessons')
-              .select('id')
-              .in('module_id', mIds)
-            
-            if (dbLessons && dbLessons.length > 0) {
-              const lIds = dbLessons.map(l => l.id)
-              const { data: dbQuizzes } = await supabase
-                .from('quizzes')
-                .select('id, title, duration_minutes')
-                .in('lesson_id', lIds)
-              
-              if (dbQuizzes) {
-                setAvailableQuizzes(dbQuizzes.map(q => ({
-                  id: q.id,
-                  title: q.title,
-                  duration: q.duration_minutes ? `${q.duration_minutes} min` : 'Sin límite',
-                  status: 'active'
-                })))
-              }
-
-              // Fetch forums (filtered by lessons of this course)
-              const { data: dbForums } = await supabase
-                .from('forums')
-                .select('id, lessons!inner(title)')
-                .in('lesson_id', lIds)
-              
-              if (dbForums) {
-                setAvailableForums(dbForums.map((f: any) => ({
-                  id: f.id,
-                  name: f.lessons?.title || 'Foro de Discusión',
-                  type: 'forum'
-                })))
-              }
-            }
-          }
-
-          // Fetch resources
-          const { data: dbResources } = await supabase
-            .from('resources')
-            .select('id, title, file_size, mime_type')
-            .eq('course_id', courseId)
-          
-          if (dbResources) {
-            setAvailableResources(dbResources.map(r => {
-              let resourceType: 'pdf' | 'doc' | 'link' = 'doc'
-              const mime = r.mime_type?.toLowerCase() || ''
-              if (mime.includes('pdf')) {
-                resourceType = 'pdf'
-              } else if (mime === 'url' || mime === 'link') {
-                resourceType = 'link'
-              }
-
-              return {
-                id: r.id,
-                name: r.title,
-                type: resourceType,
-                size: r.file_size ? `${(r.file_size / 1024 / 1024).toFixed(1)} MB` : 'Enlace Web'
-              }
-            }))
-          }
+          const { quizzes, forums, resources } = await getCourseLinkableItems(courseId)
+          setAvailableQuizzes(quizzes)
+          setAvailableForums(forums)
+          setAvailableResources(resources)
         } else {
           setAvailableQuizzes(MOCK_QUIZZES)
           setAvailableResources(MOCK_RESOURCES)
@@ -216,15 +161,9 @@ export function TeacherCourseModulesScreen({ courseId }: { courseId: string }) {
   const handleOpenConfig = async (moduleId: string, lesson: any) => {
     if (lesson.type === 'quiz') {
       try {
-        const supabase = createClient()
-        const { data: quiz, error } = await supabase
-          .from('quizzes')
-          .select('id')
-          .eq('lesson_id', lesson.id)
-          .maybeSingle()
-        
-        if (quiz) {
-          router.push(`/teacher/courses/${courseId}/quizzes/${quiz.id}/edit`)
+        const { quizId } = await getLessonQuizOrForumRedirect(lesson.id)
+        if (quizId) {
+          router.push(`/teacher/courses/${courseId}/quizzes/${quizId}/edit`)
           return
         }
       } catch (err) {
@@ -235,15 +174,9 @@ export function TeacherCourseModulesScreen({ courseId }: { courseId: string }) {
     }
     if (lesson.type === 'forum') {
       try {
-        const supabase = createClient()
-        const { data: forum } = await supabase
-          .from('forums')
-          .select('id')
-          .eq('lesson_id', lesson.id)
-          .maybeSingle()
-        
-        if (forum) {
-          router.push(`/teacher/courses/${courseId}/resources/${forum.id}/edit?type=forum`)
+        const { forumId } = await getLessonQuizOrForumRedirect(lesson.id)
+        if (forumId) {
+          router.push(`/teacher/courses/${courseId}/resources/${forumId}/edit?type=forum`)
           return
         }
       } catch (err) {
@@ -272,14 +205,9 @@ export function TeacherCourseModulesScreen({ courseId }: { courseId: string }) {
           return
         }
       } else {
-        const supabase = createClient()
-        const { data: forum } = await supabase
-          .from('forums')
-          .select('id')
-          .eq('lesson_id', lessonId)
-          .maybeSingle()
-        if (forum) {
-          router.push(`/teacher/courses/${courseId}/forums/${forum.id}`)
+        const { forumId } = await getLessonQuizOrForumRedirect(lessonId)
+        if (forumId) {
+          router.push(`/teacher/courses/${courseId}/forums/${forumId}`)
           return
         }
       }
@@ -300,29 +228,10 @@ export function TeacherCourseModulesScreen({ courseId }: { courseId: string }) {
 
           if (!isDemoMode && !lessonId.startsWith('new_') && !lessonId.startsWith('quiz_') && !lessonId.startsWith('res_')) {
             try {
-              const supabase = createClient()
-              
-              // Verify if it is in lessons table
-              const { data: lesson } = await supabase
-                .from('lessons')
-                .select('id')
-                .eq('id', lessonId)
-                .maybeSingle()
-
-              if (lesson) {
-                const { error } = await supabase
-                  .from('lessons')
-                  .delete()
-                  .eq('id', lessonId)
-                if (error) throw error
+              const res = await deleteModuleItem(lessonId)
+              if (res.type === 'lesson') {
                 toast.success('Lección eliminada de la base de datos')
               } else {
-                // If it's not a lesson, it's a resource. We just unlink it by setting module_id to null
-                const { error } = await supabase
-                  .from('resources')
-                  .update({ module_id: null })
-                  .eq('id', lessonId)
-                if (error) throw error
                 toast.success('Recurso desvinculado del módulo')
               }
             } catch (err: any) {
@@ -390,43 +299,8 @@ export function TeacherCourseModulesScreen({ courseId }: { courseId: string }) {
 
     if (!isDemoMode && quizModalModuleId) {
       try {
-        const supabase = createClient()
-        const { data: dbQuiz } = await supabase
-          .from('quizzes')
-          .select('lesson_id')
-          .eq('id', quizId)
-          .maybeSingle()
-        
-        if (dbQuiz && dbQuiz.lesson_id) {
-          lessonId = dbQuiz.lesson_id
-          const { error } = await supabase
-            .from('lessons')
-            .update({ 
-              module_id: quizModalModuleId,
-              sort_order: nextSortOrder
-            })
-            .eq('id', lessonId)
-          if (error) throw error
-        } else {
-          const { data: newLesson, error: lErr } = await supabase
-            .from('lessons')
-            .insert({
-              module_id: quizModalModuleId,
-              title: quiz.title,
-              type: 'quiz',
-              sort_order: nextSortOrder
-            })
-            .select()
-            .single()
-          if (lErr) throw lErr
-          lessonId = newLesson.id
-
-          const { error: qErr } = await supabase
-            .from('quizzes')
-            .update({ lesson_id: lessonId })
-            .eq('id', quizId)
-          if (qErr) throw qErr
-        }
+        const linked = await linkQuizToModule(quizModalModuleId, quizId, nextSortOrder)
+        lessonId = linked.lessonId
       } catch (err: any) {
         console.error('Error linking quiz:', err)
         toast.error('No se pudo vincular el quiz en la base de datos')
@@ -468,16 +342,7 @@ export function TeacherCourseModulesScreen({ courseId }: { courseId: string }) {
 
     if (!isDemoMode && resourceModalModuleId) {
       try {
-        const supabase = createClient()
-        const { error } = await supabase
-          .from('resources')
-          .update({ 
-            module_id: resourceModalModuleId,
-            sort_order: nextSortOrder
-          })
-          .eq('id', resourceId)
-
-        if (error) throw error
+        await linkResourceToModule(resourceModalModuleId, resourceId, nextSortOrder)
       } catch (err: any) {
         console.error('Error al vincular recurso:', err)
         toast.error('No se pudo vincular el recurso en la base de datos')
@@ -524,43 +389,8 @@ export function TeacherCourseModulesScreen({ courseId }: { courseId: string }) {
 
     if (!isDemoMode && forumModalModuleId) {
       try {
-        const supabase = createClient()
-        const { data: dbForum } = await supabase
-          .from('forums')
-          .select('lesson_id')
-          .eq('id', forumId)
-          .maybeSingle()
-        
-        if (dbForum && dbForum.lesson_id) {
-          lessonId = dbForum.lesson_id
-          const { error } = await supabase
-            .from('lessons')
-            .update({ 
-              module_id: forumModalModuleId,
-              sort_order: nextSortOrder
-            })
-            .eq('id', lessonId)
-          if (error) throw error
-        } else {
-          const { data: newLesson, error: lErr } = await supabase
-            .from('lessons')
-            .insert({
-              module_id: forumModalModuleId,
-              title: forum.name,
-              type: 'forum',
-              sort_order: nextSortOrder
-            })
-            .select()
-            .single()
-          if (lErr) throw lErr
-          lessonId = newLesson.id
-
-          const { error: fErr } = await supabase
-            .from('forums')
-            .update({ lesson_id: lessonId })
-            .eq('id', forumId)
-          if (fErr) throw fErr
-        }
+        const linked = await linkForumToModule(forumModalModuleId, forumId, nextSortOrder)
+        lessonId = linked.lessonId
       } catch (err: any) {
         console.error('Error linking forum:', err)
         toast.error('No se pudo vincular el foro en la base de datos')
@@ -597,14 +427,7 @@ export function TeacherCourseModulesScreen({ courseId }: { courseId: string }) {
 
     if (!isDemoMode) {
       try {
-        const supabase = createClient()
-        const { data, error } = await supabase
-          .from('course_modules')
-          .insert({ course_id: courseId, title: newTitle, sort_order: newOrder })
-          .select()
-          .single()
-
-        if (error) throw error
+        const data = await createCourseModule(courseId, newTitle, newOrder)
 
         const newMod: CourseModule = {
           id: data.id,
@@ -648,14 +471,9 @@ export function TeacherCourseModulesScreen({ courseId }: { courseId: string }) {
           const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL ||
             process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
 
-          if (!isDemoMode) {
+          if (!isDemoMode && !moduleId.startsWith('mod_')) {
             try {
-              const supabase = createClient()
-              const { error } = await supabase
-                .from('course_modules')
-                .delete()
-                .eq('id', moduleId)
-              if (error) throw error
+              await deleteCourseModule(moduleId)
             } catch (err: any) {
               console.error('Error eliminando módulo:', err?.message || err?.code || JSON.stringify(err))
               toast.error('No se pudo eliminar el módulo')
@@ -688,12 +506,7 @@ export function TeacherCourseModulesScreen({ courseId }: { courseId: string }) {
 
     if (!isDemoMode && !moduleId.startsWith('mod_')) {
       try {
-        const supabase = createClient()
-        const { error } = await supabase
-          .from('course_modules')
-          .update({ title: trimmed })
-          .eq('id', moduleId)
-        if (error) throw error
+        await updateCourseModuleTitle(moduleId, trimmed)
       } catch (err: any) {
         console.error('Error renombrando módulo:', err?.message || err?.code || JSON.stringify(err))
         toast.error('No se pudo guardar el nombre del módulo')
@@ -744,20 +557,24 @@ export function TeacherCourseModulesScreen({ courseId }: { courseId: string }) {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.1 }}
-              className="rounded-2xl border border-slate-100 bg-white shadow-[0_8px_30px_rgb(0,0,0,0.02)] overflow-hidden dark:border-slate-800/60 dark:bg-slate-900"
+              className={`rounded-2xl border border-slate-100 bg-white shadow-[0_8px_30px_rgb(0,0,0,0.02)] dark:border-slate-800/60 dark:bg-slate-900 transition-all ${
+                openDropdownId === mod.id ? 'relative z-30' : 'relative z-0'
+              }`}
             >
               {/* Header Módulo */}
               <div 
-                className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors"
+                className={`flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors ${
+                  isExpanded ? 'rounded-t-2xl' : 'rounded-2xl'
+                }`}
                 onClick={() => toggleModule(mod.id)}
               >
-                <div className="flex items-center gap-4">
-                  <div className="cursor-grab text-slate-300 hover:text-slate-500 dark:text-slate-600 dark:hover:text-slate-400" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center gap-4 flex-1 min-w-0 pr-2">
+                  <div className="cursor-grab text-slate-300 hover:text-slate-500 dark:text-slate-600 dark:hover:text-slate-400 shrink-0" onClick={(e) => e.stopPropagation()}>
                     <GripVertical className="h-5 w-5 pointer-events-none" />
                   </div>
-                  <div className="flex-1 flex flex-col justify-center min-h-[44px]">
+                  <div className="flex-1 flex flex-col justify-center min-h-[44px] min-w-0">
                     {editingModuleId === mod.id ? (
-                      <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                      <div className="flex items-center gap-2 w-full max-w-xl" onClick={e => e.stopPropagation()}>
                         <FolderOpen className="h-4.5 w-4.5 text-blue-500 shrink-0" />
                         <span className="text-base font-bold text-slate-900 dark:text-white shrink-0">Módulo {mod.order}:</span>
                         <input 
@@ -770,14 +587,14 @@ export function TeacherCourseModulesScreen({ courseId }: { courseId: string }) {
                             if (e.key === 'Escape') setEditingModuleId(null)
                           }}
                           onBlur={() => handleSaveRename(mod.id)}
-                          className="px-2 py-1 bg-white border border-blue-500 rounded-md outline-none text-sm font-bold text-slate-900 dark:bg-slate-800 dark:text-white w-full max-w-[200px]"
+                          className="px-2.5 py-1 bg-white border border-blue-500 rounded-md outline-none text-sm font-bold text-slate-900 dark:bg-slate-800 dark:text-white flex-1 min-w-[160px] shadow-sm"
                         />
                       </div>
                     ) : (
                       <>
-                        <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2 truncate">
                           <FolderOpen className="h-4.5 w-4.5 text-blue-500 shrink-0" />
-                          Módulo {mod.order}: {mod.title}
+                          <span>Módulo {mod.order}: {mod.title}</span>
                         </h3>
                         <p className="text-xs text-slate-400 mt-0.5">{mod.lessonsCount} recursos</p>
                       </>
@@ -785,7 +602,7 @@ export function TeacherCourseModulesScreen({ courseId }: { courseId: string }) {
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 shrink-0">
                   <div className="relative">
                     <button 
                       onClick={(e) => { 
@@ -797,16 +614,16 @@ export function TeacherCourseModulesScreen({ courseId }: { courseId: string }) {
                       <Settings2 className="h-4 w-4 pointer-events-none" />
                     </button>
                     {openDropdownId === mod.id && (
-                      <div className="absolute right-0 top-full mt-1 w-36 rounded-xl bg-white shadow-lg border border-slate-100 dark:border-slate-800 dark:bg-slate-900 z-10 py-1" onClick={e => e.stopPropagation()}>
+                      <div className="absolute right-0 top-full mt-1.5 w-44 rounded-xl bg-white shadow-xl border border-slate-100 dark:border-slate-800 dark:bg-slate-900 z-50 py-1.5" onClick={e => e.stopPropagation()}>
                         <button 
                           onClick={() => { handleStartRename(mod); setOpenDropdownId(null); }}
-                          className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
+                          className="w-full text-left px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800/80 transition-colors"
                         >
                           Renombrar
                         </button>
                         <button 
                           onClick={() => { handleDeleteModule(mod.id); setOpenDropdownId(null); }}
-                          className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-slate-800"
+                          className="w-full text-left px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/20 transition-colors"
                         >
                           Eliminar Módulo
                         </button>
@@ -827,7 +644,7 @@ export function TeacherCourseModulesScreen({ courseId }: { courseId: string }) {
                     animate={{ height: 'auto', opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
                     transition={{ duration: 0.2 }}
-                    className="border-t border-slate-50 dark:border-slate-800/40 bg-slate-50/30 dark:bg-slate-900/50 p-4"
+                    className="overflow-hidden rounded-b-2xl border-t border-slate-50 dark:border-slate-800/40 bg-slate-50/30 dark:bg-slate-900/50 p-4"
                   >
                     <Reorder.Group
                       axis="y"

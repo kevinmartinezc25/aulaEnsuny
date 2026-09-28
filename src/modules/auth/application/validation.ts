@@ -3,7 +3,7 @@ import { z } from 'zod'
 export const loginSchema = z.object({
   identifier: z
     .string()
-    .min(4, 'Ingresa tu correo institucional o número de documento.'),
+    .min(4, 'Ingresa tu documento de identidad o correo.'),
   password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres.'),
 })
 

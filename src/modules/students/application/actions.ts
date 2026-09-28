@@ -2,6 +2,7 @@
 
 import { createClient, createAdminClient } from '@/core/config/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { getPlanillaStudentSession } from '@/modules/planilla-asistida/application/studentAuthActions'
 
 export interface TeacherStudent {
   id: string
@@ -363,4 +364,405 @@ export async function sendStudentMessage(studentId: string | 'all', subject: str
   await new Promise(resolve => setTimeout(resolve, 800))
   console.log(`Mensaje enviado a: ${studentId}`, { subject, message })
   return { success: true }
+}
+
+export interface StudentCalendarEvent {
+  id: string
+  title: string
+  description: string
+  dueDate: string
+  courseName: string
+  eventType: 'homework' | 'exam' | 'event'
+  courseColor: string
+  completed?: boolean
+}
+
+export interface StudentCalendarTask {
+  id: string
+  title: string
+  course: string
+  dueDate: string
+  urgency: 'Urgente' | 'Próximo' | 'Pendiente'
+  description?: string
+  completed: boolean
+  href?: string
+  lessonId?: string
+}
+
+export interface StudentCalendarOverviewResult {
+  events: StudentCalendarEvent[]
+  tasks: StudentCalendarTask[]
+  studentId: string | null
+}
+
+/**
+ * Obtener eventos del calendario y tareas del estudiante actual,
+ * determinando con precisión cuáles actividades ya han sido completadas o entregadas.
+ */
+export async function getStudentCalendarOverview(): Promise<StudentCalendarOverviewResult> {
+  try {
+    const adminClient = createAdminClient()
+    const authClient = await createClient()
+
+    const { data: { user } } = await authClient.auth.getUser()
+    const planillaSession = !user ? await getPlanillaStudentSession() : null
+
+    let studentId = user?.id || planillaSession?.profileId || null
+    let studentGradeLevel = planillaSession?.gradeLevel || null
+
+    if (!studentId && planillaSession?.documentId) {
+      const cleanDoc = planillaSession.documentId.replace(/[^0-9a-zA-Z]/g, '')
+      const { data: dir } = await adminClient
+        .from('student_directory')
+        .select('profile_id, grade_level')
+        .or(`document_id.eq.${planillaSession.documentId},document_id.eq.${cleanDoc}`)
+        .maybeSingle()
+      if (dir?.profile_id) {
+        studentId = dir.profile_id
+        studentGradeLevel = dir.grade_level || studentGradeLevel
+      } else {
+        const { data: details } = await adminClient
+          .from('student_details')
+          .select('student_id, grade_level')
+          .or(`document_number.eq.${planillaSession.documentId},document_number.eq.${cleanDoc}`)
+          .maybeSingle()
+        if (details?.student_id) {
+          studentId = details.student_id
+          studentGradeLevel = details.grade_level || studentGradeLevel
+        }
+      }
+    }
+
+    if (studentId && !studentGradeLevel) {
+      const { data: prof } = await adminClient
+        .from('profiles')
+        .select('grade_level')
+        .eq('id', studentId)
+        .maybeSingle()
+      if (prof?.grade_level) {
+        studentGradeLevel = prof.grade_level
+      }
+    }
+
+    if (!studentId) {
+      return { events: [], tasks: [], studentId: null }
+    }
+
+    // 1. Obtener cursos del estudiante
+    let dbCourses: any[] = []
+    const { data: enrollments } = await adminClient
+      .from('student_courses')
+      .select('course_id')
+      .eq('student_id', studentId)
+
+    if (enrollments && enrollments.length > 0) {
+      const courseIds = enrollments.map(e => e.course_id)
+      const { data: coursesData } = await adminClient
+        .from('courses')
+        .select('id, slug, title, description, subject, grade_level, group_name')
+        .in('id', courseIds)
+        .eq('status', 'active')
+      dbCourses = coursesData || []
+    } else if (studentGradeLevel) {
+      const { data: gradeCourses } = await adminClient
+        .from('courses')
+        .select('id, slug, title, description, subject, grade_level, group_name')
+        .eq('grade_level', studentGradeLevel)
+        .eq('status', 'active')
+      dbCourses = gradeCourses || []
+    }
+
+    const courseIds = dbCourses.map(c => c.id)
+    let dbModules: any[] = []
+    let dbLessons: any[] = []
+    const completedLessonIds = new Set<string>()
+
+    if (courseIds.length > 0) {
+      const { data: modulesData } = await adminClient
+        .from('course_modules')
+        .select('id, course_id')
+        .in('course_id', courseIds)
+      dbModules = modulesData || []
+
+      const moduleIds = dbModules.map(m => m.id)
+      if (moduleIds.length > 0) {
+        const { data: lessonsData } = await adminClient
+          .from('lessons')
+          .select('id, module_id, title, type, content, due_date')
+          .in('module_id', moduleIds)
+        dbLessons = lessonsData || []
+      }
+    }
+
+    const lessonIds = dbLessons.map(l => l.id)
+
+    // 2. Progreso completado o entregado en student_progress
+    if (lessonIds.length > 0) {
+      const { data: progData } = await adminClient
+        .from('student_progress')
+        .select('lesson_id, completed, submission_text')
+        .eq('student_id', studentId)
+        .in('lesson_id', lessonIds)
+
+      progData?.forEach(p => {
+        if (p.completed || (p.submission_text && p.submission_text.trim().length > 0)) {
+          completedLessonIds.add(p.lesson_id)
+        }
+      })
+
+      // 3. Quizzes y quiz_attempts
+      try {
+        const { data: quizzesData } = await adminClient
+          .from('quizzes')
+          .select('id, lesson_id, title, end_date')
+          .in('lesson_id', lessonIds)
+
+        if (quizzesData && quizzesData.length > 0) {
+          const quizIds = quizzesData.map(q => q.id)
+          const { data: attemptsData } = await adminClient
+            .from('quiz_attempts')
+            .select('quiz_id, completed_at, score, status')
+            .eq('student_id', studentId)
+            .in('quiz_id', quizIds)
+
+          attemptsData?.forEach(a => {
+            if (a.completed_at || a.score !== null || a.status === 'completed') {
+              const matchedQuiz = quizzesData.find(q => q.id === a.quiz_id)
+              if (matchedQuiz?.lesson_id) {
+                completedLessonIds.add(matchedQuiz.lesson_id)
+              }
+            }
+          })
+        }
+      } catch (quizErr) {
+        console.warn('Error checking quizzes in student calendar:', quizErr)
+      }
+
+      // 4. Foros participados
+      try {
+        const { data: forumsData } = await adminClient
+          .from('forums')
+          .select('id, lesson_id')
+          .in('lesson_id', lessonIds)
+
+        if (forumsData && forumsData.length > 0) {
+          const forumIds = forumsData.map(f => f.id)
+          const { data: threads } = await adminClient
+            .from('forum_threads')
+            .select('id, forum_id')
+            .eq('author_id', studentId)
+            .in('forum_id', forumIds)
+
+          threads?.forEach(t => {
+            const fo = forumsData.find(f => f.id === t.forum_id)
+            if (fo) completedLessonIds.add(fo.lesson_id)
+          })
+
+          const { data: replies } = await adminClient
+            .from('forum_replies')
+            .select('thread_id')
+            .eq('author_id', studentId)
+
+          if (replies && replies.length > 0) {
+            const replyThreadIds = replies.map(r => r.thread_id)
+            const { data: parentThreads } = await adminClient
+              .from('forum_threads')
+              .select('id, forum_id')
+              .in('id', replyThreadIds)
+
+            parentThreads?.forEach(pt => {
+              const fo = forumsData.find(f => f.id === pt.forum_id)
+              if (fo) completedLessonIds.add(fo.lesson_id)
+            })
+          }
+        }
+      } catch (forumErr) {
+        console.warn('Error checking forums in calendar:', forumErr)
+      }
+    }
+
+    // 5. Calendarios institucionales
+    let calendarQuery = adminClient
+      .from('calendars')
+      .select('*, courses(title, subject)')
+
+    if (courseIds.length > 0) {
+      calendarQuery = calendarQuery.or(`course_id.in.(${courseIds.join(',')}),course_id.is.null`)
+    } else {
+      calendarQuery = calendarQuery.is('course_id', null)
+    }
+
+    const { data: dbEvents } = await calendarQuery
+
+    const getColor = (subjectName: string = '') => {
+      const s = subjectName.toLowerCase()
+      if (s.includes('matem')) return 'bg-purple-500 text-purple-600 dark:text-purple-400'
+      if (s.includes('tec') || s.includes('prog')) return 'bg-emerald-500 text-emerald-600 dark:text-emerald-400'
+      if (s.includes('ingl') || s.includes('lengu')) return 'bg-amber-500 text-amber-600 dark:text-amber-400'
+      return 'bg-blue-500 text-blue-600 dark:text-blue-400'
+    }
+
+    const mappedEvents: StudentCalendarEvent[] = (dbEvents || []).map((e: any) => ({
+      id: e.id,
+      title: e.title,
+      description: e.description || '',
+      dueDate: new Date(e.due_date).toISOString(),
+      courseName: e.courses?.title || 'Evento General',
+      eventType: e.event_type || 'homework',
+      courseColor: getColor(e.courses?.subject),
+      completed: completedLessonIds.has(e.id)
+    }))
+
+    const lessonEvents: StudentCalendarEvent[] = dbLessons
+      .filter(l => l.due_date)
+      .map(l => {
+        const mod = dbModules.find(m => m.id === l.module_id)
+        const crs = dbCourses.find(c => c.id === mod?.course_id)
+        return {
+          id: l.id,
+          title: l.title,
+          description: l.content ? l.content.replace(/<[^>]*>/g, '').trim().substring(0, 150) : '',
+          dueDate: new Date(l.due_date).toISOString(),
+          courseName: crs?.title || 'Curso',
+          eventType: l.type === 'quiz' ? 'exam' : 'homework',
+          courseColor: getColor(crs?.subject),
+          completed: completedLessonIds.has(l.id)
+        }
+      })
+
+    // 6. Tareas / Actividades
+    const ACTIONABLE_TYPES = new Set(['task', 'quiz', 'forum', 'assignment', 'homework', 'taller'])
+    const courseTasks: StudentCalendarTask[] = []
+
+    for (const l of dbLessons) {
+      if (ACTIONABLE_TYPES.has(l.type)) {
+        const mod = dbModules.find(m => m.id === l.module_id)
+        const crs = dbCourses.find(c => c.id === mod?.course_id)
+        const isCompleted = completedLessonIds.has(l.id)
+
+        let formattedDate = 'Sin fecha límite'
+        let urgency: 'Urgente' | 'Próximo' | 'Pendiente' = 'Pendiente'
+
+        if (l.due_date) {
+          const dueObj = new Date(l.due_date)
+          formattedDate = dueObj.toLocaleDateString('es-ES', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit'
+          })
+
+          const timeLeftMs = dueObj.getTime() - Date.now()
+          const hoursLeft = timeLeftMs / (1000 * 60 * 60)
+          if (hoursLeft < 24) urgency = 'Urgente'
+          else if (hoursLeft < 72) urgency = 'Próximo'
+        }
+
+        courseTasks.push({
+          id: l.id,
+          title: l.title,
+          course: crs?.title || 'Curso',
+          dueDate: formattedDate,
+          urgency,
+          description: l.content ? l.content.replace(/<[^>]*>/g, '').trim().substring(0, 150) : 'Actividad del curso',
+          completed: isCompleted,
+          href: crs?.slug ? `/student/courses/${crs.slug}?lessonId=${l.id}` : undefined,
+          lessonId: l.id
+        })
+      }
+    }
+
+    const existingIds = new Set(courseTasks.map(t => t.id))
+    const calendarTasks: StudentCalendarTask[] = (dbEvents || [])
+      .filter((e: any) => !existingIds.has(e.id) && (e.event_type === 'homework' || e.event_type === 'exam'))
+      .map((e: any) => {
+        const due = new Date(e.due_date)
+        const now = new Date()
+        const hoursDiff = (due.getTime() - now.getTime()) / (1000 * 60 * 60)
+        let urgency: 'Urgente' | 'Próximo' | 'Pendiente' = 'Pendiente'
+        if (hoursDiff > 0 && hoursDiff < 24) urgency = 'Urgente'
+        else if (hoursDiff > 0 && hoursDiff < 72) urgency = 'Próximo'
+
+        const formattedDate = due.toLocaleDateString('es-ES', {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit'
+        })
+
+        return {
+          id: e.id,
+          title: e.title,
+          course: e.courses?.title || 'Evento General',
+          dueDate: formattedDate,
+          urgency,
+          description: e.description || '',
+          completed: completedLessonIds.has(e.id)
+        }
+      })
+
+    const allTasks = [...courseTasks, ...calendarTasks]
+    allTasks.sort((a, b) => {
+      if (a.completed !== b.completed) return a.completed ? 1 : -1
+      const urgencyWeight = { 'Urgente': 0, 'Próximo': 1, 'Pendiente': 2 }
+      return (urgencyWeight[a.urgency] ?? 2) - (urgencyWeight[b.urgency] ?? 2)
+    })
+
+    return {
+      events: [...mappedEvents, ...lessonEvents],
+      tasks: allTasks,
+      studentId
+    }
+  } catch (error: any) {
+    console.error('Error en getStudentCalendarOverview:', error)
+    return { events: [], tasks: [], studentId: null }
+  }
+}
+
+/**
+ * Permite al estudiante marcar o desmarcar una actividad como completada directamente.
+ */
+export async function toggleStudentTaskCompletion(taskId: string, completed: boolean) {
+  try {
+    const adminClient = createAdminClient()
+    const authClient = await createClient()
+
+    const { data: { user } } = await authClient.auth.getUser()
+    const planillaSession = !user ? await getPlanillaStudentSession() : null
+    let studentId = user?.id || planillaSession?.profileId || null
+
+    if (!studentId && planillaSession?.documentId) {
+      const cleanDoc = planillaSession.documentId.replace(/[^0-9a-zA-Z]/g, '')
+      const { data: dir } = await adminClient
+        .from('student_directory')
+        .select('profile_id')
+        .or(`document_id.eq.${planillaSession.documentId},document_id.eq.${cleanDoc}`)
+        .maybeSingle()
+      if (dir?.profile_id) studentId = dir.profile_id
+    }
+
+    if (!studentId) {
+      return { success: false, error: 'Estudiante no autenticado' }
+    }
+
+    const { error } = await adminClient
+      .from('student_progress')
+      .upsert({
+        student_id: studentId,
+        lesson_id: taskId,
+        completed,
+        completed_at: completed ? new Date().toISOString() : null
+      }, { onConflict: 'student_id,lesson_id' })
+
+    if (error) throw error
+
+    revalidatePath('/student/calendar')
+    revalidatePath('/student/dashboard')
+    return { success: true }
+  } catch (error: any) {
+    console.error('Error en toggleStudentTaskCompletion:', error)
+    return { success: false, error: error.message }
+  }
 }

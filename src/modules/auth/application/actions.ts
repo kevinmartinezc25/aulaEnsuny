@@ -8,20 +8,53 @@ import { z } from 'zod'
 import { loginSchema, LoginInput, isEmailIdentifier } from './validation'
 
 /**
- * Resuelve el email de un estudiante a partir de su número de documento.
- * Busca en student_details → student_id → auth.users (via admin client).
- * Retorna null si no se encuentra ningún usuario asociado.
+ * Resuelve el email oficial de autenticación (auth.users)
+ * a partir de un identificador que puede ser:
+ * 1. Número de documento (con o sin puntos/espacios).
+ * 2. Correo electrónico (directo en auth.users o registrado en student_contacts).
  */
-async function resolveStudentEmailByDocument(documentNumber: string): Promise<string | null> {
+async function resolveAuthEmail(identifier: string): Promise<string | null> {
   try {
     const adminClient = createAdminClient()
-    const doc = documentNumber.trim().replace(/[^0-9a-zA-Z]/g, '')
+    const trimmed = identifier.trim()
+    const isEmail = isEmailIdentifier(trimmed)
+
+    if (isEmail) {
+      const cleanEmail = trimmed.toLowerCase()
+
+      // 1. Verificar si existe en student_contacts para enlazarlo con su cuenta
+      const { data: contact } = await adminClient
+        .from('student_contacts')
+        .select('student_id')
+        .ilike('student_email', cleanEmail)
+        .limit(1)
+        .maybeSingle()
+
+      if (contact?.student_id) {
+        const { data: userData } = await adminClient.auth.admin.getUserById(contact.student_id)
+        if (userData?.user?.email) {
+          return userData.user.email
+        }
+      }
+
+      // Si no difiere o no está en student_contacts, retorna el correo ingresado
+      return cleanEmail
+    }
+
+    // Es un documento de identidad: normalizar eliminando puntos, comas, guiones y espacios
+    const docDigits = trimmed.replace(/\D/g, '')
+    const docAlphanumeric = trimmed.replace(/[^0-9a-zA-Z]/g, '')
+
+    // Construir lista de variantes para la consulta OR
+    const variants = Array.from(new Set([trimmed, docDigits, docAlphanumeric])).filter(Boolean)
+    const orQuery = variants.map(v => `document_number.eq.${v}`).join(',')
+    const dirOrQuery = variants.map(v => `document_id.eq.${v}`).join(',')
 
     // 1. Buscar en student_details por document_number
     const { data: detail } = await adminClient
       .from('student_details')
       .select('student_id')
-      .or(`document_number.eq.${documentNumber.trim()},document_number.eq.${doc}`)
+      .or(orQuery)
       .limit(1)
       .maybeSingle()
 
@@ -32,7 +65,8 @@ async function resolveStudentEmailByDocument(documentNumber: string): Promise<st
       const { data: dir } = await adminClient
         .from('student_directory')
         .select('profile_id')
-        .or(`document_id.eq.${documentNumber.trim()},document_id.eq.${doc}`)
+        .or(dirOrQuery)
+        .not('profile_id', 'is', null)
         .limit(1)
         .maybeSingle()
       studentId = dir?.profile_id
@@ -46,7 +80,7 @@ async function resolveStudentEmailByDocument(documentNumber: string): Promise<st
 
     return userData.user.email
   } catch (err) {
-    console.error('resolveStudentEmailByDocument error:', err)
+    console.error('resolveAuthEmail error:', err)
     return null
   }
 }
@@ -113,14 +147,12 @@ export async function login(input: LoginInput) {
   // ── Producción / Staging ──────────────────────────────────────────────────
   const supabase = await createClient()
 
-  // Resolver el email si el identificador es un número de documento
-  let emailToUse = identifier.trim()
-  if (!isEmailIdentifier(identifier)) {
-    const resolved = await resolveStudentEmailByDocument(identifier)
-    if (!resolved) {
-      return { error: 'No encontramos una cuenta asociada a ese documento. Verifica que hayas creado tu acceso en aulaEnsuny.' }
+  // Resolver el email oficial de Supabase Auth
+  const emailToUse = await resolveAuthEmail(identifier)
+  if (!emailToUse) {
+    return {
+      error: 'No encontramos una cuenta asociada a este documento o correo. Verifica que estés matriculado en aulaEnsuny.'
     }
-    emailToUse = resolved
   }
 
   const { data, error } = await supabase.auth.signInWithPassword({
@@ -130,7 +162,7 @@ export async function login(input: LoginInput) {
 
   if (error) {
     const translatedMessage = error.message === 'Invalid login credentials'
-      ? 'Credenciales de inicio de sesión inválidas. Verifica tu correo/documento y contraseña.'
+      ? 'Credenciales inválidas. Verifica tu documento/correo y contraseña.'
       : error.message
 
     return { error: translatedMessage }
