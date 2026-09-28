@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react'
 import { Award, ShieldAlert, FileText, CheckCircle2, RefreshCw, Users } from 'lucide-react'
 import { toast } from 'sonner'
-import { jsPDF } from 'jspdf'
 import { 
   getElections, getElectionTables, getElectionVoters, getJurors, getElectionResults,
   submitAssistedVote, getCandidates, getTableVotesCount,
@@ -109,9 +108,10 @@ export default function JurorElectionsPage() {
     toast.success('Incidencia registrada')
   }
 
-  function handleGeneratePartialAct() {
+  async function handleGeneratePartialAct() {
     toast.success('Generando acta de mesa...')
     
+    const { jsPDF } = await import('jspdf')
     const doc = new jsPDF()
     const electionName = elections.find(e => e.id === selectedElectionId)?.name || ''
     const tableName = assignedTable?.name || 'Mesa 01'

@@ -8,7 +8,6 @@ import {
   BookOpen, ClipboardList, GraduationCap, Heart, Flag, Laptop, FileCheck, Info, Save,
   Briefcase, CheckCircle2, MessageSquare, FileSpreadsheet, Download, Upload
 } from 'lucide-react'
-import * as XLSX from 'xlsx'
 import { getEvents, getEventCategories, getSystemUsers, saveEvent, deleteEvent, saveEventsBatch, InstitutionalEvent, EventCategory, ProfileInfo } from '../../application/actions'
 import { toast } from 'sonner'
 
@@ -459,7 +458,8 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
   }
 
   // Download Excel template
-  const downloadTemplate = () => {
+  const downloadTemplate = async () => {
+    const XLSX = await import('xlsx')
     const templateData = [
       {
         "Fecha": "Lunes 03",
@@ -585,8 +585,9 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
     if (!file) return
 
     const reader = new FileReader()
-    reader.onload = (evt) => {
+    reader.onload = async (evt) => {
       try {
+        const XLSX = await import('xlsx')
         const data = new Uint8Array(evt.target?.result as ArrayBuffer)
         const workbook = XLSX.read(data, { type: 'array' })
         const sheetName = workbook.SheetNames[0]

@@ -14,7 +14,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { logout } from '@/modules/auth/application/actions'
 import { createClient } from '@/core/config/supabase/client'
 import { PendingPermissionsAlertModal } from '@/modules/permissions/presentation/components/PendingPermissionsAlertModal'
-import { PushNotificationPrompt } from '@/components/notifications/PushNotificationPrompt'
+import { useUserSessionStore } from '@/store/useUserSessionStore'
 
 // ─── Admin Sidebar (grouped sections) ──────────────────────────────────────────
 const ADMIN_NAV = [
@@ -166,6 +166,7 @@ function AdminSidebar({ onClose, user, enabledModules = [], isCollapsed = false 
 
   const handleLogout = async () => {
     if (onClose) onClose()
+    useUserSessionStore.getState().clearSession()
     if (typeof window !== 'undefined') {
       sessionStorage.removeItem('pending_permissions_popup_dismissed')
     }
@@ -544,6 +545,7 @@ function SidebarContent({ onClose, isCollapsed = false, user }: SidebarProps) {
   const handleLogout = async () => {
     if (onClose) onClose()
 
+    useUserSessionStore.getState().clearSession()
     try {
       const result = await logout()
       if (result?.success) {
@@ -740,7 +742,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [isDark, setIsDark] = useState(false)
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
-  const [user, setUser] = useState<UserSessionInfo | null>(null)
+  const sessionUser = useUserSessionStore(state => state.user)
+  const initSession = useUserSessionStore(state => state.initSession)
+
+  useEffect(() => {
+    initSession()
+  }, [initSession])
+
+  const user: UserSessionInfo | null = sessionUser ? {
+    id: sessionUser.id,
+    name: sessionUser.name,
+    email: sessionUser.email,
+    role: sessionUser.role,
+    grade: sessionUser.grade,
+    avatarUrl: sessionUser.avatarUrl
+  } : null
   const isStudent = user?.role === 'student' || pathname.startsWith('/student')
   const isStudentVirtualCourses = isStudentVirtualCampusRoute(pathname)
   const isStudentPortal = isStudent && !isStudentVirtualCourses
@@ -982,169 +998,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
-  // Cargar perfil del usuario actual de manera reactiva/dinámica
-  useEffect(() => {
-    async function loadUserSession() {
-      const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL ||
-                         process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
 
-      // 1. Verificar si hay sesión demo activa en la cookie (solo en modo demo)
-      const getCookie = (name: string) => {
-        const value = `; ${document.cookie}`
-        const parts = value.split(`; ${name}=`)
-        if (parts.length === 2) return parts.pop()?.split(';').shift()
-        return null
-      }
-
-      if (isDemoMode) {
-        const demoCookie = getCookie('aulaensuny-demo-session')
-        if (demoCookie) {
-          try {
-            const session = JSON.parse(decodeURIComponent(demoCookie))
-            const demoId = session.id || (
-              session.email === 'convivencia@ensuny.edu.co' ? 'demo-admin-disc' :
-              session.email === 'secretaria@ensuny.edu.co' ? 'demo-admin-sec' :
-              session.email === 'admin_pruebas@ensuny.edu.co' ? 'demo-admin-coord' : 'demo-admin-coord'
-            )
-            setUser({
-              id: demoId,
-              name: `${session.first_name} ${session.last_name}`,
-              email: session.email || '',
-              role: session.role || 'student',
-              grade: session.grade_level || undefined,
-              avatarUrl: undefined
-            })
-            return
-          } catch (e) {
-            console.error(e)
-          }
-        }
-        return
-      }
-
-      try {
-        const supabase = createClient()
-        const { data: { user: authUser } } = await supabase.auth.getUser()
-        if (authUser) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('*, roles(name)')
-            .eq('id', authUser.id)
-            .single()
-
-          if (profile) {
-            setUser({
-              id: authUser.id,
-              name: `${profile.first_name} ${profile.last_name}`,
-              email: authUser.email || '',
-              role: profile.roles?.name || 'student',
-              grade: profile.grade_level || undefined,
-              avatarUrl: profile.avatar_url || undefined
-            })
-          } else {
-            setUser({
-              id: authUser.id,
-              name: `${authUser.user_metadata?.first_name || 'Usuario'} ${authUser.user_metadata?.last_name || ''}`,
-              email: authUser.email || '',
-              role: authUser.user_metadata?.role_name || 'student',
-              grade: authUser.user_metadata?.grade_level || undefined,
-              avatarUrl: authUser.user_metadata?.avatar_url || undefined
-            })
-          }
-        }
-      } catch (err) {
-        console.error('Error al cargar sesión de usuario en layout:', err)
-      }
-    }
-    loadUserSession()
-  }, [pathname]) // Se actualiza si cambia la ruta (por si se edita el perfil en Settings)
-
-  // Cargar notificaciones reales en base a la sesión del usuario (bypassea mocks en producción)
-  useEffect(() => {
-    async function loadNotifications() {
-      const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL ||
-                         process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
-
-      if (isDemoMode) {
-        if (typeof window !== 'undefined') {
-          const localNotifs = localStorage.getItem('aulaensuny-demo-notifications')
-          if (localNotifs) {
-            try {
-              setNotifications(JSON.parse(localNotifs))
-            } catch (e) {
-              const defaultMocks = user?.role === 'teacher' 
-                ? TEACHER_MOCK_NOTIFICATIONS 
-                : (user?.role === 'admin' || user?.role === 'superadmin' ? ADMIN_MOCK_NOTIFICATIONS : STUDENT_MOCK_NOTIFICATIONS)
-              setNotifications(defaultMocks)
-            }
-          } else {
-            const defaultMocks = user?.role === 'teacher' 
-              ? TEACHER_MOCK_NOTIFICATIONS 
-              : (user?.role === 'admin' || user?.role === 'superadmin' ? ADMIN_MOCK_NOTIFICATIONS : STUDENT_MOCK_NOTIFICATIONS)
-            localStorage.setItem('aulaensuny-demo-notifications', JSON.stringify(defaultMocks))
-            setNotifications(defaultMocks)
-          }
-        } else {
-          const defaultMocks = user?.role === 'teacher' 
-            ? TEACHER_MOCK_NOTIFICATIONS 
-            : (user?.role === 'admin' || user?.role === 'superadmin' ? ADMIN_MOCK_NOTIFICATIONS : STUDENT_MOCK_NOTIFICATIONS)
-          setNotifications(defaultMocks)
-        }
-        return
-      }
-
-      if (!user) {
-        setNotifications([])
-        return
-      }
-
-      try {
-        const supabase = createClient()
-        const { data: { user: authUser } } = await supabase.auth.getUser()
-
-        // Buscar notificaciones destinadas al rol del usuario, a todos ('all') o dirigidas específicamente al usuario
-        // Si el rol es superadmin, también debe poder ver notificaciones dirigidas al rol admin
-        let roleFilter = `target_role.eq.${user.role}`
-        if (user.role === 'superadmin') {
-          roleFilter = `target_role.eq.superadmin,target_role.eq.admin`
-        }
-
-        let query = supabase.from('notifications').select('*')
-        if (authUser) {
-          query = query.or(`target_role.eq.all,${roleFilter},recipient_id.eq.${authUser.id}`)
-        } else {
-          query = query.or(`target_role.eq.all,${roleFilter}`)
-        }
-
-        const { data, error } = await query
-          .order('created_at', { ascending: false })
-          .limit(10)
-
-        if (error) {
-          console.warn('Error fetching layout notifications:', error)
-          setNotifications([])
-        } else {
-          const mapped = (data || []).map((n: any) => {
-            const date = new Date(n.created_at)
-            const timeStr = date.toLocaleDateString('es-ES', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-            return {
-              id: n.id,
-              title: n.title,
-              message: n.message,
-              time: timeStr,
-              read: n.is_read ?? false
-            }
-          })
-          setNotifications(mapped)
-        }
-      } catch (err) {
-        console.error('Error loading layout notifications:', err)
-        setNotifications([])
-      }
-    }
-
-    loadNotifications()
-  }, [user])
 
   const toggleTheme = () => {
     const isDarkNow = document.documentElement.classList.toggle('dark')
@@ -1153,6 +1007,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   const handleLogout = async () => {
+    useUserSessionStore.getState().clearSession()
     try {
       const result = await logout()
       if (result?.success) {

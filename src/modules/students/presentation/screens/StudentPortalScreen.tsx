@@ -8,6 +8,8 @@ import { createClient } from '@/core/config/supabase/client'
 import { StudentVirtualCourseModal } from '../components/StudentVirtualCourseModal'
 import { getStudentEmailStatus } from '../../application/studentEmailActions'
 
+import { useUserSessionStore } from '@/store/useUserSessionStore'
+
 interface StudentInfo { name: string; group: string; gradeLevel: string; jornada: string; academicYear: string; avatarInitials: string }
 
 interface ModuleCard { id: string; title: string; description: string; href: string; icon: React.ElementType; bgColor: string; iconColor: string; borderColor: string }
@@ -27,11 +29,22 @@ function getGreeting(): string {
 
 export function StudentPortalScreen() {
   const shouldReduceMotion = useReducedMotion()
-  const [info, setInfo] = useState<StudentInfo>({ name: 'Estudiante', group: '-', gradeLevel: '-', jornada: 'Mañana', academicYear: new Date().getFullYear().toString(), avatarInitials: 'E' })
+  const sessionUser = useUserSessionStore(state => state.user)
+  const initSession = useUserSessionStore(state => state.initSession)
+
+  const [info, setInfo] = useState<StudentInfo>(() => ({
+    name: sessionUser?.name || 'Estudiante',
+    group: sessionUser?.group || '-',
+    gradeLevel: sessionUser?.grade || '-',
+    jornada: 'Mañana',
+    academicYear: new Date().getFullYear().toString(),
+    avatarInitials: getInitials(sessionUser?.name || 'E')
+  }))
   const [hasCourses, setHasCourses] = useState(false)
   const [hasEmail, setHasEmail] = useState(false)
   const [isVirtualModalOpen, setIsVirtualModalOpen] = useState(false)
-  const [loading, setLoading] = useState(true)
+  // Si ya tenemos sesión precacheada, no bloquear la pantalla con skeleton
+  const [loading, setLoading] = useState(!sessionUser)
 
   useEffect(() => {
     async function load() {
@@ -40,41 +53,86 @@ export function StudentPortalScreen() {
         if (demo) {
           const gc = (n: string) => { const v = '; ' + document.cookie; const p = v.split('; ' + n + '='); if (p.length === 2) return p.pop()?.split(';').shift(); return null }
           const ck = gc('aulaensuny-demo-session')
-          if (ck) { const s = JSON.parse(decodeURIComponent(ck)); const full = ((s.first_name||'') + ' ' + (s.last_name||'')).trim(); setInfo({ name: full||'Estudiante', group: 'Demo 10-A', gradeLevel: s.grade_level||'10', jornada: 'Mañana', academicYear: new Date().getFullYear().toString(), avatarInitials: getInitials(full||'E') }); setHasCourses(true); setHasEmail(true) }
-          setLoading(false); return
+          if (ck) {
+            const s = JSON.parse(decodeURIComponent(ck))
+            const full = ((s.first_name||'') + ' ' + (s.last_name||'')).trim()
+            setInfo({ name: full||'Estudiante', group: 'Demo 10-A', gradeLevel: s.grade_level||'10', jornada: 'Mañana', academicYear: new Date().getFullYear().toString(), avatarInitials: getInitials(full||'E') })
+            setHasCourses(true)
+            setHasEmail(true)
+          }
+          setLoading(false)
+          return
+        }
+
+        // Obtener usuario del store o inicializarlo si aún no está
+        let currentUser = sessionUser
+        if (!currentUser) {
+          currentUser = await initSession()
+        }
+
+        if (!currentUser) {
+          setLoading(false)
+          return
         }
 
         const supabase = createClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        
-        let name = 'Estudiante', group = '-', gradeLevel = '-', jornada = 'Mañana', academicYear = new Date().getFullYear().toString()
+        const userId = currentUser.id
 
-        if (user) {
-          const { data: p } = await supabase.from('profiles').select('first_name, last_name, grade_level, group_name').eq('id', user.id).single()
-          if (p) { name = ((p.first_name||'') + ' ' + (p.last_name||'')).trim()||'Estudiante'; group = p.group_name||'-'; gradeLevel = p.grade_level||'-' }
-          const { data: en } = await supabase.from('student_enrollments').select('jornada, group_name, grade_level, academic_year').eq('student_id', user.id).eq('enrollment_status', 'active').order('academic_year', { ascending: false }).limit(1).maybeSingle()
-          if (en) { if (en.jornada) jornada = en.jornada; if (en.group_name) group = en.group_name; if (en.grade_level) gradeLevel = en.grade_level; if (en.academic_year) academicYear = String(en.academic_year) }
-          const { data: cs } = await supabase.from('student_courses').select('id').eq('student_id', user.id).limit(1)
-          setHasCourses(cs != null && cs.length > 0)
+        // Ejecutar consultas en PARALELO para evitar efecto cascada
+        const [enrollmentRes, coursesRes, emailStatusRes] = await Promise.allSettled([
+          supabase
+            .from('student_enrollments')
+            .select('jornada, group_name, grade_level, academic_year')
+            .eq('student_id', userId)
+            .eq('enrollment_status', 'active')
+            .order('academic_year', { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+          supabase
+            .from('student_courses')
+            .select('id')
+            .eq('student_id', userId)
+            .limit(1),
+          getStudentEmailStatus()
+        ])
+
+        let name = currentUser.name || 'Estudiante'
+        let group = currentUser.group || '-'
+        let gradeLevel = currentUser.grade || '-'
+        let jornada = 'Mañana'
+        let academicYear = new Date().getFullYear().toString()
+
+        if (enrollmentRes.status === 'fulfilled' && enrollmentRes.value.data) {
+          const en = enrollmentRes.value.data
+          if (en.jornada) jornada = en.jornada
+          if (en.group_name) group = en.group_name
+          if (en.grade_level) gradeLevel = en.grade_level
+          if (en.academic_year) academicYear = String(en.academic_year)
         }
 
-        // Consultar estado de cursos y correo unificado
-        try {
-          const status = await getStudentEmailStatus()
+        if (coursesRes.status === 'fulfilled' && coursesRes.value.data) {
+          setHasCourses(coursesRes.value.data.length > 0)
+        }
+
+        if (emailStatusRes.status === 'fulfilled' && emailStatusRes.value) {
+          const status = emailStatusRes.value
           if (status.hasCourses) setHasCourses(true)
           if (status.hasEmail) setHasEmail(true)
           if (status.fullName && status.fullName !== 'Estudiante' && name === 'Estudiante') {
             name = status.fullName
           }
-        } catch (stErr) {
-          console.error(stErr)
         }
 
         setInfo({ name, group, gradeLevel, jornada, academicYear, avatarInitials: getInitials(name) })
-      } catch (e) { console.error(e) } finally { setLoading(false) }
+      } catch (e) {
+        console.error('Error cargando portal estudiante:', e)
+      } finally {
+        setLoading(false)
+      }
     }
+
     load()
-  }, [])
+  }, [sessionUser, initSession])
 
   const BASE: ModuleCard[] = [
     { id: 'grades', title: 'Calificaciones', description: 'Resultados por periodo, área y competencia.', href: '/student/grades', icon: TrendingUp, bgColor: 'bg-emerald-50/80 dark:bg-emerald-950/20', iconColor: 'text-emerald-700 dark:text-emerald-400', borderColor: 'border-emerald-200/60 dark:border-emerald-800/40' },

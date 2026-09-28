@@ -848,48 +848,33 @@ export async function getAdminDashboardStats() {
   try {
     const adminClient = createAdminClient()
 
-    // 1. Obtener perfiles reales con roles
-    const { data: dbProfiles, error: profilesErr } = await adminClient
-      .from('profiles')
-      .select('*, roles!inner(name)')
+    // Parallelize all admin dashboard queries concurrently to avoid waterfalls
+    const [
+      { data: dbProfiles, error: profilesErr },
+      { data: dbCourses, error: coursesErr },
+      { data: dbGrades, error: gradesErr },
+      { count: quizAttemptsCount, error: attemptsErr },
+      { count: resourcesCount, error: resErr }
+    ] = await Promise.all([
+      adminClient.from('profiles').select('id, first_name, last_name, roles!inner(name)'),
+      adminClient.from('courses').select('id, title, status, subject, grade_level'),
+      adminClient.from('grades').select('score, student_id, course_id, created_at'),
+      adminClient.from('quiz_attempts').select('*', { count: 'exact', head: true }),
+      adminClient.from('resources').select('*', { count: 'exact', head: true })
+    ])
 
     if (profilesErr) throw profilesErr
-
-    const students = (dbProfiles || []).filter(p => p.roles.name === 'student')
-    const teachers = (dbProfiles || []).filter(p => p.roles.name === 'teacher')
-
-    // 2. Obtener cursos activos
-    const { data: dbCourses, error: coursesErr } = await adminClient
-      .from('courses')
-      .select('id, title, status, subject, grade_level')
-
     if (coursesErr) throw coursesErr
-    const activeCoursesCount = (dbCourses || []).filter(c => c.status === 'active').length
-
-    // 3. Obtener calificaciones (para el promedio académico global)
-    const { data: dbGrades, error: gradesErr } = await adminClient
-      .from('grades')
-      .select('score, student_id, course_id, created_at')
-
     if (gradesErr) throw gradesErr
+    if (attemptsErr) throw attemptsErr
 
+    const students = ((dbProfiles as any[]) || []).filter(p => p.roles?.name === 'student')
+    const teachers = ((dbProfiles as any[]) || []).filter(p => p.roles?.name === 'teacher')
+    const activeCoursesCount = (dbCourses || []).filter(c => c.status === 'active').length
     const gradesCount = dbGrades?.length || 0
     const totalScore = dbGrades?.reduce((sum, g) => sum + Number(g.score), 0) || 0
     const avgGradeVal = gradesCount > 0 ? (totalScore / gradesCount).toFixed(1) : '0.0'
-
-    // 3b. Obtener el número real de quizzes realizados (intentos en quiz_attempts)
-    const { count: quizAttemptsCount, error: attemptsErr } = await adminClient
-      .from('quiz_attempts')
-      .select('*', { count: 'exact', head: true })
-
-    if (attemptsErr) throw attemptsErr
     const quizzesCount = quizAttemptsCount || 0
-
-    // 4. Obtener total de recursos
-    const { count: resourcesCount, error: resErr } = await adminClient
-      .from('resources')
-      .select('*', { count: 'exact', head: true })
-
     const resourcesTotal = resourcesCount || 0
 
     // 5. Historial de rendimiento mensual

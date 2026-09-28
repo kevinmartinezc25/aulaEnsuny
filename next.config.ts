@@ -12,6 +12,7 @@ const withSerwist = withSerwistInit({
 const nextConfig: NextConfig = {
   turbopack: {},
   experimental: {
+    optimizePackageImports: ['lucide-react', '@heroicons/react', 'date-fns'],
     serverActions: {
       bodySizeLimit: '50mb',
     },

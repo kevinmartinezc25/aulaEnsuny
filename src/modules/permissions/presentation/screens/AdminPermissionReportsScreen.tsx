@@ -15,7 +15,6 @@ import {
   Loader2,
   Users
 } from 'lucide-react'
-import * as XLSX from 'xlsx'
 import { toast } from 'sonner'
 import {
   ResponsiveContainer,
@@ -56,6 +55,7 @@ export function AdminPermissionReportsScreen() {
   const handleExportExcel = async () => {
     setIsExporting(true)
     try {
+      const XLSX = await import('xlsx')
       const { requests } = await getAdminPermissions({ tab: 'all' })
       const rows = requests.map(r => ({
         'Radicado': r.requestNumber,
