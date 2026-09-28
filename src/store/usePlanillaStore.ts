@@ -57,6 +57,8 @@ interface PlanillaState {
   toggleActivityPublished: (id: string) => void
 }
 
+let activeSavePromise: Promise<void> | null = null
+
 export const usePlanillaStore = create<PlanillaState>((set, get) => ({
   subjectId: null,
   students: [],
@@ -166,28 +168,94 @@ export const usePlanillaStore = create<PlanillaState>((set, get) => ({
 
       return {
         grades: newGrades,
-        hasUnsavedChanges: newDirty.length > 0,
+        hasUnsavedChanges: newDirty.length > 0 || state.dirtyAttendance.length > 0,
         dirtyGrades: newDirty
       }
     })
   },
 
   saveChanges: async () => {
-    const state = get()
-    if (state.dirtyGrades.length === 0 && state.dirtyAttendance.length === 0) return
+    // Si ya hay un guardado en curso, esperar a que termine y luego guardar lo que quede pendiente
+    if (activeSavePromise) {
+      await activeSavePromise
+      const state = get()
+      if (state.dirtyGrades.length > 0 || state.dirtyAttendance.length > 0) {
+        return get().saveChanges()
+      }
+      return
+    }
 
-    set({ isSaving: true })
+    const runSave = async () => {
+      const state = get()
+      if (state.dirtyGrades.length === 0 && state.dirtyAttendance.length === 0) {
+        set({ isSaving: false, hasUnsavedChanges: false })
+        return
+      }
+
+      set({ isSaving: true })
+
+      // Tomar una instantánea exacta de lo que se va a enviar en esta petición
+      const gradesToSave = [...state.dirtyGrades]
+      const attendanceToSave = [...state.dirtyAttendance]
+
+      try {
+        if (gradesToSave.length > 0) {
+          await saveAssistedGrades(gradesToSave)
+        }
+        if (attendanceToSave.length > 0) {
+          await saveAssistedAttendance(attendanceToSave)
+        }
+
+        // Conciliación atómica: eliminar SOLO los registros que fueron guardados exitosamente.
+        // Si el docente digitó o cambió algo mientras la petición estaba en curso, preservarlo intacto.
+        set((currentState) => {
+          const savedGradeMap = new Map(
+            gradesToSave.map(g => [`${g.student_id}_${g.activity_id}`, g.grade_value])
+          )
+          const remainingDirtyGrades = currentState.dirtyGrades.filter(g => {
+            const key = `${g.student_id}_${g.activity_id}`
+            if (!savedGradeMap.has(key)) return true // Nuevo cambio durante el guardado
+            return savedGradeMap.get(key) !== g.grade_value // Modificado durante el guardado
+          })
+
+          const savedAttMap = new Map(
+            attendanceToSave.map(a => [`${a.student_id}_${a.session_id}`, a.status])
+          )
+          const remainingDirtyAttendance = currentState.dirtyAttendance.filter(a => {
+            const key = `${a.student_id}_${a.session_id}`
+            if (!savedAttMap.has(key)) return true
+            return savedAttMap.get(key) !== a.status
+          })
+
+          const hasRemaining = remainingDirtyGrades.length > 0 || remainingDirtyAttendance.length > 0
+
+          return {
+            hasUnsavedChanges: hasRemaining,
+            dirtyGrades: remainingDirtyGrades,
+            dirtyAttendance: remainingDirtyAttendance,
+            isSaving: false
+          }
+        })
+
+        // Si quedaron cambios que ocurrieron concurrentemente, desencadenar guardado de los restantes
+        const afterState = get()
+        if (afterState.dirtyGrades.length > 0 || afterState.dirtyAttendance.length > 0) {
+          setTimeout(() => {
+            get().saveChanges()
+          }, 300)
+        }
+      } catch (error: any) {
+        set({ isSaving: false })
+        console.error('Error guardando planilla/asistencia:', error)
+        toast.error(error.message || 'Error al guardar los cambios. Intenta de nuevo.')
+      }
+    }
+
+    activeSavePromise = runSave()
     try {
-      if (state.dirtyGrades.length > 0) {
-        await saveAssistedGrades(state.dirtyGrades)
-      }
-      if (state.dirtyAttendance.length > 0) {
-        await saveAssistedAttendance(state.dirtyAttendance)
-      }
-      set({ hasUnsavedChanges: false, dirtyGrades: [], dirtyAttendance: [], isSaving: false })
-    } catch (error) {
-      set({ isSaving: false })
-      toast.error('Error al guardar los cambios. Intenta de nuevo.')
+      await activeSavePromise
+    } finally {
+      activeSavePromise = null
     }
   },
 

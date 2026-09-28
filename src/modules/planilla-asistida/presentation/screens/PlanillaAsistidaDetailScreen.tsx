@@ -63,6 +63,14 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
   // Zustand Store
   const initializeStore = usePlanillaStore(state => state.initialize)
   const storeState = usePlanillaStore()
+
+  const handleTabChange = async (newTab: 'planilla' | 'actividades' | 'estudiantes' | 'asistencia' | 'configuracion') => {
+    if (activeTab === newTab) return
+    if (storeState.hasUnsavedChanges || storeState.dirtyGrades.length > 0 || storeState.dirtyAttendance.length > 0) {
+      await storeState.saveChanges()
+    }
+    setActiveTab(newTab)
+  }
   
   // Fase 2: Evaluación
   const [isAchievementModalOpen, setIsAchievementModalOpen] = useState(false)
@@ -339,25 +347,25 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
           {/* Tabs */}
           <div className="flex items-center gap-5 overflow-x-auto custom-scrollbar flex-1 xl:ml-6">
             <button 
-              onClick={() => setActiveTab('planilla')}
+              onClick={() => handleTabChange('planilla')}
               className={`pb-2 text-[13px] font-semibold border-b-2 transition-colors whitespace-nowrap ${activeTab === 'planilla' ? 'border-emerald-600 text-emerald-700 dark:text-emerald-500' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
             >
               Planilla
             </button>
             <button 
-              onClick={() => setActiveTab('asistencia')}
+              onClick={() => handleTabChange('asistencia')}
               className={`pb-2 text-[13px] font-semibold border-b-2 transition-colors whitespace-nowrap ${activeTab === 'asistencia' ? 'border-emerald-600 text-emerald-700 dark:text-emerald-500' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
             >
               Asistencia
             </button>
             <button 
-              onClick={() => setActiveTab('estudiantes')}
+              onClick={() => handleTabChange('estudiantes')}
               className={`pb-2 text-[13px] font-semibold border-b-2 transition-colors whitespace-nowrap ${activeTab === 'estudiantes' ? 'border-emerald-600 text-emerald-700 dark:text-emerald-500' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
             >
               Estudiantes
             </button>
             <button 
-              onClick={() => setActiveTab('actividades')}
+              onClick={() => handleTabChange('actividades')}
               className={`pb-2 text-[13px] font-semibold border-b-2 transition-colors whitespace-nowrap ${activeTab === 'actividades' ? 'border-emerald-600 text-emerald-700 dark:text-emerald-500' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
             >
               Estructura

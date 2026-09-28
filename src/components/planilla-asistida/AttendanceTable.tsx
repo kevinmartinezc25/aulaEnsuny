@@ -28,19 +28,29 @@ export function AttendanceTable({ subjectId }: AttendanceTableProps) {
     setIsModalOpen(true)
   }
 
-  // Auto-save logic (debounce)
+  // Auto-save logic (debounce 400ms para respuesta ágil)
   const saveTimeout = useRef<NodeJS.Timeout | null>(null)
   useEffect(() => {
     if (hasUnsavedChanges) {
       if (saveTimeout.current) clearTimeout(saveTimeout.current)
       saveTimeout.current = setTimeout(() => {
         saveChanges()
-      }, 1500)
+      }, 400)
     }
     return () => {
       if (saveTimeout.current) clearTimeout(saveTimeout.current)
     }
   }, [attendance, hasUnsavedChanges, saveChanges])
+
+  // Flush inmediato al desmontar el componente (p. ej. cambio de pestaña o navegación)
+  useEffect(() => {
+    return () => {
+      const state = usePlanillaStore.getState()
+      if (state.hasUnsavedChanges || state.dirtyGrades.length > 0 || state.dirtyAttendance.length > 0) {
+        state.saveChanges()
+      }
+    }
+  }, [])
 
   const handleOpenCreate = () => {
     setSessionToEdit(null)

@@ -63,15 +63,20 @@ const GradeCell = React.memo(({
 
   const handleBlur = () => {
     setIsFocused(false)
-    // Formatear al salir si es válido
+    // Formatear al salir si es válido y sincronizar
     const parsed = parseFloat(localValue.replace(',', '.'))
     if (!isNaN(parsed) && parsed >= 1.0 && parsed <= 5.0) {
-      setLocalValue(parsed.toFixed(1))
+      const formatted = parsed.toFixed(1)
+      setLocalValue(formatted)
+      onChange(studentId, activityId, formatted)
     } else if (localValue === '') {
       setLocalValue('')
+      onChange(studentId, activityId, '')
     } else {
       // Si es inválido, revertir a initialValue visualmente
-      setLocalValue(initialValue !== undefined && initialValue !== null ? initialValue.toFixed(1) : '')
+      const fallback = initialValue !== undefined && initialValue !== null ? initialValue.toFixed(1) : ''
+      setLocalValue(fallback)
+      onChange(studentId, activityId, fallback)
     }
   }
   const isFailing = !isFocused && localValue !== '' && parseFloat(localValue) < 3.0
@@ -141,19 +146,29 @@ export function SpreadsheetTable({ subjectId }: SpreadsheetTableProps) {
     return result
   }, [students, searchQuery, sortOrder])
   
-  // Auto-save logic (debounce)
+  // Auto-save logic (debounce 400ms para respuesta ágil)
   const saveTimeout = useRef<NodeJS.Timeout | null>(null)
   useEffect(() => {
     if (hasUnsavedChanges) {
       if (saveTimeout.current) clearTimeout(saveTimeout.current)
       saveTimeout.current = setTimeout(() => {
         saveChanges()
-      }, 1500)
+      }, 400)
     }
     return () => {
       if (saveTimeout.current) clearTimeout(saveTimeout.current)
     }
   }, [grades, hasUnsavedChanges, saveChanges])
+
+  // Flush inmediato al desmontar el componente (p. ej. cambio de pestaña o navegación)
+  useEffect(() => {
+    return () => {
+      const state = usePlanillaStore.getState()
+      if (state.hasUnsavedChanges || state.dirtyGrades.length > 0 || state.dirtyAttendance.length > 0) {
+        state.saveChanges()
+      }
+    }
+  }, [])
 
   // Estadísticas rápidas se moverán abajo de calcFinalAverage
 

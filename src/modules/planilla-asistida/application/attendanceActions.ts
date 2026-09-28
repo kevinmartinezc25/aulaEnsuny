@@ -165,7 +165,10 @@ export async function saveAssistedAttendance(records: { session_id: string, stud
 
     if (error) {
       console.error('Error saving attendance:', error)
-      throw new Error('Error al guardar la asistencia')
+      if (error.message?.includes('assisted_attendance_status_check')) {
+        throw new Error('Error de validación en la base de datos: ejecuta el script "supabase_attendance_update_t.sql" en Supabase para habilitar "T" (Tardanza).')
+      }
+      throw new Error(`Error al guardar la asistencia: ${error.message || 'Error desconocido'}`)
     }
   }
 
