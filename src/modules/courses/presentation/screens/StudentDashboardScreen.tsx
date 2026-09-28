@@ -28,6 +28,7 @@ interface Task {
   course: string
   dueDate: string
   urgency: 'Urgente' | 'Próximo' | 'Pendiente'
+  status: 'Pendiente' | 'Entregado' | 'Calificado'
   type?: string
   href?: string
 }
@@ -116,6 +117,7 @@ export function StudentDashboardScreen() {
       course: 'Física I',
       dueDate: 'Hoy, 6:00 PM',
       urgency: 'Urgente',
+      status: 'Pendiente',
       type: 'homework',
     },
     {
@@ -124,6 +126,7 @@ export function StudentDashboardScreen() {
       course: 'Matemáticas I',
       dueDate: 'Mañana, 11:59 PM',
       urgency: 'Próximo',
+      status: 'Pendiente',
       type: 'quiz',
     },
     {
@@ -132,6 +135,7 @@ export function StudentDashboardScreen() {
       course: 'Programación',
       dueDate: 'Viernes, 11:59 PM',
       urgency: 'Próximo',
+      status: 'Pendiente',
       type: 'homework',
     },
     {
@@ -140,6 +144,7 @@ export function StudentDashboardScreen() {
       course: 'Inglés I',
       dueDate: 'Lunes, 11:59 PM',
       urgency: 'Pendiente',
+      status: 'Pendiente',
       type: 'homework',
     },
   ]
@@ -344,6 +349,9 @@ export function StudentDashboardScreen() {
           let dbResources: any[] = []
           let courseForums: any[] = []
           let courseQuizzes: any[] = []
+          let dbLessonGrades: any[] = []
+          let dbQuizAttempts: any[] = []
+          let progressData: any[] = []
           let completedLessonIds = new Set<string>()
           let completedResourceIds = new Set<string>()
 
@@ -368,13 +376,13 @@ export function StudentDashboardScreen() {
                 .in('module_id', moduleIds)
               dbResources = resourcesData || []
 
-              const { data: progressData } = await supabase
+              const { data: progressDataRes } = await supabase
                 .from('student_progress')
-                .select('lesson_id')
+                .select('lesson_id, completed, submission_text')
                 .eq('student_id', user.id)
-                .eq('completed', true)
                 .in('lesson_id', dbLessons.map(l => l.id))
-              completedLessonIds = new Set((progressData || []).map(p => p.lesson_id))
+              progressData = progressDataRes || []
+              completedLessonIds = new Set(progressData.filter((p: any) => p.completed).map((p: any) => p.lesson_id))
 
               // Fetch student resource progress completions
               const resourceIds = dbResources.map(r => r.id)
@@ -392,10 +400,9 @@ export function StudentDashboardScreen() {
                 }
               }
 
-
-
               // Fetch student forum interactions to auto-complete forums they participated in
               const lessonIds = dbLessons.map(l => l.id)
+
               if (lessonIds.length > 0) {
                 const { data: forumsData } = await supabase
                   .from('forums')
@@ -412,6 +419,41 @@ export function StudentDashboardScreen() {
                 } catch (e) {
                   console.warn('Could not select quizzes:', e)
                 }
+
+                // Sincronizar calificaciones y entregas reales
+                try {
+                  const [gradesRes, attemptsRes] = await Promise.all([
+                    supabase
+                      .from('student_lesson_grades')
+                      .select('lesson_id, grade, score')
+                      .eq('student_id', user.id)
+                      .in('lesson_id', lessonIds),
+                    courseQuizzes.length > 0
+                      ? supabase
+                          .from('quiz_attempts')
+                          .select('quiz_id, score, status, completed_at')
+                          .eq('student_id', user.id)
+                          .in('quiz_id', courseQuizzes.map(q => q.id))
+                      : Promise.resolve({ data: [] })
+                  ])
+                  dbLessonGrades = gradesRes.data || []
+                  dbQuizAttempts = attemptsRes.data || []
+                } catch (e) {
+                  console.warn('Could not load grades/attempts for dashboard:', e)
+                }
+
+                // Actualizar completedLessonIds con actividades ya calificadas o con examen completado
+                dbLessonGrades.forEach(g => {
+                  if (g.grade !== null || g.score !== null) {
+                    completedLessonIds.add(g.lesson_id)
+                  }
+                })
+                dbQuizAttempts.forEach(qa => {
+                  if (qa.completed_at || qa.status === 'completed' || qa.score !== null) {
+                    const quizObj = courseQuizzes.find(q => q.id === qa.quiz_id)
+                    if (quizObj) completedLessonIds.add(quizObj.lesson_id)
+                  }
+                })
 
                 const forumIds = courseForums.map(f => f.id)
                 if (forumIds.length > 0) {
@@ -516,22 +558,47 @@ export function StudentDashboardScreen() {
           const coursePendingTasks: Task[] = []
 
           for (const l of dbLessons) {
-            if (ACTIONABLE_TYPES.has(l.type) && !completedLessonIds.has(l.id)) {
+            if (ACTIONABLE_TYPES.has(l.type)) {
               const mod = dbModules.find(m => m.id === l.module_id)
               const crs = dbCourses.find(c => c.id === mod?.course_id)
+              const forumObj = courseForums.find((f: any) => f.lesson_id === l.id)
+              const quizObj = courseQuizzes.find((q: any) => q.lesson_id === l.id)
+              const gradeObj = dbLessonGrades.find((g: any) => g.lesson_id === l.id)
+              const quizAttempt = quizObj ? dbQuizAttempts.find((qa: any) => qa.quiz_id === quizObj.id) : null
+              const progObj = (progressData || []).find((p: any) => p.lesson_id === l.id)
+
+              // Determinar estado real sincronizado con el boletín / virtual-grades
+              let status: 'Pendiente' | 'Entregado' | 'Calificado' = 'Pendiente'
+              if (gradeObj && (gradeObj.grade !== null || gradeObj.score !== null)) {
+                status = 'Calificado'
+              } else if (quizAttempt && quizAttempt.score !== null && quizAttempt.score !== undefined) {
+                status = 'Calificado'
+              } else if (
+                (progObj && (progObj.completed || (progObj.submission_text && progObj.submission_text.trim().length > 0))) ||
+                (quizAttempt && (quizAttempt.completed_at || quizAttempt.status === 'completed')) ||
+                completedLessonIds.has(l.id)
+              ) {
+                status = 'Entregado'
+              } else {
+                status = 'Pendiente'
+              }
+
+              // Si ya está calificada con nota definitiva, no listar en actividades pendientes
+              if (status === 'Calificado') continue
 
               let rawDueDate: string | null = l.due_date || null
-              if (!rawDueDate && l.type === 'forum') {
-                const f = courseForums.find((forum: any) => forum.lesson_id === l.id)
-                if (f?.due_date) rawDueDate = f.due_date
+              if (!rawDueDate && l.type === 'forum' && forumObj?.due_date) {
+                rawDueDate = forumObj.due_date
               }
-              if (!rawDueDate && l.type === 'quiz') {
-                const q = courseQuizzes.find((quiz: any) => quiz.lesson_id === l.id)
-                if (q?.end_date) rawDueDate = q.end_date
+              if (!rawDueDate && l.type === 'quiz' && quizObj?.end_date) {
+                rawDueDate = quizObj.end_date
               }
 
               let formattedDate = 'Sin fecha límite'
               let urgency: 'Urgente' | 'Próximo' | 'Pendiente' = 'Pendiente'
+
+              // Validar si es un foro NO evaluable
+              const isNonGradedForum = l.type === 'forum' && !forumObj?.is_graded
 
               if (rawDueDate) {
                 const dueDateObj = new Date(rawDueDate)
@@ -545,7 +612,13 @@ export function StudentDashboardScreen() {
 
                 const timeLeftMs = dueDateObj.getTime() - Date.now()
                 const hoursLeft = timeLeftMs / (1000 * 60 * 60)
-                if (hoursLeft < 24) {
+
+                if (status === 'Entregado') {
+                  urgency = 'Pendiente'
+                } else if (isNonGradedForum) {
+                  // Si es un foro y NO es evaluable, quitar etiqueta de Urgente cuando se está venciendo
+                  urgency = 'Pendiente'
+                } else if (hoursLeft < 24) {
                   urgency = 'Urgente'
                 } else if (hoursLeft < 72) {
                   urgency = 'Próximo'
@@ -558,6 +631,7 @@ export function StudentDashboardScreen() {
                 course: crs?.title || 'Curso',
                 dueDate: formattedDate,
                 urgency,
+                status,
                 type: l.type,
                 href: crs?.slug ? `/student/courses/${crs.slug}?lessonId=${l.id}` : undefined
               })
@@ -589,13 +663,16 @@ export function StudentDashboardScreen() {
               minute: '2-digit'
             })
 
+            const isForumTask = t.event_type === 'forum' || t.title?.toLowerCase().includes('foro')
             const timeLeftMs = dueDateObj.getTime() - Date.now()
             const hoursLeft = timeLeftMs / (1000 * 60 * 60)
             let urgency: 'Urgente' | 'Próximo' | 'Pendiente' = 'Pendiente'
-            if (hoursLeft < 24) {
-              urgency = 'Urgente'
-            } else if (hoursLeft < 72) {
-              urgency = 'Próximo'
+            if (!isForumTask) {
+              if (hoursLeft < 24) {
+                urgency = 'Urgente'
+              } else if (hoursLeft < 72) {
+                urgency = 'Próximo'
+              }
             }
 
             return {
@@ -604,6 +681,7 @@ export function StudentDashboardScreen() {
               course: t.courses?.title || 'Evento General',
               dueDate: formattedDate,
               urgency,
+              status: 'Pendiente',
               type: t.event_type || 'homework',
               href: '/student/calendar'
             }
@@ -616,6 +694,10 @@ export function StudentDashboardScreen() {
 
           const mappedTasks = [...coursePendingTasks, ...calendarPendingTasks]
           mappedTasks.sort((a, b) => {
+            // Primero tareas pendientes por entregar, luego entregadas
+            if (a.status !== b.status) {
+              return a.status === 'Pendiente' ? -1 : 1
+            }
             const urgencyWeight = { 'Urgente': 0, 'Próximo': 1, 'Pendiente': 2 }
             return (urgencyWeight[a.urgency] ?? 2) - (urgencyWeight[b.urgency] ?? 2)
           })
@@ -732,7 +814,7 @@ export function StudentDashboardScreen() {
 
           setStatsData([
             { title: 'Cursos activos', value: String(mappedCourses.length), linkText: 'Ver cursos', href: '#mis-cursos', icon: BookOpen, color: 'text-blue-500 bg-blue-50 dark:bg-blue-950/30' },
-            { title: 'Actividades pendientes', value: String(mappedTasks.length), linkText: 'Ver tareas', href: '/student/calendar', icon: CheckCircle, color: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-950/30' },
+            { title: 'Actividades pendientes', value: String(mappedTasks.filter(t => t.status === 'Pendiente').length), linkText: 'Ver tareas', href: '/student/calendar', icon: CheckCircle, color: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-950/30' },
             { title: 'Progreso general', value: `${progressPercentage}%`, linkText: 'Ver calificaciones', href: '/student/virtual-grades', icon: TrendingUp, color: 'text-indigo-500 bg-indigo-50 dark:bg-indigo-950/30' },
           ])
 
@@ -1149,17 +1231,28 @@ export function StudentDashboardScreen() {
                             <span className={`rounded-lg border px-1.5 py-0.2 text-[9px] font-bold shrink-0 ${typeBadge.color}`}>
                               {typeBadge.label}
                             </span>
+                            <span className={`rounded-lg border px-2 py-0.5 text-[10px] font-bold shrink-0 ${
+                              task.status === 'Entregado'
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800/40'
+                                : task.status === 'Calificado'
+                                ? 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-300 dark:border-indigo-800/40'
+                                : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800/40'
+                            }`}>
+                              {task.status}
+                            </span>
                           </div>
                           <p className="text-xs text-slate-400 dark:text-slate-500 truncate">{task.course}</p>
                         </div>
                       </Link>
-                      <div className="mt-3 sm:mt-0 flex items-center justify-between sm:justify-end gap-4 pl-11 sm:pl-0 shrink-0">
+                      <div className="mt-3 sm:mt-0 flex items-center justify-between sm:justify-end gap-3 pl-11 sm:pl-0 shrink-0">
                         <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
                           {task.dueDate}
                         </span>
-                        <span className={`rounded-lg border px-2 py-0.5 text-[11px] font-bold ${badgeColor}`}>
-                          {task.urgency}
-                        </span>
+                        {task.status === 'Pendiente' && (task.urgency === 'Urgente' || task.urgency === 'Próximo') && (
+                          <span className={`rounded-lg border px-2 py-0.5 text-[11px] font-bold ${badgeColor}`}>
+                            {task.urgency}
+                          </span>
+                        )}
                       </div>
                     </motion.div>
                   )

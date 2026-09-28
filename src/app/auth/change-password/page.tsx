@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import React, { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
@@ -44,11 +44,20 @@ export default function ChangePasswordPage() {
     setLoading(true)
     try {
       const res = await changePasswordFirstLogin(password)
-      if (res.error) { setError(res.error) }
-      else { setSuccess(true); setTimeout(() => router.replace('/student/dashboard'), 1800) }
-    } catch { setError('Error al guardar la contrasena. Intenta nuevamente.') }
-    finally { setLoading(false) }
-  }, [password, confirm, allMet, match, router])
+      if (res.error) {
+        setError(res.error)
+      } else {
+        setSuccess(true)
+        setTimeout(() => {
+          window.location.href = '/student/dashboard'
+        }, 500)
+      }
+    } catch {
+      setError('Error al guardar la contrasena. Intenta nuevamente.')
+    } finally {
+      setLoading(false)
+    }
+  }, [password, confirm, allMet, match])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 dark:from-slate-950 dark:via-slate-900 dark:to-emerald-950/20 flex items-center justify-center p-4">

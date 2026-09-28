@@ -323,25 +323,43 @@ export async function changePasswordFirstLogin(newPassword: string) {
     return { error: 'No se encontró una sesión activa. Por favor inicia sesión nuevamente.' }
   }
 
-  // 1. Actualizar la contraseña en Supabase Auth
-  const { error: updateError } = await supabase.auth.updateUser({ password: newPassword })
-  if (updateError) {
-    return { error: updateError.message }
-  }
-
-  // 2. Marcar en profiles que la contraseña ya fue cambiada
+  const now = new Date().toISOString()
   const adminClient = createAdminClient()
-  const { error: profileError } = await adminClient
-    .from('profiles')
-    .update({ password_changed_at: new Date().toISOString() })
-    .eq('id', user.id)
 
-  if (profileError) {
-    // No falla crítico — la contraseña ya se actualizó. Solo lo registramos.
-    console.error('Error actualizando password_changed_at:', profileError)
+  // 1. Actualizar contraseña y metadata en Supabase Auth y marcar password_changed_at en profiles en paralelo
+  const [updateAuthRes, profileRes] = await Promise.all([
+    supabase.auth.updateUser({
+      password: newPassword,
+      data: { password_changed_at: now }
+    }),
+    adminClient
+      .from('profiles')
+      .update({ password_changed_at: now })
+      .eq('id', user.id)
+  ])
+
+  if (updateAuthRes.error) {
+    return { error: updateAuthRes.error.message }
   }
 
-  revalidatePath('/', 'layout')
+  if (profileRes.error) {
+    console.error('Error actualizando password_changed_at en profiles:', profileRes.error)
+  }
+
+  // 2. Actualizar inmediatamente la cookie de caché para que el middleware valide la nueva contraseña en 0ms
+  try {
+    const cookieStore = await cookies()
+    cookieStore.set('aulaensuny-auth-cache', `${user.id}:student:1`, {
+      path: '/',
+      sameSite: 'lax',
+      maxAge: 86400 * 7
+    })
+  } catch (cookieErr) {
+    console.warn('No se pudo escribir la cookie aulaensuny-auth-cache:', cookieErr)
+  }
+
+  // 3. Revalidar solo la ruta del estudiante (evita congelar el servidor con revalidatePath('/', 'layout'))
+  revalidatePath('/student/dashboard')
   return { success: true }
 }
 
