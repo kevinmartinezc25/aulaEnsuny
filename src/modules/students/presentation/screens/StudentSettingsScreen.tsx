@@ -1,9 +1,11 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
+import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { User, Lock, Bell, Palette, UploadCloud, Save, CheckCircle } from 'lucide-react'
+import { User, Lock, Bell, Palette, UploadCloud, Save, CheckCircle, ArrowLeft } from 'lucide-react'
 import { createClient } from '@/core/config/supabase/client'
+import { getStudentEmailStatus, saveOrUpdateStudentEmail } from '../../application/studentEmailActions'
 
 export function StudentSettingsScreen() {
   const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'notifications' | 'appearance'>('profile')
@@ -211,6 +213,19 @@ export function StudentSettingsScreen() {
             setBio(user.user_metadata?.bio || '')
           }
         }
+
+        // Consultar correo y perfil unificado
+        try {
+          const status = await getStudentEmailStatus()
+          if (status.email) setEmail(status.email)
+          if (status.fullName && (!user || !firstName)) {
+            const parts = status.fullName.split(' ')
+            if (!firstName) setFirstName(parts[0] || '')
+            if (!lastName) setLastName(parts.slice(1).join(' ') || '')
+          }
+        } catch (e) {
+          console.error('Error cargando correo de estudiante:', e)
+        }
       } catch (err) {
         console.error('Error al cargar perfil:', err)
       } finally {
@@ -284,6 +299,15 @@ export function StudentSettingsScreen() {
     }
 
     try {
+      if (email && email.trim()) {
+        const emailRes = await saveOrUpdateStudentEmail(email.trim())
+        if (!emailRes.success) {
+          alert(emailRes.error || 'No se pudo actualizar el correo.')
+          setIsSaving(false)
+          return
+        }
+      }
+
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
@@ -327,59 +351,68 @@ export function StudentSettingsScreen() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-8">
+    <div className="w-[90%] sm:w-full max-w-4xl mx-auto py-5 sm:py-6 space-y-5 sm:space-y-6 px-0 sm:px-4 animate-in fade-in duration-200">
+      {/* Back to portal */}
+      <Link
+        href="/student/dashboard"
+        className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors group"
+      >
+        <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
+        Volver al Portal
+      </Link>
+
       <div>
         <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
           Configuración de Cuenta
         </h1>
-        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
           Administra tu perfil, preferencias y ajustes de seguridad.
         </p>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-8">
+      <div className="flex flex-col md:flex-row gap-5 sm:gap-6">
         {/* Sidebar Menu */}
-        <div className="w-full md:w-64 shrink-0">
-          <nav className="flex flex-col gap-1">
+        <div className="w-full md:w-56 shrink-0">
+          <nav className="grid grid-cols-2 sm:grid-cols-4 md:flex md:flex-col gap-1.5 sm:gap-1">
             <button
               onClick={() => setActiveTab('profile')}
-              className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all ${
+              className={`flex items-center justify-center md:justify-start gap-2.5 sm:gap-3 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold transition-all ${
                 activeTab === 'profile'
                   ? 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400'
                   : 'text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-slate-200'
               }`}
             >
-              <User className="h-4 w-4" /> Mi Perfil
+              <User className="h-4 w-4 shrink-0" /> <span className="truncate">Mi Perfil</span>
             </button>
             <button
               onClick={() => setActiveTab('security')}
-              className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all ${
+              className={`flex items-center justify-center md:justify-start gap-2.5 sm:gap-3 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold transition-all ${
                 activeTab === 'security'
                   ? 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400'
                   : 'text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-slate-200'
               }`}
             >
-              <Lock className="h-4 w-4" /> Seguridad
+              <Lock className="h-4 w-4 shrink-0" /> <span className="truncate">Seguridad</span>
             </button>
             <button
               onClick={() => setActiveTab('notifications')}
-              className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all ${
+              className={`flex items-center justify-center md:justify-start gap-2.5 sm:gap-3 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold transition-all ${
                 activeTab === 'notifications'
                   ? 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400'
                   : 'text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-slate-200'
               }`}
             >
-              <Bell className="h-4 w-4" /> Notificaciones
+              <Bell className="h-4 w-4 shrink-0" /> <span className="truncate">Notificaciones</span>
             </button>
             <button
               onClick={() => setActiveTab('appearance')}
-              className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all ${
+              className={`flex items-center justify-center md:justify-start gap-2.5 sm:gap-3 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold transition-all ${
                 activeTab === 'appearance'
                   ? 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400'
                   : 'text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-slate-200'
               }`}
             >
-              <Palette className="h-4 w-4" /> Apariencia
+              <Palette className="h-4 w-4 shrink-0" /> <span className="truncate">Apariencia</span>
             </button>
           </nav>
         </div>
@@ -392,7 +425,7 @@ export function StudentSettingsScreen() {
               animate={{ opacity: 1, y: 0 }}
               className="rounded-3xl border border-slate-100 bg-white shadow-sm dark:border-slate-800/60 dark:bg-slate-900 overflow-hidden"
             >
-              <div className="p-6 sm:p-8 space-y-8">
+              <div className="p-5 sm:p-7 space-y-6 sm:space-y-8">
                 {/* Avatar Upload */}
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
                   <div className="relative h-24 w-24 shrink-0 rounded-full border-4 border-white shadow-lg dark:border-slate-800 bg-slate-100 dark:bg-slate-800 overflow-hidden">
@@ -482,10 +515,11 @@ export function StudentSettingsScreen() {
                       <input
                         type="email"
                         value={email}
-                        readOnly
-                        className="w-full rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm text-slate-500 outline-none cursor-not-allowed dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400"
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="tu-correo@ejemplo.com"
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition-all focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:focus:border-blue-500"
                       />
-                      <p className="text-xs text-slate-400 mt-1">El correo institucional no puede modificarse.</p>
+                      <p className="text-xs text-slate-400 mt-1">Correo de contacto vinculado a tu cuenta y campus virtual.</p>
                     </div>
                     <div className="space-y-2">
                       <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Grado / Grupo</label>
@@ -541,7 +575,7 @@ export function StudentSettingsScreen() {
               animate={{ opacity: 1, y: 0 }}
               className="rounded-3xl border border-slate-100 bg-white shadow-sm dark:border-slate-800/60 dark:bg-slate-900 overflow-hidden"
             >
-              <div className="p-6 sm:p-8 space-y-6">
+              <div className="p-5 sm:p-7 space-y-6">
                 <div>
                   <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
                     <Lock className="h-5 w-5 text-slate-400" /> Cambiar Contraseña
@@ -616,7 +650,7 @@ export function StudentSettingsScreen() {
               animate={{ opacity: 1, y: 0 }}
               className="rounded-3xl border border-slate-100 bg-white shadow-sm dark:border-slate-800/60 dark:bg-slate-900 overflow-hidden"
             >
-              <div className="p-6 sm:p-8 space-y-6">
+              <div className="p-5 sm:p-7 space-y-6">
                 <div>
                   <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
                     <Bell className="h-5 w-5 text-slate-400" /> Preferencias de Notificación
@@ -678,7 +712,7 @@ export function StudentSettingsScreen() {
               animate={{ opacity: 1, y: 0 }}
               className="rounded-3xl border border-slate-100 bg-white shadow-sm dark:border-slate-800/60 dark:bg-slate-900 overflow-hidden"
             >
-              <div className="p-6 sm:p-8 space-y-6">
+              <div className="p-5 sm:p-7 space-y-6">
                 <div>
                   <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
                     <Palette className="h-5 w-5 text-slate-400" /> Apariencia Visual

@@ -6,6 +6,7 @@ import { BookOpen, CheckCircle, Award, TrendingUp, Flame, Rocket, Code2, AlertTr
 import Link from 'next/link'
 import { createClient } from '@/core/config/supabase/client'
 import { getStudentLatestAnnouncements } from '../../application/announcementActions'
+import { getStudentDashboardCourses } from '../../application/studentCoursesActions'
 
 interface Course {
   id: string
@@ -740,6 +741,57 @@ export function StudentDashboardScreen() {
           } catch (e) {
             console.error('Error fetching student dashboard announcements:', e)
           }
+        } else {
+          // Sesión del portal por documento de identidad
+          try {
+            const result = await getStudentDashboardCourses()
+            if (result.studentName && result.studentName !== 'Estudiante') {
+              setStudentName(result.studentName.split(' ')[0] || result.studentName)
+            }
+            if (result.courses && result.courses.length > 0) {
+              const mapped = result.courses.map((c: any) => {
+                const subject = (c.subject || 'GENERAL').toUpperCase()
+                let color = 'bg-blue-500'
+                let bgColor = 'bg-blue-50/50 dark:bg-blue-950/20'
+                let textColor = 'text-blue-600 dark:text-blue-400'
+
+                if (subject.includes('MATEM')) {
+                  color = 'bg-purple-500'
+                  bgColor = 'bg-purple-50/50 dark:bg-purple-950/20'
+                  textColor = 'text-purple-600 dark:text-purple-400'
+                } else if (subject.includes('TEC') || subject.includes('PROG')) {
+                  color = 'bg-emerald-500'
+                  bgColor = 'bg-emerald-50/50 dark:bg-emerald-950/20'
+                  textColor = 'text-emerald-600 dark:text-emerald-400'
+                } else if (subject.includes('INGL') || subject.includes('LENGU')) {
+                  color = 'bg-amber-500'
+                  bgColor = 'bg-amber-50/50 dark:bg-amber-950/20'
+                  textColor = 'text-amber-600 dark:text-amber-400'
+                }
+
+                return {
+                  id: c.id,
+                  slug: c.slug,
+                  title: c.title,
+                  topic: c.description || 'Sin descripción',
+                  progress: 0,
+                  category: subject,
+                  color,
+                  bgColor,
+                  textColor,
+                  image: c.banner_url || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=300',
+                }
+              })
+              setCourses(mapped)
+              setStatsData([
+                { title: 'Cursos activos', value: String(mapped.length), linkText: 'Ver todos', href: '/student/dashboard', icon: BookOpen, color: 'text-blue-500 bg-blue-50 dark:bg-blue-950/30' },
+                { title: 'Actividades pendientes', value: '0', linkText: 'Ver tareas', href: '/student/calendar', icon: CheckCircle, color: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-950/30' },
+                { title: 'Progreso general', value: '0%', linkText: 'Ver progreso', href: '/student/dashboard', icon: TrendingUp, color: 'text-indigo-500 bg-indigo-50 dark:bg-indigo-950/30' },
+              ])
+            }
+          } catch (portalErr) {
+            console.error('Error cargando cursos de sesión del portal:', portalErr)
+          }
         }
       } catch (err) {
         console.error('Error al cargar datos del estudiante:', err)
@@ -755,8 +807,8 @@ export function StudentDashboardScreen() {
     <div className="space-y-8 max-w-7xl mx-auto">
       {/* Saludo */}
       <div className="space-y-1">
-        <div className="flex flex-row items-center gap-3">
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <h1 className="text-xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white break-words">
             ¡Hola, {studentName}!
           </h1>
           <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-200/50 dark:border-blue-800/30 w-fit">
@@ -769,9 +821,9 @@ export function StudentDashboardScreen() {
       </div>
 
       {/* Grid de Estadísticas */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {loading ? (
-          Array.from({ length: 4 }).map((_, idx) => (
+          Array.from({ length: 3 }).map((_, idx) => (
             <div key={idx} className="rounded-2xl border border-slate-100 bg-white p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] dark:border-slate-800/60 dark:bg-slate-900 animate-pulse">
               <div className="flex items-center gap-4">
                 <div className="h-11 w-11 rounded-xl bg-slate-100 dark:bg-slate-800" />
@@ -837,7 +889,7 @@ export function StudentDashboardScreen() {
               </h2>
               <div className="flex items-center gap-3">
                 <Link href="/student/join-course" className="inline-flex items-center gap-1 text-xs font-semibold text-[#1F4E31] hover:underline dark:text-[#388E59]">
-                  <PlusCircle className="h-3.5 w-3.5" /> Unirse a un curso
+                  <PlusCircle className="h-3.5 w-3.5" /> Agregar curso
                 </Link>
                 <Link href="/student/dashboard" className="text-xs font-semibold text-blue-600 hover:underline dark:text-blue-400 flex items-center gap-0.5">
                   Ver todos <ArrowRight className="h-3 w-3" />
@@ -871,10 +923,10 @@ export function StudentDashboardScreen() {
                 </div>
                 <h3 className="text-base font-bold text-slate-900 dark:text-white">Sin cursos registrados</h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-xs mx-auto">
-                  Aún no tienes cursos asignados para tu grado. Puedes solicitar acceso usando un código de invitación o contactar al administrador.
+                  Aún no tienes asignaturas matriculadas. Puedes inscribirte en tus cursos ingresando el código proporcionado por tu docente.
                 </p>
                 <Link href="/student/join-course" className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl bg-[#1F4E31] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#153823]">
-                  <PlusCircle className="h-4 w-4" /> Unirse a un curso
+                  <PlusCircle className="h-4 w-4" /> Agregar curso
                 </Link>
               </div>
             ) : (

@@ -1634,7 +1634,7 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
               {([
                 { id: 'announcements', label: 'Novedades', shortLabel: 'Novedades' },
                 { id: 'content', label: 'Contenido', shortLabel: 'Contenido' },
-                { id: 'grades', label: 'Calificaciones', shortLabel: 'Notas' },
+                { id: 'grades', label: 'Mis Notas', shortLabel: 'Notas' },
                 { id: 'reports', label: 'Reporte General', shortLabel: 'Reporte' },
               ] as const).map((tab) => {
                 const isSelected = activeTab === tab.id
@@ -2941,7 +2941,7 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
             <div className="rounded-2xl bg-white border border-slate-100 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.02)] dark:bg-slate-900 dark:border-slate-800 flex flex-col">
               <h3 className="text-base font-bold text-slate-900 dark:text-white mb-6">Evolución de Calificaciones</h3>
               <div className="flex-1 min-h-[250px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <LineChart data={performanceData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.2} />
                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />
@@ -2960,7 +2960,7 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
             <div className="rounded-2xl bg-white border border-slate-100 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.02)] dark:bg-slate-900 dark:border-slate-800 flex flex-col">
               <h3 className="text-base font-bold text-slate-900 dark:text-white mb-6">Horas de Estudio por Módulo</h3>
               <div className="flex-1 min-h-[250px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <BarChart data={timeData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.2} />
                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />

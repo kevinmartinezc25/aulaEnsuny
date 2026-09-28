@@ -1,7 +1,7 @@
 import { type NextRequest } from 'next/server'
 import { updateSession } from '@/core/config/supabase/middleware'
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   return await updateSession(request)
 }
 
@@ -18,4 +18,3 @@ export const config = {
     '/((?!_next/static|_next/image|favicon.ico|manifest\\.webmanifest|manifest\\.json|sw\\.js|offline|icons/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|json|webmanifest)$).*)',
   ],
 }
-

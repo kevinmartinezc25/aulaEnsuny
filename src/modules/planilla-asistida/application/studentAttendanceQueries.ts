@@ -1,6 +1,7 @@
 'use server'
 
 import { createAdminClient } from '@/core/config/supabase/server'
+import { createClient } from '@/core/config/supabase/server'
 import { getPlanillaStudentSession } from './studentAuthActions'
 
 export interface StudentAttendanceSubjectSummary {

@@ -1,9 +1,16 @@
 import { z } from 'zod'
 
 export const loginSchema = z.object({
-  email: z.string().email('Por favor ingresa un correo electrónico válido.'),
+  identifier: z
+    .string()
+    .min(4, 'Ingresa tu correo institucional o número de documento.'),
   password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres.'),
 })
+
+/** Determina si una cadena es un correo electrónico válido */
+export function isEmailIdentifier(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())
+}
 
 export type LoginInput = z.infer<typeof loginSchema>
 

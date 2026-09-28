@@ -165,7 +165,7 @@ export function AdminPermissionReportsScreen() {
             <span>Evolución Mensual de Solicitudes</span>
           </h3>
           <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <AreaChart data={metrics.monthlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="totalGrad" x1="0" y1="0" x2="0" y2="1">
@@ -192,7 +192,7 @@ export function AdminPermissionReportsScreen() {
             <span>Distribución por Tipo de Permiso</span>
           </h3>
           <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <BarChart data={metrics.byTypeData} layout="vertical" margin={{ top: 10, right: 20, left: 40, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} opacity={0.3} />
                 <XAxis type="number" tick={{ fontSize: 11 }} />

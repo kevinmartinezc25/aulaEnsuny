@@ -4,6 +4,7 @@ import { createAdminClient, createClient } from '@/core/config/supabase/server'
 import { ScheduleData, ScheduleDayKey } from '@/components/schedule/DayTabsScheduleView'
 import { generateTimeSlots } from '@/app/admin/schedules/utils/timeCalculator'
 import { resolveOfficialGroup } from '@/modules/planilla-asistida/application/groupResolver'
+import { getPlanillaStudentSession } from '@/modules/planilla-asistida/application/studentAuthActions'
 
 export interface StudentDashboardScheduleResponse {
   success: boolean
@@ -21,10 +22,11 @@ export async function getStudentDashboardSchedule(): Promise<StudentDashboardSch
   const supabase = createAdminClient()
   const authClient = await createClient()
 
-  // 1. Obtener usuario autenticado
-  const { data: { user }, error: userError } = await authClient.auth.getUser()
+  // 1. Obtener usuario autenticado o sesión del portal
+  const { data: { user } } = await authClient.auth.getUser()
+  const planillaSession = !user ? await getPlanillaStudentSession() : null
   
-  if (userError || !user) {
+  if (!user && !planillaSession) {
     return {
       success: false,
       hasGroup: false,
@@ -45,63 +47,65 @@ export async function getStudentDashboardSchedule(): Promise<StudentDashboardSch
   const isGloballyPublished = publishedImports && publishedImports.length > 0
 
   // 2. Resolver identidad y grupo del estudiante de manera robusta
-  let docId: string | null = null
-  let activeGradeLevel = ''
-  let activeGroupName = ''
+  let docId: string | null = planillaSession?.documentId || null
+  let activeGradeLevel = planillaSession?.gradeLevel || ''
+  let activeGroupName = planillaSession?.groupName || ''
   let directoryData: any = null
 
-  // 2.1 Buscar detalles del perfil
-  const { data: profileDetails } = await supabase
-    .from('student_details')
-    .select('document_number')
-    .eq('student_id', user.id)
-    .maybeSingle()
+  if (user) {
+    // 2.1 Buscar detalles del perfil
+    const { data: profileDetails } = await supabase
+      .from('student_details')
+      .select('document_number')
+      .eq('student_id', user.id)
+      .maybeSingle()
 
-  if (profileDetails?.document_number) docId = profileDetails.document_number
+    if (profileDetails?.document_number) docId = profileDetails.document_number
 
-  // 2.2 Buscar en directorio por profile_id
-  const { data: dirByProfile } = await supabase
-    .from('student_directory')
-    .select('id, document_id, grade_level, group_name')
-    .eq('profile_id', user.id)
-    .maybeSingle()
-
-  if (dirByProfile) {
-    directoryData = dirByProfile
-    if (!docId && dirByProfile.document_id) docId = dirByProfile.document_id
-    activeGradeLevel = dirByProfile.grade_level || ''
-    activeGroupName = dirByProfile.group_name || ''
-  }
-
-  // 2.3 Si no se encontró por profile_id, buscar por documento
-  if (!directoryData && docId) {
-    const cleanDoc = docId.replace(/[^0-9a-zA-Z]/g, '')
-    const { data: dirByDoc } = await supabase
+    // 2.2 Buscar en directorio por profile_id
+    const { data: dirByProfile } = await supabase
       .from('student_directory')
       .select('id, document_id, grade_level, group_name')
-      .or(`document_id.eq.${docId},document_id.eq.${cleanDoc}`)
-      .limit(1)
+      .eq('profile_id', user.id)
+      .maybeSingle()
 
-    if (dirByDoc && dirByDoc.length > 0) {
-      directoryData = dirByDoc[0]
-      activeGradeLevel = directoryData.grade_level || ''
-      activeGroupName = directoryData.group_name || ''
+    if (dirByProfile) {
+      directoryData = dirByProfile
+      if (!docId && dirByProfile.document_id) docId = dirByProfile.document_id
+      activeGradeLevel = dirByProfile.grade_level || ''
+      activeGroupName = dirByProfile.group_name || ''
     }
-  }
 
-  // 2.4 Verificar matrícula activa en student_enrollments (tiene prioridad)
-  const { data: enrollment } = await supabase
-    .from('student_enrollments')
-    .select('group_name, grade_level')
-    .eq('student_id', user.id)
-    .eq('enrollment_status', 'active')
-    .order('academic_year', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+    // 2.3 Si no se encontró por profile_id, buscar por documento
+    if (!directoryData && docId) {
+      const cleanDoc = docId.replace(/[^0-9a-zA-Z]/g, '')
+      const { data: dirByDoc } = await supabase
+        .from('student_directory')
+        .select('id, document_id, grade_level, group_name')
+        .or(`document_id.eq.${docId},document_id.eq.${cleanDoc}`)
+        .limit(1)
 
-  if (enrollment) {
-    if (enrollment.group_name) activeGroupName = enrollment.group_name
-    if (enrollment.grade_level) activeGradeLevel = enrollment.grade_level
+      if (dirByDoc && dirByDoc.length > 0) {
+        directoryData = dirByDoc[0]
+        activeGradeLevel = directoryData.grade_level || ''
+        activeGroupName = directoryData.group_name || ''
+      }
+    }
+
+    // 2.4 Verificar matrícula activa en student_enrollments (tiene prioridad)
+    const { data: enrollment } = await supabase
+      .from('student_enrollments')
+      .select('group_name, grade_level')
+      .eq('student_id', user.id)
+      .eq('enrollment_status', 'active')
+      .order('academic_year', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (enrollment) {
+      if (enrollment.group_name) activeGroupName = enrollment.group_name
+      if (enrollment.grade_level) activeGradeLevel = enrollment.grade_level
+    }
   }
 
   if (!activeGradeLevel || !activeGroupName) {

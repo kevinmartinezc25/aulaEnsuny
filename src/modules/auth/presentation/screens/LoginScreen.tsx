@@ -45,7 +45,7 @@ export function LoginScreen() {
   } = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: '',
+      identifier: '',
       password: '',
     },
   })
@@ -181,10 +181,10 @@ export function LoginScreen() {
             {/* Cabecera */}
             <div className="mb-6 text-center">
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-                Bienvenido
+                Ingresar a aulaEnsuny
               </h1>
               <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-                Ingresa tus credenciales para continuar
+                Accede a tu plataforma educativa
               </p>
             </div>
 
@@ -208,31 +208,31 @@ export function LoginScreen() {
                 animate="show"
                 className="space-y-4"
               >
-                {/* Correo electrónico */}
+                {/* Correo o Documento */}
                 <motion.div variants={itemVariants} className="space-y-1.5">
                   <Label
-                    htmlFor="email"
+                    htmlFor="identifier"
                     className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400"
                   >
-                    Correo Electrónico
+                    Correo institucional o documento
                   </Label>
                   <Input
-                    id="email"
-                    type="email"
-                    autoComplete="email"
-                    placeholder="usuario@ensuny.edu.co"
+                    id="identifier"
+                    type="text"
+                    autoComplete="username"
+                    placeholder="usuario@ensuny.edu.co o número de documento"
                     className={`h-11 rounded-2xl border-slate-200/90 bg-slate-100/60 px-3.5 text-sm transition-all duration-150 hover:bg-slate-100/90 focus:bg-white focus:ring-2 focus:ring-[#1F4E31]/20 focus:border-[#1F4E31] dark:border-white/10 dark:bg-slate-800/50 dark:hover:bg-slate-800/80 dark:focus:bg-slate-900 dark:focus:ring-emerald-500/25 dark:focus:border-emerald-500 ${
-                      errors.email ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' : ''
+                      errors.identifier ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' : ''
                     }`}
-                    {...register('email')}
+                    {...register('identifier')}
                   />
-                  {errors.email && (
+                  {errors.identifier && (
                     <motion.p
                       initial={{ opacity: 0, y: -2 }}
                       animate={{ opacity: 1, y: 0 }}
                       className="text-xs text-red-500 mt-1 pl-1"
                     >
-                      {errors.email.message}
+                      {errors.identifier.message}
                     </motion.p>
                   )}
                 </motion.div>
@@ -284,7 +284,7 @@ export function LoginScreen() {
                   )}
                 </motion.div>
 
-                {/* Botón de Iniciar Sesión con respuesta física inmediata en pointer-down */}
+                {/* Botón de Ingresar con respuesta física inmediata en pointer-down */}
                 <motion.div variants={itemVariants} className="pt-2">
                   <Button
                     type="submit"
@@ -294,16 +294,30 @@ export function LoginScreen() {
                     {isLoading ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        <span>Iniciando sesión...</span>
+                        <span>Ingresando...</span>
                       </>
                     ) : (
-                      'Iniciar Sesión'
+                      'Ingresar'
                     )}
                   </Button>
                 </motion.div>
 
-                {/* Enlaces inferiores */}
-                <motion.div variants={itemVariants} className="pt-2 text-center flex flex-col items-center gap-3">
+                {/* Divisor */}
+                <motion.div variants={itemVariants} className="pt-2">
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-slate-200/80 dark:border-slate-700/60" />
+                    </div>
+                    <div className="relative flex justify-center text-[10px]">
+                      <span className="bg-white dark:bg-slate-900 px-2 text-slate-400 dark:text-slate-500 uppercase tracking-wider font-semibold">
+                        ¿No tienes acceso?
+                      </span>
+                    </div>
+                  </div>
+                </motion.div>
+
+                {/* Enlace de creación de cuenta para estudiantes */}
+                <motion.div variants={itemVariants} className="text-center flex flex-col items-center gap-3">
                   <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
                     ¿Eres estudiante y aún no tienes una cuenta?{' '}
                     <Link
