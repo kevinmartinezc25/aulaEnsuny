@@ -942,4 +942,515 @@ export async function updateModuleItemsOrder(moduleId: string, items: { id: stri
   }
 }
 
+export async function createCourseModule(
+  courseId: string,
+  title: string,
+  sortOrder: number
+): Promise<{ id: string; title: string; sort_order: number }> {
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('course_modules')
+    .insert({ course_id: courseId, title, sort_order: sortOrder })
+    .select('id, title, sort_order')
+    .single()
+
+  if (error || !data) {
+    console.error('Error creating module in server action:', error)
+    throw new Error(error?.message || 'Error al crear el módulo')
+  }
+
+  return data
+}
+
+export async function deleteCourseModule(moduleId: string): Promise<void> {
+  const supabase = createAdminClient()
+  const { error } = await supabase
+    .from('course_modules')
+    .delete()
+    .eq('id', moduleId)
+
+  if (error) {
+    console.error('Error deleting module in server action:', error)
+    throw new Error(error.message)
+  }
+}
+
+export async function updateCourseModuleTitle(moduleId: string, title: string): Promise<void> {
+  const supabase = createAdminClient()
+  const { error } = await supabase
+    .from('course_modules')
+    .update({ title })
+    .eq('id', moduleId)
+
+  if (error) {
+    console.error('Error updating module title in server action:', error)
+    throw new Error(error.message)
+  }
+}
+
+export async function deleteModuleItem(itemId: string): Promise<{ type: 'lesson' | 'resource' }> {
+  const supabase = createAdminClient()
+
+  // 1. Verificar si es una lección
+  const { data: lesson } = await supabase
+    .from('lessons')
+    .select('id')
+    .eq('id', itemId)
+    .maybeSingle()
+
+  if (lesson) {
+    const { error } = await supabase
+      .from('lessons')
+      .delete()
+      .eq('id', itemId)
+
+    if (error) {
+      console.error('Error deleting lesson in server action:', error)
+      throw new Error(error.message)
+    }
+    return { type: 'lesson' }
+  }
+
+  // 2. Si no es lección, es un recurso: desvincular del módulo (module_id = null)
+  const { error: resErr } = await supabase
+    .from('resources')
+    .update({ module_id: null })
+    .eq('id', itemId)
+
+  if (resErr) {
+    console.error('Error unlinking resource in server action:', resErr)
+    throw new Error(resErr.message)
+  }
+
+  return { type: 'resource' }
+}
+
+export async function linkQuizToModule(
+  moduleId: string,
+  quizId: string,
+  sortOrder: number
+): Promise<{ lessonId: string; title: string; duration?: string }> {
+  const supabase = createAdminClient()
+
+  const { data: dbQuiz, error: qErr } = await supabase
+    .from('quizzes')
+    .select('id, title, duration_minutes, lesson_id')
+    .eq('id', quizId)
+    .single()
+
+  if (qErr || !dbQuiz) {
+    throw new Error(qErr?.message || 'Quiz no encontrado')
+  }
+
+  let lessonId = dbQuiz.lesson_id
+
+  if (lessonId) {
+    const { error } = await supabase
+      .from('lessons')
+      .update({
+        module_id: moduleId,
+        sort_order: sortOrder,
+      })
+      .eq('id', lessonId)
+
+    if (error) throw new Error(error.message)
+  } else {
+    const { data: newLesson, error: lErr } = await supabase
+      .from('lessons')
+      .insert({
+        module_id: moduleId,
+        title: dbQuiz.title,
+        type: 'quiz',
+        sort_order: sortOrder,
+      })
+      .select('id')
+      .single()
+
+    if (lErr || !newLesson) throw new Error(lErr?.message || 'Error creando lección para quiz')
+    lessonId = newLesson.id
+
+    const { error: updErr } = await supabase
+      .from('quizzes')
+      .update({ lesson_id: lessonId })
+      .eq('id', quizId)
+
+    if (updErr) throw new Error(updErr.message)
+  }
+
+  return {
+    lessonId,
+    title: dbQuiz.title,
+    duration: dbQuiz.duration_minutes ? `${dbQuiz.duration_minutes} min` : undefined,
+  }
+}
+
+export async function linkResourceToModule(
+  moduleId: string,
+  resourceId: string,
+  sortOrder: number
+): Promise<void> {
+  const supabase = createAdminClient()
+
+  const { error } = await supabase
+    .from('resources')
+    .update({
+      module_id: moduleId,
+      sort_order: sortOrder,
+    })
+    .eq('id', resourceId)
+
+  if (error) {
+    console.error('Error linking resource in server action:', error)
+    throw new Error(error.message)
+  }
+}
+
+export async function linkForumToModule(
+  moduleId: string,
+  forumId: string,
+  sortOrder: number
+): Promise<{ lessonId: string; title: string }> {
+  const supabase = createAdminClient()
+
+  const { data: dbForum, error: fErr } = await supabase
+    .from('forums')
+    .select('id, title, lesson_id')
+    .eq('id', forumId)
+    .maybeSingle()
+
+  if (fErr || !dbForum) {
+    throw new Error(fErr?.message || 'Foro no encontrado')
+  }
+
+  let lessonId = dbForum.lesson_id
+
+  if (lessonId) {
+    const { error } = await supabase
+      .from('lessons')
+      .update({
+        module_id: moduleId,
+        sort_order: sortOrder,
+      })
+      .eq('id', lessonId)
+
+    if (error) throw new Error(error.message)
+  } else {
+    const { data: newLesson, error: lErr } = await supabase
+      .from('lessons')
+      .insert({
+        module_id: moduleId,
+        title: dbForum.title || 'Foro de debate',
+        type: 'forum',
+        sort_order: sortOrder,
+      })
+      .select('id, title')
+      .single()
+
+    if (lErr || !newLesson) throw new Error(lErr?.message || 'Error creando lección para foro')
+    lessonId = newLesson.id
+
+    const { error: updErr } = await supabase
+      .from('forums')
+      .update({ lesson_id: lessonId })
+      .eq('id', forumId)
+
+    if (updErr) throw new Error(updErr.message)
+  }
+
+  return {
+    lessonId,
+    title: dbForum.title || 'Foro de debate',
+  }
+}
+
+export async function getCourseLinkableItems(courseId: string) {
+  const supabase = createAdminClient()
+
+  // 1. Quizzes y foros a través de las lecciones de los módulos del curso
+  const { data: dbModules } = await supabase
+    .from('course_modules')
+    .select('id')
+    .eq('course_id', courseId)
+
+  let quizzes: { id: string; title: string; duration: string; status: string }[] = []
+  let forums: { id: string; name: string; type: string }[] = []
+
+  if (dbModules && dbModules.length > 0) {
+    const mIds = dbModules.map(m => m.id)
+    const { data: dbLessons } = await supabase
+      .from('lessons')
+      .select('id')
+      .in('module_id', mIds)
+
+    if (dbLessons && dbLessons.length > 0) {
+      const lIds = dbLessons.map(l => l.id)
+      const { data: dbQuizzes } = await supabase
+        .from('quizzes')
+        .select('id, title, duration_minutes')
+        .in('lesson_id', lIds)
+
+      if (dbQuizzes) {
+        quizzes = dbQuizzes.map(q => ({
+          id: q.id,
+          title: q.title,
+          duration: q.duration_minutes ? `${q.duration_minutes} min` : 'Sin límite',
+          status: 'active'
+        }))
+      }
+
+      const { data: dbForums } = await supabase
+        .from('forums')
+        .select('id, lessons!inner(title)')
+        .in('lesson_id', lIds)
+
+      if (dbForums) {
+        forums = dbForums.map((f: any) => ({
+          id: f.id,
+          name: f.lessons?.title || 'Foro de Discusión',
+          type: 'forum'
+        }))
+      }
+    }
+  }
+
+  // 2. Resources del curso
+  const { data: dbResources } = await supabase
+    .from('resources')
+    .select('id, title, file_size, mime_type')
+    .eq('course_id', courseId)
+
+  let resources: { id: string; name: string; type: 'pdf' | 'doc' | 'link'; size: string }[] = []
+  if (dbResources) {
+    resources = dbResources.map(r => {
+      let resourceType: 'pdf' | 'doc' | 'link' = 'doc'
+      const mime = r.mime_type?.toLowerCase() || ''
+      if (mime.includes('pdf')) {
+        resourceType = 'pdf'
+      } else if (mime === 'url' || mime === 'link') {
+        resourceType = 'link'
+      }
+
+      return {
+        id: r.id,
+        name: r.title,
+        type: resourceType,
+        size: r.file_size ? `${(r.file_size / 1024 / 1024).toFixed(1)} MB` : 'Enlace Web'
+      }
+    })
+  }
+
+  return { quizzes, forums, resources }
+}
+
+export async function getLessonQuizOrForumRedirect(lessonId: string): Promise<{ quizId?: string; forumId?: string }> {
+  const supabase = createAdminClient()
+
+  const { data: quiz } = await supabase
+    .from('quizzes')
+    .select('id')
+    .eq('lesson_id', lessonId)
+    .maybeSingle()
+
+  if (quiz) {
+    return { quizId: quiz.id }
+  }
+
+  const { data: forum } = await supabase
+    .from('forums')
+    .select('id')
+    .eq('lesson_id', lessonId)
+    .maybeSingle()
+
+  if (forum) {
+    return { forumId: forum.id }
+  }
+
+  return {}
+}
+
+export interface TeacherDashboardCourse {
+  id: string
+  slug: string
+  title: string
+  subject: string
+  gradeLevel: string | null
+  description: string | null
+  studentsCount: number
+  modulesCount: number
+  joinCode: string
+}
+
+export interface TeacherDashboardOverviewResult {
+  courses: TeacherDashboardCourse[]
+  stats: {
+    coursesCount: number
+    studentsCount: number
+    quizzesCount: number
+    avgGrade: string
+  }
+}
+
+export async function getTeacherDashboardOverview(): Promise<TeacherDashboardOverviewResult> {
+  try {
+    const authClient = await createClient()
+    const { data: { user } } = await authClient.auth.getUser()
+
+    if (!user) {
+      return {
+        courses: [],
+        stats: { coursesCount: 0, studentsCount: 0, quizzesCount: 0, avgGrade: '—' }
+      }
+    }
+
+    const adminClient = createAdminClient()
+
+    // 1. Obtener identificadores posibles del docente (profile_id y academic_teachers.id)
+    const { data: acTeacher } = await adminClient
+      .from('academic_teachers')
+      .select('id')
+      .eq('profile_id', user.id)
+      .maybeSingle()
+
+    const teacherIds = Array.from(new Set([user.id, acTeacher?.id])).filter(Boolean) as string[]
+
+    // 2. Consultar asignaturas reales asignadas/creadas por el docente
+    const { data: dbCourses, error: coursesErr } = await adminClient
+      .from('courses')
+      .select('id, title, slug, description, subject, grade_level, group_name, join_code, status, created_at')
+      .in('teacher_id', teacherIds)
+      .order('created_at', { ascending: false })
+
+    if (coursesErr) {
+      console.error('Error fetching teacher courses:', coursesErr)
+    }
+
+    if (!dbCourses || dbCourses.length === 0) {
+      return {
+        courses: [],
+        stats: { coursesCount: 0, studentsCount: 0, quizzesCount: 0, avgGrade: '—' }
+      }
+    }
+
+    const courseIds = dbCourses.map(c => c.id)
+
+    // 3. Conteo de módulos por curso
+    const { data: modules } = await adminClient
+      .from('course_modules')
+      .select('id, course_id')
+      .in('course_id', courseIds)
+
+    // 4. Conteo de estudiantes inscritos
+    const { data: enrollments } = await adminClient
+      .from('student_courses')
+      .select('student_id, course_id')
+      .in('course_id', courseIds)
+
+    const distinctStudents = new Set((enrollments || []).map(e => e.student_id)).size
+
+    // 5. Quizzes creados o evaluados
+    let quizzesCount = 0
+    const moduleIds = (modules || []).map(m => m.id)
+    if (moduleIds.length > 0) {
+      const { data: lessons } = await adminClient
+        .from('lessons')
+        .select('id')
+        .in('module_id', moduleIds)
+
+      const lessonIds = (lessons || []).map(l => l.id)
+      if (lessonIds.length > 0) {
+        const { data: quizzesList } = await adminClient
+          .from('quizzes')
+          .select('id')
+          .in('lesson_id', lessonIds)
+
+        const quizIds = (quizzesList || []).map(q => q.id)
+        if (quizIds.length > 0) {
+          const { count: attemptsCount } = await adminClient
+            .from('quiz_attempts')
+            .select('*', { count: 'exact', head: true })
+            .in('quiz_id', quizIds)
+
+          quizzesCount = (attemptsCount && attemptsCount > 0) ? attemptsCount : quizIds.length
+        }
+      }
+    }
+
+    // 6. Rendimiento promedio real
+    let totalGradeSum = 0
+    let totalGradeCount = 0
+
+    const { data: periodGrades } = await adminClient
+      .from('student_period_grades')
+      .select('final_grade')
+      .in('course_id', courseIds)
+
+    if (periodGrades && periodGrades.length > 0) {
+      for (const g of periodGrades) {
+        const num = Number(g.final_grade)
+        if (!isNaN(num) && num > 0) {
+          totalGradeSum += num
+          totalGradeCount++
+        }
+      }
+    }
+
+    if (totalGradeCount === 0) {
+      const { data: regularGrades } = await adminClient
+        .from('grades')
+        .select('score')
+        .in('course_id', courseIds)
+
+      if (regularGrades && regularGrades.length > 0) {
+        for (const g of regularGrades) {
+          const num = Number(g.score)
+          if (!isNaN(num) && num > 0) {
+            totalGradeSum += num
+            totalGradeCount++
+          }
+        }
+      }
+    }
+
+    const avgGrade = totalGradeCount > 0
+      ? `${(totalGradeSum / totalGradeCount).toFixed(1)} / 5.0`
+      : '—'
+
+    // 7. Mapear cursos para la interfaz
+    const mappedCourses: TeacherDashboardCourse[] = dbCourses.map(c => {
+      const courseStudents = (enrollments || []).filter(e => e.course_id === c.id).length
+      const courseModules = (modules || []).filter(m => m.course_id === c.id).length
+
+      return {
+        id: c.id,
+        slug: c.slug || c.id,
+        title: c.title,
+        subject: c.subject || 'General',
+        gradeLevel: c.grade_level || null,
+        description: c.description || null,
+        studentsCount: courseStudents,
+        modulesCount: courseModules,
+        joinCode: c.join_code || ''
+      }
+    })
+
+    return {
+      courses: mappedCourses,
+      stats: {
+        coursesCount: mappedCourses.length,
+        studentsCount: distinctStudents || (enrollments?.length ?? 0),
+        quizzesCount,
+        avgGrade
+      }
+    }
+  } catch (error) {
+    console.error('Error in getTeacherDashboardOverview:', error)
+    return {
+      courses: [],
+      stats: { coursesCount: 0, studentsCount: 0, quizzesCount: 0, avgGrade: '—' }
+    }
+  }
+}
+
+
+
 

@@ -1,10 +1,10 @@
-import { StudentRegistrationScreen } from '@/modules/auth/presentation/screens/StudentRegistrationScreen'
+import { redirect } from 'next/navigation'
 
 export const metadata = {
-  title: 'Registro de Estudiante | aulaEnsuny',
-  description: 'Regístrate en la plataforma educativa aulaEnsuny',
+  title: 'Acceso Estudiante | aulaEnsuny',
+  description: 'Ingreso a la plataforma educativa aulaEnsuny',
 }
 
 export default function StudentRegistrationPage() {
-  return <StudentRegistrationScreen />
+  redirect('/login')
 }

@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { motion, AnimatePresence, useReducedMotion, Variants } from 'framer-motion'
+import { motion, useReducedMotion, Variants } from 'framer-motion'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { login } from '@/modules/auth/application/actions'
@@ -11,8 +11,7 @@ import { loginSchema, LoginInput } from '@/modules/auth/application/validation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import QRCode from 'react-qr-code'
-import { Loader2, AlertCircle, Eye, EyeOff, Moon, Sun, QrCode, X, ArrowLeft } from 'lucide-react'
+import { Loader2, AlertCircle, Eye, EyeOff, Moon, Sun, ArrowLeft } from 'lucide-react'
 
 export function LoginScreen() {
   const router = useRouter()
@@ -22,7 +21,6 @@ export function LoginScreen() {
   const [errorMsg, setErrorMsg] = useState<string | null>(() => errorParam || null)
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
-  const [showQRModal, setShowQRModal] = useState(false)
 
   useEffect(() => {
     const root = document.documentElement
@@ -214,13 +212,12 @@ export function LoginScreen() {
                     htmlFor="identifier"
                     className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400"
                   >
-                    Correo institucional o documento
+                    Documento de identidad o correo
                   </Label>
                   <Input
                     id="identifier"
                     type="text"
                     autoComplete="username"
-                    placeholder="usuario@ensuny.edu.co o número de documento"
                     className={`h-11 rounded-2xl border-slate-200/90 bg-slate-100/60 px-3.5 text-sm transition-all duration-150 hover:bg-slate-100/90 focus:bg-white focus:ring-2 focus:ring-[#1F4E31]/20 focus:border-[#1F4E31] dark:border-white/10 dark:bg-slate-800/50 dark:hover:bg-slate-800/80 dark:focus:bg-slate-900 dark:focus:ring-emerald-500/25 dark:focus:border-emerald-500 ${
                       errors.identifier ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' : ''
                     }`}
@@ -258,7 +255,6 @@ export function LoginScreen() {
                       id="password"
                       type={showPassword ? 'text' : 'password'}
                       autoComplete="current-password"
-                      placeholder=""
                       className={`h-11 rounded-2xl border-slate-200/90 bg-slate-100/60 px-3.5 pr-11 text-sm transition-all duration-150 hover:bg-slate-100/90 focus:bg-white focus:ring-2 focus:ring-[#1F4E31]/20 focus:border-[#1F4E31] dark:border-white/10 dark:bg-slate-800/50 dark:hover:bg-slate-800/80 dark:focus:bg-slate-900 dark:focus:ring-emerald-500/25 dark:focus:border-emerald-500 ${
                         errors.password ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' : ''
                       }`}
@@ -273,7 +269,7 @@ export function LoginScreen() {
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
-                  {errors.password && (
+                  {errors.password ? (
                     <motion.p
                       initial={{ opacity: 0, y: -2 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -281,6 +277,10 @@ export function LoginScreen() {
                     >
                       {errors.password.message}
                     </motion.p>
+                  ) : (
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500 pl-1">
+                      ¿Primer ingreso? Tu contraseña inicial es tu documento.
+                    </p>
                   )}
                 </motion.div>
 
@@ -300,42 +300,6 @@ export function LoginScreen() {
                       'Ingresar'
                     )}
                   </Button>
-                </motion.div>
-
-                {/* Divisor */}
-                <motion.div variants={itemVariants} className="pt-2">
-                  <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t border-slate-200/80 dark:border-slate-700/60" />
-                    </div>
-                    <div className="relative flex justify-center text-[10px]">
-                      <span className="bg-white dark:bg-slate-900 px-2 text-slate-400 dark:text-slate-500 uppercase tracking-wider font-semibold">
-                        ¿No tienes acceso?
-                      </span>
-                    </div>
-                  </div>
-                </motion.div>
-
-                {/* Enlace de creación de cuenta para estudiantes */}
-                <motion.div variants={itemVariants} className="text-center flex flex-col items-center gap-3">
-                  <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-                    ¿Eres estudiante y aún no tienes una cuenta?{' '}
-                    <Link
-                      href="/register/student"
-                      className="font-bold text-[#1F4E31] hover:text-[#153823] underline-offset-2 hover:underline transition-colors dark:text-emerald-400 dark:hover:text-emerald-300 active:scale-95 duration-100 inline-block"
-                    >
-                      Crear acceso de estudiante
-                    </Link>
-                  </p>
-
-                  <button
-                    type="button"
-                    onClick={() => setShowQRModal(true)}
-                    className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-slate-100/80 hover:bg-slate-200/80 dark:bg-slate-800/70 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-full text-xs font-semibold transition-all active:scale-95 duration-100 ease-out cursor-pointer border border-slate-200/50 dark:border-white/5"
-                  >
-                    <QrCode className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400" />
-                    <span>Mostrar QR de Registro</span>
-                  </button>
                 </motion.div>
               </motion.div>
             </form>
@@ -359,65 +323,6 @@ export function LoginScreen() {
           </motion.div>
         </motion.div>
       </main>
-
-      {/* Modal QR con física de resorte y desenfoque fluido */}
-      <AnimatePresence>
-        {showQRModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            {/* Backdrop desenfocado */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              onClick={() => setShowQRModal(false)}
-              className="absolute inset-0 bg-slate-950/40 backdrop-blur-md cursor-pointer"
-            />
-
-            {/* Tarjeta Modal centrada */}
-            <motion.div
-              initial={{ opacity: 0, scale: shouldReduceMotion ? 1 : 0.94, y: shouldReduceMotion ? 0 : 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: shouldReduceMotion ? 1 : 0.96, y: shouldReduceMotion ? 0 : 6 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 280, mass: 0.8 }}
-              className="relative z-10 bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl rounded-[32px] p-6 sm:p-8 max-w-sm w-full shadow-2xl border border-white/60 dark:border-white/10 overflow-hidden"
-            >
-              <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white dark:via-white/20 to-transparent" />
-
-              <button
-                onClick={() => setShowQRModal(false)}
-                type="button"
-                className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-90 duration-100 cursor-pointer"
-                aria-label="Cerrar modal"
-              >
-                <X className="w-5 h-5" />
-              </button>
-
-              <div className="text-center space-y-3 pt-1">
-                <div className="mx-auto w-12 h-12 bg-emerald-500/10 rounded-2xl flex items-center justify-center border border-emerald-500/20">
-                  <QrCode className="w-6 h-6 text-[#1F4E31] dark:text-emerald-400" />
-                </div>
-                <h3 className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">
-                  Registro Rápido
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed px-2">
-                  Escanea este código QR desde tu dispositivo móvil para acceder directamente al formulario de registro.
-                </p>
-                <div className="bg-white p-4 rounded-2xl inline-flex items-center justify-center mt-2 shadow-[0_4px_16px_rgba(0,0,0,0.06)] border border-slate-100 dark:border-slate-800">
-                  <QRCode
-                    value={
-                      typeof window !== 'undefined'
-                        ? `${window.location.origin}/register/student`
-                        : 'https://aula.ensuny.edu.co/register/student'
-                    }
-                    size={170}
-                  />
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
     </div>
   )
 }

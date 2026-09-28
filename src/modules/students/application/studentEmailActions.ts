@@ -35,12 +35,11 @@ export async function getStudentEmailStatus(): Promise<StudentEmailStatus> {
   if (profileId) {
     const { data: profile } = await adminClient
       .from('profiles')
-      .select('first_name, last_name, email')
+      .select('first_name, last_name')
       .eq('id', profileId)
       .maybeSingle()
 
     if (profile) {
-      if (!currentEmail && profile.email) currentEmail = profile.email
       if (!fullName) fullName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim()
     }
 
@@ -115,7 +114,7 @@ export async function getStudentEmailStatus(): Promise<StudentEmailStatus> {
 
 /**
  * Guarda o actualiza el correo electrónico del estudiante,
- * sincronizando tanto profiles como auth.users (si existe cuenta).
+ * sincronizando tanto student_contacts como auth.users.
  */
 export async function saveOrUpdateStudentEmail(newEmail: string): Promise<{ success: boolean; error?: string }> {
   try {
@@ -142,14 +141,14 @@ export async function saveOrUpdateStudentEmail(newEmail: string): Promise<{ succ
       return { success: false, error: 'No se pudo identificar la sesión del estudiante.' }
     }
 
-    // 2. Verificar que el correo no esté ya asignado a OTRA cuenta distinta
-    const { data: existingUser } = await adminClient
-      .from('profiles')
-      .select('id')
-      .eq('email', cleanEmail)
+    // 2. Verificar que el correo no esté ya asignado a OTRA cuenta distinta en student_contacts
+    const { data: existingContact } = await adminClient
+      .from('student_contacts')
+      .select('student_id')
+      .ilike('student_email', cleanEmail)
       .maybeSingle()
 
-    if (existingUser && existingUser.id !== profileId) {
+    if (existingContact && existingContact.student_id !== profileId) {
       return {
         success: false,
         error: 'Este correo electrónico ya está registrado por otra cuenta en la plataforma.'
@@ -158,14 +157,16 @@ export async function saveOrUpdateStudentEmail(newEmail: string): Promise<{ succ
 
     // 3. Si tiene profileId (cuenta creada en profiles)
     if (profileId) {
-      // 3.1 Actualizar profiles
-      const { error: profileError } = await adminClient
-        .from('profiles')
-        .update({ email: cleanEmail })
-        .eq('id', profileId)
+      // 3.1 Actualizar/insertar en student_contacts
+      const { error: contactErr } = await adminClient
+        .from('student_contacts')
+        .upsert({
+          student_id: profileId,
+          student_email: cleanEmail
+        }, { onConflict: 'student_id' })
 
-      if (profileError) {
-        console.error('Error actualizando profiles.email:', profileError)
+      if (contactErr) {
+        console.error('Error actualizando student_contacts.student_email:', contactErr)
       }
 
       // 3.2 Sincronizar en auth.users de Supabase
@@ -180,19 +181,10 @@ export async function saveOrUpdateStudentEmail(newEmail: string): Promise<{ succ
       } catch (authErr) {
         console.warn('No se pudo actualizar auth.users directamente:', authErr)
       }
-
-      // 3.3 Actualizar student_contacts si existe
-      await adminClient
-        .from('student_contacts')
-        .upsert({
-          student_id: profileId,
-          student_email: cleanEmail
-        }, { onConflict: 'student_id' })
     }
 
     // 4. Si el estudiante aún no tenía profileId pero tiene registro en student_directory
     if (!profileId && directoryId) {
-      // Si profiles tiene campo id o profile_id vinculado
       const { data: dirStudent } = await adminClient
         .from('student_directory')
         .select('profile_id')
@@ -201,9 +193,11 @@ export async function saveOrUpdateStudentEmail(newEmail: string): Promise<{ succ
 
       if (dirStudent?.profile_id) {
         await adminClient
-          .from('profiles')
-          .update({ email: cleanEmail })
-          .eq('id', dirStudent.profile_id)
+          .from('student_contacts')
+          .upsert({
+            student_id: dirStudent.profile_id,
+            student_email: cleanEmail
+          }, { onConflict: 'student_id' })
 
         try {
           await adminClient.auth.admin.updateUserById(dirStudent.profile_id, {

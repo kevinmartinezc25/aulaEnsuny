@@ -211,15 +211,6 @@ export default function LandingPage() {
               </Link>
             </div>
 
-            {/* Enlace de Registro sutil inferior */}
-            <div className="pt-2">
-              <Link
-                href="/register/student"
-                className="text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-[#1F4E31] dark:hover:text-emerald-400 transition-colors underline underline-offset-4"
-              >
-                ¿Eres estudiante? Solicita tu acceso aquí
-              </Link>
-            </div>
 
             {/* Badges de Instalación PWA Promocionales */}
             <InstallPWA />
@@ -341,9 +332,6 @@ export default function LandingPage() {
           <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-xs font-medium text-slate-500 dark:text-slate-400">
             <Link href="/login" className="text-emerald-700 dark:text-emerald-400 font-semibold hover:underline transition-colors">
               Ingresar a aulaEnsuny
-            </Link>
-            <Link href="/register/student" className="hover:text-[#1F4E31] dark:hover:text-emerald-400 transition-colors">
-              Registro de Estudiantes
             </Link>
             <Link href="/docs" className="hover:text-[#1F4E31] dark:hover:text-emerald-400 transition-colors">
               Documentos Oficiales

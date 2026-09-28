@@ -18,7 +18,8 @@ interface Course {
   color: string
   bgColor: string
   textColor: string
-  image: string
+  image?: string
+  gradeLevel?: string | null
 }
 
 interface Task {
@@ -271,9 +272,9 @@ export function StudentDashboardScreen() {
         setTasks(pendingTasksMock)
         setAchievements(recentAchievementsMock)
         setStatsData([
-          { title: 'Cursos activos', value: String(activeCoursesMock.length), linkText: 'Ver todos', href: '/student/dashboard', icon: BookOpen, color: 'text-blue-500 bg-blue-50 dark:bg-blue-950/30' },
+          { title: 'Cursos activos', value: String(activeCoursesMock.length), linkText: 'Ver cursos', href: '#mis-cursos', icon: BookOpen, color: 'text-blue-500 bg-blue-50 dark:bg-blue-950/30' },
           { title: 'Actividades pendientes', value: String(pendingTasksMock.length), linkText: 'Ver tareas', href: '/student/calendar', icon: CheckCircle, color: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-950/30' },
-          { title: 'Progreso general', value: '54%', linkText: 'Ver progreso', href: '/student/dashboard', icon: TrendingUp, color: 'text-indigo-500 bg-indigo-50 dark:bg-indigo-950/30' },
+          { title: 'Progreso general', value: '54%', linkText: 'Ver calificaciones', href: '/student/virtual-grades', icon: TrendingUp, color: 'text-indigo-500 bg-indigo-50 dark:bg-indigo-950/30' },
         ])
         // Demo calendar events: use dates relative to today
         const t = new Date()
@@ -502,7 +503,8 @@ export function StudentDashboardScreen() {
               color,
               bgColor,
               textColor,
-              image: c.banner_url || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=300',
+              image: c.banner_url || '',
+              gradeLevel: c.grade_level || null,
             }
           }
 
@@ -729,9 +731,9 @@ export function StudentDashboardScreen() {
           const progressPercentage = totalAllItems > 0 ? Math.min(100, Math.round((completedAllItems / totalAllItems) * 100)) : 0
 
           setStatsData([
-            { title: 'Cursos activos', value: String(mappedCourses.length), linkText: 'Ver todos', href: '/student/dashboard', icon: BookOpen, color: 'text-blue-500 bg-blue-50 dark:bg-blue-950/30' },
+            { title: 'Cursos activos', value: String(mappedCourses.length), linkText: 'Ver cursos', href: '#mis-cursos', icon: BookOpen, color: 'text-blue-500 bg-blue-50 dark:bg-blue-950/30' },
             { title: 'Actividades pendientes', value: String(mappedTasks.length), linkText: 'Ver tareas', href: '/student/calendar', icon: CheckCircle, color: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-950/30' },
-            { title: 'Progreso general', value: `${progressPercentage}%`, linkText: 'Ver progreso', href: '/student/dashboard', icon: TrendingUp, color: 'text-indigo-500 bg-indigo-50 dark:bg-indigo-950/30' },
+            { title: 'Progreso general', value: `${progressPercentage}%`, linkText: 'Ver calificaciones', href: '/student/virtual-grades', icon: TrendingUp, color: 'text-indigo-500 bg-indigo-50 dark:bg-indigo-950/30' },
           ])
 
           // Fetch latest announcements (only for enrolled courses)
@@ -784,9 +786,9 @@ export function StudentDashboardScreen() {
               })
               setCourses(mapped)
               setStatsData([
-                { title: 'Cursos activos', value: String(mapped.length), linkText: 'Ver todos', href: '/student/dashboard', icon: BookOpen, color: 'text-blue-500 bg-blue-50 dark:bg-blue-950/30' },
+                { title: 'Cursos activos', value: String(mapped.length), linkText: 'Ver cursos', href: '#mis-cursos', icon: BookOpen, color: 'text-blue-500 bg-blue-50 dark:bg-blue-950/30' },
                 { title: 'Actividades pendientes', value: '0', linkText: 'Ver tareas', href: '/student/calendar', icon: CheckCircle, color: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-950/30' },
-                { title: 'Progreso general', value: '0%', linkText: 'Ver progreso', href: '/student/dashboard', icon: TrendingUp, color: 'text-indigo-500 bg-indigo-50 dark:bg-indigo-950/30' },
+                { title: 'Progreso general', value: '0%', linkText: 'Ver calificaciones', href: '/student/virtual-grades', icon: TrendingUp, color: 'text-indigo-500 bg-indigo-50 dark:bg-indigo-950/30' },
               ])
             }
           } catch (portalErr) {
@@ -821,19 +823,24 @@ export function StudentDashboardScreen() {
       </div>
 
       {/* Grid de Estadísticas */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-3">
         {loading ? (
           Array.from({ length: 3 }).map((_, idx) => (
-            <div key={idx} className="rounded-2xl border border-slate-100 bg-white p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] dark:border-slate-800/60 dark:bg-slate-900 animate-pulse">
-              <div className="flex items-center gap-4">
-                <div className="h-11 w-11 rounded-xl bg-slate-100 dark:bg-slate-800" />
-                <div className="space-y-2 flex-1">
-                  <div className="h-3 w-20 rounded bg-slate-100 dark:bg-slate-800" />
-                  <div className="h-6 w-10 rounded bg-slate-200 dark:bg-slate-700" />
+            <div
+              key={idx}
+              className={`rounded-2xl sm:rounded-3xl border border-slate-100 bg-white p-3.5 sm:p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] dark:border-slate-800/60 dark:bg-slate-900 animate-pulse ${
+                idx === 2 ? 'col-span-2 sm:col-span-1' : ''
+              }`}
+            >
+              <div className="flex items-center gap-2.5 sm:gap-4">
+                <div className="h-9 w-9 sm:h-11 sm:w-11 rounded-xl bg-slate-100 dark:bg-slate-800 shrink-0" />
+                <div className="space-y-1.5 sm:space-y-2 flex-1 min-w-0">
+                  <div className="h-2.5 sm:h-3 w-16 sm:w-20 rounded bg-slate-100 dark:bg-slate-800" />
+                  <div className="h-5 sm:h-6 w-8 sm:w-10 rounded bg-slate-200 dark:bg-slate-700" />
                 </div>
               </div>
-              <div className="mt-4 border-t border-slate-50 pt-3 dark:border-slate-800/40">
-                <div className="h-3 w-16 rounded bg-slate-100 dark:bg-slate-800" />
+              <div className="mt-2.5 sm:mt-4 border-t border-slate-50 pt-2 sm:pt-3 dark:border-slate-800/40">
+                <div className="h-2.5 sm:h-3 w-12 sm:w-16 rounded bg-slate-100 dark:bg-slate-800" />
               </div>
             </div>
           ))
@@ -846,27 +853,29 @@ export function StudentDashboardScreen() {
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, delay: idx * 0.05 }}
-                className="rounded-2xl border border-slate-100 bg-white p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] dark:border-slate-800/60 dark:bg-slate-900"
+                className={`rounded-2xl sm:rounded-3xl border border-slate-100 bg-white p-3.5 sm:p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] dark:border-slate-800/60 dark:bg-slate-900 flex flex-col justify-between ${
+                  idx === 2 ? 'col-span-2 sm:col-span-1' : ''
+                }`}
               >
-                <div className="flex items-center gap-4">
-                  <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${stat.color}`}>
-                    <Icon className="h-5 w-5" />
+                <div className="flex items-center gap-2.5 sm:gap-4">
+                  <div className={`flex h-9 w-9 sm:h-11 sm:w-11 items-center justify-center rounded-xl shrink-0 ${stat.color}`}>
+                    <Icon className="h-4.5 w-4.5 sm:h-5 sm:w-5" />
                   </div>
-                  <div className="text-left">
-                    <p className="text-xs font-medium text-slate-400 dark:text-slate-500">
+                  <div className="text-left min-w-0">
+                    <p className="text-[10px] sm:text-xs font-medium text-slate-400 dark:text-slate-500 truncate sm:whitespace-normal">
                       {stat.title}
                     </p>
-                    <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                    <p className="text-lg sm:text-2xl font-bold text-slate-900 dark:text-white leading-tight mt-0.5">
                       {stat.value}
                     </p>
                   </div>
                 </div>
-                <div className="mt-4 border-t border-slate-50 pt-3 dark:border-slate-800/40 text-left">
+                <div className="mt-2.5 sm:mt-4 border-t border-slate-50 pt-2 sm:pt-3 dark:border-slate-800/40 text-left">
                   <Link
                     href={stat.href}
-                    className="text-xs font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400"
+                    className="text-[10px] sm:text-xs font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 inline-flex items-center gap-1"
                   >
-                    {stat.linkText}
+                    {stat.linkText} <ArrowRight className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                   </Link>
                 </div>
               </motion.div>
@@ -882,7 +891,7 @@ export function StudentDashboardScreen() {
         <div className="lg:col-span-2 space-y-8">
 
           {/* Cursos */}
-          <div className="space-y-4">
+          <div id="mis-cursos" className="space-y-4 scroll-mt-20">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
                 Mis cursos
@@ -891,28 +900,26 @@ export function StudentDashboardScreen() {
                 <Link href="/student/join-course" className="inline-flex items-center gap-1 text-xs font-semibold text-[#1F4E31] hover:underline dark:text-[#388E59]">
                   <PlusCircle className="h-3.5 w-3.5" /> Agregar curso
                 </Link>
-                <Link href="/student/dashboard" className="text-xs font-semibold text-blue-600 hover:underline dark:text-blue-400 flex items-center gap-0.5">
-                  Ver todos <ArrowRight className="h-3 w-3" />
+                <Link href="/student/virtual-grades" className="text-xs font-semibold text-blue-600 hover:underline dark:text-blue-400 flex items-center gap-0.5">
+                  Calificaciones <ArrowRight className="h-3 w-3" />
                 </Link>
               </div>
             </div>
 
             {/* Grid/Scroll de Cursos */}
             {loading ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div className="grid grid-cols-2 gap-3 sm:gap-6">
                 {Array.from({ length: 2 }).map((_, idx) => (
-                  <div key={idx} className="rounded-3xl border border-slate-100 bg-white shadow-[0_8px_30px_rgb(0,0,0,0.02)] dark:border-slate-800/60 dark:bg-slate-900 overflow-hidden animate-pulse">
-                    <div className="h-36 w-full bg-slate-100 dark:bg-slate-800" />
-                    <div className="p-5 space-y-4">
-                      <div className="space-y-2">
-                        <div className="h-5 w-2/3 rounded bg-slate-200 dark:bg-slate-700" />
-                        <div className="h-3.5 w-1/2 rounded bg-slate-100 dark:bg-slate-800" />
-                      </div>
-                      <div className="space-y-2 pt-2">
-                        <div className="h-1.5 w-full rounded-full bg-slate-100 dark:bg-slate-800" />
-                      </div>
-                      <div className="h-10 w-full rounded-xl bg-slate-100 dark:bg-slate-800/80 mt-2" />
+                  <div key={idx} className="rounded-2xl sm:rounded-3xl border border-slate-100 bg-white p-3.5 sm:p-5 shadow-[0_4px_20px_rgb(0,0,0,0.02)] dark:border-slate-800/60 dark:bg-slate-900 animate-pulse space-y-3">
+                    <div className="space-y-2">
+                      <div className="h-4 w-1/3 rounded bg-slate-100 dark:bg-slate-800" />
+                      <div className="h-5 w-4/5 rounded bg-slate-200 dark:bg-slate-700" />
+                      <div className="h-3.5 w-2/3 rounded bg-slate-100 dark:bg-slate-800" />
                     </div>
+                    <div className="space-y-1.5 pt-3">
+                      <div className="h-1.5 w-full rounded-full bg-slate-100 dark:bg-slate-800" />
+                    </div>
+                    <div className="h-8 w-full rounded-xl bg-slate-100 dark:bg-slate-800/80 mt-2" />
                   </div>
                 ))}
               </div>
@@ -930,69 +937,76 @@ export function StudentDashboardScreen() {
                 </Link>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                {courses.map((course, idx) => (
-                  <motion.div
-                    key={course.id}
-                    initial={{ opacity: 0, y: 15 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.35, delay: idx * 0.08 }}
-                    className="group relative flex flex-col overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-[0_8px_30px_rgb(0,0,0,0.02)] transition-all duration-300 hover:shadow-[0_15px_40px_rgba(0,0,0,0.05)] hover:-translate-y-0.5 dark:border-slate-800/60 dark:bg-slate-900"
-                  >
-                    {/* Banner Image */}
-                    <div className="h-36 w-full overflow-hidden bg-slate-100 dark:bg-slate-800 relative">
-                      <img
-                        src={course.image}
-                        alt={course.title}
-                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
-                      {/* Badge */}
-                      <span className={`absolute top-4 left-4 rounded-lg px-2.5 py-1 text-[10px] font-bold tracking-wider text-white ${course.color}`}>
-                        {course.category}
-                      </span>
-                    </div>
+              <div className="grid grid-cols-2 gap-3 sm:gap-6">
+                {courses.map((course, idx) => {
+                  const gradeText = course.gradeLevel
+                    ? course.gradeLevel.toLowerCase().includes('grado')
+                      ? course.gradeLevel
+                      : `${course.gradeLevel} Grado`
+                    : null
 
-                    {/* Body */}
-                    <div className="flex flex-1 flex-col p-5">
-                      <div className="flex-1 text-left space-y-1">
-                        <h3 className="text-lg font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                  return (
+                    <motion.div
+                      key={course.id}
+                      initial={{ opacity: 0, y: 15 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.35, delay: idx * 0.08 }}
+                      className="group relative flex flex-col justify-between overflow-hidden rounded-2xl sm:rounded-3xl border border-slate-200/80 bg-white p-3.5 sm:p-5 shadow-[0_4px_20px_rgb(0,0,0,0.02)] transition-all duration-300 hover:shadow-md hover:border-slate-300 hover:-translate-y-0.5 dark:border-slate-800/80 dark:bg-slate-900 text-left"
+                    >
+                      <div className="space-y-2 sm:space-y-2.5">
+                        {/* Badges superiores: Grado y Categoría/Materia */}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {gradeText && (
+                            <span className="inline-flex items-center rounded-lg bg-emerald-50 px-2 py-0.5 sm:px-2.5 sm:py-1 text-[9px] sm:text-xs font-bold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/40">
+                              {gradeText}
+                            </span>
+                          )}
+                          <span className={`inline-flex items-center rounded-lg px-2 py-0.5 sm:px-2.5 sm:py-1 text-[9px] sm:text-xs font-semibold ${course.bgColor} ${course.textColor} border border-current/10`}>
+                            {course.category}
+                          </span>
+                        </div>
+
+                        {/* Nombre del curso con gran énfasis */}
+                        <h3
+                          className="text-xs sm:text-base font-extrabold text-slate-900 dark:text-white line-clamp-2 leading-snug group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors"
+                          title={course.title}
+                        >
                           {course.title}
                         </h3>
-                        <p className="text-sm text-slate-400 dark:text-slate-500 line-clamp-1">
+
+                        {/* Descripción / Tema del curso */}
+                        <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
                           {course.topic}
                         </p>
                       </div>
 
-                      {/* Progress Bar */}
-                      <div className="mt-5 space-y-2">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-slate-400 dark:text-slate-500 font-medium">Progreso</span>
-                          <span className="text-slate-800 dark:text-slate-200 font-semibold">{course.progress}%</span>
+                      {/* Progreso y Botón inferior */}
+                      <div className="mt-3 sm:mt-5 pt-2.5 sm:pt-3 border-t border-slate-100 dark:border-slate-800/80 space-y-2.5 sm:space-y-3">
+                        <div className="space-y-1 sm:space-y-1.5">
+                          <div className="flex items-center justify-between text-[10px] sm:text-xs">
+                            <span className="text-slate-400 dark:text-slate-500 font-medium">Progreso</span>
+                            <span className="text-slate-800 dark:text-slate-200 font-semibold">{course.progress}%</span>
+                          </div>
+                          <div className="h-1.5 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                            <motion.div
+                              initial={{ width: 0 }}
+                              animate={{ width: `${course.progress}%` }}
+                              transition={{ duration: 0.6, delay: 0.2 }}
+                              className={`h-full rounded-full ${course.color}`}
+                            />
+                          </div>
                         </div>
-                        <div className="h-1.5 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                          <motion.div
-                            initial={{ width: 0 }}
-                            animate={{ width: `${course.progress}%` }}
-                            transition={{ duration: 0.6, delay: 0.2 }}
-                            className={`h-full rounded-full ${course.color}`}
-                          />
-                        </div>
-                      </div>
 
-                      {/* Button */}
-                      <div className="mt-6">
                         <Link
                           href={`/student/courses/${course.slug || course.id}`}
-                          className={`flex w-full items-center justify-between rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-200 ${course.bgColor} ${course.textColor} hover:opacity-90 active:scale-[0.98]`}
-                        >
+                          className={`flex w-full items-center justify-between rounded-xl px-2.5 py-2 sm:px-4 sm:py-2.5 text-[11px] sm:text-xs font-semibold transition-all duration-200 ${course.bgColor} ${course.textColor} hover:opacity-90 active:scale-[0.98]`}>
                           <span>Continuar</span>
-                          <ChevronRight className="h-4 w-4" />
+                          <ChevronRight className="h-3.5 w-3.5" />
                         </Link>
                       </div>
-                    </div>
-                  </motion.div>
-                ))}
+                    </motion.div>
+                  )
+                })}
               </div>
             )}
           </div>
@@ -1006,9 +1020,9 @@ export function StudentDashboardScreen() {
             </div>
 
             {loading ? (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {Array.from({ length: 3 }).map((_, idx) => (
-                  <div key={idx} className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm dark:border-slate-800/60 dark:bg-slate-900 animate-pulse h-32" />
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
+                {Array.from({ length: 2 }).map((_, idx) => (
+                  <div key={idx} className="rounded-2xl border border-slate-100 bg-white p-3.5 sm:p-4 shadow-sm dark:border-slate-800/60 dark:bg-slate-900 animate-pulse h-28" />
                 ))}
               </div>
             ) : latestAnnouncements.length === 0 ? (
@@ -1016,8 +1030,8 @@ export function StudentDashboardScreen() {
                 <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">No hay novedades recientes.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {latestAnnouncements.map((ann) => {
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
+                {latestAnnouncements.map((ann, idx) => {
                   let typeColor = 'bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400'
                   if (ann.type === 'urgent') typeColor = 'bg-red-500/10 text-red-600 dark:bg-red-500/20 dark:text-red-400'
                   else if (ann.type === 'reminder') typeColor = 'bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400'
@@ -1025,22 +1039,24 @@ export function StudentDashboardScreen() {
                   return (
                     <div
                       key={ann.id}
-                      className="rounded-2xl border border-slate-100 bg-white p-4 shadow-[0_8px_30px_rgb(0,0,0,0.01)] text-left flex flex-col justify-between dark:border-slate-800/60 dark:bg-slate-900 hover:shadow-[0_12px_35px_rgb(0,0,0,0.02)] transition-shadow"
+                      className={`rounded-2xl border border-slate-100 bg-white p-3 sm:p-4 shadow-[0_8px_30px_rgb(0,0,0,0.01)] text-left flex flex-col justify-between dark:border-slate-800/60 dark:bg-slate-900 hover:shadow-[0_12px_35px_rgb(0,0,0,0.02)] transition-shadow ${
+                        idx === 2 ? 'col-span-2 md:col-span-1' : ''
+                      }`}
                     >
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className={`rounded-lg px-2 py-0.5 text-[9px] font-black uppercase tracking-wider ${typeColor}`}>
+                      <div className="space-y-1.5 sm:space-y-2">
+                        <div className="flex items-center justify-between gap-1.5 sm:gap-2">
+                          <span className={`rounded-lg px-2 py-0.5 text-[8px] sm:text-[9px] font-black uppercase tracking-wider ${typeColor}`}>
                             {ann.type === 'urgent' ? 'Urgente' : ann.type === 'reminder' ? 'Recordatorio' : 'Anuncio'}
                           </span>
-                          <span className="text-[10px] text-slate-400 font-bold truncate max-w-[100px]">{ann.courseTitle}</span>
+                          <span className="text-[9px] sm:text-[10px] text-slate-400 font-bold truncate max-w-[80px] sm:max-w-[100px]">{ann.courseTitle}</span>
                         </div>
                         <h4 className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm truncate">
                           {ann.title}
                         </h4>
-                        <div className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2" dangerouslySetInnerHTML={{ __html: ann.content }} />
+                        <div className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2" dangerouslySetInnerHTML={{ __html: ann.content }} />
                       </div>
 
-                      <div className="mt-4 pt-3 border-t border-slate-50 dark:border-slate-800/40 flex items-center justify-between text-[10px] text-slate-400 dark:text-slate-500">
+                      <div className="mt-2.5 sm:mt-4 pt-2 sm:pt-3 border-t border-slate-50 dark:border-slate-800/40 flex items-center justify-between text-[9px] sm:text-[10px] text-slate-400 dark:text-slate-500">
                         <span>{new Date(ann.publishAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</span>
                         <Link
                           href={`/student/courses/${ann.courseId}`}

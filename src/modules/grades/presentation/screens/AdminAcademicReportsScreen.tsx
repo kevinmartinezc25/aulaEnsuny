@@ -6,29 +6,8 @@ import { toast } from 'sonner'
 import { getAcademicPeriods, AcademicPeriod } from '../../application/achievementsActions'
 import { getAcademicLevels } from '@/modules/admin/application/actions'
 import { AcademicLevel } from '@/modules/admin/application/types'
-import { getStudentPeriodReport, getConsolidatedGroupGrades, ConsolidatedGradeRow } from '../../application/gradesActions'
+import { getStudentPeriodReport, getConsolidatedGroupGrades, ConsolidatedGradeRow, StudentReportResult } from '../../application/gradesActions'
 import { createClient } from '@/core/config/supabase/client'
-
-interface SubjectGradeDetail {
-  courseId: string
-  courseTitle: string
-  subject: string
-  teacherName: string
-  finalGrade: number | null
-  performanceLevel: string | null
-  lessonGrades: {
-    lessonTitle: string
-    gradeType: string
-    grade: number
-    maxGrade: number
-  }[]
-}
-
-interface StudentReportInfo {
-  subjects: SubjectGradeDetail[]
-  generalAverage: number
-  generalPerformanceLevel: string
-}
 
 export function AdminAcademicReportsScreen() {
   const [periods, setPeriods] = useState<AcademicPeriod[]>([])
@@ -53,7 +32,7 @@ export function AdminAcademicReportsScreen() {
   const [printIndividualData, setPrintIndividualData] = useState<{
     studentId: string
     studentName: string
-    report: StudentReportInfo
+    report: StudentReportResult
   } | null>(null)
   const [printGroupData, setPrintGroupData] = useState<{
     report: ConsolidatedGradeRow[]
