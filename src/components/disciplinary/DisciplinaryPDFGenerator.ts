@@ -1,4 +1,3 @@
-import { jsPDF } from 'jspdf'
 import { DisciplinaryReport } from '@/modules/disciplinary/application/actions'
 
 async function loadBase64Image(url: string): Promise<{ dataUrl: string; width: number; height: number } | null> {
@@ -36,6 +35,7 @@ async function loadBase64Image(url: string): Promise<{ dataUrl: string; width: n
  * Utiliza jsPDF con el membrete oficial institucional.
  */
 export async function generateDisciplinaryPDF(report: DisciplinaryReport) {
+  const { jsPDF } = await import('jspdf')
   const doc = new jsPDF()
 
   const margin = 20

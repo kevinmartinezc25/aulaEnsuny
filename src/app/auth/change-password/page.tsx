@@ -61,9 +61,9 @@ export default function ChangePasswordPage() {
               <div className="mx-auto w-14 h-14 rounded-2xl bg-gradient-to-br from-[#1F4E31] to-emerald-600 flex items-center justify-center mb-4 shadow-lg shadow-emerald-900/20">
                 <ShieldCheck className="w-7 h-7 text-white" />
               </div>
-              <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-1.5">Crea tu contrasena</h1>
+              <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-1.5">Crea tu contraseña</h1>
               <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed max-w-xs mx-auto">
-                Define una contrasena segura y personal antes de acceder a tu portal.
+                Define una contraseña segura y personal antes de acceder a tu portal.
               </p>
             </div>
 

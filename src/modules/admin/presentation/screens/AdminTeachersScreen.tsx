@@ -7,7 +7,6 @@ import {
   BookOpen, Filter, CheckCircle, Loader2, AlertCircle, Phone, Mail, Award,
   Upload, Download, FileSpreadsheet
 } from 'lucide-react'
-import * as XLSX from 'xlsx'
 import { toast } from 'sonner'
 import { createClient } from '@/core/config/supabase/client'
 import { getAdminTeachers, getAdminCourses, createAdminUser, updateAdminUser, deleteAdminUser } from '../../application/actions'
@@ -277,7 +276,8 @@ export function AdminTeachersScreen() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isImporting, setIsImporting] = useState(false)
 
-  const handleDownloadTemplate = () => {
+  const handleDownloadTemplate = async () => {
+    const XLSX = await import('xlsx')
     const ws = XLSX.utils.json_to_sheet([
       { Nombre: 'Juan Perez', Correo: 'juan.perez@ejemplo.com', Telefono: '3001234567' },
       { Nombre: 'Maria Gomez', Correo: 'maria.gomez@ejemplo.com', Telefono: '3109876543' }
@@ -298,6 +298,7 @@ export function AdminTeachersScreen() {
     const toastId = toast.loading('Procesando archivo Excel e importando docentes...')
 
     try {
+      const XLSX = await import('xlsx')
       const data = await file.arrayBuffer()
       const wb = XLSX.read(data)
       const ws = wb.Sheets[wb.SheetNames[0]]

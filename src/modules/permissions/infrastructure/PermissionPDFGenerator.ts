@@ -1,4 +1,3 @@
-import { jsPDF } from 'jspdf'
 import { PermissionRequest, PERMISSION_STATUS_LABELS } from '../domain/entities'
 import { formatPermissionDateRange } from '../presentation/utils/dateUtils'
 
@@ -33,6 +32,7 @@ async function loadBase64Image(url: string): Promise<{ dataUrl: string; width: n
 }
 
 export async function generatePermissionPDF(request: PermissionRequest) {
+  const { jsPDF } = await import('jspdf')
   const doc = new jsPDF()
   const margin = 18
   const pageWidth = doc.internal.pageSize.getWidth()

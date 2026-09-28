@@ -1,31 +1,77 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-// Obtiene el nombre del rol: primero desde user_metadata del JWT (sin BD),
-// con fallback a la tabla profiles si no está en metadata.
-async function getUserRole(supabase: any, userId: string, userMetadata?: Record<string, any>): Promise<string> {
-  // 1. Lectura rápida desde JWT (no requiere query a BD)
-  const metaRole = (userMetadata?.role_name as string | undefined)?.toLowerCase()
-  if (metaRole === 'admin' || metaRole === 'superadmin' || metaRole === 'teacher' || metaRole === 'student') {
-    return metaRole
+interface UserRoleInfo {
+  roleName: string
+  passwordChanged: boolean
+}
+
+// Obtiene el nombre del rol y estado de contraseña de forma optimizada:
+// 1. Cookie ligera de sesión (0 queries).
+// 2. Metadata del JWT (0 queries).
+// 3. Fallback unificado a BD (1 sola query consolidada en lugar de 3).
+async function getUserRoleAndStatus(
+  request: NextRequest,
+  response: NextResponse,
+  supabase: any,
+  userId: string,
+  userMetadata?: Record<string, any>
+): Promise<UserRoleInfo> {
+  // 1. Comprobar caché en cookie de la sesión actual
+  const cachedRoleCookie = request.cookies.get('aulaensuny-auth-cache')?.value
+  if (cachedRoleCookie) {
+    const [cachedUserId, cachedRole, cachedPwd] = cachedRoleCookie.split(':')
+    if (cachedUserId === userId && cachedRole) {
+      return {
+        roleName: cachedRole.toLowerCase(),
+        passwordChanged: cachedPwd === '1'
+      }
+    }
   }
 
-  // 2. Fallback: consultar BD
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role_id')
-    .eq('id', userId)
-    .single()
+  // 2. Comprobar si está en metadata del JWT
+  const metaRole = (userMetadata?.role_name as string | undefined)?.toLowerCase()
+  const metaPwd = Boolean(userMetadata?.password_changed_at)
 
-  if (!profile?.role_id) return 'student'
+  if (metaRole && (metaRole === 'admin' || metaRole === 'superadmin' || metaRole === 'teacher')) {
+    response.cookies.set('aulaensuny-auth-cache', `${userId}:${metaRole}:1`, {
+      path: '/',
+      sameSite: 'lax',
+      maxAge: 86400 * 7
+    })
+    return { roleName: metaRole, passwordChanged: true }
+  }
 
-  const { data: role } = await supabase
-    .from('roles')
-    .select('name')
-    .eq('id', profile.role_id)
-    .single()
+  // 3. Consulta consolidada a profiles (una sola petición para rol y password_changed_at)
+  try {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('password_changed_at, roles(name)')
+      .eq('id', userId)
+      .maybeSingle()
 
-  return (role?.name || 'student').toLowerCase()
+    let resolvedRole = 'student'
+    if (profile?.roles && typeof profile.roles === 'object' && 'name' in profile.roles) {
+      resolvedRole = (profile.roles.name as string).toLowerCase()
+    } else if (metaRole) {
+      resolvedRole = metaRole
+    }
+
+    const hasChangedPassword = Boolean(profile?.password_changed_at || metaPwd)
+
+    response.cookies.set('aulaensuny-auth-cache', `${userId}:${resolvedRole}:${hasChangedPassword ? '1' : '0'}`, {
+      path: '/',
+      sameSite: 'lax',
+      maxAge: 86400 * 7
+    })
+
+    return {
+      roleName: resolvedRole,
+      passwordChanged: hasChangedPassword
+    }
+  } catch {
+    return { roleName: metaRole || 'student', passwordChanged: true }
+  }
 }
 
 // Calcula la ruta del dashboard según el rol
@@ -158,40 +204,30 @@ export async function updateSession(request: NextRequest) {
 
   // 2. Caso: Usuario autenticado
   if (user) {
-    const roleName = (await getUserRole(supabase, user.id, user.user_metadata)).toLowerCase()
+    const { roleName, passwordChanged } = await getUserRoleAndStatus(
+      request,
+      response,
+      supabase,
+      user.id,
+      user.user_metadata
+    )
 
     // Verificar si el estudiante debe cambiar su contraseña antes de acceder
     if (roleName === 'student') {
       const isStudentDashboardAccess = pathname.startsWith('/student') || pathname === '/'
       const isGoingToChangePassword = isChangePasswordPage
 
-      if (isStudentDashboardAccess && !isGoingToChangePassword) {
-        // Consultar BD solo cuando el estudiante intenta acceder a sus rutas
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('password_changed_at')
-          .eq('id', user.id)
-          .single()
-
-        if (!profile?.password_changed_at) {
-          const url = request.nextUrl.clone()
-          url.pathname = '/auth/change-password'
-          return NextResponse.redirect(url)
-        }
+      if (isStudentDashboardAccess && !isGoingToChangePassword && !passwordChanged) {
+        const url = request.nextUrl.clone()
+        url.pathname = '/auth/change-password'
+        return NextResponse.redirect(url)
       }
 
       // Si el estudiante ya cambió su contraseña e intenta volver a /auth/change-password, redirigir al dashboard
-      if (isGoingToChangePassword) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('password_changed_at')
-          .eq('id', user.id)
-          .single()
-        if (profile?.password_changed_at) {
-          const url = request.nextUrl.clone()
-          url.pathname = '/student/dashboard'
-          return NextResponse.redirect(url)
-        }
+      if (isGoingToChangePassword && passwordChanged) {
+        const url = request.nextUrl.clone()
+        url.pathname = '/student/dashboard'
+        return NextResponse.redirect(url)
       }
     }
 

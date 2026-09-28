@@ -6,7 +6,6 @@ import {
   UserCheck, Layers, RefreshCw, UploadCloud, AlertCircle, FileText, ChevronRight, Play, Eye
 } from 'lucide-react'
 import { toast } from 'sonner'
-import * as XLSX from 'xlsx'
 import { 
   getElections, createOrUpdateElection, deleteElection,
   getCandidates, createOrUpdateCandidate, deleteCandidate,
@@ -216,6 +215,7 @@ export default function AdminElectionsPage() {
     const reader = new FileReader()
     reader.onload = async (evt) => {
       try {
+        const XLSX = await import('xlsx')
         const bstr = evt?.target?.result
         if (!bstr) return
         const wb = XLSX.read(bstr, { type: 'binary' })
@@ -266,7 +266,8 @@ export default function AdminElectionsPage() {
     reader.readAsBinaryString(excelFile)
   }
 
-  function handleDownloadTemplate() {
+  async function handleDownloadTemplate() {
+    const XLSX = await import('xlsx')
     const templateData = [
       {
         "Documento": "10001",

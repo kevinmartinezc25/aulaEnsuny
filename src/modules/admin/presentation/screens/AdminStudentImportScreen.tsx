@@ -8,7 +8,6 @@ import {
   SkipForward, Trash2, RefreshCw, Info
 } from 'lucide-react'
 import Link from 'next/link'
-import * as XLSX from 'xlsx'
 import { toast } from 'sonner'
 import {
   validateImportRows,
@@ -50,8 +49,9 @@ const MAX_ROWS = 500
 function parseFileToRows(file: File): Promise<StudentImportRow[]> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
+        const XLSX = await import('xlsx')
         const data = new Uint8Array(e.target?.result as ArrayBuffer)
         const wb = XLSX.read(data, { type: 'array' })
         const ws = wb.Sheets[wb.SheetNames[0]]
