@@ -5,6 +5,7 @@ import { SignJWT, jwtVerify } from 'jose'
 import { createAdminClient } from '@/core/config/supabase/server'
 import { resolveOfficialGroup } from './groupResolver'
 import { formatCapitalizedWords } from '@/lib/utils'
+import { createClient } from '@/core/config/supabase/server'
 
 // Mantenemos el secreto en las variables de entorno, o usamos uno fallback (en dev)
 const JWT_SECRET = process.env.JWT_SECRET || 'aulaensuny_planilla_super_secret_key_12345'
@@ -239,33 +240,85 @@ export async function authenticatePlanillaStudent(documentId: string) {
   }
 }
 
-/**
- * Obtiene la sesión actual del estudiante
- */
 export async function getPlanillaStudentSession(): Promise<PlanillaStudentSession | null> {
   const cookieStore = await cookies()
   const token = cookieStore.get('planilla-student-session')?.value
 
-  if (!token) return null
+  let session: PlanillaStudentSession | null = null
 
-  try {
-    const { payload } = await jwtVerify(token, encodedSecret)
-    const session = payload as unknown as PlanillaStudentSession
-    if (session) {
-      if (session.fullName) {
-        session.fullName = formatCapitalizedWords(session.fullName) || session.fullName
-      }
-      if (session.firstName) {
-        session.firstName = formatCapitalizedWords(session.firstName) || session.firstName
-      }
-      if (session.lastName) {
-        session.lastName = formatCapitalizedWords(session.lastName) || session.lastName
+  if (token) {
+    try {
+      const { payload } = await jwtVerify(token, encodedSecret)
+      session = payload as unknown as PlanillaStudentSession
+    } catch (error) {
+      // Ignorar error de JWT expirado o inválido, probamos con Supabase
+    }
+  }
+
+  // ADAPTADOR PARA NUEVO FLUJO SUPABASE AUTH
+  if (!session) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    if (user) {
+      const adminClient = createAdminClient()
+      
+      // Buscar en perfiles
+      const { data: profile } = await adminClient
+        .from('profiles')
+        .select('first_name, last_name, grade_level, group_name')
+        .eq('id', user.id)
+        .single()
+
+      // Buscar si existe un registro en student_directory con este profile_id
+      const { data: linkedDir } = await adminClient
+        .from('student_directory')
+        .select('id, document_id, grade_level, group_name, academic_year')
+        .eq('profile_id', user.id)
+        .maybeSingle()
+
+      // También buscamos en student_enrollments
+      const { data: enrollment } = await adminClient
+        .from('student_enrollments')
+        .select('jornada, group_name, grade_level, academic_year')
+        .eq('student_id', user.id)
+        .eq('enrollment_status', 'active')
+        .order('academic_year', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+        
+      if (profile) {
+        const rawFullName = `${profile.last_name || ''} ${profile.first_name || ''}`.trim()
+        session = {
+          directoryId: linkedDir?.id || user.id, // Fallback
+          documentId: linkedDir?.document_id || '',
+          firstName: profile.first_name,
+          lastName: profile.last_name,
+          fullName: rawFullName,
+          groupName: enrollment?.group_name || linkedDir?.group_name || profile.group_name || '',
+          gradeLevel: enrollment?.grade_level || linkedDir?.grade_level || profile.grade_level || '',
+          academicYear: enrollment?.academic_year || linkedDir?.academic_year || new Date().getFullYear().toString(),
+          jornada: enrollment?.jornada || 'Mañana',
+          profileId: user.id
+        }
       }
     }
-    return session
-  } catch (error) {
-    return null
   }
+
+  if (session) {
+    if (session.fullName) {
+      session.fullName = formatCapitalizedWords(session.fullName) || session.fullName
+    }
+    if (session.firstName) {
+      session.firstName = formatCapitalizedWords(session.firstName) || session.firstName
+    }
+    if (session.lastName) {
+      session.lastName = formatCapitalizedWords(session.lastName) || session.lastName
+    }
+    return session
+  }
+
+  return null
 }
 
 /**

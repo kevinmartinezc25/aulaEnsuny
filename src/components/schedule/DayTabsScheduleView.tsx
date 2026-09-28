@@ -99,6 +99,24 @@ function parseTimeToMinutes(timeStr: string): number {
   return hours * 60 + minutes
 }
 
+function formatAMPM(timeStr: string): string {
+  if (!timeStr) return ''
+  // Si ya tiene AM/PM, lo dejamos igual
+  if (timeStr.toUpperCase().includes('AM') || timeStr.toUpperCase().includes('PM')) {
+    return timeStr
+  }
+  
+  const [hStr, mStr] = timeStr.split(':')
+  let hours = parseInt(hStr, 10)
+  const isPM = hours >= 12
+  
+  if (hours > 12) hours -= 12
+  if (hours === 0) hours = 12
+  
+  const formattedHours = hours.toString().padStart(2, '0')
+  return `${formattedHours}:${mStr} ${isPM ? 'PM' : 'AM'}`
+}
+
 /**
  * Determina si la clase está ocurriendo actualmente
  */
@@ -379,19 +397,11 @@ export default function DayTabsScheduleView({
                     <div className="flex-1 flex flex-col justify-between gap-2 min-w-0">
                       {/* Fila Superior: Badge Hora + Rango Horario + Estado */}
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-black uppercase tracking-tight shrink-0 shadow-xs ${
-                          isOngoing
-                            ? 'bg-emerald-600 text-white border border-emerald-700'
-                            : 'bg-emerald-100/90 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200/90 dark:border-emerald-700/60'
-                        }`}>
-                          {hourLabel}
-                        </span>
-
                         <div className={`flex items-center gap-1.5 text-xs sm:text-sm font-bold ${
                           isOngoing ? 'text-emerald-900 dark:text-emerald-200' : 'text-emerald-700/80 dark:text-emerald-400/80'
                         }`}>
                           <Clock className={`w-3.5 h-3.5 shrink-0 ${isOngoing ? 'text-emerald-600 dark:text-emerald-400' : 'text-emerald-600/70 dark:text-emerald-400/70'}`} />
-                          <span>{item.startTime}{item.endTime ? ` – ${item.endTime}` : ''}</span>
+                          <span>{formatAMPM(item.startTime)}{item.endTime ? ` – ${formatAMPM(item.endTime)}` : ''}</span>
                         </div>
 
                         {isOngoing && (
@@ -423,15 +433,15 @@ export default function DayTabsScheduleView({
                         ? 'bg-emerald-600 text-white border border-emerald-700 shadow-md'
                         : 'bg-emerald-100/80 dark:bg-emerald-900/40 border border-emerald-200/80 dark:border-emerald-800/60'
                     }`}>
-                      <span className={`text-[9px] font-black uppercase tracking-widest leading-none ${
-                        isOngoing ? 'text-emerald-100' : 'text-emerald-700/80 dark:text-emerald-300/80'
+                      {isOngoing && (
+                        <span className="text-[9px] font-black uppercase tracking-widest leading-none text-emerald-100 mb-1">
+                          En Curso
+                        </span>
+                      )}
+                      <span className={`text-xs sm:text-sm font-black leading-tight mt-1 tracking-tight whitespace-nowrap ${
+                        isOngoing ? 'text-white' : 'text-[#1F4E31] dark:text-emerald-300'
                       }`}>
-                        {isOngoing ? 'Actual' : 'Estado'}
-                      </span>
-                      <span className={`text-base sm:text-lg font-black leading-tight mt-1 tracking-tight ${
-                        isOngoing ? 'text-white' : 'text-emerald-800 dark:text-emerald-200'
-                      }`}>
-                        Libre
+                        {hourLabel}
                       </span>
                     </div>
                   </div>
@@ -455,19 +465,11 @@ export default function DayTabsScheduleView({
                   <div className="flex-1 flex flex-col justify-between gap-2 min-w-0">
                     {/* Fila Superior: Badge Hora + Rango Horario + Badge Estado + Badge Novedad */}
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-black uppercase tracking-tight shrink-0 shadow-xs ${
-                        isOngoing
-                          ? 'bg-emerald-600 text-white border border-emerald-700'
-                          : 'bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200/70 dark:border-indigo-800/70'
-                      }`}>
-                        {hourLabel}
-                      </span>
-                      
                       <div className={`flex items-center gap-1.5 text-xs sm:text-sm font-bold ${
                         isOngoing ? 'text-emerald-900 dark:text-emerald-200 font-extrabold' : 'text-slate-500 dark:text-slate-400'
                       }`}>
                         <Clock className={`w-3.5 h-3.5 shrink-0 ${isOngoing ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`} />
-                        <span>{item.startTime}{item.endTime ? ` – ${item.endTime}` : ''}</span>
+                        <span>{formatAMPM(item.startTime)}{item.endTime ? ` – ${formatAMPM(item.endTime)}` : ''}</span>
                       </div>
 
                       {item.isNovedad && (
@@ -525,17 +527,17 @@ export default function DayTabsScheduleView({
                   </div>
 
                   {/* A la derecha: Badge del Grupo o Jornada / Actual */}
-                  {hideGroupBadge && context.type === 'student' ? (
+                  {context.type === 'student' || hideGroupBadge ? (
                     <div className={`shrink-0 flex flex-col items-center justify-center px-3.5 py-2 rounded-2xl shadow-xs min-w-[76px] ${
                       isOngoing
                         ? 'bg-emerald-600 text-white border border-emerald-700 shadow-md'
                         : 'bg-emerald-500/10 dark:bg-emerald-950/50 border border-emerald-500/20 dark:border-emerald-800/40'
                     }`}>
-                      <span className={`text-[9px] font-black uppercase tracking-wider leading-none ${
-                        isOngoing ? 'text-emerald-100' : 'text-emerald-700 dark:text-emerald-400'
-                      }`}>
-                        {isOngoing ? 'En Curso' : 'Jornada'}
-                      </span>
+                      {isOngoing && (
+                        <span className="text-[9px] font-black uppercase tracking-wider leading-none text-emerald-100 mb-1">
+                          En Curso
+                        </span>
+                      )}
                       <span className={`text-xs sm:text-sm font-black leading-tight mt-1 tracking-tight whitespace-nowrap ${
                         isOngoing ? 'text-white' : 'text-[#1F4E31] dark:text-emerald-300'
                       }`}>

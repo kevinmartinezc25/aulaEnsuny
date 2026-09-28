@@ -396,11 +396,11 @@ export default function StaticScheduleGrid({
       <DayTabsScheduleView
         schedule={mobileScheduleData}
         context={{
-          title: entityName || (entityType === 'teacher' ? 'Horario Personal' : 'Horario de Grupo'),
-          subtitle: entityType === 'teacher' ? 'Docente' : (directorName ? `Director: ${directorName}` : 'Horario de Clases'),
-          type: entityType
+          title: entityType === 'group' ? `Horario del Grupo ${entityName}` : (entityName || 'Horario Personal'),
+          subtitle: entityType === 'teacher' ? 'Docente' : `Año lectivo ${new Date().getFullYear()}`,
+          type: entityType === 'group' ? 'student' : entityType // Tratamos al grupo como student visualmente para forzar el badge derecho
         }}
-        hideGroupBadge={hideGroupBadge || entityType === 'group'}
+        hideGroupBadge={true}
       />
     </div>
   )

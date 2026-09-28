@@ -1,20 +1,33 @@
 'use client'
 
 import React from 'react'
+import Link from 'next/link'
+import { ArrowLeft } from 'lucide-react'
 import DayTabsScheduleView from '@/components/schedule/DayTabsScheduleView'
 import { StudentDashboardScheduleResponse } from '@/modules/students/application/scheduleActions'
 import StaticScheduleGrid from '@/app/teacher/schedule/components/StaticScheduleGrid'
 
 export function StudentScheduleClient({ initialData }: { initialData: StudentDashboardScheduleResponse }) {
+  const currentYear = new Date().getFullYear()
   const context = {
-    title: 'Mi Horario',
-    subtitle: initialData.groupName || 'Sin grupo',
+    title: `Horario del Grupo ${initialData.groupName || 'No asignado'}`,
+    subtitle: `Año lectivo ${currentYear}`,
     type: 'student' as const
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+    <div className="w-[90%] sm:w-full max-w-4xl mx-auto pt-2 sm:pt-3 pb-6 space-y-2.5 sm:space-y-3 px-0 sm:px-4">
       <div>
+        <Link 
+          href="/student/dashboard" 
+          className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          <span>Volver al Portal</span>
+        </Link>
+      </div>
+
+      <div className="hidden lg:block">
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Mi Horario de Clases</h1>
         
         {initialData.hasGroup ? (
@@ -37,7 +50,7 @@ export function StudentScheduleClient({ initialData }: { initialData: StudentDas
         )}
       </div>
 
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden min-h-[500px] lg:h-[600px] flex-1 w-full flex flex-col relative">
+      <div className="lg:bg-white dark:lg:bg-slate-900 lg:rounded-2xl lg:border lg:border-slate-200 dark:lg:border-slate-800 lg:shadow-sm overflow-hidden min-h-[500px] lg:h-[600px] flex-1 w-full flex flex-col relative">
         {initialData.groupId && initialData.isPublished ? (
           <StaticScheduleGrid 
             entityType="group"

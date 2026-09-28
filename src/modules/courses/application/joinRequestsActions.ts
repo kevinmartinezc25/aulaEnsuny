@@ -1,6 +1,7 @@
 'use server'
 
 import { createAdminClient, createClient } from '@/core/config/supabase/server'
+import { getPlanillaStudentSession } from '@/modules/planilla-asistida/application/studentAuthActions'
 
 export interface CourseJoinRequest {
   id: string
@@ -66,12 +67,42 @@ export async function regenerateCourseJoinCode(courseId: string): Promise<string
   return joinCode
 }
 
+async function getEffectiveStudentId(): Promise<string | null> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (user?.id) return user.id
+
+  const planillaSession = await getPlanillaStudentSession()
+  if (!planillaSession) return null
+
+  if (planillaSession.profileId) return planillaSession.profileId
+
+  if (planillaSession.documentId) {
+    const admin = createAdminClient()
+    const cleanDoc = planillaSession.documentId.replace(/[^0-9a-zA-Z]/g, '')
+    const { data: dir } = await admin
+      .from('student_directory')
+      .select('profile_id')
+      .or(`document_id.eq.${planillaSession.documentId},document_id.eq.${cleanDoc}`)
+      .maybeSingle()
+    if (dir?.profile_id) return dir.profile_id
+
+    const { data: details } = await admin
+      .from('student_details')
+      .select('student_id')
+      .or(`document_number.eq.${planillaSession.documentId},document_number.eq.${cleanDoc}`)
+      .maybeSingle()
+    if (details?.student_id) return details.student_id
+  }
+
+  return null
+}
+
 export async function createJoinRequest(input: CreateJoinRequestInput): Promise<{ success: boolean; error?: string }> {
   try {
-    const supabase = await createClient()
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    const studentId = await getEffectiveStudentId()
 
-    if (userError || !user?.id) {
+    if (!studentId) {
       return { success: false, error: 'Debes iniciar sesión para solicitar ingreso' }
     }
 
@@ -119,7 +150,7 @@ export async function createJoinRequest(input: CreateJoinRequestInput): Promise<
     const { data: existingEnrollment } = await admin
       .from('student_courses')
       .select('id')
-      .eq('student_id', user.id)
+      .eq('student_id', studentId)
       .eq('course_id', course.id)
       .maybeSingle()
 
@@ -130,7 +161,7 @@ export async function createJoinRequest(input: CreateJoinRequestInput): Promise<
     const { data: existingRequest } = await admin
       .from('course_join_requests')
       .select('id')
-      .eq('student_id', user.id)
+      .eq('student_id', studentId)
       .eq('course_id', course.id)
       .eq('status', 'pending')
       .maybeSingle()
@@ -143,7 +174,7 @@ export async function createJoinRequest(input: CreateJoinRequestInput): Promise<
       .from('course_join_requests')
       .insert({
         course_id: course.id,
-        student_id: user.id,
+        student_id: studentId,
         status: 'pending',
         requested_at: new Date().toISOString(),
         comments: null
@@ -300,10 +331,9 @@ export async function reviewJoinRequest(input: ReviewJoinRequestInput): Promise<
 }
 
 export async function getStudentJoinRequests(): Promise<CourseJoinRequest[]> {
-  const supabase = await createClient()
-  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  const studentId = await getEffectiveStudentId()
 
-  if (userError || !user?.id) {
+  if (!studentId) {
     throw new Error('Debes iniciar sesión')
   }
 
@@ -321,7 +351,7 @@ export async function getStudentJoinRequests(): Promise<CourseJoinRequest[]> {
       comments,
       courses!course_id(title, subject)
     `)
-    .eq('student_id', user.id)
+    .eq('student_id', studentId)
     .order('requested_at', { ascending: false })
 
   if (error) {
@@ -343,10 +373,9 @@ export async function getStudentJoinRequests(): Promise<CourseJoinRequest[]> {
 }
 
 export async function cancelJoinRequest(requestId: string): Promise<void> {
-  const supabase = await createClient()
-  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  const studentId = await getEffectiveStudentId()
 
-  if (userError || !user?.id) {
+  if (!studentId) {
     throw new Error('Debes iniciar sesión')
   }
 
@@ -361,7 +390,7 @@ export async function cancelJoinRequest(requestId: string): Promise<void> {
     throw new Error('No se encontró la solicitud')
   }
 
-  if (request.student_id !== user.id) {
+  if (request.student_id !== studentId) {
     throw new Error('No tienes permiso para cancelar esta solicitud')
   }
 

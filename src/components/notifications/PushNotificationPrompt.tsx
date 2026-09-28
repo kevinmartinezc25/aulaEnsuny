@@ -8,8 +8,6 @@ export const PushNotificationPrompt = () => {
   const { isSupported, permission, isSubscribed, isLoading, subscribeToPush } = usePushNotifications();
   const [isVisible, setIsVisible] = useState(false);
 
-  console.log("==== PUSH PROMPT RENDER ==== ", { isVisible, isSupported, permission, isLoading });
-
   useEffect(() => {
     // Si ya está suscrito o dio permisos, ocultar
     if (isSubscribed || permission === 'granted') {

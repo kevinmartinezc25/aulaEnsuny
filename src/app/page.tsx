@@ -201,19 +201,12 @@ export default function LandingPage() {
               Ecosistema escolar diseñado para la Escuela Normal Superior del Nordeste. Seguimiento de notas, gestión académica y acceso directo a tu horario.
             </p>
 
-            {/* Accesos Simplificados (Botones) */}
+            {/* Acceso Unificado */}
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-6 max-w-xl mx-auto">
               <Link href="/login" className="w-full sm:w-auto">
                 <Button className="w-full sm:w-auto rounded-2xl bg-[#1F4E31] hover:bg-[#183e27] text-white font-bold text-sm px-8 h-14 shadow-sm shadow-emerald-950/20 active:scale-[0.98] duration-100 ease-out dark:bg-emerald-600 dark:hover:bg-emerald-700 cursor-pointer flex items-center justify-center gap-2">
-                  <span>Iniciar Sesión</span>
+                  <span>Ingresar a aulaEnsuny</span>
                   <ArrowRight className="h-5 w-5 opacity-80" />
-                </Button>
-              </Link>
-              
-              <Link href="/consulta-calificaciones" className="w-full sm:w-auto">
-                <Button variant="outline" className="w-full sm:w-auto rounded-2xl border-2 border-emerald-200 dark:border-emerald-800/60 bg-emerald-50/50 hover:bg-emerald-100/50 dark:bg-slate-900/50 dark:hover:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 font-bold text-sm px-8 h-14 active:scale-[0.98] duration-100 ease-out cursor-pointer flex items-center justify-center gap-2 transition-all">
-                  <GraduationCap className="h-5 w-5" />
-                  <span>Consulta Académica</span>
                 </Button>
               </Link>
             </div>
@@ -224,7 +217,7 @@ export default function LandingPage() {
                 href="/register/student"
                 className="text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-[#1F4E31] dark:hover:text-emerald-400 transition-colors underline underline-offset-4"
               >
-                Solicita tu acceso al campus virtual aquí
+                ¿Eres estudiante? Solicita tu acceso aquí
               </Link>
             </div>
 
@@ -346,11 +339,8 @@ export default function LandingPage() {
           </p>
 
           <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-xs font-medium text-slate-500 dark:text-slate-400">
-            <Link href="/consulta-calificaciones" className="text-emerald-700 dark:text-emerald-400 font-semibold hover:underline transition-colors">
-              Consultar Calificaciones
-            </Link>
-            <Link href="/login" className="hover:text-[#1F4E31] dark:hover:text-emerald-400 transition-colors">
-              Iniciar Sesión
+            <Link href="/login" className="text-emerald-700 dark:text-emerald-400 font-semibold hover:underline transition-colors">
+              Ingresar a aulaEnsuny
             </Link>
             <Link href="/register/student" className="hover:text-[#1F4E31] dark:hover:text-emerald-400 transition-colors">
               Registro de Estudiantes

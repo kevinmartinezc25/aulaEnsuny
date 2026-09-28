@@ -49,6 +49,7 @@ export async function updateSession(request: NextRequest) {
   const isAuthCallback = pathname.startsWith('/auth/callback')
   const isRecoveryReset = pathname.startsWith('/recovery/reset')
   const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/register') || (pathname.startsWith('/recovery') && !isRecoveryReset)
+  const isChangePasswordPage = pathname === '/auth/change-password'
   const isPwaResource = pathname === '/manifest.webmanifest' ||
                         pathname === '/manifest.json' ||
                         pathname === '/sw.js' ||
@@ -57,19 +58,13 @@ export async function updateSession(request: NextRequest) {
   const isPublicFile = pathname.match(/\.(png|jpg|jpeg|gif|svg|ico|css|js|webmanifest|json)$/) || isPwaResource
   const isPublicDocs = pathname.startsWith('/docs')
   const isLandingPage = pathname === '/'
-  const isConsultaCalificaciones = pathname.startsWith('/consulta-calificaciones')
-
-  // Bypassear el middleware de Supabase para el portal de calificaciones (usa su propio JWT)
-  if (isConsultaCalificaciones) {
-    return response
-  }
 
   if (isDemoMode) {
     const demoSessionCookie = request.cookies.get('aulaensuny-demo-session')
     const session = demoSessionCookie ? JSON.parse(demoSessionCookie.value) : null
 
     // 1. Caso: Invitado intentando entrar a ruta protegida
-    if (!session && !isAuthPage && !isRecoveryReset && !isAuthCallback && !isPublicFile && !isPublicDocs && !isLandingPage && !isPwaResource && !isConsultaCalificaciones) {
+    if (!session && !isAuthPage && !isChangePasswordPage && !isRecoveryReset && !isAuthCallback && !isPublicFile && !isPublicDocs && !isLandingPage && !isPwaResource) {
       const url = request.nextUrl.clone()
       url.pathname = '/login'
       return NextResponse.redirect(url)
@@ -152,7 +147,10 @@ export async function updateSession(request: NextRequest) {
   }
 
   // 1. Caso: Usuario no autenticado
-  if (!user && !isAuthPage && !isRecoveryReset && !isAuthCallback && !isPublicFile && !isPublicDocs && !isLandingPage && !isPwaResource && !isConsultaCalificaciones) {
+  if (!user && !isAuthPage && !isChangePasswordPage && !isRecoveryReset && !isAuthCallback && !isPublicFile && !isPublicDocs && !isLandingPage && !isPwaResource) {
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
@@ -161,6 +159,41 @@ export async function updateSession(request: NextRequest) {
   // 2. Caso: Usuario autenticado
   if (user) {
     const roleName = (await getUserRole(supabase, user.id, user.user_metadata)).toLowerCase()
+
+    // Verificar si el estudiante debe cambiar su contraseña antes de acceder
+    if (roleName === 'student') {
+      const isStudentDashboardAccess = pathname.startsWith('/student') || pathname === '/'
+      const isGoingToChangePassword = isChangePasswordPage
+
+      if (isStudentDashboardAccess && !isGoingToChangePassword) {
+        // Consultar BD solo cuando el estudiante intenta acceder a sus rutas
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('password_changed_at')
+          .eq('id', user.id)
+          .single()
+
+        if (!profile?.password_changed_at) {
+          const url = request.nextUrl.clone()
+          url.pathname = '/auth/change-password'
+          return NextResponse.redirect(url)
+        }
+      }
+
+      // Si el estudiante ya cambió su contraseña e intenta volver a /auth/change-password, redirigir al dashboard
+      if (isGoingToChangePassword) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('password_changed_at')
+          .eq('id', user.id)
+          .single()
+        if (profile?.password_changed_at) {
+          const url = request.nextUrl.clone()
+          url.pathname = '/student/dashboard'
+          return NextResponse.redirect(url)
+        }
+      }
+    }
 
     if (isAuthPage || pathname === '/') {
       const url = request.nextUrl.clone()

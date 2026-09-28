@@ -1,0 +1,16 @@
+{
+  "userId": "88667106-482d-42f7-b5df-b268f1441fe5",
+  "fullName": "Blandón Marín Santiago",
+  "candidateIds": [
+    "88667106-482d-42f7-b5df-b268f1441fe5",
+    "prof-88667106-482d-42f7-b5df-b268f1441fe5",
+    "dir-88667106-482d-42f7-b5df-b268f1441fe5"
+  ],
+  "enrollmentsCount": 5,
+  "gradeNum": 11,
+  "groupNum": 2,
+  "allSubjectIdsSize": 5,
+  "subjectsDataLength": 5,
+  "subjectsError": null,
+  "studentIdsCount": 5
+}

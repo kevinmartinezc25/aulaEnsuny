@@ -1618,7 +1618,7 @@ export async function enrollStudent(data: FullStudentData) {
     const lastName = `${data.details.firstSurname} ${data.details.secondSurname || ''}`.trim()
 
     // 3. Crear el usuario en Supabase Auth
-    const tempPassword = `Ensuny${new Date().getFullYear()}!`
+    const tempPassword = data.details.documentNumber || `Ensuny${new Date().getFullYear()}!`
     const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
       email: data.email,
       password: tempPassword,
@@ -1875,7 +1875,7 @@ export async function updateStudent(id: string, data: FullStudentData) {
         try {
           const tempPassword = data.password && data.password.trim().length >= 6 
             ? data.password.trim() 
-            : `Ensuny${new Date().getFullYear()}!`
+            : (data.details.documentNumber || `Ensuny${new Date().getFullYear()}!`)
 
           const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
             email: data.email,

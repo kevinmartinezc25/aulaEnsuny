@@ -7,7 +7,7 @@ import {
   PanelLeftClose, PanelLeftOpen, Moon, Sun, LayoutDashboard, Users, GraduationCap,
   ClipboardList, BarChart2, BellRing, FolderOpen, ShieldCheck, ShieldAlert, UserCog, Activity, ChevronRight, FileText, CalendarDays, Download,
   Layers, FileCheck2, FileSpreadsheet, Vote, CalendarCheck, SlidersHorizontal, CheckSquare,
-  Building2
+  Building2, UserCircle, BarChart
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
@@ -97,6 +97,16 @@ function getInitials(name?: string) {
   return parts[0][0].toUpperCase()
 }
 
+function isStudentVirtualCampusRoute(pathname: string): boolean {
+  return (
+    pathname === '/student/courses' ||
+    pathname.startsWith('/student/courses/') ||
+    pathname.startsWith('/student/requests') ||
+    pathname.startsWith('/student/virtual-grades') ||
+    pathname.startsWith('/student/join-course')
+  )
+}
+
 function AdminSidebar({ onClose, user, enabledModules = [], isCollapsed = false }: { onClose?: () => void; user: UserSessionInfo | null; enabledModules?: string[], isCollapsed?: boolean }) {
   const pathname = usePathname()
   const router = useRouter()
@@ -173,13 +183,25 @@ function AdminSidebar({ onClose, user, enabledModules = [], isCollapsed = false 
   return (
     <div className="flex h-full flex-col bg-white dark:bg-slate-900 border-r border-slate-100 dark:border-slate-800/60">
       {/* Logo */}
-      <div className={`flex h-16 shrink-0 items-center border-b border-slate-100 dark:border-slate-800/60 ${isCollapsed ? 'justify-center px-1 gap-1.5' : 'gap-2 px-4'}`}>
-        <img src="/escudo_ensuny.png" alt="Escudo ENSUNY" className={`${isCollapsed ? 'h-6 w-6' : 'h-8 w-8'} shrink-0 object-contain`} />
-        <img src="/logo_1.svg" alt="aulaEnsuny" className={`${isCollapsed ? 'h-6 w-6' : 'h-8 w-8'} shrink-0 object-contain`} />
-        {!isCollapsed && (
-          <div>
-            <p className="text-sm font-bold text-slate-900 dark:text-white tracking-tight whitespace-nowrap">aulaEnsuny</p>
-            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+      <div className={`flex h-16 shrink-0 items-center border-b border-slate-100 dark:border-slate-800/60 ${isCollapsed ? 'justify-center px-1 gap-1.5' : 'gap-2.5 px-4'}`}>
+        <img src="/escudo_ensuny.png" alt="Escudo ENSUNY" className={`${isCollapsed ? 'h-7 w-7' : 'h-8 w-auto'} shrink-0 object-contain`} />
+        {isCollapsed ? (
+          <img src="/logo_1.svg" alt="aulaEnsuny" className="h-6 w-6 shrink-0 object-contain" />
+        ) : (
+          <div className="flex flex-col justify-center">
+            <div className="relative w-[175px] h-9 flex items-center justify-start">
+              <img
+                src="/logo.svg?v=2"
+                alt="aulaEnsuny Logo"
+                className="object-contain object-left w-full h-full dark:hidden"
+              />
+              <img
+                src="/logo_dark.svg?v=2"
+                alt="aulaEnsuny Logo Dark"
+                className="object-contain object-left w-full h-full hidden dark:block"
+              />
+            </div>
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 mt-0.5">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
               {user?.role === 'superadmin' ? 'SuperAdmin' : 'Admin'}
             </span>
@@ -373,7 +395,7 @@ function SidebarContent({ onClose, isCollapsed = false, user }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [isProfileOpen, setIsProfileOpen] = useState(false)
-  const [hasVirtualCourses, setHasVirtualCourses] = useState(true)
+  const [hasVirtualCourses, setHasVirtualCourses] = useState(false)
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({})
 
   const toggleGroup = (groupLabel: string) => {
@@ -387,7 +409,7 @@ function SidebarContent({ onClose, isCollapsed = false, user }: SidebarProps) {
 
   useEffect(() => {
     async function checkCourses() {
-      if (isTeacher && user?.id) {
+      if (user?.id) {
         const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL ||
           process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
         if (isDemoMode) {
@@ -396,8 +418,13 @@ function SidebarContent({ onClose, isCollapsed = false, user }: SidebarProps) {
         }
         try {
           const supabase = createClient()
-          const { data } = await supabase.from('courses').select('id').eq('teacher_id', user.id).limit(1)
-          setHasVirtualCourses(data !== null && data.length > 0)
+          if (isTeacher) {
+            const { data } = await supabase.from('courses').select('id').eq('teacher_id', user.id).limit(1)
+            setHasVirtualCourses(data !== null && data.length > 0)
+          } else {
+            const { data } = await supabase.from('student_courses').select('id').eq('student_id', user.id).limit(1)
+            setHasVirtualCourses(data !== null && data.length > 0)
+          }
         } catch (e) {
           console.error(e)
         }
@@ -406,30 +433,64 @@ function SidebarContent({ onClose, isCollapsed = false, user }: SidebarProps) {
     checkCourses()
   }, [isTeacher, user?.id])
 
+  const isStudentVirtualCourses = isStudentVirtualCampusRoute(pathname)
+
   let menuGroups = [
     {
-      label: 'Académico',
+      label: 'ACADÉMICO',
       items: [
-        { name: 'Mis cursos', href: '/student/dashboard', icon: BookOpen },
+        { name: 'Portal Académico', href: '/student/dashboard', icon: LayoutDashboard },
+        ...(hasVirtualCourses ? [{ name: 'Mis cursos', href: '/student/courses', icon: BookOpen }] : []),
         { name: 'Horario', href: '/student/schedule', icon: CalendarDays },
-        { name: 'Mis solicitudes', href: '/student/requests', icon: ClipboardList },
+        ...(hasVirtualCourses ? [{ name: 'Mis solicitudes', href: '/student/requests', icon: ClipboardList }] : []),
         { name: 'Calificaciones', href: '/student/grades', icon: TrendingUp },
+        { name: 'Convivencia', href: '/student/disciplinary', icon: ShieldAlert },
+        { name: 'Asistencia Escolar', href: '/student/attendance', icon: Activity },
       ]
     },
     {
-      label: 'Gestión',
+      label: 'GESTIÓN',
       items: [
         { name: 'Calendario', href: '/student/calendar', icon: Calendar },
         { name: 'Votaciones', href: '/student/elections', icon: ShieldCheck },
       ]
     },
     {
-      label: 'Sistema',
+      label: 'SISTEMA',
       items: [
         { name: 'Configuración', href: '/student/settings', icon: Settings },
       ]
     }
   ]
+
+  // Si estamos en el Campus Virtual, mostramos un menú exclusivo
+  if (!isTeacher && isStudentVirtualCourses) {
+    menuGroups = [
+      {
+        label: 'ACADÉMICO',
+        items: [
+          { name: 'Portal Académico', href: '/student/dashboard', icon: LayoutDashboard },
+          { name: 'Mis cursos', href: '/student/courses', icon: BookOpen },
+          { name: 'Horario', href: '/student/schedule', icon: CalendarDays },
+          { name: 'Mis solicitudes', href: '/student/requests', icon: ClipboardList },
+          { name: 'Calificaciones', href: '/student/virtual-grades', icon: TrendingUp },
+        ]
+      },
+      {
+        label: 'GESTIÓN',
+        items: [
+          { name: 'Calendario', href: '/student/calendar', icon: Calendar },
+          { name: 'Votaciones', href: '/student/elections', icon: ShieldCheck },
+        ]
+      },
+      {
+        label: 'SISTEMA',
+        items: [
+          { name: 'Configuración', href: '/student/settings', icon: Settings },
+        ]
+      }
+    ]
+  }
 
   if (isTeacher) {
     menuGroups = [
@@ -497,21 +558,31 @@ function SidebarContent({ onClose, isCollapsed = false, user }: SidebarProps) {
     <div className="flex h-full flex-col justify-between">
       {/* Brand Header */}
       <div className={`h-16 shrink-0 flex items-center border-b border-slate-100 dark:border-slate-800/60 ${isCollapsed ? 'justify-center px-1' : 'px-4 pr-10'}`}>
-        <Link href="/" className={`flex items-center ${isCollapsed ? 'justify-center gap-1.5' : 'gap-2'}`} onClick={onClose}>
+        <Link href="/" className={`flex items-center ${isCollapsed ? 'justify-center gap-1.5' : 'gap-2.5'}`} onClick={onClose}>
           <img
             src="/escudo_ensuny.png"
             alt="Escudo ENSUNY"
-            className={`${isCollapsed ? 'h-6 w-6' : 'h-8 w-8'} shrink-0 object-contain`}
+            className={`${isCollapsed ? 'h-7 w-7' : 'h-8 w-auto'} shrink-0 object-contain`}
           />
-          <img
-            src="/logo_1.svg"
-            alt="aulaEnsuny Logo"
-            className={`${isCollapsed ? 'h-6 w-6' : 'h-8 w-8'} shrink-0 object-contain`}
-          />
-          {!isCollapsed && (
-            <span className="text-base font-bold tracking-tight text-slate-900 dark:text-white whitespace-nowrap">
-              aulaEnsuny
-            </span>
+          {isCollapsed ? (
+            <img
+              src="/logo_1.svg"
+              alt="aulaEnsuny Logo"
+              className="h-6 w-6 shrink-0 object-contain"
+            />
+          ) : (
+            <div className="relative w-[185px] h-10 flex items-center justify-start">
+              <img
+                src="/logo.svg?v=2"
+                alt="aulaEnsuny Logo"
+                className="object-contain object-left w-full h-full dark:hidden"
+              />
+              <img
+                src="/logo_dark.svg?v=2"
+                alt="aulaEnsuny Logo Dark"
+                className="object-contain object-left w-full h-full hidden dark:block"
+              />
+            </div>
           )}
         </Link>
       </div>
@@ -522,7 +593,7 @@ function SidebarContent({ onClose, isCollapsed = false, user }: SidebarProps) {
           {menuGroups.map((group, groupIdx) => {
             const isGroupCollapsed = collapsedGroups[group.label || String(groupIdx)]
             return (
-            <div key={groupIdx} className="space-y-1">
+            <div key={group.label || String(groupIdx)} className="space-y-1">
               {group.label && !isCollapsed && (
                 <div 
                   className="px-4 mb-2 flex items-center justify-between cursor-pointer group/label"
@@ -669,6 +740,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [user, setUser] = useState<UserSessionInfo | null>(null)
+  const isStudent = user?.role === 'student' || pathname.startsWith('/student')
+  const isStudentVirtualCourses = isStudentVirtualCampusRoute(pathname)
+  const isStudentPortal = isStudent && !isStudentVirtualCourses
   const [enabledModules, setEnabledModules] = useState<string[]>([])
   const [pendingAlertModal, setPendingAlertModal] = useState<{ isOpen: boolean; count: number }>({
     isOpen: false,
@@ -1149,7 +1223,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <button onClick={toggleTheme} className="rounded-xl p-2.5 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors" title="Cambiar tema">
                 {isDark ? <Sun className="h-4.5 w-4.5" /> : <Moon className="h-4.5 w-4.5" />}
               </button>
-              <div className="relative">
+              <div className="relative hidden sm:block">
                 <button onClick={() => setIsNotificationsOpen(!isNotificationsOpen)} className="relative rounded-xl p-2.5 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors">
                   <Bell className="h-4.5 w-4.5" />
                   {unreadCount > 0 && <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-blue-500 ring-2 ring-white dark:ring-slate-900" />}
@@ -1260,7 +1334,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex min-h-screen bg-[#f9fafb] dark:bg-slate-950 transition-all duration-300">
       {/* Sidebar Desktop */}
-      {!isCourseSection && !isDocsPage && (
+      {!isStudentPortal && !isCourseSection && !isDocsPage && (
         <aside className={`fixed inset-y-0 left-0 z-20 hidden border-r border-slate-100 bg-white/70 backdrop-blur-md dark:border-slate-800/60 dark:bg-slate-900/70 md:block transition-all duration-300 ${isSidebarCollapsed ? 'w-20' : 'w-64'}`}>
           <SidebarContent user={user} isCollapsed={isSidebarCollapsed} />
           <button onClick={toggleSidebar}
@@ -1272,128 +1346,203 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       )}
 
       {/* Main Container */}
-      <div className={`flex flex-1 flex-col transition-all duration-300 min-w-0 ${(isCourseSection || isDocsPage) ? 'pl-0' : (isSidebarCollapsed ? 'md:pl-20' : 'md:pl-64')}`}>
+      <div className={`flex flex-1 flex-col transition-all duration-300 min-w-0 ${(isStudentPortal || isCourseSection || isDocsPage) ? 'pl-0' : (isSidebarCollapsed ? 'md:pl-20' : 'md:pl-64')}`}>
         {/* Header */}
         {!isDocsPage && (
-          <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-slate-100 bg-white px-6 dark:border-slate-800/60 dark:bg-slate-950 print:hidden">
-          <div className="flex items-center gap-4">
-            <button onClick={() => setIsMobileMenuOpen(true)} className={`rounded-lg p-2 hover:bg-slate-55 dark:hover:bg-slate-800/50 ${isCourseSection ? 'block' : 'md:hidden'}`}>
-              <Menu className="h-5 w-5 text-slate-600 dark:text-slate-400" />
-            </button>
-            {isCourseSection && (
-              <Link href={pathname.includes('/student') ? '/student/dashboard' : '/teacher/dashboard'} className="hidden md:flex items-center gap-2 px-2 hover:opacity-80 transition-opacity">
-                <img src="/escudo_ensuny.png" alt="Escudo ENSUNY" className="h-8 w-8 shrink-0 object-contain" />
-                <img src="/logo_1.svg" alt="aulaEnsuny Logo" className="h-8 w-8 shrink-0 object-contain" />
-                <span className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">aulaEnsuny</span>
-              </Link>
-            )}
-          </div>
-
-          <div className="ml-auto flex items-center gap-3 sm:gap-4">
-            <button
-              type="button"
-              onClick={() => {
-                if (typeof window !== 'undefined') {
-                  window.dispatchEvent(new CustomEvent('open-pwa-install'))
-                }
-              }}
-              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20 text-xs font-semibold transition-all active:scale-[0.98] cursor-pointer"
-              title="Instalar aulaEnsuny en este dispositivo"
-            >
-              <Download className="h-3.5 w-3.5" />
-              <span>Instalar</span>
-            </button>
-            <button onClick={toggleTheme} className="relative rounded-xl p-2.5 text-slate-500 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors" title="Cambiar tema">
-              {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-            </button>
-            <div className="relative">
-              <button onClick={() => setIsNotificationsOpen(!isNotificationsOpen)} className="relative rounded-xl p-2.5 text-slate-500 hover:bg-slate-55 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white transition-colors">
-                <Bell className="h-5 w-5" />
-                {unreadCount > 0 && <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-blue-500 ring-2 ring-white dark:ring-slate-900" />}
-              </button>
-              <AnimatePresence>
-                {isNotificationsOpen && (
-                  <>
-                    {/* Backdrop */}
-                    <div
-                      className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[1px] sm:bg-transparent"
-                      onClick={() => setIsNotificationsOpen(false)}
-                    />
-                    {/* Panel dropdown */}
-                    <motion.div
-                      initial={{ opacity: 0, y: -6, scale: 0.98 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -6, scale: 0.98 }}
-                      transition={{ duration: 0.15 }}
-                      className={`z-50 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900 ${
-                        isMobile
-                          ? 'fixed top-16 right-2 w-[calc(100vw-1rem)] max-w-[360px]'
-                          : 'absolute right-0 top-full mt-2 w-80 shadow-xl'
-                      }`}
+          <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-slate-200/70 dark:border-slate-800/60 bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl px-3 sm:px-6 print:hidden transition-colors">
+            <div className={`flex w-full items-center justify-between ${isStudentPortal ? 'max-w-5xl mx-auto' : ''}`}>
+              <div className="flex items-center gap-3 sm:gap-4">
+                <button onClick={() => setIsMobileMenuOpen(true)} className={`rounded-full p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800 transition-colors ${(isStudentPortal || isCourseSection) ? 'hidden' : 'md:hidden'}`}>
+                  <Menu className="h-5 w-5" />
+                </button>
+                {(isStudentPortal || isCourseSection) && (
+                  <div className="flex items-center gap-3 sm:gap-4">
+                    <Link
+                      href={isStudent ? '/student/dashboard' : '/teacher/dashboard'}
+                      className="group flex items-center gap-2.5 sm:gap-3 hover:opacity-90 active:scale-[0.99] transition-all duration-150 shrink-0"
                     >
-                      <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-800/60">
-                        <h3 className="text-sm font-bold text-slate-900 dark:text-white">Notificaciones</h3>
-                        <div className="flex items-center gap-2">
-                          {unreadCount > 0 && (
-                            <button onClick={markAllNotificationsAsRead} className="text-xs font-semibold text-blue-600 dark:text-blue-400">
-                              Marcar leídas
-                            </button>
-                          )}
-                          {notifications.length > 0 && (
-                            <button onClick={clearAllNotifications} className="text-xs font-semibold text-red-500 hover:text-red-600 dark:text-red-400">
-                              Limpiar todo
-                            </button>
-                          )}
-                        </div>
+                      {/* Escudo Institucional ENSUNY */}
+                      <img
+                        src="/escudo_ensuny.png"
+                        alt="Escudo ENSUNY"
+                        className="h-8.5 sm:h-10 w-auto object-contain shrink-0 drop-shadow-xs"
+                      />
+                      {/* Logotipo oficial aulaEnsuny con proporción exacta */}
+                      <div className="relative h-8 sm:h-9.5 aspect-[416/145] flex items-center justify-start shrink-0">
+                        <img
+                          src="/logo.svg?v=2"
+                          alt="aulaEnsuny Logo"
+                          className="object-contain object-left w-full h-full dark:hidden"
+                        />
+                        <img
+                          src="/logo_dark.svg?v=2"
+                          alt="aulaEnsuny Logo Dark"
+                          className="object-contain object-left w-full h-full hidden dark:block"
+                        />
                       </div>
-                      <div className="max-h-[60vh] sm:max-h-[300px] overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/40">
-                        {notifications.length === 0 ? (
-                          <div className="flex flex-col items-center justify-center py-10 text-slate-400">
-                            <Bell className="h-9 w-9 mb-2 opacity-30" />
-                            <p className="text-xs">Sin notificaciones</p>
-                          </div>
-                        ) : notifications.map(notif => (
-                          <div key={notif.id}
-                            className={`group flex items-start gap-2 px-3 py-3 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50 ${notif.read ? 'opacity-70' : 'bg-blue-50/30 dark:bg-blue-900/10'}`}>
-                            <div className="flex-1 min-w-0 cursor-pointer" onClick={() => markNotificationAsRead(notif.id)}>
-                              <div className="flex items-center gap-1.5">
-                                {!notif.read && <span className="h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0" />}
-                                <h4 className={`text-sm font-bold truncate ${notif.read ? 'text-slate-700 dark:text-slate-300' : 'text-slate-900 dark:text-white'}`}>{notif.title}</h4>
-                              </div>
-                              <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mt-0.5">{notif.message}</p>
-                              <span className="text-[10px] font-medium text-slate-400 mt-1 block">{notif.time}</span>
-                            </div>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); deleteNotification(notif.id); }}
-                              className="shrink-0 p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                              title="Eliminar"
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="border-t border-slate-100 p-3 dark:border-slate-800/60 text-center">
-                        <button onClick={() => setIsNotificationsOpen(false)} className="text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors">Cerrar</button>
-                      </div>
-                    </motion.div>
-                  </>
+                    </Link>
+
+                    {/* Divisor y Distintivo Portal Académico */}
+                    <div className="hidden sm:flex items-center gap-2.5">
+                      <div className="h-4 w-px bg-slate-200 dark:bg-slate-800" />
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider text-emerald-800 dark:text-emerald-300 bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/20 uppercase">
+                        Portal Académico
+                      </span>
+                    </div>
+                  </div>
                 )}
-              </AnimatePresence>
+              </div>
+
+              <div className="ml-auto flex items-center gap-1.5 sm:gap-2.5">
+                {isStudent && (
+                  <a
+                    href="https://www.ensuny.edu.co"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hidden lg:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100/70 hover:bg-slate-200/70 dark:bg-slate-800/70 dark:hover:bg-slate-800 border border-slate-200/60 dark:border-white/10 text-xs font-semibold text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-all active:scale-95 duration-100 ease-out"
+                  >
+                    <svg className="w-3.5 h-3.5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                    <span>Sitio Web</span>
+                  </a>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (typeof window !== 'undefined') {
+                      window.dispatchEvent(new CustomEvent('open-pwa-install'))
+                    }
+                  }}
+                  className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 hover:bg-emerald-100/80 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 text-xs font-semibold border border-emerald-200/60 dark:border-emerald-800/60 transition-all active:scale-95 duration-100 ease-out cursor-pointer"
+                  title="Instalar aulaEnsuny en este dispositivo"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  <span>Instalar</span>
+                </button>
+
+                <div className="hidden sm:block h-4 w-px bg-slate-200 dark:bg-slate-800 mx-0.5" />
+
+                <button
+                  onClick={toggleTheme}
+                  type="button"
+                  className="rounded-full p-2 text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white bg-slate-100/70 hover:bg-slate-200/70 dark:bg-slate-800/70 dark:hover:bg-slate-800 border border-slate-200/50 dark:border-white/10 active:scale-90 duration-100 ease-out cursor-pointer shrink-0"
+                  title="Cambiar tema"
+                  aria-label="Cambiar tema"
+                >
+                  {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                </button>
+
+                <div className="relative hidden sm:block">
+                  <button
+                    onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+                    type="button"
+                    className="rounded-full p-2 text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white bg-slate-100/70 hover:bg-slate-200/70 dark:bg-slate-800/70 dark:hover:bg-slate-800 border border-slate-200/50 dark:border-white/10 active:scale-90 duration-100 ease-out cursor-pointer shrink-0 relative"
+                    title="Notificaciones"
+                  >
+                    <Bell className="h-4 w-4" />
+                    {unreadCount > 0 && <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-blue-500 ring-2 ring-white dark:ring-slate-900" />}
+                  </button>
+                  <AnimatePresence>
+                    {isNotificationsOpen && (
+                      <>
+                        {/* Backdrop */}
+                        <div
+                          className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[1px] sm:bg-transparent"
+                          onClick={() => setIsNotificationsOpen(false)}
+                        />
+                        {/* Panel dropdown */}
+                        <motion.div
+                          initial={{ opacity: 0, y: -6, scale: 0.98 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: -6, scale: 0.98 }}
+                          transition={{ duration: 0.15 }}
+                          className={`z-50 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900 ${
+                            isMobile
+                              ? 'fixed top-16 right-2 w-[calc(100vw-1rem)] max-w-[360px]'
+                              : 'absolute right-0 top-full mt-2 w-80 shadow-xl'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-800/60">
+                            <h3 className="text-sm font-bold text-slate-900 dark:text-white">Notificaciones</h3>
+                            <div className="flex items-center gap-2">
+                              {unreadCount > 0 && (
+                                <button onClick={markAllNotificationsAsRead} className="text-xs font-semibold text-blue-600 dark:text-blue-400">
+                                  Marcar leídas
+                                </button>
+                              )}
+                              {notifications.length > 0 && (
+                                <button onClick={clearAllNotifications} className="text-xs font-semibold text-red-500 hover:text-red-600 dark:text-red-400">
+                                  Limpiar todo
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                          <div className="max-h-[60vh] sm:max-h-[300px] overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/40">
+                            {notifications.length === 0 ? (
+                              <div className="flex flex-col items-center justify-center py-10 text-slate-400">
+                                <Bell className="h-9 w-9 mb-2 opacity-30" />
+                                <p className="text-xs">Sin notificaciones</p>
+                              </div>
+                            ) : notifications.map(notif => (
+                              <div key={notif.id}
+                                className={`group flex items-start gap-2 px-3 py-3 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50 ${notif.read ? 'opacity-70' : 'bg-blue-50/30 dark:bg-blue-900/10'}`}>
+                                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => markNotificationAsRead(notif.id)}>
+                                  <div className="flex items-center gap-1.5">
+                                    {!notif.read && <span className="h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0" />}
+                                    <h4 className={`text-sm font-bold truncate ${notif.read ? 'text-slate-700 dark:text-slate-300' : 'text-slate-900 dark:text-white'}`}>{notif.title}</h4>
+                                  </div>
+                                  <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mt-0.5">{notif.message}</p>
+                                  <span className="text-[10px] font-medium text-slate-400 mt-1 block">{notif.time}</span>
+                                </div>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); deleteNotification(notif.id); }}
+                                  className="shrink-0 p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                  title="Eliminar"
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="border-t border-slate-100 p-3 dark:border-slate-800/60 text-center">
+                            <button onClick={() => setIsNotificationsOpen(false)} className="text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors">Cerrar</button>
+                          </div>
+                        </motion.div>
+                      </>
+                    )}
+                  </AnimatePresence>
+                </div>
+
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-full text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 dark:text-red-400 dark:bg-red-950/40 dark:hover:bg-red-900/50 border border-red-200 dark:border-red-900/60 active:scale-95 duration-100 ease-out cursor-pointer shadow-xs"
+                  title="Cerrar sesión"
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Cerrar Sesión</span>
+                </button>
+              </div>
             </div>
-            <button onClick={handleLogout} className="flex items-center gap-2 rounded-xl border border-red-100 bg-red-50 px-3.5 py-2 text-xs font-semibold text-red-600 hover:bg-red-100 active:scale-[0.98] transition-all dark:border-red-900/30 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20">
-              <LogOut className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Cerrar Sesión</span>
-            </button>
-          </div>
-        </header>
+          </header>
         )}
 
         <main className={`flex-1 min-w-0 ${
           isDocsPage ? 'overflow-hidden p-0'
           : isCourseSection ? 'overflow-y-auto p-0 h-[calc(100vh-4rem)]'
-          : 'overflow-hidden p-6 md:p-8'
-        }`}>{children}</main>
+          : isStudentPortal ? 'overflow-x-hidden p-0 sm:p-4 md:p-8'
+          : 'overflow-y-auto p-6 md:p-8'
+        }`}>
+          <div className={`h-full ${
+            isDocsPage ? '' 
+            : isCourseSection ? 'w-full'
+            : isStudentPortal ? 'w-full lg:w-[70%] mx-auto'
+            : 'w-full max-w-[1600px] mx-auto'
+          }`}>
+            {children}
+          </div>
+        </main>
         {!isDocsPage && !isCourseSection && (
           <footer className="border-t border-slate-100 py-6 text-center text-xs text-slate-400 dark:border-slate-800/60 dark:text-slate-500">
             <p>© {new Date().getFullYear()} aulaEnsuny. Todos los derechos reservados.</p>

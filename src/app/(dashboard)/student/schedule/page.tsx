@@ -1,6 +1,8 @@
 import { Metadata } from 'next'
 import { getStudentDashboardSchedule } from '@/modules/students/application/scheduleActions'
 import { StudentScheduleClient } from './components/StudentScheduleClient'
+import { getPlanillaStudentSession } from '@/modules/planilla-asistida/application/studentAuthActions'
+import { redirect } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,6 +12,11 @@ export const metadata: Metadata = {
 }
 
 export default async function StudentSchedulePage() {
+  const session = await getPlanillaStudentSession()
+  if (!session) {
+    redirect('/login')
+  }
+
   const scheduleData = await getStudentDashboardSchedule()
   return <StudentScheduleClient initialData={scheduleData} />
 }

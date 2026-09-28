@@ -173,7 +173,7 @@ export function AdminEvaluationsScreen() {
             <p className="text-xs text-slate-400 mt-0.5">Visualización del desempeño global en exámenes.</p>
           </div>
           <div className="h-60 mt-4 w-full">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <BarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" className="dark:stroke-slate-800" />
                 <XAxis dataKey="name" stroke="#94A3B8" fontSize={11} tickLine={false} />

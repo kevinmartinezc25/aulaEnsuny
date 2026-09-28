@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useTransition, useMemo } from 'react'
+import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   CalendarCheck2, 
@@ -141,7 +142,7 @@ export function StudentAttendanceClientView({
   }, [subjects, selectedSubjectId])
 
   return (
-    <div className="space-y-6 sm:space-y-8 animate-in fade-in duration-200">
+    <div className="w-[90%] sm:w-full max-w-4xl mx-auto py-5 sm:py-6 space-y-5 sm:space-y-6 px-0 sm:px-4 animate-in fade-in duration-200">
       
       {/* ────────────────────────────────────────────────────────────── */}
       {/* NIVEL 2: TRAZABILIDAD POR FECHAS                              */}
@@ -150,7 +151,7 @@ export function StudentAttendanceClientView({
         <div className="space-y-6">
           {/* Barra de Retorno y Título de la Asignatura */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-white/10 shadow-sm">
-            <div className="flex items-center gap-3.5">
+            <div className="flex items-center gap-3.5 min-w-0 flex-1">
               <Button
                 variant="outline"
                 size="icon"
@@ -159,25 +160,25 @@ export function StudentAttendanceClientView({
               >
                 <ArrowLeft className="h-5 w-5" />
               </Button>
-              <div>
+              <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/20">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/20 shrink-0">
                     <CalendarCheck2 className="h-3 w-3" />
                     Trazabilidad por Fechas
                   </span>
                   {selectedSubjectSummary?.period && (
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">
                       · Período {selectedSubjectSummary.period}
                     </span>
                   )}
                 </div>
-                <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight mt-0.5">
+                <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight mt-0.5 truncate max-w-full">
                   {selectedSubjectSummary?.name || 'Materia de Planilla Asistida'}
                 </h2>
                 {selectedSubjectSummary?.teacherName && (
-                  <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mt-0.5">
-                    <User className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400" />
-                    <span>Docente: <strong>{selectedSubjectSummary.teacherName}</strong></span>
+                  <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mt-0.5 truncate max-w-full">
+                    <User className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400 shrink-0" />
+                    <span className="truncate">Docente: <strong>{selectedSubjectSummary.teacherName}</strong></span>
                   </p>
                 )}
               </div>
@@ -277,7 +278,7 @@ export function StudentAttendanceClientView({
           )}
 
           {/* Filtros de sesiones */}
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 max-w-full overflow-x-auto pb-1">
             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mr-1">Filtrar por:</span>
             <button
               onClick={() => setTraceFilter('all')}
@@ -478,24 +479,28 @@ export function StudentAttendanceClientView({
         /* ────────────────────────────────────────────────────────────── */
         /* NIVEL 1: LISTADO DE MATERIAS DE PLANILLA ASISTIDA             */
         /* ────────────────────────────────────────────────────────────── */
-        <div className="space-y-6 sm:space-y-8">
+        <div className="space-y-5 sm:space-y-6">
+          <div>
+            <Link 
+              href="/student/dashboard" 
+              className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span>Volver al Portal</span>
+            </Link>
+          </div>
           {/* Título Simple */}
-          <div className="px-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <h1 className="text-[28px] sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight leading-tight mb-1">
-                Asistencia Escolar
-              </h1>
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                Registro general de asistencia para <strong className="text-slate-700 dark:text-slate-300">{studentName}</strong>
-              </p>
-            </div>
-            <span className="self-start sm:self-center px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 shadow-sm">
-              Módulo Planilla
-            </span>
+          <div>
+            <h1 className="text-[28px] sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight leading-tight mb-1">
+              Asistencia Escolar
+            </h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Registro general de asistencia para <strong className="text-slate-700 dark:text-slate-300">{studentName}</strong>
+            </p>
           </div>
 
           {/* ── Métricas de resumen rápido ── */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5 sm:gap-4 px-2 sm:px-0">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5 sm:gap-4">
             <div className="col-span-2 md:col-span-1 rounded-xl sm:rounded-2xl bg-emerald-50 dark:bg-emerald-900/10 p-3.5 sm:p-5 border border-emerald-100 dark:border-emerald-900/30 flex flex-col justify-between">
               <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-1">General</span>
               <span className="text-2xl sm:text-3xl font-black text-emerald-700 dark:text-emerald-300">{summary.overallPercentage}%</span>
@@ -600,7 +605,7 @@ export function StudentAttendanceClientView({
                               G{sub.grade}-{sub.group_number}
                             </span>
                           </div>
-                          <h3 className="font-bold text-xs sm:text-base md:text-lg text-slate-900 dark:text-white group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors line-clamp-2 leading-tight">
+                          <h3 className="font-bold text-xs sm:text-base md:text-lg text-slate-900 dark:text-white group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors line-clamp-2 leading-tight break-words">
                             {sub.name}
                           </h3>
                         </div>

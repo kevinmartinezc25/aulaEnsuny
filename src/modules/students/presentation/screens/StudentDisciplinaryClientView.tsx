@@ -1,8 +1,10 @@
 'use client'
 
 import React, { useState } from 'react'
+import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
+  ArrowLeft,
   ShieldCheck, 
   ShieldAlert, 
   FileText, 
@@ -62,24 +64,30 @@ export function StudentDisciplinaryClientView({
   }
 
   return (
-    <div className="space-y-6 sm:space-y-8 animate-in fade-in duration-200">
+    <div className="w-[90%] sm:w-full max-w-4xl mx-auto py-5 sm:py-6 space-y-5 sm:space-y-6 px-0 sm:px-4 animate-in fade-in duration-200">
+      {/* Botón de Regresar */}
+      <div>
+        <Link 
+          href="/student/dashboard" 
+          className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          <span>Volver al Portal</span>
+        </Link>
+      </div>
+
       {/* Título Simple */}
-      <div className="px-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-[28px] sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight leading-tight mb-1">
-            Seguimiento Convivencial
-          </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            Reportes y novedades de convivencia de <strong className="text-slate-700 dark:text-slate-300">{studentName}</strong>
-          </p>
-        </div>
-        <span className="self-start sm:self-center px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 shadow-sm">
-          Modo Solo Lectura
-        </span>
+      <div>
+        <h1 className="text-[28px] sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight leading-tight mb-1">
+          Reporte de anotaciones
+        </h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          Reportes y novedades de convivencia de <strong className="text-slate-700 dark:text-slate-300">{studentName}</strong>
+        </p>
       </div>
 
       {/* ── Métricas de resumen rápido ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-4 px-2 sm:px-0">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-4">
         <div className="rounded-xl sm:rounded-2xl bg-white dark:bg-slate-900 p-3.5 sm:p-5 border border-slate-200 dark:border-slate-800 shadow-sm">
           <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500">
             Total Novedades
@@ -145,7 +153,7 @@ export function StudentDisciplinaryClientView({
         <div className="space-y-4 sm:space-y-6">
           {/* ── Filtros por Tipo de Situación ── */}
           <div className="flex flex-wrap items-center justify-between gap-2.5">
-            <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/60">
+            <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-2xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/60 max-w-full overflow-x-auto">
               <button
                 onClick={() => setSelectedFilter('all')}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
@@ -223,12 +231,12 @@ export function StudentDisciplinaryClientView({
                     onClick={() => toggleExpand(report.id)}
                     className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors"
                   >
-                    <div className="flex items-start gap-3 sm:gap-4">
+                    <div className="flex items-start gap-3 sm:gap-4 min-w-0 flex-1">
                       <div className={`mt-0.5 sm:mt-0 w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl border flex items-center justify-center shrink-0 ${badgeTypeClass}`}>
                         <FileText className="w-5 h-5" />
                       </div>
 
-                      <div className="space-y-1">
+                      <div className="space-y-1 min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className={`px-2 py-0.5 rounded-md text-[10px] sm:text-xs font-bold border ${badgeTypeClass}`}>
                             {report.situationSnapshot?.type || 'Tipo I'}
@@ -242,7 +250,7 @@ export function StudentDisciplinaryClientView({
                           )}
                         </div>
 
-                        <h4 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white leading-snug">
+                        <h4 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white leading-snug break-words">
                           {report.situationSnapshot?.title || 'Novedad de Convivencia'}
                         </h4>
 
@@ -257,8 +265,8 @@ export function StudentDisciplinaryClientView({
                               {report.reportTime.slice(0, 5)}
                             </span>
                           )}
-                          <span className="inline-flex items-center gap-1">
-                            <User className="w-3.5 h-3.5" />
+                          <span className="inline-flex items-center gap-1 truncate max-w-full">
+                            <User className="w-3.5 h-3.5 shrink-0" />
                             Docente: {report.teacherName}
                           </span>
                         </div>

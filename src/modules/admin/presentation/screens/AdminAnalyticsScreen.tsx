@@ -293,7 +293,7 @@ export function AdminAnalyticsScreen() {
                 <p className="text-xs text-slate-450 mt-0.5">Ingreso de usuarios (Estudiantes y Profesores) durante la última semana.</p>
               </div>
               <div className="h-64 mt-6 w-full">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <LineChart data={accessData}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" className="dark:stroke-slate-800" />
                     <XAxis dataKey="day" stroke="#94A3B8" fontSize={11} tickLine={false} />
@@ -316,7 +316,7 @@ export function AdminAnalyticsScreen() {
                 <p className="text-xs text-slate-450 mt-0.5">Composición de cuentas registradas en el sistema.</p>
               </div>
               <div className="h-48 mt-4 w-full flex items-center justify-center relative">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <PieChart>
                     <Pie
                       data={roleDistribution}
@@ -366,7 +366,7 @@ export function AdminAnalyticsScreen() {
                 <p className="text-xs text-slate-450 mt-0.5">Comparativa del desempeño medio y porcentaje de estudiantes promovidos por grado.</p>
               </div>
               <div className="h-64 mt-6 w-full">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <BarChart data={gradeData}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" className="dark:stroke-slate-800" />
                     <XAxis dataKey="name" stroke="#94A3B8" fontSize={11} tickLine={false} />
