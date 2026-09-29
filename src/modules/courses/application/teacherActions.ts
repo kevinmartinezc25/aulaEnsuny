@@ -120,15 +120,43 @@ export async function getTeacherCourseStats(courseId: string): Promise<TeacherCo
     activeStudents = periodGrades.filter(g => Number(g.final_grade) >= 3.0).length
     atRiskStudents = periodGrades.filter(g => Number(g.final_grade) < 3.0).length
   } else {
-    // Try grades table
+    // Try student_lesson_grades table
     const { data: stdGrades } = await supabase
-      .from('grades')
-      .select('score')
+      .from('student_lesson_grades')
+      .select('grade, student_id')
       .eq('course_id', courseId)
     
     if (stdGrades && stdGrades.length > 0) {
-      const sum = stdGrades.reduce((acc, curr) => acc + Number(curr.score), 0)
+      const sum = stdGrades.reduce((acc, curr) => acc + Number(curr.grade), 0)
       averageGrade = sum / stdGrades.length
+
+      // Group by student to find pass/fail count
+      const studentAverages: Record<string, { sum: number, count: number }> = {}
+      stdGrades.forEach(g => {
+        if (!studentAverages[g.student_id]) {
+          studentAverages[g.student_id] = { sum: 0, count: 0 }
+        }
+        studentAverages[g.student_id].sum += Number(g.grade)
+        studentAverages[g.student_id].count++
+      })
+
+      let approved = 0
+      let atRisk = 0
+      
+      Object.values(studentAverages).forEach(student => {
+        const avg = student.sum / student.count
+        if (avg >= 3.0) approved++
+        else atRisk++
+      })
+      
+      // If some students have no grades, they are not counted in approved or atRisk yet, or we can count them as atRisk/unassessed.
+      // We will only count students with grades for the risk metric, or consider unassessed as active.
+      // Usually, it's better to show only assessed students, but to keep the bar full we can scale.
+      activeStudents = approved
+      atRiskStudents = atRisk
+    } else {
+      activeStudents = 0
+      atRiskStudents = 0
     }
   }
 
@@ -159,21 +187,21 @@ export async function getTeacherCourseStats(courseId: string): Promise<TeacherCo
   } else {
     // Fallback: Fetch real grades directly and group them dynamically by date/week
     const { data: stdGrades } = await supabase
-      .from('grades')
-      .select('score, created_at')
+      .from('student_lesson_grades')
+      .select('grade, updated_at')
       .eq('course_id', courseId)
     
     if (stdGrades && stdGrades.length > 0) {
-      const sorted = [...stdGrades].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+      const sorted = [...stdGrades].sort((a, b) => new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime())
       
-      const dates = sorted.map(g => new Date(g.created_at).getTime())
+      const dates = sorted.map(g => new Date(g.updated_at).getTime())
       const minDate = Math.min(...dates)
       const maxDate = Math.max(...dates)
       const diffDays = (maxDate - minDate) / (1000 * 60 * 60 * 24)
 
       const grouped: Record<string, { sum: number; count: number }> = {}
       sorted.forEach(g => {
-        const d = new Date(g.created_at)
+        const d = new Date(g.updated_at)
         const key = diffDays > 60
           ? d.toLocaleDateString('es-ES', { month: 'short' })
           : d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
@@ -181,7 +209,7 @@ export async function getTeacherCourseStats(courseId: string): Promise<TeacherCo
         if (!grouped[key]) {
           grouped[key] = { sum: 0, count: 0 }
         }
-        grouped[key].sum += Number(g.score)
+        grouped[key].sum += Number(g.grade)
         grouped[key].count++
       })
 
@@ -191,6 +219,14 @@ export async function getTeacherCourseStats(courseId: string): Promise<TeacherCo
           promedio: parseFloat((val.sum / val.count).toFixed(2))
         })
       })
+      
+      // If there's only 1 point, Recharts area chart won't draw a line/area properly
+      if (chartData.length === 1) {
+        chartData.unshift({
+          name: 'Inicio',
+          promedio: chartData[0].promedio
+        })
+      }
     }
   }
 

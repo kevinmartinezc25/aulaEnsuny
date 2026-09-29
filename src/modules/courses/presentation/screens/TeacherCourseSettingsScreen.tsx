@@ -428,12 +428,10 @@ export function TeacherCourseSettingsScreen({ courseId }: { courseId: string }) 
                     <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Periodo académico</label>
                     <select value={academicPeriod} onChange={(e) => setAcademicPeriod(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none focus:border-[#1F4E31] dark:border-slate-700 dark:bg-slate-800/50 dark:text-white">
                       <option value="">Seleccione...</option>
-                      <option value="Primer Semestre">Primer Semestre</option>
-                      <option value="Segundo Semestre">Segundo Semestre</option>
-                      <option value="Primer Trimestre">Primer Trimestre</option>
-                      <option value="Segundo Trimestre">Segundo Trimestre</option>
-                      <option value="Tercer Trimestre">Tercer Trimestre</option>
-                      <option value="Anual">Anual</option>
+                      <option value="Primer Periodo">Primer Periodo</option>
+                      <option value="Segundo Periodo">Segundo Periodo</option>
+                      <option value="Tercer Periodo">Tercer Periodo</option>
+                      <option value="Cuarto Periodo">Cuarto Periodo</option>
                     </select>
                   </div>
                   <div className="space-y-2">

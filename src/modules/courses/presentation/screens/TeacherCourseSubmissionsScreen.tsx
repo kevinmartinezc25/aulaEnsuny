@@ -47,6 +47,20 @@ type Submission = {
   gradeType?: 'quiz' | 'task' | 'workshop' | 'activity'
 }
 
+const formatStudentName = (student: any) => {
+  const rawName = student.lastName && student.firstName 
+    ? `${student.lastName} ${student.firstName}` 
+    : (student.name.includes(' ') 
+        ? `${student.name.split(' ').slice(1).join(' ')} ${student.name.split(' ')[0]}` 
+        : student.name);
+  
+  return rawName
+    .toLowerCase()
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
 export function TeacherCourseSubmissionsScreen({ courseId }: { courseId: string }) {
   const [settings, setSettings] = useState<CourseSettings | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
@@ -179,8 +193,9 @@ export function TeacherCourseSubmissionsScreen({ courseId }: { courseId: string 
   const filteredStudents = useMemo(() => {
     const result = students.filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()))
     return result.sort((a, b) => {
-      const getLastName = (name: string) => name.split(' ').slice(1).join(' ') || name
-      return getLastName(a.name).localeCompare(getLastName(b.name))
+      const lastNameA = a.lastName || a.name.split(' ').slice(1).join(' ') || a.name
+      const lastNameB = b.lastName || b.name.split(' ').slice(1).join(' ') || b.name
+      return lastNameA.localeCompare(lastNameB)
     })
   }, [students, searchTerm])
 
@@ -406,8 +421,8 @@ export function TeacherCourseSubmissionsScreen({ courseId }: { courseId: string 
           </div>
         </div>
 
-        {/* Matriz (Table) Wrapper */}
-        <div className="overflow-x-auto pb-8">
+        {/* Matriz (Table) Wrapper para Desktop */}
+        <div className="hidden md:block overflow-x-auto pb-8">
           <table className="w-full text-left text-sm whitespace-nowrap">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50/50 dark:border-slate-800/60 dark:bg-slate-800/20">
@@ -418,12 +433,12 @@ export function TeacherCourseSubmissionsScreen({ courseId }: { courseId: string 
                 {filteredAssignments.map((assignment) => {
                   const categoryName = settings.categories.find(c => c.id === assignment.categoryId)?.name
                   return (
-                    <th key={assignment.id} className="px-6 py-4 font-semibold text-slate-600 dark:text-slate-300 text-center min-w-[160px] max-w-[200px]">
-                      <div className="flex flex-col items-center gap-1">
+                    <th key={assignment.id} className="px-6 py-4 font-semibold text-slate-600 dark:text-slate-300 text-center min-w-[160px] whitespace-normal">
+                      <div className="flex flex-col items-center gap-1 w-full max-w-[180px] mx-auto">
                         <span className="text-[10px] uppercase font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md dark:bg-indigo-500/10 dark:text-indigo-400">
                           {categoryName}
                         </span>
-                        <span className="truncate w-full text-center" title={assignment.name}>{assignment.name}</span>
+                        <span className="whitespace-normal break-words w-full text-center leading-tight" title={assignment.name}>{assignment.name}</span>
                       </div>
                     </th>
                   )
@@ -443,7 +458,9 @@ export function TeacherCourseSubmissionsScreen({ courseId }: { courseId: string 
                             {student.name.charAt(0).toUpperCase()}
                           </div>
                         )}
-                        <span className="font-semibold text-slate-900 dark:text-white truncate">{student.name}</span>
+                        <span className="font-semibold text-slate-900 dark:text-white truncate">
+                          {formatStudentName(student)}
+                        </span>
                       </div>
                     </td>
                     
@@ -496,6 +513,93 @@ export function TeacherCourseSubmissionsScreen({ courseId }: { courseId: string 
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Matriz (Cards) Wrapper para Mobile */}
+        <div className="md:hidden flex flex-col gap-4 pb-8">
+          {filteredStudents.length > 0 ? (
+            filteredStudents.map((student) => (
+              <div key={student.id} className="bg-white dark:bg-[#151b2b] rounded-2xl border border-slate-100 dark:border-slate-800/60 p-4 shadow-[2px_4px_12px_-2px_rgba(0,0,0,0.03)] flex flex-col gap-4">
+                {/* Header del estudiante */}
+                <div className="flex items-center gap-3 border-b border-slate-100 dark:border-slate-800/60 pb-4">
+                  {student.avatar ? (
+                    <img src={student.avatar} alt={student.name} className="h-10 w-10 rounded-full object-cover border border-slate-100 dark:border-slate-700" />
+                  ) : (
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-50 text-sm font-bold text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 border border-indigo-100/20">
+                      {student.name.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <div>
+                    <span className="font-bold text-slate-900 dark:text-white block text-[15px] leading-tight">
+                      {formatStudentName(student)}
+                    </span>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400">{student.email || 'Estudiante'}</span>
+                  </div>
+                </div>
+
+                {/* Lista de actividades */}
+                <div className="flex flex-col gap-2.5">
+                  {filteredAssignments.map((assignment) => {
+                    const submission = submissions.find(s => s.studentId === student.id && s.assignmentId === assignment.id)
+                    const categoryName = settings?.categories?.find(c => c.id === assignment.categoryId)?.name
+
+                    return (
+                      <div key={assignment.id} className="flex flex-col p-3 bg-slate-50 dark:bg-slate-800/30 rounded-xl border border-slate-100 dark:border-slate-800/60">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex flex-col gap-1 min-w-0 flex-1">
+                            <span className="text-[9px] uppercase font-bold text-indigo-600 dark:text-indigo-400">
+                              {categoryName}
+                            </span>
+                            <span className="font-semibold text-xs text-slate-800 dark:text-slate-200 leading-snug break-words">
+                              {assignment.name}
+                            </span>
+                          </div>
+                          
+                          {/* Action button */}
+                          <div className="shrink-0 mt-1">
+                            {!submission ? (
+                              <button 
+                                onClick={() => handleCreateEmptyAndGrade(student.id, assignment.id)}
+                                className="inline-flex items-center justify-center rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-slate-500 border border-dashed border-slate-300 hover:border-indigo-300 hover:text-indigo-600 hover:bg-indigo-50 dark:border-slate-600 dark:text-slate-400"
+                              >
+                                Evaluar
+                              </button>
+                            ) : submission.status === 'graded' ? (
+                              <button 
+                                onClick={() => handleOpenGrader(submission.id)}
+                                className="inline-flex items-center justify-center rounded-lg px-2.5 py-1.5 text-[11px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400"
+                              >
+                                {submission.grade?.toFixed(1)} / 5.0
+                              </button>
+                            ) : submission.status === 'draft' ? (
+                              <button 
+                                onClick={() => handleOpenGrader(submission.id)}
+                                className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold bg-amber-50 text-amber-600 border border-amber-100 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20"
+                              >
+                                Borrador
+                              </button>
+                            ) : (
+                              <button  
+                                onClick={() => handleOpenGrader(submission.id)}
+                                className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold bg-indigo-50 text-indigo-600 border border-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-400 dark:border-indigo-500/20"
+                              >
+                                <FileText className="h-3 w-3" />
+                                Revisar
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="py-12 text-center text-slate-500 dark:text-slate-400 bg-white dark:bg-[#151b2b] rounded-2xl border border-slate-100 dark:border-slate-800/60">
+              No se encontraron estudiantes.
+            </div>
+          )}
         </div>
       </div>
 
@@ -554,10 +658,10 @@ export function TeacherCourseSubmissionsScreen({ courseId }: { courseId: string 
             </div>
 
             {/* Content Split */}
-            <div className="flex flex-1 overflow-hidden">
+            <div className="flex flex-col lg:flex-row flex-1 overflow-y-auto lg:overflow-hidden">
               {/* Document Preview (Left) */}
-              <div className="flex-1 bg-slate-200/50 dark:bg-black/20 p-4 sm:p-8 overflow-y-auto flex items-center justify-center">
-                <div className="w-full max-w-4xl h-full bg-white dark:bg-slate-800 shadow-xl rounded-xl border border-slate-200 dark:border-slate-700 flex flex-col items-center justify-start p-8 overflow-y-auto">
+              <div className="flex-1 bg-slate-200/50 dark:bg-black/20 p-4 sm:p-8 overflow-y-auto flex items-center justify-center min-h-[60vh] lg:min-h-0">
+                <div className="w-full max-w-4xl h-full min-h-[400px] lg:min-h-0 bg-white dark:bg-slate-800 shadow-xl rounded-xl border border-slate-200 dark:border-slate-700 flex flex-col items-center justify-start p-4 sm:p-8 overflow-y-auto">
                   {(() => {
                     // Try to parse as file metadata JSON
                     let fileMeta: { fileName: string; driveUrl: string; driveDownloadUrl: string } | null = null
@@ -627,8 +731,8 @@ export function TeacherCourseSubmissionsScreen({ courseId }: { courseId: string 
                 </div>
               </div>
 
-              {/* Grading Sidebar (Right) */}
-              <div className="w-full max-w-sm bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 flex flex-col shrink-0">
+              {/* Grading Sidebar (Right/Bottom) */}
+              <div className="w-full lg:max-w-sm bg-white dark:bg-slate-900 border-t lg:border-t-0 lg:border-l border-slate-200 dark:border-slate-800 flex flex-col shrink-0 lg:overflow-y-auto">
                 <div className="p-6 border-b border-slate-100 dark:border-slate-800">
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-4">Calificación</h3>
                   
