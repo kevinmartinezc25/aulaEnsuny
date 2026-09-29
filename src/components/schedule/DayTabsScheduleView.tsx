@@ -520,7 +520,18 @@ export default function DayTabsScheduleView({
                         </div>
                       )}
 
-                      {!item.location && !item.teacher && (
+                      {context.type === 'teacher' && Boolean(item.group) && item.group !== 'Jornada Institucional' && (
+                        <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md border shadow-sm ${
+                          isOngoing 
+                            ? 'bg-emerald-100/80 dark:bg-emerald-900/40 border-emerald-300/60 dark:border-emerald-700/60' 
+                            : 'bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-800/60'
+                        }`}>
+                          <Users className={`w-3.5 h-3.5 shrink-0 ${isOngoing ? 'text-emerald-700 dark:text-emerald-400' : 'text-indigo-600 dark:text-indigo-400'}`} />
+                          <span className={`text-xs font-black uppercase tracking-wider ${isOngoing ? 'text-emerald-900 dark:text-emerald-200' : 'text-indigo-700 dark:text-indigo-300'}`}>{item.group}</span>
+                        </div>
+                      )}
+
+                      {!(item.location) && !(item.teacher) && !(context.type === 'teacher' && item.group && item.group !== 'Jornada Institucional') && (
                         <span className={`font-medium ${isOngoing ? 'text-emerald-800 dark:text-emerald-300' : 'text-slate-400 dark:text-slate-500'}`}>Clase Programada</span>
                       )}
                     </div>

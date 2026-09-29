@@ -424,8 +424,8 @@ export function GradesScreen() {
       <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5 sm:gap-4">
         <div className="col-span-2 md:col-span-1 rounded-xl sm:rounded-2xl bg-emerald-50 dark:bg-emerald-900/10 p-3.5 sm:p-5 border border-emerald-100 dark:border-emerald-900/30 flex flex-col justify-between">
           <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-1">General</span>
-          <span className="text-2xl sm:text-3xl font-black text-emerald-700 dark:text-emerald-300">
-            {report.generalAverage > 0 ? report.generalAverage.toFixed(1) : 'N/A'}
+          <span className={`font-black text-emerald-700 dark:text-emerald-300 truncate ${report.generalAverage > 0 ? 'text-2xl sm:text-3xl' : 'text-lg sm:text-xl'}`}>
+            {report.generalAverage > 0 ? report.generalAverage.toFixed(1) : 'Pendiente'}
           </span>
         </div>
         <div className="rounded-xl sm:rounded-2xl bg-white dark:bg-slate-900 p-3.5 sm:p-5 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
@@ -572,9 +572,9 @@ export function GradesScreen() {
                           : avg >= 3.0
                           ? 'text-amber-600 dark:text-amber-400'
                           : 'text-rose-600 dark:text-rose-400'
-                        : 'text-slate-400'
+                        : 'text-slate-400 text-[10px] uppercase tracking-wider'
                     }`}>
-                      {hasGrade ? avg.toFixed(1) : 'N/A'}
+                      {hasGrade ? avg.toFixed(1) : 'Sin notas'}
                     </span>
                   </div>
 

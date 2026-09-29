@@ -10,9 +10,13 @@ import Link from 'next/link'
 import { toast } from 'sonner'
 import { CreateSubjectModal } from '../components/CreateSubjectModal'
 
-export function PlanillaAsistidaListScreen() {
-  const [subjects, setSubjects] = useState<AssistedSubject[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+export interface PlanillaAsistidaListProps {
+  initialSubjects?: AssistedSubject[]
+}
+
+export function PlanillaAsistidaListScreen({ initialSubjects }: PlanillaAsistidaListProps = {}) {
+  const [subjects, setSubjects] = useState<AssistedSubject[]>(initialSubjects || [])
+  const [isLoading, setIsLoading] = useState(!initialSubjects)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedGrade, setSelectedGrade] = useState<string>('all')
   const [selectedGroup, setSelectedGroup] = useState<string>('all')
@@ -36,13 +40,15 @@ export function PlanillaAsistidaListScreen() {
   }
 
   useEffect(() => {
-    loadSubjects()
+    if (!initialSubjects) {
+      loadSubjects()
+    }
     
     // Cerrar dropdown globalmente
     const handleGlobalClick = () => setOpenDropdownId(null)
     window.addEventListener('click', handleGlobalClick)
     return () => window.removeEventListener('click', handleGlobalClick)
-  }, [])
+  }, [initialSubjects])
 
   const toggleDropdown = (id: string, e: React.MouseEvent) => {
     e.preventDefault()
@@ -80,12 +86,12 @@ export function PlanillaAsistidaListScreen() {
     })
   }
 
-  const uniqueGrades = Array.from(new Set(subjects.map(s => s.grade?.toString()).filter(Boolean))).sort((a, b) => Number(a) - Number(b))
-  const uniqueGroups = Array.from(new Set(subjects.map(s => s.group_number?.toString() || (s.grade === 12 || s.grade === 13 ? '1' : '')).filter(Boolean))).sort((a, b) => Number(a) - Number(b))
-  const uniqueSubjects = Array.from(new Set(subjects.map(s => s.name).filter(Boolean))).sort()
-  const uniquePeriods = Array.from(new Set(subjects.map(s => s.period?.toString()).filter(Boolean))).sort()
+  const uniqueGrades = React.useMemo(() => Array.from(new Set(subjects.map(s => s.grade?.toString()).filter(Boolean))).sort((a, b) => Number(a) - Number(b)), [subjects])
+  const uniqueGroups = React.useMemo(() => Array.from(new Set(subjects.map(s => s.group_number?.toString() || (s.grade === 12 || s.grade === 13 ? '1' : '')).filter(Boolean))).sort((a, b) => Number(a) - Number(b)), [subjects])
+  const uniqueSubjects = React.useMemo(() => Array.from(new Set(subjects.map(s => s.name).filter(Boolean))).sort(), [subjects])
+  const uniquePeriods = React.useMemo(() => Array.from(new Set(subjects.map(s => s.period?.toString()).filter(Boolean))).sort(), [subjects])
 
-  const filteredSubjects = subjects.filter(subject => {
+  const filteredSubjects = React.useMemo(() => subjects.filter(subject => {
     const isPfc12 = subject.grade === 12
     const isPfc13 = subject.grade === 13
     const isNivelatorio = subject.grade === 0 || subject.name.toLowerCase().includes('nivelat')
@@ -104,7 +110,7 @@ export function PlanillaAsistidaListScreen() {
     const matchesPeriod = selectedPeriod === 'all' || subject.period?.toString() === selectedPeriod
 
     return matchesSearch && matchesGrade && matchesGroup && matchesSubject && matchesPeriod
-  })
+  }), [subjects, searchQuery, selectedGrade, selectedGroup, selectedSubject, selectedPeriod])
 
   return (
     <div className="flex-1 space-y-2 p-2 lg:px-4 lg:py-2">

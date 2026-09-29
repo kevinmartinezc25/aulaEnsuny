@@ -931,13 +931,37 @@ export async function getAdminDashboardStats() {
       }
     })
 
-    // 7. Calcular cursos más activos usando inscripciones reales
-    const { data: dashEnrollments } = await adminClient
-      .from('student_courses')
-      .select('course_id')
-      
+    // 7 + 8 + 9. Paralelizar todas las queries secundarias en un solo Promise.all
+    // (antes eran ~8 queries secuenciales; ahora se ejecutan simultáneamente)
+    // Nota: las queries opcionales se envuelven en Promise.resolve().catch() porque
+    // PostgrestFilterBuilder no expone .catch() directamente en su interfaz de tipos.
+    const [
+      { data: dashEnrollments },
+      { data: dbProgress },
+      { data: dbAttempts },
+      auditsResult,
+      disciplinaryResult,
+      permissionsResult,
+      { data: directoryStudents },
+      { data: registeredDetails }
+    ] = await Promise.all([
+      adminClient.from('student_courses').select('course_id'),
+      adminClient.from('student_progress').select('completed_at').eq('completed', true),
+      adminClient.from('quiz_attempts').select('completed_at, started_at'),
+      Promise.resolve(adminClient.from('grade_audits').select('created_at')).catch(() => ({ data: null as null })),
+      Promise.resolve(adminClient.from('disciplinary_reports').select('created_at')).catch(() => ({ data: null as null })),
+      Promise.resolve(adminClient.from('teacher_permissions').select('created_at')).catch(() => ({ data: null as null })),
+      adminClient.from('student_directory').select('id, document_id, first_name, last_name, profile_id').is('profile_id', null).eq('status', 'active'),
+      adminClient.from('student_details').select('student_id, document_number')
+    ])
+
+    const dbAudits: Array<{ created_at: string }> | null = auditsResult?.data ?? null
+    const dbDisciplinary: Array<{ created_at: string }> | null = disciplinaryResult?.data ?? null
+    const dbPermissions: Array<{ created_at: string }> | null = permissionsResult?.data ?? null
+
+    // 7. Top cursos usando inscripciones reales
     const dashCourseCounts: Record<string, number> = {}
-    dashEnrollments?.forEach(e => {
+    dashEnrollments?.forEach((e: { course_id: string | null }) => {
       if (e.course_id) {
         dashCourseCounts[e.course_id] = (dashCourseCounts[e.course_id] || 0) + 1
       }
@@ -949,24 +973,11 @@ export async function getAdminDashboardStats() {
       const completionPct = courseGrades.length > 0
         ? Math.min(Math.round((courseGrades.filter(g => Number(g.score) >= 3.0).length / courseGrades.length) * 100), 100)
         : 0
-
-      return {
-        name: c.title,
-        completionPct: completionPct,
-        students: studentsInCourse
-      }
+      return { name: c.title, completionPct, students: studentsInCourse }
     }).sort((a, b) => b.completionPct - a.completionPct).slice(0, 4)
 
-    // 8. Actividad real de la plataforma: accesos e interacciones reales por día de la semana
-    const activityDays: Record<string, number> = {
-      Lun: 0,
-      Mar: 0,
-      Mié: 0,
-      Jue: 0,
-      Vie: 0,
-      Sáb: 0,
-      Dom: 0
-    }
+    // 8. Actividad real de la plataforma por día de la semana
+    const activityDays: Record<string, number> = { Lun: 0, Mar: 0, Mié: 0, Jue: 0, Vie: 0, Sáb: 0, Dom: 0 }
     const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
 
     const addActivityDate = (dateStr: string | null | undefined) => {
@@ -974,79 +985,27 @@ export async function getAdminDashboardStats() {
       const date = new Date(dateStr)
       if (isNaN(date.getTime())) return
       const dayName = dayNames[date.getDay()]
-      if (dayName && dayName in activityDays) {
-        activityDays[dayName]++
-      }
+      if (dayName && dayName in activityDays) activityDays[dayName]++
     }
 
-    // A. Progreso de lecciones completadas por estudiantes
-    const { data: dbProgress } = await adminClient
-      .from('student_progress')
-      .select('completed_at')
-      .eq('completed', true)
-    dbProgress?.forEach(p => addActivityDate(p.completed_at))
-
-    // B. Calificaciones asentadas en el sistema
+    // A. Progreso de lecciones
+    dbProgress?.forEach((p: { completed_at: string | null }) => addActivityDate(p.completed_at))
+    // B. Calificaciones asentadas
     dbGrades?.forEach(g => addActivityDate(g.created_at))
+    // C. Intentos de quizzes
+    dbAttempts?.forEach((a: { completed_at: string | null; started_at: string | null }) => addActivityDate(a.completed_at || a.started_at))
+    // D. Bitácora de auditoría de notas
+    dbAudits?.forEach(a => addActivityDate(a.created_at))
+    // E. Reportes disciplinarios
+    dbDisciplinary?.forEach(d => addActivityDate(d.created_at))
+    // F. Permisos docentes
+    dbPermissions?.forEach(p => addActivityDate(p.created_at))
+    // Nota: auth.admin.listUsers se eliminó — era la query más lenta y de bajo impacto en esta métrica
 
-    // C. Intentos de evaluaciones y quizzes entregados
-    const { data: dbAttempts } = await adminClient
-      .from('quiz_attempts')
-      .select('completed_at, started_at')
-    dbAttempts?.forEach(a => addActivityDate(a.completed_at || a.started_at))
-
-    // D. Inicios de sesión de usuarios registrados en Supabase Auth
-    try {
-      const { data: authData } = await adminClient.auth.admin.listUsers({ perPage: 1000 })
-      authData?.users?.forEach(u => addActivityDate(u.last_sign_in_at))
-    } catch (authErr) {
-      console.warn('Aviso al consultar logins en Auth:', authErr)
-    }
-
-    // E. Registro de bitácora de auditoría de notas
-    try {
-      const { data: dbAudits } = await adminClient
-        .from('grade_audits')
-        .select('created_at')
-      dbAudits?.forEach(a => addActivityDate(a.created_at))
-    } catch (e) {}
-
-    // F. Reportes y situaciones disciplinarias de convivencia
-    try {
-      const { data: dbDisciplinary } = await adminClient
-        .from('disciplinary_reports')
-        .select('created_at')
-      dbDisciplinary?.forEach(d => addActivityDate(d.created_at))
-    } catch (e) {}
-
-    // G. Permisos docentes radicados
-    try {
-      const { data: dbPermissions } = await adminClient
-        .from('teacher_permissions')
-        .select('created_at')
-      dbPermissions?.forEach(p => addActivityDate(p.created_at))
-    } catch (e) {}
-
-    // Orden semanal institucional: Lunes a Domingo con conteo exacto y real (sin fórmulas simuladas)
     const weekOrder = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
-    const accessData = weekOrder.map(day => ({
-      day,
-      accesos: activityDays[day] || 0
-    }))
+    const accessData = weekOrder.map(day => ({ day, accesos: activityDays[day] || 0 }))
 
-    // 9. Obtener estudiantes del directorio sin cuenta virtual
-    // (estos son los matriculados importados por CSV que aún no tienen acceso a la plataforma)
-    const { data: directoryStudents } = await adminClient
-      .from('student_directory')
-      .select('id, document_id, first_name, last_name, profile_id')
-      .is('profile_id', null)
-      .eq('status', 'active')
-
-    // Consultar student_details para identificar documentos de los estudiantes ya registrados
-    const { data: registeredDetails } = await adminClient
-      .from('student_details')
-      .select('student_id, document_number')
-
+    // 9. Calcular estudiantes del directorio sin cuenta virtual
     const registeredDocSet = new Set<string>()
     for (const d of registeredDetails || []) {
       if (d.document_number) registeredDocSet.add(d.document_number.trim().toLowerCase())

@@ -136,7 +136,15 @@ export function CreateSubjectModal({ isOpen, onClose, onSuccess, initialData, ex
               value={formData.name}
               onChange={(e) => {
                 const val = e.target.value
-                const formatted = val ? val.charAt(0).toUpperCase() + val.slice(1).toLowerCase() : ''
+                const formatted = val
+                  .split(' ')
+                  .map(word => {
+                    if (word.length > 1) {
+                      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+                    }
+                    return word
+                  })
+                  .join(' ')
                 setFormData(prev => ({ ...prev, name: formatted }))
               }}
               required

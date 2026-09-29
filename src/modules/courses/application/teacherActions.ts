@@ -910,6 +910,21 @@ export async function getTeacherSubmissionsData(courseId: string) {
   }
 }
 
+export async function updateModulesOrder(courseId: string, modulesData: { id: string }[]): Promise<void> {
+  const adminClient = createAdminClient()
+
+  for (let i = 0; i < modulesData.length; i++) {
+    const mod = modulesData[i]
+    if (mod.id.startsWith('mod_')) continue // mock
+    const sortOrder = i + 1
+
+    await adminClient
+      .from('course_modules')
+      .update({ sort_order: sortOrder })
+      .eq('id', mod.id)
+  }
+}
+
 export async function updateModuleItemsOrder(moduleId: string, items: { id: string }[]): Promise<void> {
   const supabase = createAdminClient()
 
@@ -1333,21 +1348,22 @@ export async function getTeacherDashboardOverview(): Promise<TeacherDashboardOve
 
     const courseIds = dbCourses.map(c => c.id)
 
-    // 3. Conteo de módulos por curso
-    const { data: modules } = await adminClient
-      .from('course_modules')
-      .select('id, course_id')
-      .in('course_id', courseIds)
-
-    // 4. Conteo de estudiantes inscritos
-    const { data: enrollments } = await adminClient
-      .from('student_courses')
-      .select('student_id, course_id')
-      .in('course_id', courseIds)
+    // Parallelize independent queries
+    const [
+      { data: modules },
+      { data: enrollments },
+      { data: periodGrades },
+      { data: regularGrades }
+    ] = await Promise.all([
+      adminClient.from('course_modules').select('id, course_id').in('course_id', courseIds),
+      adminClient.from('student_courses').select('student_id, course_id').in('course_id', courseIds),
+      adminClient.from('student_period_grades').select('final_grade').in('course_id', courseIds),
+      adminClient.from('grades').select('score').in('course_id', courseIds)
+    ])
 
     const distinctStudents = new Set((enrollments || []).map(e => e.student_id)).size
 
-    // 5. Quizzes creados o evaluados
+    // Quizzes creados o evaluados (dependen de los módulos)
     let quizzesCount = 0
     const moduleIds = (modules || []).map(m => m.id)
     if (moduleIds.length > 0) {
@@ -1375,14 +1391,9 @@ export async function getTeacherDashboardOverview(): Promise<TeacherDashboardOve
       }
     }
 
-    // 6. Rendimiento promedio real
+    // Rendimiento promedio real
     let totalGradeSum = 0
     let totalGradeCount = 0
-
-    const { data: periodGrades } = await adminClient
-      .from('student_period_grades')
-      .select('final_grade')
-      .in('course_id', courseIds)
 
     if (periodGrades && periodGrades.length > 0) {
       for (const g of periodGrades) {
@@ -1394,19 +1405,12 @@ export async function getTeacherDashboardOverview(): Promise<TeacherDashboardOve
       }
     }
 
-    if (totalGradeCount === 0) {
-      const { data: regularGrades } = await adminClient
-        .from('grades')
-        .select('score')
-        .in('course_id', courseIds)
-
-      if (regularGrades && regularGrades.length > 0) {
-        for (const g of regularGrades) {
-          const num = Number(g.score)
-          if (!isNaN(num) && num > 0) {
-            totalGradeSum += num
-            totalGradeCount++
-          }
+    if (totalGradeCount === 0 && regularGrades && regularGrades.length > 0) {
+      for (const g of regularGrades) {
+        const num = Number(g.score)
+        if (!isNaN(num) && num > 0) {
+          totalGradeSum += num
+          totalGradeCount++
         }
       }
     }
@@ -1451,6 +1455,151 @@ export async function getTeacherDashboardOverview(): Promise<TeacherDashboardOve
   }
 }
 
+export async function getTeacherTodaySchedule(userId: string): Promise<{ schedule: any[], nextClass: any | null, isWeekend: boolean }> {
+  try {
+    const adminClient = createAdminClient()
+    const now = new Date()
+    const bogotaDateStr = now.toLocaleString('en-US', { timeZone: 'America/Bogota' })
+    const bogotaDate = new Date(bogotaDateStr)
+    const dayOfWeek = bogotaDate.getDay()
+    
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
+
+    if (isWeekend) {
+      return { schedule: [], nextClass: null, isWeekend: true }
+    }
+
+    const { data: academicTeacher } = await adminClient
+      .from('academic_teachers')
+      .select('id')
+      .eq('profile_id', userId)
+      .single()
+
+    if (!academicTeacher) {
+      return { schedule: [], nextClass: null, isWeekend: false }
+    }
+
+    // Usar la fecha local de Bogotá en formato YYYY-MM-DD
+    const tzOffset = bogotaDate.getTimezoneOffset() * 60000;
+    const localISOTime = (new Date(bogotaDate.getTime() - tzOffset)).toISOString().slice(0, -1);
+    const todayDateStr = localISOTime.split('T')[0]
+
+    const { data: overrides } = await adminClient
+      .from('sch_daily_overrides')
+      .select('id, period_id, day_of_week, subject:academic_subjects(name), group:academic_groups(name)')
+      .eq('teacher_id', academicTeacher.id)
+      .eq('target_date', todayDateStr)
+
+    let daySlots: any[] = []
+    let hasNovedades = false
+    
+    if (overrides && overrides.length > 0) {
+      daySlots = overrides
+      hasNovedades = true
+    } else {
+      const { getScheduleSlotsAction } = await import('@/modules/admin/application/actions')
+      const allSlots = await getScheduleSlotsAction('teacher', academicTeacher.id)
+      if (allSlots) {
+        daySlots = allSlots.filter((s: any) => parseInt(s.day_of_week) === dayOfWeek)
+      }
+    }
+    
+    if (!daySlots) {
+      return { schedule: [], nextClass: null, isWeekend: false }
+    }
+
+    daySlots.sort((a: any, b: any) => parseInt(a.period_id) - parseInt(b.period_id))
+    let periodsArray: any[] = []
+    let periodsMap: any = {}
+    try {
+      const { getGeneralSchedulePeriodsAction } = await import('@/app/admin/schedules/actions')
+      const configRes = await getGeneralSchedulePeriodsAction()
+      if (configRes.success && configRes.config?.periods) {
+        periodsArray = configRes.config.periods
+        periodsMap = periodsArray.reduce((acc: any, p: any) => {
+          acc[p.period] = p
+          return acc
+        }, {})
+      }
+    } catch (e) {}
+
+    let maxPeriodId = 6
+    if (periodsArray.length > 0) {
+       const maxVal = Math.max(...periodsArray.map(p => parseInt(p.period || '0')))
+       if (!isNaN(maxVal) && maxVal > 0) maxPeriodId = maxVal
+    } else if (daySlots.length > 0) {
+       const maxVal = Math.max(...daySlots.map((s:any) => parseInt(s.period_id || '0')))
+       if (!isNaN(maxVal) && maxVal > 0) maxPeriodId = Math.max(maxVal, 6)
+    }
+    
+    const fullDaySlots = []
+    for (let i = 1; i <= maxPeriodId; i++) {
+       const slotForPeriod = daySlots.find((s:any) => parseInt(s.period_id) === i)
+       const pInfo = periodsMap[i]
+       
+       if (slotForPeriod) {
+         fullDaySlots.push({
+            id: slotForPeriod.id,
+            period: i,
+            subject: slotForPeriod.subject?.name || 'Clase',
+            group: slotForPeriod.group?.name || 'Grupo',
+            startTime: pInfo?.startTime || `${i}ª Hora`,
+            endTime: pInfo?.endTime || '',
+            isCurrent: false,
+            isFree: false,
+            isNovedad: hasNovedades
+         })
+       } else {
+         fullDaySlots.push({
+            id: `free-${i}`,
+            period: i,
+            subject: 'Libre',
+            group: '',
+            startTime: pInfo?.startTime || `${i}ª Hora`,
+            endTime: pInfo?.endTime || '',
+            isCurrent: false,
+            isFree: true,
+            isNovedad: hasNovedades
+         })
+       }
+    }
+
+    const nowTimeStr = bogotaDate.toTimeString().substring(0,5)
+    let foundCurrent = false
+    let nextClass = null
+
+    for (let i = 0; i < fullDaySlots.length; i++) {
+      const slot = fullDaySlots[i]
+      if (slot.startTime && slot.endTime) {
+        if (nowTimeStr >= slot.startTime && nowTimeStr <= slot.endTime) {
+          slot.isCurrent = true
+          foundCurrent = true
+          for (let j = i + 1; j < fullDaySlots.length; j++) {
+            if (!fullDaySlots[j].isFree) {
+              nextClass = fullDaySlots[j]
+              break
+            }
+          }
+          break
+        }
+      }
+    }
+
+    if (!foundCurrent) {
+      for (let i = 0; i < fullDaySlots.length; i++) {
+        if (fullDaySlots[i].startTime && nowTimeStr < fullDaySlots[i].startTime && !fullDaySlots[i].isFree) {
+          nextClass = fullDaySlots[i]
+          break
+        }
+      }
+    }
+
+    return { schedule: fullDaySlots, nextClass, isWeekend: false }
+  } catch (error) {
+    console.error('Error fetching today schedule:', error)
+    return { schedule: [], nextClass: null, isWeekend: false }
+  }
+}
 
 
 
