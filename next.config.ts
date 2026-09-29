@@ -8,10 +8,6 @@ const withSerwist = withSerwistInit({
 });
 
 const nextConfig: NextConfig = {
-  // @ts-ignore: En Next.js >14 serverActions va en la raíz, aunque el tipo en este proyecto no esté actualizado.
-  serverActions: {
-    bodySizeLimit: '50mb',
-  },
   turbopack: {
     // Excluir archivos de la raíz que no son parte de la app
     // para reducir el grafo de módulos que Turbopack observa
@@ -19,6 +15,9 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     optimizePackageImports: ['lucide-react', '@heroicons/react', 'date-fns', 'framer-motion', 'recharts'],
+    serverActions: {
+      bodySizeLimit: '50mb',
+    },
   },
 };
 
