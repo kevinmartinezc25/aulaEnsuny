@@ -41,20 +41,20 @@ export function TeacherCourseDashboardScreen({ courseId }: { courseId: string })
     <div className="space-y-8">
       {/* Cabecera Interna */}
       <div className="space-y-1">
-        <div className="flex items-center text-xs font-medium text-slate-400 mb-2">
-          <span>Mis materias</span>
-          <span className="mx-2">/</span>
-          <span className="text-slate-900 dark:text-white">{stats.title}</span>
-          <span className="mx-2">/</span>
-          <span>Gestión del Curso</span>
+        <div className="flex flex-wrap items-center text-xs font-medium text-slate-400 mb-2 gap-y-1">
+          <span className="shrink-0">Mis materias</span>
+          <span className="mx-2 shrink-0">/</span>
+          <span className="text-slate-900 dark:text-white truncate max-w-[140px] sm:max-w-xs" title={stats.title}>{stats.title}</span>
+          <span className="mx-2 shrink-0">/</span>
+          <span className="shrink-0">Gestión del Curso</span>
         </div>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white truncate">
           Gestión del Curso
         </h1>
         {joinCode ? (
-          <div className="mt-3 inline-flex w-fit items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50/80 px-3 py-1.5 text-sm font-semibold text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-400">
-            <span>Código de acceso</span>
-            <span className="font-mono tracking-[0.2em]">{joinCode}</span>
+          <div className="mt-3 flex flex-col sm:flex-row w-full sm:w-fit items-start sm:items-center gap-2 sm:gap-3 rounded-2xl sm:rounded-full border border-emerald-100 bg-emerald-50/80 px-5 sm:px-4 py-3.5 sm:py-2 text-sm font-semibold text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-400">
+            <span className="opacity-80">Código de acceso</span>
+            <span className="font-mono tracking-[0.25em] text-lg sm:text-base bg-white/50 dark:bg-black/20 px-3 py-1 rounded-md">{joinCode}</span>
           </div>
         ) : (
           <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
@@ -67,7 +67,7 @@ export function TeacherCourseDashboardScreen({ courseId }: { courseId: string })
       </div>
 
       {/* Grid de Estadísticas */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4">
         {[
           { title: 'Módulos activos', value: stats.modulesCount, icon: FolderOpen, color: 'text-blue-500 bg-blue-50 dark:bg-blue-950/30' },
           { title: 'Quizzes creados', value: stats.quizzesCount, icon: HelpCircle, color: 'text-purple-500 bg-purple-50 dark:bg-purple-950/30' },
@@ -78,17 +78,17 @@ export function TeacherCourseDashboardScreen({ courseId }: { courseId: string })
           return (
             <div
               key={stat.title}
-              className="rounded-2xl border border-slate-100 bg-white p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] dark:border-slate-800/60 dark:bg-slate-900"
+              className="rounded-2xl border border-slate-100 bg-white p-3.5 sm:p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] dark:border-slate-800/60 dark:bg-slate-900"
             >
-              <div className="flex items-center gap-4">
-                <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${stat.color}`}>
-                  <Icon className="h-5 w-5" />
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
+                <div className={`flex h-9 w-9 sm:h-11 sm:w-11 items-center justify-center rounded-xl shrink-0 ${stat.color}`}>
+                  <Icon className="h-4.5 w-4.5 sm:h-5 sm:w-5" />
                 </div>
-                <div>
-                  <p className="text-xs font-medium text-slate-400 dark:text-slate-500">
+                <div className="min-w-0">
+                  <p className="text-[10px] sm:text-xs font-medium text-slate-400 dark:text-slate-500 truncate sm:whitespace-normal">
                     {stat.title}
                   </p>
-                  <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                  <p className="text-lg sm:text-2xl font-bold text-slate-900 dark:text-white mt-0.5">
                     {stat.value}
                   </p>
                 </div>

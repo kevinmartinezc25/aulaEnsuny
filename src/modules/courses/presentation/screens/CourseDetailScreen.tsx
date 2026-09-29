@@ -741,7 +741,7 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
       // 1. Fetch course details
       const { data: course, error: courseErr } = await supabase
         .from('courses')
-        .select('id, title, subject')
+        .select('id, title, subject, academic_period, profiles(first_name, last_name)')
         .eq('id', courseId)
         .single()
 
@@ -1031,12 +1031,17 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
       const completedItems = countableItems.filter(l => l.status === 'completed' || l.status === 'graded').length
       const progressPercentage = totalItems > 0 ? Math.min(100, Math.round((completedItems / totalItems) * 100)) : 0
 
+      const teacherProfile = Array.isArray(course.profiles) ? course.profiles[0] : course.profiles
+      const teacherFullName = teacherProfile ? `${teacherProfile.first_name || ''} ${teacherProfile.last_name || ''}`.trim() : 'Asignado'
+
       const resolvedCourseDetails: CourseDetails = {
         id: course.id,
         title: course.title,
         subject: course.subject,
         progress: progressPercentage,
         modules: mappedModules,
+        teacherName: teacherFullName,
+        period: course.academic_period || '3.er periodo'
       }
 
       setCourseData(resolvedCourseDetails)
@@ -1451,8 +1456,8 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
         <AlertCircle className="h-12 w-12 text-red-500" />
         <h2 className="text-xl font-bold text-slate-900 dark:text-white">Error al cargar el curso</h2>
         <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md">{error || 'El curso no existe o no tienes acceso a él.'}</p>
-        <Link href="/student/dashboard" className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 transition-colors">
-          Volver al Panel
+        <Link href="/student/courses" className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 transition-colors">
+          Volver a Cursos
         </Link>
       </div>
     )
@@ -1580,7 +1585,7 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
             {/* Left Header: Back button, Category Pill, Title, Docente */}
             <div className="flex items-start gap-3 sm:gap-4 pr-10 md:pr-0">
               <Link
-                href="/student/dashboard"
+                href="/student/courses"
                 aria-label="Volver a los cursos"
                 className="w-9 h-9 sm:w-10 sm:h-10 rounded-full border border-neutral-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-neutral-50 dark:hover:bg-slate-700/80 active:scale-95 flex items-center justify-center shadow-xs text-neutral-700 dark:text-slate-200 transition-all shrink-0 mt-0.5"
               >

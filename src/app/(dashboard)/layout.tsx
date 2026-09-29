@@ -1260,13 +1260,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       </div>
                     </Link>
 
-                    {/* Divisor y Distintivo Portal Académico */}
-                    <div className="hidden sm:flex items-center gap-2.5">
-                      <div className="h-4 w-px bg-slate-200 dark:bg-slate-800" />
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider text-emerald-800 dark:text-emerald-300 bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/20 uppercase">
-                        Portal Académico
-                      </span>
-                    </div>
+
                   </div>
                 )}
               </div>
