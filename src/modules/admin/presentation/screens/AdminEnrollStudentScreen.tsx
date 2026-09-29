@@ -411,7 +411,8 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
 
   // --- Guardar Formulario Completo ---
   const handleSave = async () => {
-    if (!details.firstName || !details.firstSurname || !details.documentNumber || !email) {
+    const finalEmail = email.trim()
+    if (!details.firstName || !details.firstSurname || !details.documentNumber || !finalEmail) {
       toast.error('Primer Nombre, Primer Apellido, Documento y Correo Electrónico son obligatorios.')
       setActiveTab('basic')
       return
@@ -438,7 +439,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
     const payload: FullStudentData = {
       id: studentId || '',
       name: `${details.firstName} ${details.firstSurname}`,
-      email,
+      email: finalEmail,
       status: enrollment.enrollmentStatus === 'active' ? 'active' : 'inactive',
       joinedDate: isEditMode ? '' : new Date().toISOString().split('T')[0],
       details,

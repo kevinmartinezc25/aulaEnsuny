@@ -389,8 +389,16 @@ export function AdminUsersScreen() {
                 <Trash2 className="h-7 w-7 text-red-600 dark:text-red-400" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-slate-900 dark:text-white">¿Eliminar Usuario?</h2>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Esta acción eliminará a <strong className="text-slate-700 dark:text-slate-300">{deleteTarget.name}</strong> del sistema. No se puede deshacer.</p>
+                <h2 className="text-lg font-bold text-slate-900 dark:text-white">¿Eliminar Usuario Permanentemente?</h2>
+                <div className="text-sm text-slate-500 dark:text-slate-400 mt-2 space-y-3">
+                  <p>
+                    Esta acción eliminará a <strong className="text-slate-700 dark:text-slate-300">{deleteTarget.name}</strong> del sistema. No se puede deshacer.
+                  </p>
+                  <div className="p-3 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-xl text-xs text-left border border-amber-200/50 dark:border-amber-900/50">
+                    <strong className="block mb-1">Recomendación de uso:</strong>
+                    Para usuarios con actividad previa (profesores con cursos, estudiantes con notas), es más seguro cambiar su estado a <strong>"Inactivo"</strong> editando su perfil. Usa la eliminación definitiva solo para usuarios creados por error.
+                  </div>
+                </div>
               </div>
               <div className="flex gap-3">
                 <button disabled={isSaving} onClick={() => setDeleteTarget(null)} className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors disabled:opacity-50">

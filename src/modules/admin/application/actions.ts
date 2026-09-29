@@ -290,17 +290,33 @@ export async function deleteAdminUser(id: string) {
     await adminClient.from('sch_curriculum').update({ teacher_id: null }).eq('teacher_id', id)
     await adminClient.from('courses').update({ teacher_id: null }).eq('teacher_id', id)
 
-    // 2. Intentar borrar en auth.users (si existe en Supabase Auth)
+    // 2. Limpiar registros dependientes más comunes (estudiantes) antes de borrar el perfil
+    await adminClient.from('student_lesson_grades').delete().eq('student_id', id)
+    await adminClient.from('student_progress').delete().eq('student_id', id)
+    await adminClient.from('student_resource_progress').delete().eq('student_id', id)
+    await adminClient.from('student_courses').delete().eq('student_id', id)
+    await adminClient.from('student_course_join_requests').delete().eq('student_id', id)
+    await adminClient.from('grades').delete().eq('student_id', id)
+    await adminClient.from('quiz_attempts').delete().eq('student_id', id)
+    await adminClient.from('resources').delete().eq('uploaded_by', id)
+
+    // 3. Intentar borrar en auth.users (si existe en Supabase Auth)
     const { error: authError } = await adminClient.auth.admin.deleteUser(id)
 
-    // 3. Garantizar la eliminación en la tabla profiles
+    // 4. Garantizar la eliminación en la tabla profiles
     const { error: profileError } = await adminClient.from('profiles').delete().eq('id', id)
 
-    // 4. Garantizar la eliminación en student_directory (por si es una cuenta precargada huérfana)
-    await adminClient.from('student_directory').delete().eq('id', id)
+    // 5. Garantizar la eliminación en student_directory (por si es una cuenta precargada huérfana)
+    await adminClient.from('student_directory').delete().eq('profile_id', id) // Delete by profile_id
+    await adminClient.from('student_directory').delete().eq('id', id) // Fallback if id was used
 
-    if (authError && profileError) {
-      return { error: authError.message || profileError.message }
+    // Manejo correcto de errores: fallar si falla el borrado del perfil
+    if (profileError) {
+      return { error: 'Error al eliminar el perfil: ' + profileError.message }
+    }
+    // Opcional: registrar authError si falló pero el perfil se borró, pero no bloquear si el auth user no existía.
+    if (authError && !authError.message.includes('User not found')) {
+      console.warn('Advertencia al borrar Auth User:', authError.message)
     }
 
     try {

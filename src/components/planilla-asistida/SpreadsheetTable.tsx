@@ -609,109 +609,141 @@ export function SpreadsheetTable({ subjectId }: SpreadsheetTableProps) {
       <div className="overflow-auto border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 shadow-sm relative custom-scrollbar flex-1">
         <table className="w-max min-w-full border-collapse text-sm">
           <thead className="sticky top-0 z-40 shadow-sm">
-            {/* Fila 1: Logros */}
+            {/* Fila 1: Celdas vacías fijas + Títulos de Logros + Celda vacía sobre Promedio Final */}
             <tr>
               <th className="sticky left-0 z-50 w-8 min-w-[32px] max-w-[32px] bg-white dark:bg-slate-900 border-b border-r border-slate-200 dark:border-slate-700"></th>
               <th className="hidden md:table-cell sticky left-8 z-50 w-12 min-w-[48px] max-w-[48px] bg-white dark:bg-slate-900 border-b border-r border-slate-200 dark:border-slate-700"></th>
               <th className="sticky left-8 md:left-20 z-50 w-32 min-w-[128px] max-w-[128px] md:w-64 md:min-w-[256px] md:max-w-[256px] bg-white dark:bg-slate-900 border-b border-r border-slate-200 dark:border-slate-700"></th>
-              
+
               {achievements.map((ach, i) => {
                 const color = LOGRO_COLORS[i % LOGRO_COLORS.length]
-                const achActivities = activities.filter(a => a.achievement_id === ach.id)
-                // Colspan = actividades + 1 (promedio). Pero si un componente no tiene act, ocupa 0? 
-                // Asumimos que los 3 componentes siempre se renderizan. 
-                // Colspan = (acts de Hacer) + (acts de Saber) + (acts de Ser) + 1 (promedio)
-                const totalActs = achActivities.length
-                const baseCols = totalActs > 0 ? totalActs + 1 : 4 // Al menos 3 componentes vacíos + promedio = 4
                 const hasCode = ach.code_config && ach.code_config.type !== 'none'
-                const cols = baseCols + (hasCode ? 1 : 0)
-                
+                const hakerCount = Math.max(1, activities.filter(a => a.achievement_id === ach.id && a.component_type === 'hacer').length)
+                const saberCount = Math.max(1, activities.filter(a => a.achievement_id === ach.id && a.component_type === 'saber').length)
+                const serCount   = Math.max(1, activities.filter(a => a.achievement_id === ach.id && a.component_type === 'ser').length)
+                const cols = hakerCount + saberCount + serCount + 1 + (hasCode ? 1 : 0)
+
                 return (
-                  <th key={ach.id} colSpan={cols} className={`px-4 py-2 border-b border-r ${color.border} ${color.bg} ${color.text} text-center font-bold`}>
+                  <th key={ach.id} colSpan={cols} className={`px-4 py-2 border-b border-r ${color.border} ${color.bg} ${color.text} text-center font-bold text-xs uppercase`}>
                     {ach.name}
                   </th>
                 )
               })}
-              <th rowSpan={3} className="bg-slate-100 dark:bg-slate-800 border-b border-l border-slate-200 dark:border-slate-700 font-bold sticky right-0 z-50 shadow-[-4px_0_10px_rgba(0,0,0,0.05)] w-16 min-w-[64px] align-bottom pb-4">
+
+              <th className="bg-slate-100 dark:bg-slate-800 border-b border-l border-slate-200 dark:border-slate-700 sticky right-0 z-50 shadow-[-4px_0_10px_rgba(0,0,0,0.05)] w-16 min-w-[64px]"></th>
+            </tr>
+
+            {/* Fila 2: Cabeceras fijas + Componentes (HACER, SABER, SER) + Cód. + Promedio Logro + Promedio Final */}
+            <tr>
+              <th rowSpan={2} className="sticky left-0 z-50 w-8 min-w-[32px] max-w-[32px] bg-white dark:bg-slate-900 border-b border-r border-slate-200 dark:border-slate-700"></th>
+              <th rowSpan={2} className="hidden md:table-cell sticky left-8 z-50 w-12 min-w-[48px] max-w-[48px] bg-white dark:bg-slate-900 border-b border-r border-slate-200 dark:border-slate-700 text-center font-semibold text-slate-500">N°</th>
+              <th rowSpan={2} className="sticky left-8 md:left-20 z-50 w-32 min-w-[128px] max-w-[128px] md:w-64 md:min-w-[256px] md:max-w-[256px] bg-white dark:bg-slate-900 border-b border-r border-slate-200 dark:border-slate-700 text-left font-semibold text-slate-500 shadow-[4px_0_10px_rgba(0,0,0,0.05)]">Apellidos y Nombres</th>
+
+              {achievements.map((ach, i) => {
+                const color = LOGRO_COLORS[i % LOGRO_COLORS.length]
+                const hasCode = ach.code_config && ach.code_config.type !== 'none'
+
+                return (
+                  <React.Fragment key={ach.id}>
+                    {(['hacer', 'saber', 'ser'] as const).map(comp => {
+                      const compActivities = activities.filter(a => a.achievement_id === ach.id && a.component_type === comp)
+                      const colspan = Math.max(1, compActivities.length)
+                      const weight = comp === 'ser' ? '30%' : '35%'
+
+                      return (
+                        <th
+                          key={`${ach.id}-${comp}`}
+                          colSpan={colspan}
+                          className="px-2 py-1 border-b border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold text-center text-slate-600 dark:text-slate-400"
+                        >
+                          <span className="text-[10px] font-bold block uppercase">{comp}</span>
+                          <span className="text-[9px] font-normal text-slate-400">{weight}</span>
+                        </th>
+                      )
+                    })}
+
+                    {hasCode && (
+                      <th
+                        key={`${ach.id}-code`}
+                        rowSpan={2}
+                        className="px-1 py-1 border-b border-r border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-bold text-center text-slate-500 align-bottom pb-3 w-12 min-w-[48px]"
+                      >
+                        Cód.
+                      </th>
+                    )}
+
+                    <th
+                      key={`${ach.id}-prom`}
+                      rowSpan={2}
+                      className={`border-b border-r ${color.border} ${color.bg} align-bottom pb-3 w-12 min-w-[48px]`}
+                    >
+                      <div className={`writing-vertical-rl transform rotate-180 text-xs font-bold ${color.text} whitespace-nowrap mx-auto h-20 text-left uppercase tracking-wide`}>
+                        Promedio
+                      </div>
+                    </th>
+                  </React.Fragment>
+                )
+              })}
+
+              <th
+                rowSpan={2}
+                className="bg-slate-100 dark:bg-slate-800 border-b border-l border-slate-200 dark:border-slate-700 font-bold sticky right-0 z-50 shadow-[-4px_0_10px_rgba(0,0,0,0.05)] w-16 min-w-[64px] align-bottom pb-4"
+              >
                 <div className="writing-vertical-rl transform rotate-180 text-xs font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap mx-auto h-24 text-left uppercase tracking-wide">
                   Promedio final
                 </div>
               </th>
             </tr>
-            
-            {/* Header Fila 2: Componentes */}
-            <tr>
-              <th rowSpan={2} className="border-b border-r border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-2 w-8 min-w-[32px] max-w-[32px] sticky left-0 z-50"></th>
-              <th rowSpan={2} className="hidden md:table-cell border-b border-r border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-2 w-12 min-w-[48px] max-w-[48px] text-center font-semibold text-slate-500 sticky left-8 z-50">N°</th>
-              <th rowSpan={2} className="border-b border-r border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-2 w-32 min-w-[128px] max-w-[128px] md:w-64 md:min-w-[256px] md:max-w-[256px] text-left font-semibold text-slate-500 sticky left-8 md:left-20 z-50 shadow-[4px_0_10px_rgba(0,0,0,0.05)]">Apellidos y Nombres</th>
-              
-              {achievements.map((ach, i) => {
-                const color = LOGRO_COLORS[i % LOGRO_COLORS.length]
-                
-                const hasCode = ach.code_config && ach.code_config.type !== 'none'
-                
-                const compHeaders = (['hacer', 'saber', 'ser'] as const).map(comp => {
-                  const compActivities = activities.filter(a => a.achievement_id === ach.id && a.component_type === comp)
-                  const colspan = Math.max(1, compActivities.length)
-                  const weight = comp === 'ser' ? '30%' : '35%'
-                  
-                  return (
-                    <th key={`${ach.id}-${comp}`} colSpan={colspan} className={`px-2 py-1 border-b border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold text-center text-slate-600 dark:text-slate-400`}>
-                      {comp.toUpperCase()} <br/><span className="text-[10px] font-normal">{weight}</span>
-                    </th>
-                  )
-                })
 
-                const headers: React.ReactNode[] = [...compHeaders]
-                
-                if (hasCode) {
-                  headers.push(
-                    <th key={`${ach.id}-code`} rowSpan={2} className={`px-1 py-1 border-b border-r border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-bold text-center text-slate-500 align-bottom pb-3 w-12`}>
-                      Cód.
-                    </th>
-                  )
-                }
-
-                headers.push(
-                  <th key={`${ach.id}-prom`} rowSpan={2} className={`border-b border-r ${color.border} ${color.bg} align-bottom pb-3 w-12 min-w-[48px]`}>
-                    <div className={`writing-vertical-rl transform rotate-180 text-xs font-bold ${color.text} whitespace-nowrap mx-auto h-20 text-left uppercase tracking-wide`}>
-                      Promedio
-                    </div>
-                  </th>
-                )
-
-                return headers
-              })}
-            </tr>
-
-            {/* Fila 3: Actividades */}
+            {/* Fila 3: Subcolumnas de Actividades por Componente */}
             <tr>
               {achievements.map((ach) => {
-                return (['hacer', 'saber', 'ser'] as const).map(comp => {
-                  const compActivities = activities.filter(a => a.achievement_id === ach.id && a.component_type === comp)
-                  
-                  if (compActivities.length === 0) {
-                    return <th key={`${ach.id}-${comp}-empty`} className="px-1 py-1 border-b border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 w-12 min-w-[48px] text-center"></th>
-                  }
+                return (
+                  <React.Fragment key={ach.id}>
+                    {(['hacer', 'saber', 'ser'] as const).map(comp => {
+                      const compActivities = activities.filter(a => a.achievement_id === ach.id && a.component_type === comp)
 
-                  return compActivities.map(act => (
-                    <th key={act.id} className="px-1 pt-6 pb-2 border-b border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 w-12 min-w-[48px] relative group">
-                      <button 
-                        onClick={() => handleTogglePublish(act.id, act.name, !!act.is_published)}
-                        className={`absolute top-1 right-1 p-1 rounded-md z-10 transition-all ${act.is_published ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 shadow-sm' : 'text-slate-400 dark:text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
-                        title={act.is_published ? "Ocultar a estudiantes" : "Publicar a estudiantes"}
-                      >
-                        {act.is_published ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
-                      </button>
-                      <div className={`writing-vertical-rl transform rotate-180 text-[11px] font-bold ${act.is_published ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-800 dark:text-slate-200'} whitespace-nowrap mx-auto h-20 text-left uppercase tracking-wide flex items-center justify-start gap-1`}>
-                        {act.name}
-                      </div>
-                    </th>
-                  ))
-                })
+                      if (compActivities.length === 0) {
+                        return (
+                          <th
+                            key={`${ach.id}-${comp}-empty`}
+                            className="px-1 py-1 border-b border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 w-12 min-w-[48px] text-center"
+                          ></th>
+                        )
+                      }
+
+                      return compActivities.map(act => (
+                        <th
+                          key={act.id}
+                          className="px-1 pt-6 pb-2 border-b border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 w-12 min-w-[48px] relative group"
+                        >
+                          <button
+                            onClick={() => handleTogglePublish(act.id, act.name, !!act.is_published)}
+                            className={`absolute top-1 right-1 p-0.5 rounded-md z-10 transition-all ${
+                              act.is_published
+                                ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 shadow-sm'
+                                : 'text-slate-400 dark:text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                            }`}
+                            title={act.is_published ? "Ocultar a estudiantes" : "Publicar a estudiantes"}
+                          >
+                            {act.is_published ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                          </button>
+                          <div
+                            className={`writing-vertical-rl transform rotate-180 text-[11px] font-bold ${
+                              act.is_published ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-800 dark:text-slate-200'
+                            } whitespace-nowrap mx-auto h-20 text-left uppercase tracking-wide flex items-center justify-start gap-1`}
+                          >
+                            {act.name}
+                          </div>
+                        </th>
+                      ))
+                    })}
+                  </React.Fragment>
+                )
               })}
             </tr>
           </thead>
+
 
           <tbody>
             {filteredAndSortedStudents.map((student, rowIdx) => {
