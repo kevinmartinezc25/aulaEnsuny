@@ -1317,7 +1317,7 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
     if (file) setTaskFile(file)
   }
 
-  const parseSubmissionFile = (submissionText?: string): { fileName: string; driveUrl: string; driveDownloadUrl: string } | null => {
+  const parseSubmissionFile = (submissionText?: string): { fileName: string; driveUrl: string; driveDownloadUrl: string; uploadedAt?: string } | null => {
     if (!submissionText) return null
     try {
       const parsed = JSON.parse(submissionText)
@@ -1434,6 +1434,60 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
     } catch (e) {
       console.error(e)
       toast.error('No se pudo marcar la lección como completada')
+    }
+  }
+
+  const handleUndoSubmission = async (lessonId: string) => {
+    try {
+      setTaskFileUploading(true)
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      if (activeLesson?.submissionText) {
+        const fileMeta = parseSubmissionFile(activeLesson.submissionText)
+        if (fileMeta && fileMeta.uploadedAt) {
+          const diffMinutes = (new Date().getTime() - new Date(fileMeta.uploadedAt).getTime()) / 60000;
+          if (diffMinutes >= 15) {
+            toast.error('El tiempo límite de 15 minutos para cancelar la entrega ha expirado.')
+            setTaskFileUploading(false)
+            return
+          }
+        }
+      }
+
+      const { error } = await supabase
+        .from('student_progress')
+        .delete()
+        .match({ student_id: user.id, lesson_id: lessonId })
+
+      if (error) throw error
+
+      toast.success('Entrega cancelada exitosamente.')
+      
+      setCourseData(prev => {
+        if (!prev) return prev
+        const updatedModules = prev.modules.map(m => ({
+          ...m,
+          lessons: m.lessons.map(l => l.id === lessonId ? { ...l, status: 'pending' as const, submissionText: undefined } : l)
+        }))
+        const countableItems = updatedModules.flatMap(m => m.lessons).filter(l => l.countsForProgress !== false)
+        const totalItems = countableItems.length
+        const completedItems = countableItems.filter(l => l.status === 'completed' || l.status === 'graded').length
+        const progressPercentage = totalItems > 0 ? Math.min(100, Math.round((completedItems / totalItems) * 100)) : 0
+
+        return { ...prev, modules: updatedModules, progress: progressPercentage }
+      })
+      if (activeLesson && activeLesson.id === lessonId) {
+        setActiveLesson(prev => prev ? { ...prev, status: 'pending' as const, submissionText: undefined } : null)
+      }
+      setTaskFile(null)
+      loadCourseData()
+    } catch (err: any) {
+      console.error('[UndoSubmission] Error:', err)
+      toast.error('Error al cancelar la entrega')
+    } finally {
+      setTaskFileUploading(false)
     }
   }
 
@@ -1991,11 +2045,37 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
                             )}
                           </div>
                         ) : (
-                          <div className="flex items-center gap-2 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
-                            <CheckCircle className="h-5 w-5 shrink-0" />
-                            <div>
-                              <p className="font-bold">¡Buen trabajo! Tu tarea fue entregada y está a la espera de ser calificada.</p>
+                          <div className="flex flex-col gap-3 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
+                            <div className="flex items-center gap-2">
+                              <CheckCircle className="h-5 w-5 shrink-0" />
+                              <div>
+                                <p className="font-bold">¡Buen trabajo! Tu tarea fue entregada y está a la espera de ser calificada.</p>
+                              </div>
                             </div>
+                            {/* Lógica para Cancelar Entrega (15 mins) */}
+                            {(() => {
+                              const fileMeta = parseSubmissionFile(activeLesson.submissionText)
+                              if (fileMeta && fileMeta.uploadedAt) {
+                                const diffMinutes = (new Date().getTime() - new Date(fileMeta.uploadedAt).getTime()) / 60000;
+                                if (diffMinutes < 15) {
+                                  const minutesLeft = Math.max(1, Math.floor(15 - diffMinutes));
+                                  return (
+                                    <div className="mt-2 pt-3 border-t border-emerald-200/50 dark:border-emerald-800/30">
+                                      <p className="text-xs mb-2 opacity-80">Tienes {minutesLeft} minuto{minutesLeft > 1 ? 's' : ''} para deshacer esta entrega si te equivocaste de archivo.</p>
+                                      <button 
+                                        onClick={() => handleUndoSubmission(activeLesson.id)}
+                                        disabled={taskFileUploading}
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20 text-xs font-semibold transition-colors disabled:opacity-50"
+                                      >
+                                        <Undo2 className="h-3.5 w-3.5" />
+                                        Cancelar Entrega
+                                      </button>
+                                    </div>
+                                  )
+                                }
+                              }
+                              return null;
+                            })()}
                           </div>
                         )}
                         {activeLesson.submissionText && (() => {
