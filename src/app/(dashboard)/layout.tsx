@@ -108,7 +108,7 @@ function isStudentVirtualCampusRoute(pathname: string): boolean {
   )
 }
 
-function AdminSidebar({ onClose, user, enabledModules = [], isCollapsed = false }: { onClose?: () => void; user: UserSessionInfo | null; enabledModules?: string[], isCollapsed?: boolean }) {
+function AdminSidebar({ onClose, user, enabledModules = [], isCollapsed = false, onLogout }: { onClose?: () => void; user: UserSessionInfo | null; enabledModules?: string[], isCollapsed?: boolean, onLogout?: () => void }) {
   const pathname = usePathname()
   const router = useRouter()
   const [isProfileOpen, setIsProfileOpen] = useState(false)
@@ -166,19 +166,23 @@ function AdminSidebar({ onClose, user, enabledModules = [], isCollapsed = false 
 
   const handleLogout = async () => {
     if (onClose) onClose()
+    // Si se recibe un manejador externo (del layout padre), usarlo directamente
+    if (onLogout) {
+      onLogout()
+      return
+    }
     useUserSessionStore.getState().clearSession()
     if (typeof window !== 'undefined') {
       sessionStorage.removeItem('pending_permissions_popup_dismissed')
     }
-
     try {
-      const result = await logout()
-      if (result?.success) {
-        router.replace('/login')
-      }
+      await logout()
     } catch (error) {
       console.error('Error al cerrar sesión:', error)
-      router.replace('/login')
+    } finally {
+      // Siempre redirigir + forzar revalidación del middleware de sesión
+      router.push('/login')
+      router.refresh()
     }
   }
 
@@ -305,7 +309,11 @@ function AdminSidebar({ onClose, user, enabledModules = [], isCollapsed = false 
                           <Link
                             key={item.name}
                             href={item.href}
-                            onClick={onClose}
+                            onClick={() => {
+                              // Asegurar que el acordeón del grupo padre permanezca abierto al navegar
+                              setOpenSections(prev => ({ ...prev, [group.section]: true }))
+                              if (onClose) onClose()
+                            }}
                             title={isCollapsed ? item.name : undefined}
                             className={`group flex items-center rounded-xl transition-all duration-150 relative ${
                               isCollapsed ? 'justify-center p-2.5 my-0.5' : 'justify-between px-2.5 py-2 my-0.5'
@@ -749,14 +757,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     initSession()
   }, [initSession])
 
-  const user: UserSessionInfo | null = sessionUser ? {
-    id: sessionUser.id,
-    name: sessionUser.name,
-    email: sessionUser.email,
-    role: sessionUser.role,
-    grade: sessionUser.grade,
-    avatarUrl: sessionUser.avatarUrl
-  } : null
+  // Usar useMemo para evitar que `user` sea un objeto nuevo en cada render
+  // (causaba loops infinitos en los useEffect que lo usaban como dependencia)
+  const user: UserSessionInfo | null = React.useMemo(() => {
+    if (!sessionUser) return null
+    return {
+      id: sessionUser.id,
+      name: sessionUser.name,
+      email: sessionUser.email,
+      role: sessionUser.role,
+      grade: sessionUser.grade,
+      avatarUrl: sessionUser.avatarUrl
+    }
+  }, [sessionUser?.id, sessionUser?.role, sessionUser?.name, sessionUser?.email, sessionUser?.grade, sessionUser?.avatarUrl])
+
   const isStudent = user?.role === 'student' || pathname.startsWith('/student')
   const isStudentVirtualCourses = isStudentVirtualCampusRoute(pathname)
   const isStudentPortal = isStudent && !isStudentVirtualCourses
@@ -811,7 +825,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
     window.addEventListener('module-permissions-updated', handlePermsUpdated)
     return () => window.removeEventListener('module-permissions-updated', handlePermsUpdated)
-  }, [user, pathname])
+  }, [user?.id, user?.role, pathname])
+
+  // Clave estable para enabledModules — evita que una nueva referencia de array
+  // dispare el useEffect aunque el contenido sea idéntico
+  const enabledModulesKey = enabledModules.join(',')
 
   // Notificación Pop-up de permisos pendientes para SuperAdmin o Admin (con módulo de permisos) al ingresar
   useEffect(() => {
@@ -856,7 +874,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
 
     checkPendingPermissionsAlert()
-  }, [user, enabledModules, pathname])
+  }, [user?.id, user?.role, enabledModulesKey, pathname])
 
   const handleReviewPermissions = () => {
     if (typeof window !== 'undefined') {
@@ -902,7 +920,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           setNotifications(formatted);
         }
       } catch (err) {
-        console.error('Fetch notification error:', err);
+        // Ignoramos silenciosamente o usamos warn para evitar el overlay de Next.js en errores de red
+        console.warn('Fetch notification warning:', err);
       }
     }
 
@@ -1008,14 +1027,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const handleLogout = async () => {
     useUserSessionStore.getState().clearSession()
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('pending_permissions_popup_dismissed')
+    }
     try {
-      const result = await logout()
-      if (result?.success) {
-        router.replace('/login')
-      }
+      await logout()
     } catch (error) {
       console.error('Error al cerrar sesión:', error)
-      router.replace('/login')
+    } finally {
+      // Siempre redirigir + forzar revalidación del middleware de sesión
+      router.push('/login')
+      router.refresh()
     }
   }
   const toggleSidebar = () => setIsSidebarCollapsed(!isSidebarCollapsed)
@@ -1033,7 +1055,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Admin Sidebar Desktop */}
         {!isDocsPage && (
           <aside className={`fixed inset-y-0 left-0 z-20 hidden lg:flex flex-col transition-all duration-300 ${isAdminSidebarVisible ? 'w-60' : 'w-20'}`}>
-            <AdminSidebar user={user} enabledModules={enabledModules} isCollapsed={!isAdminSidebarVisible} />
+            <AdminSidebar user={user} enabledModules={enabledModules} isCollapsed={!isAdminSidebarVisible} onLogout={handleLogout} />
           </aside>
         )}
 
@@ -1174,7 +1196,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <motion.aside initial={{ x: '-100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }}
                 transition={{ type: 'spring', damping: 25, stiffness: 200 }}
                 className="fixed inset-y-0 left-0 z-50 w-64 lg:hidden bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 shadow-2xl">
-                <AdminSidebar user={user} onClose={() => setIsMobileMenuOpen(false)} enabledModules={enabledModules} isCollapsed={false} />
+                <AdminSidebar user={user} onClose={() => setIsMobileMenuOpen(false)} enabledModules={enabledModules} isCollapsed={false} onLogout={handleLogout} />
                 <button onClick={() => setIsMobileMenuOpen(false)} className="absolute top-4 right-4 rounded-lg p-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 shadow-sm z-50 transition-colors">
                   <X className="h-5 w-5" />
                 </button>

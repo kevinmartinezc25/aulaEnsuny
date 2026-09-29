@@ -7,6 +7,7 @@ import {
   getCourseModules, 
   CourseModule, 
   updateModuleItemsOrder,
+  updateModulesOrder,
   createCourseModule,
   deleteCourseModule,
   updateCourseModuleTitle,
@@ -253,6 +254,24 @@ export function TeacherCourseModulesScreen({ courseId }: { courseId: string }) {
         onClick: () => {}
       }
     })
+  }
+
+  const handleReorderModules = async (newModules: CourseModule[]) => {
+    const updated = newModules.map((m, idx) => ({ ...m, order: idx + 1 }))
+    setModules(updated)
+
+    const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+      process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
+
+    if (!isDemoMode) {
+      try {
+        const modulesData = updated.map(m => ({ id: m.id }))
+        await updateModulesOrder(courseId, modulesData)
+      } catch (error) {
+        console.error('Error reordering modules:', error)
+        toast.error('No se pudo guardar el orden de los módulos')
+      }
+    }
   }
 
   const handleQuickAddLesson = (moduleId: string, type: 'video' | 'pdf' | 'quiz' | 'text' | 'task' | 'forum') => {
@@ -548,12 +567,18 @@ export function TeacherCourseModulesScreen({ courseId }: { courseId: string }) {
       </div>
 
       {/* Lista de Módulos (Acordeones) */}
-      <div className="space-y-4">
+      <Reorder.Group
+        axis="y"
+        values={modules}
+        onReorder={handleReorderModules}
+        className="space-y-4"
+      >
         {modules.map((mod, idx) => {
           const isExpanded = expandedModules[mod.id]
           return (
-            <motion.div
+            <Reorder.Item
               key={mod.id}
+              value={mod}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.1 }}
@@ -754,11 +779,11 @@ export function TeacherCourseModulesScreen({ courseId }: { courseId: string }) {
                   </motion.div>
                 )}
               </AnimatePresence>
-            </motion.div>
+            </Reorder.Item>
 
           )
         })}
-      </div>
+      </Reorder.Group>
 
       {/* Modal para Vincular Quiz */}
       <AnimatePresence>

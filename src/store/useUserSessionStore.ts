@@ -99,16 +99,27 @@ export const useUserSessionStore = create<UserSessionState>()(
               return null
             }
 
-            // Consulta optimizada a perfiles: solo los campos necesarios, evitando SELECT *
+            // Consulta optimizada a perfiles
             const { data: profile } = await supabase
               .from('profiles')
-              .select('id, first_name, last_name, grade_level, group_name, avatar_url, roles(name)')
+              .select('id, first_name, last_name, grade_level, group_name, avatar_url, role_id, roles(name)')
               .eq('id', authUser.id)
               .maybeSingle()
 
             let role = 'student'
             if (profile?.roles && typeof profile.roles === 'object' && 'name' in profile.roles) {
               role = (profile.roles.name as string).toLowerCase()
+            } else if (profile?.role_id) {
+              // Si no funcionó la relación (roles(name)), hacemos query manual por role_id
+              const { data: roleData } = await supabase
+                .from('roles')
+                .select('name')
+                .eq('id', profile.role_id)
+                .single()
+              
+              if (roleData?.name) {
+                role = roleData.name.toLowerCase()
+              }
             } else if (authUser.user_metadata?.role_name) {
               role = (authUser.user_metadata.role_name as string).toLowerCase()
             }

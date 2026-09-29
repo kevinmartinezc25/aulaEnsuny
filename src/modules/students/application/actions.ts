@@ -61,12 +61,18 @@ export async function getTeacherStudents(): Promise<TeacherStudent[]> {
       })
     }
 
-    // 3. Obtener todos los estudiantes activos
+    const studentIdsToFetch = Array.from(enrollmentsByStudent.keys())
+    if (studentIdsToFetch.length === 0) {
+      return []
+    }
+
+    // 3. Obtener solo los perfiles de los estudiantes matriculados
     const { data: profiles, error: profilesError } = await adminClient
       .from('profiles')
       .select('*, roles!inner(name)')
       .eq('roles.name', 'student')
       .eq('status', 'active')
+      .in('id', studentIdsToFetch)
 
     if (profilesError) throw profilesError
 
@@ -74,14 +80,7 @@ export async function getTeacherStudents(): Promise<TeacherStudent[]> {
       return []
     }
 
-    // 4. Filtrar perfiles que coincidan estrictamente vía student_courses
-    const matchingProfiles: any[] = profiles.filter(p => enrollmentsByStudent.has(p.id))
-
-    if (matchingProfiles.length === 0) {
-      return []
-    }
-
-    const studentIds = matchingProfiles.map(p => p.id)
+    const studentIds = profiles.map(p => p.id)
 
     // 5. Obtener los promedios definitivos de los estudiantes en los cursos de este docente
     const { data: periodGrades, error: gradesError } = await adminClient
@@ -222,7 +221,7 @@ export async function getTeacherStudents(): Promise<TeacherStudent[]> {
     const authUsers = authData?.users || []
 
     // 6. Construir lista final de estudiantes
-    return matchingProfiles.map(p => {
+    return profiles.map(p => {
       const studentGrades = gradesByStudent.get(p.id) || []
       
       // Calcular promedio del docente para este alumno

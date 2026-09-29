@@ -173,11 +173,17 @@ export async function getStudentAssistedReport(): Promise<{ subjects: PlanillaSu
   const subjectIds = Array.from(allSubjectIds)
   const studentIds = Array.from(new Set(enrollments.map(e => e.id))) // IDs internos de assisted_students
 
-  // 2. Obtener la información de todas las materias encontradas (Sin JOIN por si no hay FK)
-  const { data: subjectsData, error: subjectsError } = await admin
-    .from('assisted_subjects')
-    .select('id, name, teacher_id, grade, group_number, period')
-    .in('id', subjectIds)
+  // 2, 3, 5. Disparar consultas independientes en paralelo para optimizar la carga
+  const [subjectsRes, achievementsRes, gradesRes] = await Promise.all([
+    admin.from('assisted_subjects').select('id, name, teacher_id, grade, group_number, period').in('id', subjectIds),
+    admin.from('assisted_achievements').select('id, subject_id, name, description, position_order').in('subject_id', subjectIds).order('position_order', { ascending: true }),
+    studentIds.length > 0 ? admin.from('assisted_grades').select('activity_id, grade_value, student_id').in('student_id', studentIds) : Promise.resolve({ data: [] })
+  ])
+
+  const subjectsData = subjectsRes.data || []
+  const subjectsError = subjectsRes.error
+  const achievementsData = achievementsRes.data || []
+  const gradesData = gradesRes.data || []
 
   const debugInfo = {
     userId: session.profileId || session.directoryId,
@@ -187,7 +193,7 @@ export async function getStudentAssistedReport(): Promise<{ subjects: PlanillaSu
     gradeNum,
     groupNum,
     allSubjectIdsSize: allSubjectIds.size,
-    subjectsDataLength: subjectsData?.length || 0,
+    subjectsDataLength: subjectsData.length,
     subjectsError: subjectsError,
     studentIdsCount: studentIds.length
   }
@@ -195,19 +201,25 @@ export async function getStudentAssistedReport(): Promise<{ subjects: PlanillaSu
     fs.writeFileSync('debug.json', JSON.stringify(debugInfo, null, 2))
   } catch(e) {}
 
-  if (subjectsError || !subjectsData || subjectsData.length === 0) {
+  if (subjectsError || subjectsData.length === 0) {
     return { subjects: [], generalAverage: 0, generalPerformanceLevel: '-' }
   }
 
-  // Obtener perfiles de docentes
+  // 4. Obtener Actividades publicadas y Perfiles de docentes en paralelo
   const teacherIds = Array.from(new Set(subjectsData.map(s => s.teacher_id).filter(Boolean)))
+  const achievementIds = achievementsData.map(a => a.id)
+
+  const [teachersRes, activitiesRes] = await Promise.all([
+    teacherIds.length > 0 ? admin.from('profiles').select('id, first_name, last_name').in('id', teacherIds) : Promise.resolve({ data: [] }),
+    achievementIds.length > 0 ? admin.from('assisted_activities').select('id, achievement_id, name, component_type, position_order').in('achievement_id', achievementIds).eq('is_published', true).order('position_order', { ascending: true }) : Promise.resolve({ data: [] })
+  ])
+
   const teacherMap = new Map<string, string>()
-  if (teacherIds.length > 0) {
-    const { data: teachers } = await admin.from('profiles').select('id, first_name, last_name').in('id', teacherIds)
-    if (teachers) {
-      teachers.forEach(t => teacherMap.set(t.id, `${t.first_name || ''} ${t.last_name || ''}`.trim()))
-    }
+  if (teachersRes.data) {
+    teachersRes.data.forEach(t => teacherMap.set(t.id, `${t.first_name || ''} ${t.last_name || ''}`.trim()))
   }
+  
+  const activitiesData = activitiesRes.data || []
 
   const subjectMap = new Map(subjectsData.map((s: any) => {
     return [s.id, { 
@@ -218,36 +230,6 @@ export async function getStudentAssistedReport(): Promise<{ subjects: PlanillaSu
       period: s.period
     }]
   }))
-
-  // 3. Obtener Logros
-  const { data: achievementsData } = await admin
-    .from('assisted_achievements')
-    .select('id, subject_id, name, description, position_order')
-    .in('subject_id', subjectIds)
-    .order('position_order', { ascending: true })
-
-  // 4. Obtener Actividades publicadas
-  const achievementIds = (achievementsData || []).map((a: any) => a.id)
-  let activitiesData: any[] = []
-  if (achievementIds.length > 0) {
-    const { data: acts } = await admin
-      .from('assisted_activities')
-      .select('id, achievement_id, name, component_type, position_order')
-      .in('achievement_id', achievementIds)
-      .eq('is_published', true)
-      .order('position_order', { ascending: true })
-    activitiesData = acts || []
-  }
-
-  // 5. Obtener Notas (assisted_grades) para el estudiante interno (student_id de assisted_students)
-  let gradesData: any[] = []
-  if (studentIds.length > 0 && activitiesData.length > 0) {
-    const { data: grds } = await admin
-      .from('assisted_grades')
-      .select('activity_id, grade_value, student_id')
-      .in('student_id', studentIds)
-    gradesData = grds || []
-  }
 
   // Mapear grades por activity_id
   const gradeMap = new Map<string, number>()

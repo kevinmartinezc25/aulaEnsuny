@@ -11,6 +11,7 @@ import {
 import dynamic from 'next/dynamic'
 import { toast } from 'sonner'
 import { getAdminDashboardStats } from '../../application/actions'
+import { useUserSessionStore } from '@/store/useUserSessionStore'
 
 const AdminDashboardCharts = dynamic(
   () => import('../components/AdminDashboardCharts'),
@@ -73,8 +74,10 @@ const mockTopCourses = [
 ]
 
 export function AdminDashboardScreen() {
-  const [userRole, setUserRole] = useState<string>('admin')
-  const [rectorName, setRectorName] = useState<string>('')
+  // ── Leer rol y nombre desde el store de sesión (ya hidratado en el layout) ──
+  const sessionUser = useUserSessionStore(state => state.user)
+  const [userRole, setUserRole] = useState<string>(sessionUser?.role || 'admin')
+  const [rectorName, setRectorName] = useState<string>(sessionUser?.name || '')
   const [isDemoData, setIsDemoData] = useState(false)
   const [loading, setLoading] = useState(true)
   const [studentStats, setStudentStats] = useState({
@@ -99,106 +102,39 @@ export function AdminDashboardScreen() {
 
   const today = new Date().toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
 
+  // Sincronizar rol/nombre cuando el store de sesión se hidrate (si llegó después del primer render)
+  useEffect(() => {
+    if (sessionUser?.role) setUserRole(sessionUser.role)
+    if (sessionUser?.name) {
+      // Prioridad: nombre del store; si no hay, consultar schoolInfo de localStorage
+      let rector = sessionUser.name
+      if (!rector && typeof window !== 'undefined') {
+        const storedSchool = localStorage.getItem('schoolInfo')
+        if (storedSchool) {
+          try {
+            const parsed = JSON.parse(storedSchool)
+            if (parsed?.rector && parsed.rector !== 'Dr. Fernando Restrepo') rector = parsed.rector
+          } catch (e) {}
+        }
+      }
+      setRectorName(rector || 'Administrador Ensuny')
+    } else if (!rectorName && typeof window !== 'undefined') {
+      // Fallback: leer de schoolInfo o cookie demo si el store aún no tiene nombre
+      const storedSchool = localStorage.getItem('schoolInfo')
+      if (storedSchool) {
+        try {
+          const parsed = JSON.parse(storedSchool)
+          if (parsed?.rector && parsed.rector !== 'Dr. Fernando Restrepo') {
+            setRectorName(parsed.rector)
+          }
+        } catch (e) {}
+      }
+    }
+  }, [sessionUser])
+
   useEffect(() => {
     async function loadDashboardData() {
       setLoading(true)
-
-      // Cargar el rol y nombre del usuario de su cuenta
-      let currentAccountName = ''
-      try {
-        const { createClient } = await import('@/core/config/supabase/client')
-        const supabase = createClient()
-        const { data: { user: authUser } } = await supabase.auth.getUser()
-        if (authUser) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('*, roles(name)')
-            .eq('id', authUser.id)
-            .single()
-          
-          if (profile?.roles?.name) {
-            setUserRole(profile.roles.name)
-          } else if (authUser.user_metadata?.role_name) {
-            setUserRole(authUser.user_metadata.role_name)
-          }
-
-          if (profile?.first_name || profile?.last_name) {
-            currentAccountName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim()
-          } else if (authUser.user_metadata?.first_name) {
-            currentAccountName = `${authUser.user_metadata.first_name} ${authUser.user_metadata.last_name || ''}`.trim()
-          }
-        } else {
-          // Verificar cookie de sesión demo
-          const getCookie = (name: string) => {
-            const value = `; ${document.cookie}`
-            const parts = value.split(`; ${name}=`)
-            if (parts.length === 2) return parts.pop()?.split(';').shift()
-            return null
-          }
-          const demoCookie = getCookie('aulaensuny-demo-session')
-          if (demoCookie) {
-            const session = JSON.parse(decodeURIComponent(demoCookie))
-            if (session.role) {
-              setUserRole(session.role)
-            }
-            if (session.first_name || session.last_name) {
-              currentAccountName = `${session.first_name || ''} ${session.last_name || ''}`.trim()
-            }
-          }
-        }
-      } catch (roleErr) {
-        console.warn('Error recuperando el rol del usuario:', roleErr)
-      }
-
-      // Cargar nombre del rector coincidente con Configuración de Cuenta
-      try {
-        let rector = ''
-
-        // 1. Prioridad: Si hay nombre en la cuenta de SuperAdmin (Rector actual), usar ese nombre exacto
-        if (currentAccountName) {
-          rector = currentAccountName
-        }
-
-        // 2. Si no hay nombre directo, consultar perfil de SuperAdmin en BD
-        if (!rector) {
-          try {
-            const { createClient } = await import('@/core/config/supabase/client')
-            const supabase = createClient()
-            const { data: superProfile } = await supabase
-              .from('profiles')
-              .select('first_name, last_name, roles!inner(name)')
-              .eq('roles.name', 'superadmin')
-              .limit(1)
-              .maybeSingle()
-
-            if (superProfile) {
-              const sName = `${superProfile.first_name || ''} ${superProfile.last_name || ''}`.trim()
-              if (sName) rector = sName
-            }
-          } catch (e) {}
-        }
-
-        // 3. Si se configuró en Ajustes Institucionales (schoolInfo)
-        if (!rector && typeof window !== 'undefined') {
-          const storedSchool = localStorage.getItem('schoolInfo')
-          if (storedSchool) {
-            const parsed = JSON.parse(storedSchool)
-            if (parsed?.rector && parsed.rector !== 'Dr. Fernando Restrepo') {
-              rector = parsed.rector
-            }
-          }
-        }
-
-        // 4. Respaldo coherente
-        if (!rector) {
-          rector = currentAccountName || 'Administrador Ensuny'
-        }
-
-        setRectorName(rector)
-      } catch (rectorErr) {
-        console.warn('Error al cargar configuración del rector:', rectorErr)
-        setRectorName(currentAccountName || 'Administrador Ensuny')
-      }
 
       try {
         let stats = null
@@ -217,7 +153,6 @@ export function AdminDashboardScreen() {
             withAccountPct: stats.withAccountPct,
             withoutAccountPct: stats.withoutAccountPct
           })
-          // Map real KPIs
           const updatedKpis = [
             { title: 'Total Estudiantes', value: String(stats.studentCount), change: 'Matrícula institucional', icon: GraduationCap, color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-950/30' },
             { title: 'Con Cuenta Virtual', value: String(stats.studentsWithAccount), change: `${stats.withAccountPct}% con acceso`, icon: UserCheck, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-950/30' },
@@ -227,8 +162,6 @@ export function AdminDashboardScreen() {
             { title: 'Promedio Académico', value: stats.avgGradeVal, change: 'Media institucional', icon: TrendingUp, color: 'text-teal-600', bg: 'bg-teal-50 dark:bg-teal-950/30' },
           ]
           setKpiData(updatedKpis)
-
-          // Asignar actividad real consultada en el servidor (sin mock de accesos)
           if (stats.accessData && stats.accessData.length > 0) {
             setAccessData(stats.accessData)
           } else {
@@ -245,53 +178,6 @@ export function AdminDashboardScreen() {
           setRiskStudents(mockAtRiskStudents)
           setActiveCoursesList(mockTopCourses)
         }
-
-        // Cargar estadísticas de la Agenda Institucional
-        try {
-          const { getEvents } = await import('@/modules/institutional-agenda/application/actions')
-          const allEvents = await getEvents()
-          const now = new Date()
-          const currentMonth = now.getMonth()
-          const currentYear = now.getFullYear()
-
-          const eventsThisMonth = allEvents.filter(e => {
-            const sd = new Date(e.start_date)
-            return sd.getMonth() === currentMonth && sd.getFullYear() === currentYear
-          }).length
-
-          const upcomingEvents = allEvents.filter(e => new Date(e.start_date) >= now).length
-          const pendingEvents = allEvents.filter(e => e.status === 'pending').length
-
-          // Group by category
-          const catMap: Record<string, number> = {}
-          allEvents.forEach(e => {
-            const catName = e.event_categories?.name || 'General'
-            catMap[catName] = (catMap[catName] || 0) + 1
-          })
-          const byCategory = Object.entries(catMap).map(([name, count]) => ({ name, count }))
-
-          // Group by responsible
-          const respMap: Record<string, number> = {}
-          allEvents.forEach(e => {
-            e.event_responsibles.forEach(r => {
-              if (r.profiles) {
-                const name = `${r.profiles.first_name} ${r.profiles.last_name}`
-                respMap[name] = (respMap[name] || 0) + 1
-              }
-            })
-          })
-          const byResponsible = Object.entries(respMap).map(([name, count]) => ({ name, count }))
-
-          setAgendaStats({
-            eventsThisMonth,
-            upcomingEvents,
-            pendingEvents,
-            byCategory,
-            byResponsible
-          })
-        } catch (e) {
-          console.error('Error loading agenda stats on admin dashboard:', e)
-        }
       } catch (err) {
         console.error('Error loading admin dashboard stats:', err)
       } finally {
@@ -301,10 +187,79 @@ export function AdminDashboardScreen() {
     loadDashboardData()
   }, [])
 
+  // Carga de agenda separada — no bloquea los KPIs principales
+  useEffect(() => {
+    async function loadAgendaStats() {
+      try {
+        const { getEvents } = await import('@/modules/institutional-agenda/application/actions')
+        const allEvents = await getEvents()
+        const now = new Date()
+        const currentMonth = now.getMonth()
+        const currentYear = now.getFullYear()
+
+        const eventsThisMonth = allEvents.filter(e => {
+          const sd = new Date(e.start_date)
+          return sd.getMonth() === currentMonth && sd.getFullYear() === currentYear
+        }).length
+
+        const upcomingEvents = allEvents.filter(e => new Date(e.start_date) >= now).length
+        const pendingEvents = allEvents.filter(e => e.status === 'pending').length
+
+        const catMap: Record<string, number> = {}
+        allEvents.forEach(e => {
+          const catName = e.event_categories?.name || 'General'
+          catMap[catName] = (catMap[catName] || 0) + 1
+        })
+        const byCategory = Object.entries(catMap).map(([name, count]) => ({ name, count }))
+
+        const respMap: Record<string, number> = {}
+        allEvents.forEach(e => {
+          e.event_responsibles.forEach((r: any) => {
+            if (r.profiles) {
+              const name = `${r.profiles.first_name} ${r.profiles.last_name}`
+              respMap[name] = (respMap[name] || 0) + 1
+            }
+          })
+        })
+        const byResponsible = Object.entries(respMap).map(([name, count]) => ({ name, count }))
+
+        setAgendaStats({ eventsThisMonth, upcomingEvents, pendingEvents, byCategory, byResponsible })
+      } catch (e) {
+        console.error('Error loading agenda stats on admin dashboard:', e)
+      }
+    }
+    // Diferir 300ms para no competir con la carga principal de KPIs
+    const timer = setTimeout(loadAgendaStats, 300)
+    return () => clearTimeout(timer)
+  }, [])
+
   if (loading) {
     return (
-      <div className="h-[400px] flex items-center justify-center">
-        <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
+      <div className="max-w-7xl mx-auto space-y-8">
+        {/* Header skeleton */}
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2">
+          <div className="space-y-2">
+            <div className="h-3 w-40 rounded-full bg-slate-200 dark:bg-slate-800 animate-pulse" />
+            <div className="h-8 w-72 rounded-xl bg-slate-200 dark:bg-slate-800 animate-pulse" />
+            <div className="h-3 w-56 rounded-full bg-slate-200 dark:bg-slate-800 animate-pulse" />
+          </div>
+          <div className="h-7 w-40 rounded-full bg-slate-100 dark:bg-slate-800/60 animate-pulse" />
+        </div>
+        {/* KPI cards skeleton */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="rounded-3xl border border-slate-100 dark:border-slate-800/60 bg-white dark:bg-slate-900 p-5 shadow-sm space-y-3 animate-pulse">
+              <div className="h-9 w-9 rounded-xl bg-slate-100 dark:bg-slate-800" />
+              <div className="h-7 w-16 rounded-lg bg-slate-200 dark:bg-slate-800" />
+              <div className="h-3 w-24 rounded-full bg-slate-100 dark:bg-slate-800" />
+            </div>
+          ))}
+        </div>
+        {/* Charts skeleton */}
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+          <div className="lg:col-span-3 rounded-3xl border border-slate-100 dark:border-slate-800/60 bg-white dark:bg-slate-900 h-72 animate-pulse" />
+          <div className="lg:col-span-2 rounded-3xl border border-slate-100 dark:border-slate-800/60 bg-white dark:bg-slate-900 h-72 animate-pulse" />
+        </div>
       </div>
     )
   }

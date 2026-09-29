@@ -12,10 +12,15 @@ import { getTeacherStudents, sendStudentMessage, TeacherStudent } from '../../ap
 import { getTeacherCourses } from '@/modules/grades/application/achievementsActions'
 import { toast } from 'sonner'
 
-export function TeacherStudentsScreen() {
-  const [students, setStudents] = useState<TeacherStudent[]>([])
-  const [courses, setCourses] = useState<{ id: string; title: string; subject: string; gradeLevel: string; groupName: string }[]>([])
-  const [loading, setLoading] = useState(true)
+export interface TeacherStudentsProps {
+  initialStudents?: TeacherStudent[]
+  initialCourses?: { id: string; title: string; subject: string; gradeLevel: string; groupName: string }[]
+}
+
+export function TeacherStudentsScreen({ initialStudents, initialCourses }: TeacherStudentsProps) {
+  const [students, setStudents] = useState<TeacherStudent[]>(initialStudents || [])
+  const [courses, setCourses] = useState<{ id: string; title: string; subject: string; gradeLevel: string; groupName: string }[]>(initialCourses || [])
+  const [loading, setLoading] = useState(!initialStudents)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCourse, setSelectedCourse] = useState('all')
   const [selectedGradeGroup, setSelectedGradeGroup] = useState('all')
@@ -27,8 +32,10 @@ export function TeacherStudentsScreen() {
   const [msgBody, setMsgBody] = useState('')
   const [sendingMsg, setSendingMsg] = useState(false)
 
-  // Cargar datos
+  // Cargar datos (solo si no vienen por props)
   useEffect(() => {
+    if (initialStudents && initialCourses) return;
+
     async function loadData() {
       setLoading(true)
       try {
@@ -46,7 +53,7 @@ export function TeacherStudentsScreen() {
       }
     }
     loadData()
-  }, [])
+  }, [initialStudents, initialCourses])
 
   // Lista única de combinaciones Grado-Grupo para el filtro
   const uniqueGradeGroups = useMemo(() => {

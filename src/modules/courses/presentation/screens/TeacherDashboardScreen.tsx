@@ -15,11 +15,20 @@ const YoutubeIcon = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 )
 
-export function TeacherDashboardScreen() {
-  const [courses, setCourses] = useState<TeacherDashboardCourse[]>([])
-  const [teacherName, setTeacherName] = useState('Prof. Docente')
-  const [loading, setLoading] = useState(true)
-  const [stats, setStats] = useState({
+export interface TeacherDashboardProps {
+  initialTeacherName?: string;
+  initialCourses?: TeacherDashboardCourse[];
+  initialStats?: any;
+  initialTodaySchedule?: any[];
+  initialNextClass?: any | null;
+  initialIsWeekend?: boolean;
+}
+
+export function TeacherDashboardScreen(props: TeacherDashboardProps) {
+  const [courses, setCourses] = useState<TeacherDashboardCourse[]>(props.initialCourses || [])
+  const [teacherName, setTeacherName] = useState(props.initialTeacherName || 'Prof. Docente')
+  const [loading, setLoading] = useState(!props.initialCourses)
+  const [stats, setStats] = useState(props.initialStats || {
     coursesCount: 0,
     studentsCount: 0,
     quizzesCount: 0,
@@ -129,158 +138,71 @@ export function TeacherDashboardScreen() {
         const supabase = createClient()
         const { data: { user } } = await supabase.auth.getUser()
         if (user) {
-          // 1. Cargar perfil del docente
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', user.id)
-            .single()
-
-          if (profile) {
-            setTeacherName(`${profile.first_name || 'Prof.'} ${profile.last_name || 'Docente'}`)
-          } else if (user.user_metadata) {
-            setTeacherName(`${user.user_metadata.first_name || 'Prof.'} ${user.user_metadata.last_name || 'Docente'}`)
-          }
-
-          // 2. Cargar asignaturas y métricas reales del Aula Virtual
-          const overview = await getTeacherDashboardOverview()
-          setCourses(overview.courses)
-          setStats(overview.stats)
-
-          // 5. Cargar Horario de Hoy
-          try {
-            const currentDay = new Date().getDay()
-            setIsWeekend(currentDay === 0 || currentDay === 6)
-            
-            const { data: academicTeacher } = await supabase
-              .from('academic_teachers')
-              .select('id')
-              .eq('profile_id', user.id)
+          if (!props.initialTeacherName) {
+            // 1. Cargar perfil del docente
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', user.id)
               .single()
 
-            if (academicTeacher && currentDay >= 1 && currentDay <= 5) {
-              const { getScheduleSlotsAction } = await import('@/modules/admin/application/actions')
-              
-              // Verificar si hay Novedades (Horario sobreescrito) para HOY
-              // (Usamos la fecha real, aunque estemos forzando currentDay a 1 en Modo Prueba)
-              const todayDateStr = new Date().toISOString().split('T')[0]
-              const { data: overrides } = await supabase
-                .from('sch_daily_overrides')
-                .select('id, period_id, day_of_week, subject:academic_subjects(name), group:academic_groups(name)')
-                .eq('teacher_id', academicTeacher.id)
-                .eq('target_date', todayDateStr)
+            if (profile) {
+              setTeacherName(`${profile.first_name || 'Prof.'} ${profile.last_name || 'Docente'}`)
+            } else if (user.user_metadata) {
+              setTeacherName(`${user.user_metadata.first_name || 'Prof.'} ${user.user_metadata.last_name || 'Docente'}`)
+            }
+          }
 
-              let daySlots: any[] = []
-              let hasNovedades = false
-              
-              if (overrides && overrides.length > 0) {
-                // El docente tiene un horario especial de novedades hoy
-                daySlots = overrides
-                hasNovedades = true
-              } else {
-                // Horario base normal
-                const allSlots = await getScheduleSlotsAction('teacher', academicTeacher.id)
-                if (allSlots) {
-                  daySlots = allSlots.filter((s: any) => parseInt(s.day_of_week) === currentDay)
-                }
-              }
-              
-              if (daySlots) {
-                daySlots.sort((a: any, b: any) => parseInt(a.period_id) - parseInt(b.period_id))
-                let periodsArray: any[] = []
-                let periodsMap: any = {}
-                try {
-                  const { getGeneralSchedulePeriodsAction } = await import('@/app/admin/schedules/actions')
-                  const configRes = await getGeneralSchedulePeriodsAction()
-                  if (configRes.success && configRes.config?.periods) {
-                    periodsArray = configRes.config.periods
-                    periodsMap = periodsArray.reduce((acc: any, p: any) => {
-                      acc[p.period] = p
-                      return acc
-                    }, {})
-                  }
-                } catch (e) {}
+          if (!props.initialCourses) {
+            // 2. Cargar asignaturas y métricas reales del Aula Virtual
+            const overview = await getTeacherDashboardOverview()
+            setCourses(overview.courses)
+            setStats(overview.stats)
+          }
 
-                // Construir la jornada completa
-                let maxPeriodId = 6
-                if (periodsArray.length > 0) {
-                   const maxVal = Math.max(...periodsArray.map(p => parseInt(p.period || '0')))
-                   if (!isNaN(maxVal) && maxVal > 0) maxPeriodId = maxVal
-                } else if (daySlots.length > 0) {
-                   const maxVal = Math.max(...daySlots.map((s:any) => parseInt(s.period_id || '0')))
-                   if (!isNaN(maxVal) && maxVal > 0) maxPeriodId = Math.max(maxVal, 6)
-                }
-                
-                const fullDaySlots = []
-                for (let i = 1; i <= maxPeriodId; i++) {
-                   const slotForPeriod = daySlots.find((s:any) => parseInt(s.period_id) === i)
-                   const pInfo = periodsMap[i]
+          // 5. Cargar Horario de Hoy (usando datos iniciales del servidor)
+          try {
+            if (props.initialIsWeekend !== undefined) {
+              setIsWeekend(props.initialIsWeekend)
+            }
+            if (props.initialTodaySchedule && props.initialTodaySchedule.length > 0) {
+              const fullDaySlots = [...props.initialTodaySchedule]
+              const now = new Date()
+              const currentMinutes = now.getHours() * 60 + now.getMinutes()
+              let next = null
+              let completed = 0
+
+              for (const cls of fullDaySlots) {
+                if (cls.startTime && cls.startTime.includes(':')) {
+                   const [sh, sm] = cls.startTime.split(':')
+                   const startMins = parseInt(sh, 10) * 60 + parseInt(sm, 10)
                    
-                   if (slotForPeriod) {
-                     fullDaySlots.push({
-                        id: slotForPeriod.id,
-                        period: i,
-                        subject: slotForPeriod.subject?.name || 'Clase',
-                        group: slotForPeriod.group?.name || 'Grupo',
-                        startTime: pInfo?.startTime || `${i}ª Hora`,
-                        endTime: pInfo?.endTime || '',
-                        isCurrent: false,
-                        isFree: false,
-                        isNovedad: hasNovedades
-                     })
-                   } else {
-                     fullDaySlots.push({
-                        id: `free-${i}`,
-                        period: i,
-                        subject: 'Libre',
-                        group: '',
-                        startTime: pInfo?.startTime || `${i}ª Hora`,
-                        endTime: pInfo?.endTime || '',
-                        isCurrent: false,
-                        isFree: true,
-                        isNovedad: hasNovedades
-                     })
+                   let endMins = startMins + 55
+                   if (cls.endTime && cls.endTime.includes(':')) {
+                     const [eh, em] = cls.endTime.split(':')
+                     endMins = parseInt(eh, 10) * 60 + parseInt(em, 10)
+                   }
+                   
+                   const isOngoing = currentMinutes >= startMins && currentMinutes <= endMins
+                   cls.isCurrent = isOngoing
+
+                   if (currentMinutes >= endMins) {
+                     if (!cls.isFree) completed++
+                   }
+                   
+                   if (currentMinutes < endMins && !next && !cls.isFree) {
+                     next = { ...cls, isOngoing }
                    }
                 }
-
-                // Calcular la clase actual o siguiente y progreso de la jornada
-                const now = new Date()
-                const currentMinutes = now.getHours() * 60 + now.getMinutes()
-                let next = null
-                let completed = 0
-
-                for (const cls of fullDaySlots) {
-                  if (cls.startTime && cls.startTime.includes(':')) {
-                     const [sh, sm] = cls.startTime.split(':')
-                     const startMins = parseInt(sh, 10) * 60 + parseInt(sm, 10)
-                     
-                     let endMins = startMins + 55
-                     if (cls.endTime && cls.endTime.includes(':')) {
-                       const [eh, em] = cls.endTime.split(':')
-                       endMins = parseInt(eh, 10) * 60 + parseInt(em, 10)
-                     }
-                     
-                     const isOngoing = currentMinutes >= startMins && currentMinutes <= endMins
-                     cls.isCurrent = isOngoing
-
-                     if (currentMinutes >= endMins) {
-                       if (!cls.isFree) completed++
-                     }
-                     
-                     if (currentMinutes < endMins && !next && !cls.isFree) {
-                       next = { ...cls, isOngoing }
-                     }
-                  }
-                }
-                
-                setTodaySchedule(fullDaySlots)
-                setNextClass(next)
-                setCompletedClasses(completed)
-                setTotalClasses(fullDaySlots.filter(s => !s.isFree).length)
               }
+              
+              setTodaySchedule(fullDaySlots)
+              setNextClass(next || props.initialNextClass)
+              setCompletedClasses(completed)
+              setTotalClasses(fullDaySlots.filter(s => !s.isFree).length)
             }
           } catch(e) {
-            console.error('Error cargando horario de hoy:', e)
+            console.error('Error procesando horario de hoy:', e)
           }
 
           // Cargar próximos eventos institucionales

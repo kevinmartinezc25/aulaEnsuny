@@ -1,16 +1,16 @@
 {
-  "userId": "88667106-482d-42f7-b5df-b268f1441fe5",
-  "fullName": "Blandón Marín Santiago",
+  "userId": "9e8f339b-a826-450a-9cf5-bce66d8d6358",
+  "fullName": "De La Cruz Cárdenas Berman",
   "candidateIds": [
-    "88667106-482d-42f7-b5df-b268f1441fe5",
-    "prof-88667106-482d-42f7-b5df-b268f1441fe5",
-    "dir-88667106-482d-42f7-b5df-b268f1441fe5"
+    "9e8f339b-a826-450a-9cf5-bce66d8d6358",
+    "prof-9e8f339b-a826-450a-9cf5-bce66d8d6358",
+    "dir-9e8f339b-a826-450a-9cf5-bce66d8d6358"
   ],
-  "enrollmentsCount": 5,
-  "gradeNum": 11,
-  "groupNum": 2,
-  "allSubjectIdsSize": 5,
-  "subjectsDataLength": 5,
+  "enrollmentsCount": 7,
+  "gradeNum": 10,
+  "groupNum": 1,
+  "allSubjectIdsSize": 7,
+  "subjectsDataLength": 7,
   "subjectsError": null,
-  "studentIdsCount": 5
+  "studentIdsCount": 7
 }
