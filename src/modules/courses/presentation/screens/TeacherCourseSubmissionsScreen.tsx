@@ -57,7 +57,7 @@ const formatStudentName = (student: any) => {
   return rawName
     .toLowerCase()
     .split(' ')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
 }
 
