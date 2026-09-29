@@ -81,7 +81,7 @@ export default function ChangePasswordPage() {
                 <div className="mx-auto w-16 h-16 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 flex items-center justify-center mb-4">
                   <CheckCircle className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
                 </div>
-                <p className="text-base font-bold text-slate-900 dark:text-white mb-1">Contrasena guardada</p>
+                <p className="text-base font-bold text-slate-900 dark:text-white mb-1">Contraseña guardada</p>
                 <p className="text-sm text-slate-500 dark:text-slate-400">Redirigiendo a tu portal...</p>
               </motion.div>
             ) : (

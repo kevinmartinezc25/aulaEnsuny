@@ -173,25 +173,28 @@ export async function login(input: LoginInput) {
   let roleName = 'student'
 
   if (user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role_id, status')
+      .eq('id', user.id)
+      .single()
+
+    if (profile?.status === 'inactive') {
+      await supabase.auth.signOut()
+      return { error: 'Tu cuenta ha sido desactivada. Contacta a administración para restaurar tu acceso.' }
+    }
+
     const metaRole = user.user_metadata?.role_name
     if (metaRole === 'admin' || metaRole === 'superadmin' || metaRole === 'teacher' || metaRole === 'student') {
       roleName = metaRole
-    } else {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role_id')
-        .eq('id', user.id)
+    } else if (profile?.role_id) {
+      const { data: role } = await supabase
+        .from('roles')
+        .select('name')
+        .eq('id', profile.role_id)
         .single()
-
-      if (profile?.role_id) {
-        const { data: role } = await supabase
-          .from('roles')
-          .select('name')
-          .eq('id', profile.role_id)
-          .single()
-        if (role?.name) {
-          roleName = role.name
-        }
+      if (role?.name) {
+        roleName = role.name
       }
     }
   }

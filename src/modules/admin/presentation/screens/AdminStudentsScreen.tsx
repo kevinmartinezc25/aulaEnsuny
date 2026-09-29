@@ -40,6 +40,7 @@ export function AdminStudentsScreen() {
   const [successMsg, setSuccessMsg] = useState('')
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [directoryStats, setDirectoryStats] = useState<{ totalDirectory: number; withAccount: number; withoutAccount: number } | null>(null)
 
   useEffect(() => {
@@ -121,30 +122,26 @@ export function AdminStudentsScreen() {
 
   const performDelete = async () => {
     if (deleteTargetId) {
+      setIsDeleting(true)
       try {
         const res = await deleteAdminUser(deleteTargetId)
         if (res.error) {
           console.error('Error al retirar estudiante:', res.error)
+          alert(`Error al eliminar estudiante: ${res.error}`)
         } else {
-          setSuccessMsg('Estudiante retirado con éxito.')
+          setSuccessMsg('Estudiante eliminado con éxito.')
           const updated = await getAdminStudents()
           setStudents(updated)
           setTimeout(() => setSuccessMsg(''), 3000)
         }
       } catch (err: any) {
         console.error('Error al eliminar el estudiante:', err)
+      } finally {
+        setIsDeleting(false)
+        setIsDeleteModalOpen(false)
+        setDeleteTargetId(null)
       }
     }
-    setIsDeleteModalOpen(false)
-    setDeleteTargetId(null)
-  }
-
-  const copyRegistrationLink = () => {
-    const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://aula.ensuny.edu.co'
-    const link = `${baseUrl}/login`
-    navigator.clipboard.writeText(link)
-    setSuccessMsg('¡Enlace de acceso copiado al portapapeles!')
-    setTimeout(() => setSuccessMsg(''), 3000)
   }
 
   const handleSync = async () => {
@@ -192,14 +189,7 @@ export function AdminStudentsScreen() {
             {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
             <span className="hidden sm:inline whitespace-nowrap">Sincronizar</span>
           </button>
-          <button
-            onClick={copyRegistrationLink}
-            className="flex items-center gap-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 px-4 py-2 text-sm font-semibold active:scale-[0.98] transition-all cursor-pointer"
-            title="Copiar enlace de acceso"
-          >
-            <LinkIcon className="h-4 w-4" />
-            <span className="hidden sm:inline whitespace-nowrap">Copiar Enlace</span>
-          </button>
+
           <Link
             href="/admin/students/import"
             className="flex items-center gap-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 px-4 py-2 text-sm font-semibold active:scale-[0.98] transition-all"
@@ -427,10 +417,16 @@ export function AdminStudentsScreen() {
                 <Trash2 className="h-8 w-8" />
               </div>
               <div className="space-y-2">
-                <h3 className="text-xl font-bold text-slate-900 dark:text-white">¿Retirar estudiante?</h3>
-                <p className="text-sm text-slate-500 dark:text-slate-400">
-                  ¿Está seguro de que desea retirar este estudiante del sistema? Esta acción desvinculará sus registros académicos.
-                </p>
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white">¿Eliminar estudiante permanentemente?</h3>
+                <div className="text-sm text-slate-500 dark:text-slate-400 space-y-3">
+                  <p>
+                    ¿Está seguro de que desea <strong>eliminar</strong> este estudiante del sistema de forma definitiva? Esta acción desvinculará y borrará todos sus registros académicos.
+                  </p>
+                  <div className="p-3 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-xl text-xs text-left border border-amber-200/50 dark:border-amber-900/50">
+                    <strong className="block mb-1">Recomendación de uso:</strong> 
+                    Si el estudiante ya tiene notas o historial en la plataforma, es mejor cambiar su estado a <strong>"Inactivo"</strong> editando su perfil. Usa la eliminación definitiva únicamente para borrar estudiantes creados por error.
+                  </div>
+                </div>
               </div>
               <div className="flex gap-3 justify-center pt-2">
                 <button
@@ -443,10 +439,18 @@ export function AdminStudentsScreen() {
                   Cancelar
                 </button>
                 <button
+                  disabled={isDeleting}
                   onClick={performDelete}
-                  className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold transition active:scale-[0.98] cursor-pointer shadow-sm shadow-rose-200 dark:shadow-none"
+                  className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold transition active:scale-[0.98] cursor-pointer shadow-sm shadow-rose-200 dark:shadow-none disabled:opacity-75 flex justify-center items-center gap-2"
                 >
-                  Retirar Estudiante
+                  {isDeleting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Validando proceso de eliminación...
+                    </>
+                  ) : (
+                    'Retirar Estudiante'
+                  )}
                 </button>
               </div>
             </motion.div>
