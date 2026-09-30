@@ -1,12 +1,25 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Save, Video, FileText, File, Link as LinkIcon, Image as ImageIcon, CheckCircle, HelpCircle, UploadCloud, ClipboardList } from 'lucide-react'
+import { 
+  ArrowLeft, Save, Video, FileText, File, Link as LinkIcon, Image as ImageIcon, 
+  CheckCircle, HelpCircle, UploadCloud, ClipboardList, Paperclip, Eye, Download, 
+  Trash2, X, Plus, FolderOpen, Loader2, ExternalLink, Calendar, Clock 
+} from 'lucide-react'
 import { PdfUploadModal } from '@/modules/resources/presentation/components/PdfUploadModal'
+import { uploadPdfAction } from '@/modules/resources/presentation/actions/resourceActions'
 import { RichTextEditor } from '@/core/components/RichTextEditor'
 import { toast } from 'sonner'
 import { createClient } from '@/core/config/supabase/client'
+
+export interface TaskAttachment {
+  name: string
+  url: string
+  downloadUrl?: string
+  size?: string
+  type?: string
+}
 
 // Helper to extract embed URL for YouTube and Vimeo
 function getEmbedUrl(url: string): { type: 'youtube' | 'vimeo' | 'direct' | null; embedUrl: string | null } {
@@ -77,6 +90,18 @@ export function TeacherLessonEditorScreen({
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
   const [uploadedPdf, setUploadedPdf] = useState<any>(null)
 
+  // Attachment state for 'task' (Guías, Talleres a resolver)
+  const [taskAttachment, setTaskAttachment] = useState<TaskAttachment | null>(null)
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false)
+  const [isResourcePickerOpen, setIsResourcePickerOpen] = useState(false)
+  const [courseResources, setCourseResources] = useState<any[]>([])
+  const [isLoadingResources, setIsLoadingResources] = useState(false)
+  const [manualLinkMode, setManualLinkMode] = useState(false)
+  const [manualLinkUrl, setManualLinkUrl] = useState('')
+  const [manualLinkName, setManualLinkName] = useState('')
+  const [createdAt, setCreatedAt] = useState<string | null>(null)
+  const attachmentFileInputRef = useRef<HTMLInputElement>(null)
+
   useEffect(() => {
     if (lessonId.startsWith('new')) return
 
@@ -95,6 +120,16 @@ export function TeacherLessonEditorScreen({
           submissionType: 'file',
           dueDate: ''
         })
+        if (initialType === 'task') {
+          setTaskAttachment({
+            name: 'Documento_Adjunto.pdf',
+            url: 'https://drive.google.com/file/d/demo/preview',
+            downloadUrl: 'https://drive.google.com/file/d/demo/preview',
+            size: '1.2 MB',
+            type: 'pdf'
+          })
+        }
+        setCreatedAt(new Date().toISOString())
         setLoading(false)
         return
       }
@@ -112,16 +147,41 @@ export function TeacherLessonEditorScreen({
         if (data) {
           const resolvedType = initialType || (data.type === 'reading' ? 'text' : (data.type || (data.video_url ? 'video' : 'text')))
 
+          let loadedAttachment: TaskAttachment | null = null
+          if (data.video_url && resolvedType === 'task') {
+            try {
+              if (data.video_url.startsWith('{')) {
+                loadedAttachment = JSON.parse(data.video_url)
+              } else if (data.video_url.startsWith('http')) {
+                loadedAttachment = {
+                  name: 'Guía o Taller Adjunto',
+                  url: data.video_url,
+                  downloadUrl: data.video_url,
+                  type: data.video_url.includes('.pdf') ? 'pdf' : 'doc'
+                }
+              }
+            } catch {
+              loadedAttachment = {
+                name: 'Guía o Taller Adjunto',
+                url: data.video_url,
+                downloadUrl: data.video_url,
+                type: 'pdf'
+              }
+            }
+          }
+          setTaskAttachment(loadedAttachment)
+
           setFormData({
             title: data.title || '',
             type: resolvedType,
             status: 'active',
             duration: data.video_url ? '10 min' : '',
-            url: data.video_url || '',
+            url: (resolvedType === 'video' || resolvedType === 'pdf') ? (data.video_url || '') : '',
             content: data.content || '',
             submissionType: 'file',
             dueDate: data.due_date ? new Date(new Date(data.due_date).getTime() - (new Date(data.due_date).getTimezoneOffset() * 60000)).toISOString().slice(0, 16) : ''
           })
+          setCreatedAt(data.created_at || null)
         }
       } catch (err: any) {
         console.error('Error cargando recurso:', err)
@@ -133,6 +193,131 @@ export function TeacherLessonEditorScreen({
 
     loadLesson()
   }, [lessonId, initialType])
+
+  const handleUploadTaskFile = async (file: File) => {
+    if (!file) return
+    setIsUploadingAttachment(true)
+    const toastId = toast.loading('Subiendo guía o taller a Google Drive...')
+
+    try {
+      const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+        process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
+
+      if (isDemoMode) {
+        setTimeout(() => {
+          setTaskAttachment({
+            name: file.name,
+            url: 'https://drive.google.com/file/d/demo-guia/view',
+            downloadUrl: 'https://drive.google.com/uc?export=download&id=demo-guia',
+            size: `${(file.size / 1024 / 1024).toFixed(1)} MB`,
+            type: file.name.endsWith('.pdf') ? 'pdf' : file.name.match(/\.(doc|docx)$/i) ? 'doc' : 'file'
+          })
+          toast.success('Documento adjuntado (Demo)', { id: toastId })
+          setIsUploadingAttachment(false)
+        }, 800)
+        return
+      }
+
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Usuario no autenticado')
+
+      const { data: courseData } = await supabase
+        .from('courses')
+        .select('title')
+        .eq('id', courseId)
+        .maybeSingle()
+
+      const courseName = courseData?.title || 'Curso'
+
+      const uploadData = new FormData()
+      uploadData.append('file', file)
+      uploadData.append('title', file.name)
+      uploadData.append('description', 'Documento adjunto a la tarea')
+      uploadData.append('courseId', courseId)
+      uploadData.append('courseName', courseName)
+      if (moduleId) uploadData.append('moduleId', moduleId)
+      uploadData.append('uploadedBy', user.id)
+
+      const result = await uploadPdfAction(uploadData)
+
+      if (result.success && result.resource) {
+        setTaskAttachment({
+          name: result.resource.title || file.name,
+          url: result.resource.driveUrl,
+          downloadUrl: result.resource.driveDownloadUrl || result.resource.driveUrl,
+          size: file.size ? `${(file.size / 1024 / 1024).toFixed(1)} MB` : undefined,
+          type: file.name.endsWith('.pdf') ? 'pdf' : file.name.match(/\.(doc|docx)$/i) ? 'doc' : 'file'
+        })
+        toast.success('Documento adjuntado exitosamente', { id: toastId })
+      } else {
+        throw new Error(result.error || 'No se pudo subir el archivo a Google Drive')
+      }
+    } catch (err: any) {
+      console.error('Error uploading task attachment:', err)
+      toast.error(err?.message || 'Error al subir el documento', { id: toastId })
+    } finally {
+      setIsUploadingAttachment(false)
+    }
+  }
+
+  const handleOpenResourcePicker = async () => {
+    setIsResourcePickerOpen(true)
+    setIsLoadingResources(true)
+    try {
+      const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+        process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
+      if (isDemoMode) {
+        setCourseResources([
+          { id: 'res-1', title: 'Taller 1: Cinemática y Movimiento.pdf', drive_url: 'https://drive.google.com/...', file_size: 1500000, mime_type: 'application/pdf' },
+          { id: 'res-2', title: 'Guía de Ejercicios Prácticos.docx', drive_url: 'https://drive.google.com/...', file_size: 900000, mime_type: 'application/msword' },
+        ])
+      } else {
+        const supabase = createClient()
+        const { data } = await supabase
+          .from('resources')
+          .select('*')
+          .eq('course_id', courseId)
+          .order('created_at', { ascending: false })
+        setCourseResources(data || [])
+      }
+    } catch (err) {
+      console.error('Error fetching course resources:', err)
+      toast.error('No se pudieron cargar los recursos del curso')
+    } finally {
+      setIsLoadingResources(false)
+    }
+  }
+
+  const handleSelectResourceAsAttachment = (res: any) => {
+    setTaskAttachment({
+      name: res.title,
+      url: res.drive_url,
+      downloadUrl: res.drive_download_url || res.drive_url,
+      size: res.file_size ? `${(res.file_size / 1024 / 1024).toFixed(1)} MB` : undefined,
+      type: (res.mime_type || '').includes('pdf') ? 'pdf' : (res.mime_type || '').includes('word') ? 'doc' : 'file'
+    })
+    setIsResourcePickerOpen(false)
+    toast.success('Documento adjuntado exitosamente')
+  }
+
+  const handleSaveManualLink = () => {
+    if (!manualLinkUrl.trim()) {
+      toast.error('La URL es requerida')
+      return
+    }
+    const finalName = manualLinkName.trim() || 'Documento Adjunto'
+    setTaskAttachment({
+      name: finalName,
+      url: manualLinkUrl.trim(),
+      downloadUrl: manualLinkUrl.trim(),
+      type: manualLinkUrl.includes('.pdf') ? 'pdf' : 'link'
+    })
+    setManualLinkMode(false)
+    setManualLinkUrl('')
+    setManualLinkName('')
+    toast.success('Enlace adjuntado a la tarea')
+  }
 
   const handleSave = async () => {
     if (!formData.title.trim()) {
@@ -157,6 +342,15 @@ export function TeacherLessonEditorScreen({
     try {
       const supabase = createClient()
       
+      let resolvedVideoUrl: string | null = null
+      if (formData.type === 'video') {
+        resolvedVideoUrl = formData.url || null
+      } else if (formData.type === 'task') {
+        resolvedVideoUrl = taskAttachment ? JSON.stringify(taskAttachment) : null
+      } else if (formData.type === 'pdf') {
+        resolvedVideoUrl = formData.url || null
+      }
+
       if (lessonId.startsWith('new')) {
         // We are creating a new lesson. We need moduleId!
         const resolvedModuleId = moduleId || new URLSearchParams(window.location.search).get('moduleId')
@@ -181,7 +375,7 @@ export function TeacherLessonEditorScreen({
             module_id: resolvedModuleId,
             title: formData.title.trim(),
             content: formData.type === 'video' ? '' : formData.content,
-            video_url: formData.type === 'video' ? formData.url : null,
+            video_url: resolvedVideoUrl,
             sort_order: newOrder,
             type: formData.type === 'text' ? 'reading' : formData.type,
             due_date: formData.type === 'task' && formData.dueDate ? new Date(formData.dueDate).toISOString() : null
@@ -196,7 +390,7 @@ export function TeacherLessonEditorScreen({
           .update({
             title: formData.title.trim(),
             content: formData.type === 'video' ? '' : formData.content,
-            video_url: formData.type === 'video' ? formData.url : null,
+            video_url: resolvedVideoUrl,
             type: formData.type === 'text' ? 'reading' : formData.type,
             due_date: formData.type === 'task' && formData.dueDate ? new Date(formData.dueDate).toISOString() : null
           })
@@ -449,6 +643,180 @@ export function TeacherLessonEditorScreen({
                     />
                   </div>
 
+                  {/* Documento Adjunto */}
+                  <div className="space-y-3 pt-4 border-t border-slate-100 dark:border-slate-800/60">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <label className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                          <Paperclip className="h-4 w-4 text-orange-500" />
+                          Documento Adjunto
+                        </label>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                          Adjunta un archivo de apoyo o complementario (PDF, Word, etc.) para esta tarea.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Input invisible para subida de archivo */}
+                    <input
+                      ref={attachmentFileInputRef}
+                      type="file"
+                      className="hidden"
+                      accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.png,.jpg,.jpeg,.zip"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0]
+                        if (f) handleUploadTaskFile(f)
+                      }}
+                    />
+
+                    {taskAttachment ? (
+                      <div className="rounded-2xl border border-orange-200 bg-orange-50/50 p-4 dark:border-orange-900/50 dark:bg-orange-950/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white shadow-sm dark:bg-slate-800 text-orange-600 dark:text-orange-400">
+                            {taskAttachment.type === 'pdf' ? (
+                              <FileText className="h-6 w-6 text-red-500" />
+                            ) : taskAttachment.type === 'doc' ? (
+                              <FileText className="h-6 w-6 text-blue-500" />
+                            ) : (
+                              <File className="h-6 w-6 text-orange-500" />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-bold text-slate-900 dark:text-white truncate">
+                                {taskAttachment.name}
+                              </p>
+                              <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-bold text-orange-700 dark:bg-orange-900/50 dark:text-orange-300 uppercase">
+                                Documento Adjunto
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                              {taskAttachment.size ? `${taskAttachment.size} • ` : ''}Sincronizado con Google Drive
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                          {taskAttachment.url && (
+                            <a
+                              href={taskAttachment.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-white shadow-sm border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 transition-colors"
+                              title="Ver documento"
+                            >
+                              <Eye className="h-3.5 w-3.5 text-blue-500" />
+                              Ver
+                            </a>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => attachmentFileInputRef.current?.click()}
+                            disabled={isUploadingAttachment}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-white shadow-sm border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 transition-colors"
+                          >
+                            Reemplazar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setTaskAttachment(null)}
+                            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition-colors"
+                            title="Quitar archivo"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div 
+                          onClick={() => !isUploadingAttachment && attachmentFileInputRef.current?.click()}
+                          className={`rounded-2xl border-2 border-dashed p-6 text-center transition-all cursor-pointer ${
+                            isUploadingAttachment
+                              ? 'border-orange-400 bg-orange-50/40 dark:border-orange-600 dark:bg-orange-950/20'
+                              : 'border-slate-200 bg-slate-50/60 hover:border-orange-400 hover:bg-orange-50/30 dark:border-slate-700 dark:bg-slate-800/40 dark:hover:border-orange-500'
+                          }`}
+                        >
+                          {isUploadingAttachment ? (
+                            <div className="flex flex-col items-center justify-center py-2">
+                              <Loader2 className="h-8 w-8 text-orange-600 animate-spin mb-2" />
+                              <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">Subiendo documento a Google Drive...</p>
+                              <p className="text-xs text-slate-500 mt-0.5">Por favor espera un momento</p>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center justify-center py-1">
+                              <UploadCloud className="h-8 w-8 text-orange-500 mb-2" />
+                              <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                                Haz clic aquí para adjuntar un documento
+                              </p>
+                              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                Formatos soportados: PDF, Word (.docx), Excel, PowerPoint, imágenes · Máx. 50 MB
+                              </p>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={handleOpenResourcePicker}
+                            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 shadow-sm transition-all"
+                          >
+                            <FolderOpen className="h-3.5 w-3.5 text-blue-500" />
+                            Seleccionar de Biblioteca de Recursos
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setManualLinkMode(!manualLinkMode)}
+                            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 shadow-sm transition-all"
+                          >
+                            <LinkIcon className="h-3.5 w-3.5 text-emerald-500" />
+                            Vincular por Enlace Web / Drive
+                          </button>
+                        </div>
+
+                        {manualLinkMode && (
+                          <div className="p-4 rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 space-y-3 shadow-sm">
+                            <h4 className="text-xs font-bold text-slate-700 dark:text-slate-200">Vincular documento por URL</h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <input
+                                type="text"
+                                placeholder="Nombre del documento (ej. Archivo complementario.pdf)"
+                                value={manualLinkName}
+                                onChange={(e) => setManualLinkName(e.target.value)}
+                                className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                              />
+                              <input
+                                type="url"
+                                placeholder="URL pública o de Google Drive"
+                                value={manualLinkUrl}
+                                onChange={(e) => setManualLinkUrl(e.target.value)}
+                                className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                              />
+                            </div>
+                            <div className="flex justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setManualLinkMode(false)}
+                                className="px-3 py-1.5 text-xs text-slate-500 hover:text-slate-700 dark:text-slate-400"
+                              >
+                                Cancelar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleSaveManualLink}
+                                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-orange-600 text-white hover:bg-orange-700"
+                              >
+                                Adjuntar Enlace
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
                   <div className="space-y-3 pt-4 border-t border-slate-100 dark:border-slate-800/60">
                     <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Formato de Entrega del Estudiante</label>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -535,6 +903,19 @@ export function TeacherLessonEditorScreen({
                 </div>
               )}
 
+              <div className="pt-4 border-t border-slate-100 dark:border-slate-800/60 space-y-2">
+                <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Fecha de Publicación</label>
+                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-xs text-slate-700 dark:text-slate-300">
+                  <Calendar className="h-4 w-4 text-blue-500 shrink-0" />
+                  <span>
+                    {createdAt 
+                      ? `Publicado: ${new Date(createdAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`
+                      : 'Se registrará automáticamente al guardar'
+                    }
+                  </span>
+                </div>
+              </div>
+
               <div className="pt-4 border-t border-slate-100 dark:border-slate-800/60">
                 <div className="flex items-center gap-3 p-3 rounded-xl bg-blue-50/50 border border-blue-100 dark:bg-blue-900/10 dark:border-blue-900/30">
                   <CheckCircle className="h-5 w-5 text-blue-500 shrink-0" />
@@ -549,6 +930,99 @@ export function TeacherLessonEditorScreen({
         </div>
 
       </div>
+
+      {/* Resource Picker Modal */}
+      {isResourcePickerOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="flex items-center justify-between p-5 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                  <FolderOpen className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">Recursos del Curso</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Selecciona un archivo ya existente para vincularlo a la tarea</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsResourcePickerOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-5 space-y-2.5">
+              {isLoadingResources ? (
+                <div className="flex flex-col items-center justify-center py-12 text-slate-400 gap-3">
+                  <Loader2 className="h-7 w-7 animate-spin text-blue-600" />
+                  <p className="text-sm">Buscando documentos del curso...</p>
+                </div>
+              ) : courseResources.length === 0 ? (
+                <div className="text-center py-10 px-4">
+                  <FileText className="h-12 w-12 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
+                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">No hay documentos registrados</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-xs mx-auto">
+                    Aún no se han subido materiales en la biblioteca de este curso. Puedes subir uno directamente desde tu computadora.
+                  </p>
+                </div>
+              ) : (
+                courseResources.map((res: any) => {
+                  const isPdf = (res.mime_type || '').includes('pdf') || res.title?.endsWith('.pdf')
+                  const isDoc = (res.mime_type || '').includes('word') || res.title?.match(/\.(doc|docx)$/i)
+                  return (
+                    <div
+                      key={res.id}
+                      onClick={() => handleSelectResourceAsAttachment(res)}
+                      className="group flex items-center justify-between p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-blue-500/50 hover:bg-blue-50/30 dark:hover:bg-blue-900/10 transition-all cursor-pointer"
+                    >
+                      <div className="flex items-center gap-3 min-w-0 pr-3">
+                        <div className={`h-10 w-10 rounded-lg flex items-center justify-center shrink-0 ${
+                          isPdf 
+                            ? 'bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400' 
+                            : isDoc 
+                            ? 'bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400'
+                            : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400'
+                        }`}>
+                          <FileText className="h-5 w-5" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                            {res.title}
+                          </p>
+                          <p className="text-xs text-slate-400">
+                            {res.file_size ? `${(res.file_size / 1024 / 1024).toFixed(1)} MB` : 'Documento'}
+                            {res.created_at && ` • ${new Date(res.created_at).toLocaleDateString()}`}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-blue-600 hover:text-white dark:bg-slate-800 dark:hover:bg-blue-600 text-slate-700 dark:text-slate-300 transition-all shrink-0"
+                      >
+                        Vincular
+                      </button>
+                    </div>
+                  )
+                })
+              )}
+            </div>
+
+            <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsResourcePickerOpen(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
+

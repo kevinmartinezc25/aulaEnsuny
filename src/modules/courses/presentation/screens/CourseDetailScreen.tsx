@@ -21,6 +21,8 @@ interface Lesson {
   type: 'video' | 'reading' | 'file' | 'quiz' | 'task' | 'forum'
   duration?: string
   dueDate?: string
+  createdAt?: string
+  publishedAt?: string
   videoUrl?: string
   driveUrl?: string
   status?: LessonStatus
@@ -36,6 +38,13 @@ interface Lesson {
   } | null
   sort_order?: number
   countsForProgress?: boolean
+  taskAttachment?: {
+    name: string
+    url: string
+    downloadUrl?: string
+    size?: string
+    type?: string
+  } | null
 }
 
 interface Module {
@@ -120,6 +129,7 @@ function isContentEmpty(content: string): boolean {
 export function CourseDetailScreen({ courseId }: { courseId: string }) {
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false)
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false)
+  const [previewAttachment, setPreviewAttachment] = useState<{ title: string; driveUrl: string; downloadUrl?: string } | null>(null)
   const [activeTab, setActiveTab] = useState<'announcements' | 'content' | 'grades' | 'reports'>('announcements')
   const [isMobileContentIndex, setIsMobileContentIndex] = useState(true)
   const [announcements, setAnnouncements] = useState<any[]>([])
@@ -962,12 +972,34 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
             
             const countsForProgress = !(forumObj && forumObj.forum_type === 'qa' && !forumObj.is_graded)
 
+            // Check if there is an attached guide/workshop for this task
+            let taskAttachment: { name: string; url: string; downloadUrl?: string; size?: string; type?: string } | null = null
+            if (type === 'task' && l.video_url) {
+              try {
+                if (l.video_url.trim().startsWith('{')) {
+                  taskAttachment = JSON.parse(l.video_url)
+                } else if (l.video_url.trim().startsWith('http')) {
+                  taskAttachment = {
+                    name: 'Documento adjunto',
+                    url: l.video_url,
+                    downloadUrl: l.video_url,
+                    type: l.video_url.toLowerCase().endsWith('.pdf') ? 'pdf' : 'file'
+                  }
+                }
+              } catch (e) {
+                console.error('Error parsing taskAttachment:', e)
+              }
+            }
+
             return {
               id: l.id,
               title: l.title,
               type,
-              duration: l.video_url ? '10 min' : 'Lectura',
-              videoUrl: l.video_url || undefined,
+              duration: type === 'task' ? 'Tarea' : l.video_url ? '10 min' : 'Lectura',
+              videoUrl: type === 'task' ? undefined : (l.video_url || undefined),
+              dueDate: l.due_date || undefined,
+              createdAt: l.created_at || undefined,
+              publishedAt: l.created_at || undefined,
               status,
               content: l.content || '',
               submissionText,
@@ -981,7 +1013,8 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
                 feedback: gradeEntry.feedback || ''
               } : null,
               sort_order: l.sort_order || 0,
-              countsForProgress
+              countsForProgress,
+              taskAttachment
             }
           })
 
@@ -1010,7 +1043,9 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
               status: completedResourceIds.has(r.id) ? 'completed' as const : 'pending' as const,
               content: r.description || 'Archivo adjunto del módulo.',
               sort_order: r.sort_order || 0,
-              countsForProgress: true
+              countsForProgress: true,
+              createdAt: r.created_at || undefined,
+              publishedAt: r.created_at || undefined
             }
           })
 
@@ -1951,13 +1986,31 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
                         <span className="hidden sm:inline opacity-40">•</span>
                         <span className="flex items-center gap-1.5"><span className="opacity-70"><User className="h-3.5 w-3.5" /></span> Individual</span>
                         <span className="hidden sm:inline opacity-40">•</span>
+                        {(activeLesson.createdAt || activeLesson.publishedAt) && (
+                          <>
+                            <span className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
+                              <Calendar className="h-3.5 w-3.5 text-blue-500 opacity-80" />
+                              <span>
+                                Publicado: {new Date(activeLesson.createdAt || activeLesson.publishedAt!).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
+                              </span>
+                            </span>
+                            <span className="hidden sm:inline opacity-40">•</span>
+                          </>
+                        )}
                         {activeLesson.type === 'forum' && forumConfig?.dueDate ? (
-                          <span className="flex items-center gap-1.5 font-bold text-pink-600 dark:text-pink-400 bg-pink-50 dark:bg-pink-500/10 px-2 py-1 rounded-md border border-pink-100 dark:border-pink-500/20 shadow-sm">
+                          <span className="flex items-center gap-1.5 font-bold text-pink-600 dark:text-pink-400 bg-pink-50 dark:bg-pink-500/10 px-2.5 py-0.5 rounded-md border border-pink-100 dark:border-pink-500/20 shadow-xs">
                             <Clock className="h-3.5 w-3.5" />
                             Límite: {new Date(forumConfig.dueDate).toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true })}
                           </span>
+                        ) : activeLesson.dueDate ? (
+                          <span className="flex items-center gap-1.5 font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 px-2.5 py-0.5 rounded-md border border-amber-100 dark:border-amber-500/20 shadow-xs">
+                            <Clock className="h-3.5 w-3.5" />
+                            Límite: {new Date(activeLesson.dueDate).toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true })}
+                          </span>
                         ) : (
-                          <span className="flex items-center gap-1.5"><span className="opacity-70"><Calendar className="h-3.5 w-3.5" /></span> Sin fecha límite</span>
+                          <span className="flex items-center gap-1.5 text-slate-400">
+                            <Clock className="h-3.5 w-3.5 opacity-60" /> Sin fecha límite
+                          </span>
                         )}
                       </div>
                     </div>
@@ -2001,6 +2054,76 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
                       </div>
                     )}
 
+                    {/* Guía o Taller adjunto por el Docente */}
+                    {activeLesson.type === 'task' && activeLesson.taskAttachment && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="rounded-2xl border-2 border-dashed border-blue-200 dark:border-blue-800/60 bg-gradient-to-br from-blue-50/70 via-white to-indigo-50/40 dark:from-blue-950/20 dark:via-slate-900 dark:to-indigo-950/20 p-5 sm:p-6 shadow-sm"
+                      >
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                          <div className="flex items-start gap-3.5 min-w-0">
+                            <div className="h-12 w-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-blue-500/20">
+                              <FileText className="h-6 w-6" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
+                                  <Paperclip className="h-3 w-3" /> Documento Adjunto
+                                </span>
+                                {activeLesson.taskAttachment.size && (
+                                  <span className="text-[11px] text-slate-400 dark:text-slate-500">
+                                    • {activeLesson.taskAttachment.size}
+                                  </span>
+                                )}
+                              </div>
+                              <h4 className="text-base font-bold text-slate-900 dark:text-white mt-1.5 truncate">
+                                {activeLesson.taskAttachment.name}
+                              </h4>
+                              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                Revisa o descarga este documento adjunto correspondiente a la actividad.
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+                            {activeLesson.taskAttachment.url && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (activeLesson.taskAttachment?.url) {
+                                    setPreviewAttachment({
+                                      title: activeLesson.taskAttachment.name,
+                                      driveUrl: activeLesson.taskAttachment.url,
+                                      downloadUrl: activeLesson.taskAttachment.downloadUrl
+                                    })
+                                    setIsPdfModalOpen(true)
+                                  }
+                                }}
+                                className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750 text-xs font-bold transition-all shadow-xs cursor-pointer"
+                              >
+                                <Eye className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                <span>Visualizar</span>
+                              </button>
+                            )}
+
+                            {(activeLesson.taskAttachment.downloadUrl || activeLesson.taskAttachment.url) && (
+                              <a
+                                href={activeLesson.taskAttachment.downloadUrl || activeLesson.taskAttachment.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                download
+                                className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-sm shadow-blue-500/20 active:scale-[0.98] cursor-pointer"
+                              >
+                                <Download className="h-4 w-4" />
+                                <span>Descargar Documento</span>
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+
                     {/* 4. Entrega de Tareas (Nuevo) */}
                     {activeLesson.type === 'task' && (
                       <motion.div
@@ -2018,6 +2141,52 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
                               {activeLesson.submissionType === 'file' ? 'Sube tu documento para que el profesor lo evalúe.' : 'Escribe tu respuesta a continuación.'}
                             </p>
                           </div>
+                        </div>
+
+                        {/* Franja de Fechas: Publicación y Entrega */}
+                        <div className="flex flex-wrap items-center gap-4 sm:gap-8 p-3.5 mb-6 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-xs">
+                          {(activeLesson.createdAt || activeLesson.publishedAt) && (
+                            <div className="flex items-center gap-2.5">
+                              <div className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 shrink-0">
+                                <Calendar className="h-4 w-4" />
+                              </div>
+                              <div>
+                                <span className="block text-[10px] text-slate-400 font-medium">Fecha de publicación</span>
+                                <span className="font-bold text-slate-700 dark:text-slate-200">
+                                  {new Date(activeLesson.createdAt || activeLesson.publishedAt!).toLocaleDateString('es-ES', {
+                                    day: 'numeric',
+                                    month: 'long',
+                                    year: 'numeric'
+                                  })}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+
+                          {activeLesson.dueDate ? (
+                            <div className="flex items-center gap-2.5">
+                              <div className="p-1.5 rounded-lg bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 shrink-0">
+                                <Clock className="h-4 w-4" />
+                              </div>
+                              <div>
+                                <span className="block text-[10px] text-amber-600 dark:text-amber-400 font-semibold uppercase tracking-wider">Fecha límite de entrega</span>
+                                <span className="font-extrabold text-amber-700 dark:text-amber-300">
+                                  {new Date(activeLesson.dueDate).toLocaleString('es-ES', {
+                                    day: 'numeric',
+                                    month: 'short',
+                                    year: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })}
+                                </span>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 text-slate-400">
+                              <Clock className="h-4 w-4 opacity-50 shrink-0" />
+                              <span className="text-xs">Sin fecha límite asignada</span>
+                            </div>
+                          )}
                         </div>
 
                     {(activeLesson.status === 'submitted' || activeLesson.status === 'completed' || activeLesson.status === 'graded') && (activeLesson.submissionType === 'file' || activeLesson.submissionText) ? (
@@ -3096,13 +3265,16 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
       </AnimatePresence>
 
       {/* PDF Viewer Modal */}
-      {isPdfModalOpen && activeLesson && activeLesson.type === 'file' && (
+      {isPdfModalOpen && (previewAttachment || (activeLesson && activeLesson.type === 'file')) && (
         <PdfViewer
-          title={activeLesson.title}
-          driveUrl={activeLesson.driveUrl || "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"}
-          driveDownloadUrl={activeLesson.driveUrl || "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"}
+          title={previewAttachment?.title || activeLesson?.title || 'Documento'}
+          driveUrl={previewAttachment?.driveUrl || activeLesson?.driveUrl || "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"}
+          driveDownloadUrl={previewAttachment?.downloadUrl || previewAttachment?.driveUrl || activeLesson?.driveUrl || "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"}
           isModal={true}
-          onClose={() => setIsPdfModalOpen(false)}
+          onClose={() => {
+            setIsPdfModalOpen(false)
+            setPreviewAttachment(null)
+          }}
         />
       )}
     </div>

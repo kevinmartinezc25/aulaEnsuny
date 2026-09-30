@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { Users, FolderOpen, TrendingUp, HelpCircle } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { getTeacherCourseStats, TeacherCourseStats } from '../../application/teacherActions'
@@ -37,6 +38,13 @@ export function TeacherCourseDashboardScreen({ courseId }: { courseId: string })
     )
   }
 
+  const statCards = [
+    { title: 'Módulos activos', value: stats.modulesCount, icon: FolderOpen, color: 'text-blue-500 bg-blue-50 dark:bg-blue-950/30', href: `/teacher/courses/${courseId}/modules` },
+    { title: 'Quizzes creados', value: stats.quizzesCount, icon: HelpCircle, color: 'text-purple-500 bg-purple-50 dark:bg-purple-950/30', href: `/teacher/courses/${courseId}/quizzes` },
+    { title: 'Estudiantes', value: stats.studentsCount, icon: Users, color: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-950/30', href: `/teacher/courses/${courseId}/students` },
+    { title: 'Promedio del curso', value: stats.averageGrade.toFixed(1), icon: TrendingUp, color: 'text-amber-500 bg-amber-50 dark:bg-amber-950/30', href: `/teacher/courses/${courseId}/grades` },
+  ]
+
   return (
     <div className="space-y-8">
       {/* Cabecera Interna */}
@@ -68,24 +76,20 @@ export function TeacherCourseDashboardScreen({ courseId }: { courseId: string })
 
       {/* Grid de Estadísticas */}
       <div className="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4">
-        {[
-          { title: 'Módulos activos', value: stats.modulesCount, icon: FolderOpen, color: 'text-blue-500 bg-blue-50 dark:bg-blue-950/30' },
-          { title: 'Quizzes creados', value: stats.quizzesCount, icon: HelpCircle, color: 'text-purple-500 bg-purple-50 dark:bg-purple-950/30' },
-          { title: 'Estudiantes', value: stats.studentsCount, icon: Users, color: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-950/30' },
-          { title: 'Promedio del curso', value: stats.averageGrade.toFixed(1), icon: TrendingUp, color: 'text-amber-500 bg-amber-50 dark:bg-amber-950/30' },
-        ].map((stat) => {
+        {statCards.map((stat) => {
           const Icon = stat.icon
           return (
-            <div
+            <Link
               key={stat.title}
-              className="rounded-2xl border border-slate-100 bg-white p-3.5 sm:p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] dark:border-slate-800/60 dark:bg-slate-900"
+              href={stat.href}
+              className="group block rounded-2xl border border-slate-100 bg-white p-3.5 sm:p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] hover:shadow-md hover:border-slate-200 dark:border-slate-800/60 dark:bg-slate-900 dark:hover:border-slate-700 transition-all active:scale-[0.98]"
             >
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
-                <div className={`flex h-9 w-9 sm:h-11 sm:w-11 items-center justify-center rounded-xl shrink-0 ${stat.color}`}>
+                <div className={`flex h-9 w-9 sm:h-11 sm:w-11 items-center justify-center rounded-xl shrink-0 ${stat.color} group-hover:scale-105 transition-transform`}>
                   <Icon className="h-4.5 w-4.5 sm:h-5 sm:w-5" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-[10px] sm:text-xs font-medium text-slate-400 dark:text-slate-500 truncate sm:whitespace-normal">
+                  <p className="text-[10px] sm:text-xs font-medium text-slate-400 dark:text-slate-500 truncate sm:whitespace-normal group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                     {stat.title}
                   </p>
                   <p className="text-lg sm:text-2xl font-bold text-slate-900 dark:text-white mt-0.5">
@@ -93,7 +97,7 @@ export function TeacherCourseDashboardScreen({ courseId }: { courseId: string })
                   </p>
                 </div>
               </div>
-            </div>
+            </Link>
           )
         })}
       </div>
