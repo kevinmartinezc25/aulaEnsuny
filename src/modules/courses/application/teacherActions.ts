@@ -992,12 +992,27 @@ export async function getTeacherSubmissionsData(courseId: string) {
     .select('*')
     .eq('course_id', courseId)
 
+  // 8. Fetch student_lesson_grades (including grade and feedback)
+  const taskLessonIds = (taskLessons || []).map(t => t.id)
+  let lessonGradesQuery = supabase
+    .from('student_lesson_grades')
+    .select('student_id, lesson_id, grade, feedback')
+
+  if (taskLessonIds.length > 0) {
+    lessonGradesQuery = lessonGradesQuery.or(`course_id.eq.${courseId},lesson_id.in.(${taskLessonIds.join(',')})`)
+  } else {
+    lessonGradesQuery = lessonGradesQuery.eq('course_id', courseId)
+  }
+
+  const { data: lessonGrades } = await lessonGradesQuery
+
   return {
     quizzes,
     taskLessons,
     quizAttempts,
     progressData,
-    gradesData: gradesData || []
+    gradesData: gradesData || [],
+    lessonGrades: lessonGrades || []
   }
 }
 
