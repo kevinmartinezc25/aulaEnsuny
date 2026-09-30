@@ -40,11 +40,31 @@ type Submission = {
   date: string
   status: 'pending' | 'graded' | 'draft'
   grade?: number
+  feedback?: string
   fileType: 'pdf' | 'doc' | 'quiz'
   fileName: string
   submissionText?: string
   isLate: boolean
   gradeType?: 'quiz' | 'task' | 'workshop' | 'activity'
+}
+
+/**
+ * Retorna las clases de estilo según la escala de calificaciones:
+ * - Menos de 3.0: Rojo
+ * - Entre 3.0 y 3.9: Amarillo
+ * - 4.0 o superior: Verde
+ */
+function getGradeBadgeClasses(grade?: number): string {
+  if (grade === undefined || grade === null || isNaN(grade)) {
+    return 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'
+  }
+  if (grade < 3.0) {
+    return 'bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-950/40 dark:text-red-400 dark:hover:bg-red-900/40 border border-red-200 dark:border-red-900/50'
+  }
+  if (grade <= 3.9) {
+    return 'bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:hover:bg-amber-900/40 border border-amber-200 dark:border-amber-900/50'
+  }
+  return 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/40 border border-emerald-200 dark:border-emerald-900/50'
 }
 
 const formatStudentName = (student: any) => {
@@ -100,7 +120,7 @@ export function TeacherCourseSubmissionsScreen({ courseId }: { courseId: string 
         setStudents(mappedStudents)
 
         // 3. Fetch submissions data from server action (bypasses RLS)
-        const { quizzes, taskLessons, quizAttempts, progressData, gradesData } = await getTeacherSubmissionsData(courseId)
+        const { quizzes, taskLessons, quizAttempts, progressData, gradesData, lessonGrades } = await getTeacherSubmissionsData(courseId)
 
         const defaultCategoryId = courseSettings.categories[0]?.id || 'default_cat'
 
@@ -138,21 +158,20 @@ export function TeacherCourseSubmissionsScreen({ courseId }: { courseId: string 
         }))
         allSubmissions = [...allSubmissions, ...mappedQuizSubs]
 
-        // Task progress entries — check student_lesson_grades for existing grades
-        const supabaseClient = createClient()
-        const { data: lessonGradesData } = await supabaseClient
-          .from('student_lesson_grades')
-          .select('student_id, lesson_id, grade')
-          .eq('course_id', courseId)
-
-        const lessonGradesMap = new Map<string, number>();
-        (lessonGradesData || []).forEach((g: any) => {
-          lessonGradesMap.set(`${g.student_id}_${g.lesson_id}`, Number(g.grade))
+        // Task progress entries — check student_lesson_grades for existing grades and feedback
+        const lessonGradesMap = new Map<string, { grade: number; feedback?: string }>();
+        (lessonGrades || []).forEach((g: any) => {
+          lessonGradesMap.set(`${g.student_id}_${g.lesson_id}`, {
+            grade: Number(g.grade),
+            feedback: g.feedback || ''
+          })
         })
 
         const mappedTaskSubs = (progressData || []).map(prog => {
           const lesson = taskLessons.find(t => t.id === prog.lesson_id)
-          const existingGrade = lessonGradesMap.get(`${prog.student_id}_${prog.lesson_id}`)
+          const existingGradeObj = lessonGradesMap.get(`${prog.student_id}_${prog.lesson_id}`)
+          const existingGrade = existingGradeObj?.grade
+          const existingFeedback = existingGradeObj?.feedback || ''
           const titleLower = (lesson?.title || '').toLowerCase()
           let gradeType: 'task' | 'workshop' | 'activity' = 'task'
           if (titleLower.includes('taller')) gradeType = 'workshop'
@@ -166,6 +185,7 @@ export function TeacherCourseSubmissionsScreen({ courseId }: { courseId: string 
             date: new Date(prog.completed_at || prog.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }),
             status: existingGrade !== undefined ? ('graded' as const) : ('pending' as const),
             grade: existingGrade,
+            feedback: existingFeedback,
             fileType: 'doc' as const,
             fileName: prog.submission_text ? 'Texto en Línea' : 'Archivo de Entrega',
             submissionText: prog.submission_text || '',
@@ -173,8 +193,34 @@ export function TeacherCourseSubmissionsScreen({ courseId }: { courseId: string 
             gradeType
           }
         })
-        allSubmissions = [...allSubmissions, ...mappedTaskSubs]
 
+        // Also include manual evaluations that don't have a progress entry
+        const progressKeys = new Set((progressData || []).map((p: any) => `${p.student_id}_${p.lesson_id}`))
+        const manualSubs: Submission[] = []
+        ;(lessonGrades || []).forEach((g: any) => {
+          const key = `${g.student_id}_${g.lesson_id}`
+          if (!progressKeys.has(key)) {
+            const lesson = taskLessons.find(t => t.id === g.lesson_id)
+            if (lesson) {
+              manualSubs.push({
+                id: `manual_${g.student_id}_${g.lesson_id}`,
+                studentId: g.student_id,
+                assignmentId: g.lesson_id,
+                lessonId: g.lesson_id,
+                date: 'Calificado',
+                status: 'graded' as const,
+                grade: Number(g.grade),
+                feedback: g.feedback || '',
+                fileType: 'doc' as const,
+                fileName: 'Calificación Manual',
+                isLate: false,
+                gradeType: 'task'
+              })
+            }
+          }
+        })
+
+        allSubmissions = [...allSubmissions, ...mappedTaskSubs, ...manualSubs]
         setSubmissions(allSubmissions)
 
       } catch (err) {
@@ -212,22 +258,30 @@ export function TeacherCourseSubmissionsScreen({ courseId }: { courseId: string 
     const sub = submissions.find(s => s.id === submissionId)
     if (sub) {
       setActiveSubmissionId(sub.id)
-      setTempGrade(sub.grade ? sub.grade.toString() : '')
-      setTempFeedback('')
+      setTempGrade(sub.grade !== undefined && sub.grade !== null ? sub.grade.toString() : '')
+      setTempFeedback(sub.feedback || '')
     }
   }
 
   const handleCreateEmptyAndGrade = (studentId: string, assignmentId: string) => {
+    const existingSub = submissions.find(s => s.studentId === studentId && s.assignmentId === assignmentId)
+    if (existingSub) {
+      handleOpenGrader(existingSub.id)
+      return
+    }
+
     const newId = `temp_${Date.now()}`
     const newSub: Submission = {
       id: newId,
       studentId,
       assignmentId,
+      lessonId: assignmentId,
       date: 'No enviado',
       status: 'pending',
-      fileType: 'pdf',
+      fileType: 'doc',
       fileName: 'Sin_Archivo',
-      isLate: true
+      isLate: true,
+      feedback: ''
     }
     setSubmissions(prev => [...prev, newSub])
     
@@ -307,7 +361,7 @@ export function TeacherCourseSubmissionsScreen({ courseId }: { courseId: string 
 
     setSubmissions(prev => prev.map(s => 
       s.id === activeSubmissionId 
-        ? { ...s, status: isDraft ? 'draft' : 'graded', grade: gradeValue }
+        ? { ...s, status: isDraft ? 'draft' : 'graded', grade: gradeValue, feedback: tempFeedback }
         : s
     ))
     
@@ -385,18 +439,34 @@ export function TeacherCourseSubmissionsScreen({ courseId }: { courseId: string 
         
         {/* Toolbar & Filters */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 p-4 gap-4 dark:border-slate-800/60 shrink-0">
-          <div className="flex items-center gap-3">
-            <Filter className="h-5 w-5 text-slate-400" />
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm font-medium outline-none focus:border-indigo-500 focus:bg-white dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:focus:border-indigo-500"
-            >
-              <option value="all">Todas las Categorías</option>
-              {settings.categories.map(cat => (
-                <option key={cat.id} value={cat.id}>{cat.name}</option>
-              ))}
-            </select>
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Filter className="h-5 w-5 text-slate-400" />
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm font-medium outline-none focus:border-indigo-500 focus:bg-white dark:border-slate-700 dark:bg-slate-800/50 dark:text-white dark:focus:border-indigo-500"
+              >
+                <option value="all">Todas las Categorías</option>
+                {settings.categories.map(cat => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Escala de colores institucional */}
+            <div className="hidden lg:flex items-center gap-1.5 text-xs font-semibold pl-2 border-l border-slate-200 dark:border-slate-700">
+              <span className="text-[11px] text-slate-400 font-medium mr-1">Escala:</span>
+              <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400 border border-red-200 dark:border-red-900/50">
+                &lt; 3.0 Bajo
+              </span>
+              <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-900/50">
+                3.0 - 3.9 Básico
+              </span>
+              <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/50">
+                4.0 - 5.0 Alto/Sup.
+              </span>
+            </div>
           </div>
 
           <div className="flex items-center gap-4 w-full sm:w-auto">
@@ -479,9 +549,9 @@ export function TeacherCourseSubmissionsScreen({ courseId }: { courseId: string 
                           ) : submission.status === 'graded' ? (
                             <button 
                               onClick={() => handleOpenGrader(submission.id)}
-                              className="inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-sm font-bold bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors dark:bg-emerald-500/10 dark:text-emerald-400 dark:hover:bg-emerald-500/20"
+                              className={`inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-sm font-bold transition-colors cursor-pointer shadow-2xs ${getGradeBadgeClasses(submission.grade)}`}
                             >
-                              {submission.grade?.toFixed(1)} / 5.0
+                              {submission.grade !== undefined && submission.grade !== null ? submission.grade.toFixed(1) : '-'} / 5.0
                             </button>
                           ) : submission.status === 'draft' ? (
                             <button 
@@ -567,9 +637,9 @@ export function TeacherCourseSubmissionsScreen({ courseId }: { courseId: string 
                             ) : submission.status === 'graded' ? (
                               <button 
                                 onClick={() => handleOpenGrader(submission.id)}
-                                className="inline-flex items-center justify-center rounded-lg px-2.5 py-1.5 text-[11px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400"
+                                className={`inline-flex items-center justify-center rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition-colors cursor-pointer shadow-2xs ${getGradeBadgeClasses(submission.grade)}`}
                               >
-                                {submission.grade?.toFixed(1)} / 5.0
+                                {submission.grade !== undefined && submission.grade !== null ? submission.grade.toFixed(1) : '-'} / 5.0
                               </button>
                             ) : submission.status === 'draft' ? (
                               <button 

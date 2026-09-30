@@ -25,11 +25,10 @@ import {
   DisciplinarySituation,
   StudentDisciplinaryHistory,
   createDisciplinaryReport,
-  getStudentDisciplinaryHistory,
-  getTeacherAssignedGroups
+  getStudentDisciplinaryHistory
 } from '@/modules/disciplinary/application/actions'
 import { getSituations } from '@/modules/disciplinary/application/situationsActions'
-import { StudentSearchField } from '@/components/disciplinary/StudentSearchField'
+import { TeacherWorkloadStudentSelector } from '@/components/disciplinary/TeacherWorkloadStudentSelector'
 import { SituationSearchField } from '@/components/disciplinary/SituationSearchField'
 import { ReportPreviewDocument } from '@/components/disciplinary/ReportPreviewDocument'
 import { SignatureCanvas, SignatureCanvasRef } from '@/components/disciplinary/SignatureCanvas'
@@ -132,9 +131,6 @@ export function DisciplinaryReportFormScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const [showConfidentiality, setShowConfidentiality] = useState(true)
-  const [teacherGroups, setTeacherGroups] = useState<{ id: string; name: string; level: string }[]>([])
-  const [selectedGroupName, setSelectedGroupName] = useState<string>('')
-  const [groupsLoading, setGroupsLoading] = useState(true)
 
   // Cargar catálogo de situaciones activas al inicio
   useEffect(() => {
@@ -143,16 +139,6 @@ export function DisciplinaryReportFormScreen() {
       setSituations(data)
     }
     loadSituations()
-  }, [])
-
-  // Cargar grupos del docente
-  useEffect(() => {
-    async function loadGroups() {
-      const groups = await getTeacherAssignedGroups()
-      setTeacherGroups(groups)
-      setGroupsLoading(false)
-    }
-    loadGroups()
   }, [])
 
   // Cargar historial del estudiante al seleccionarlo
@@ -312,48 +298,14 @@ export function DisciplinaryReportFormScreen() {
                 Paso 1: Seleccionar Estudiante
               </h2>
               <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-                Busca al estudiante involucrado. Puedes filtrar rápidamente por tus grupos asignados.
+                Selecciona al estudiante involucrado según tu carga académica de horarios o realiza una búsqueda rápida.
               </p>
             </div>
 
-            <div className="rounded-2xl border border-slate-200/90 dark:border-white/10 bg-slate-50/50 dark:bg-slate-800/30 p-4 sm:p-6 space-y-5">
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-2 flex items-center gap-1.5">
-                  <Users className="h-4 w-4 text-blue-500" />
-                  <span>Filtrar por Grupo Asignado</span>
-                </label>
-                <div className="flex items-center gap-2">
-                  <select
-                    value={selectedGroupName}
-                    onChange={(e) => {
-                      setSelectedGroupName(e.target.value)
-                      setStudent(null)
-                    }}
-                    disabled={groupsLoading || teacherGroups.length === 0}
-                    className="w-full sm:w-1/2 rounded-xl border border-slate-200/90 dark:border-white/10 bg-white dark:bg-slate-900 px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
-                  >
-                    <option value="">Todos mis grupos</option>
-                    {teacherGroups.map((g) => (
-                      <option key={g.id} value={g.name}>
-                        {g.name} ({g.level})
-                      </option>
-                    ))}
-                  </select>
-                  {groupsLoading && <span className="text-xs text-slate-400">Cargando grupos...</span>}
-                </div>
-              </div>
-
-              <div className="pt-2 border-t border-slate-200/60 dark:border-white/5">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-2">
-                  Buscar Estudiante
-                </label>
-                <StudentSearchField
-                  value={student}
-                  onChange={setStudent}
-                  groupName={selectedGroupName || undefined}
-                />
-              </div>
-            </div>
+            <TeacherWorkloadStudentSelector
+              value={student}
+              onChange={setStudent}
+            />
 
             {historyLoading && (
               <div className="animate-pulse bg-slate-100 dark:bg-slate-800 h-28 rounded-2xl" />
