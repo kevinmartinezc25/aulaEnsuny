@@ -1632,7 +1632,7 @@ export async function getTeacherDashboardOverview(): Promise<TeacherDashboardOve
   }
 }
 
-export async function getTeacherTodaySchedule(userId: string): Promise<{ schedule: any[], nextClass: any | null, isWeekend: boolean }> {
+export async function getTeacherTodaySchedule(userId: string): Promise<{ schedule: any[], currentClass: any | null, nextClass: any | null, isWeekend: boolean }> {
   try {
     const adminClient = createAdminClient()
     const now = new Date()
@@ -1643,7 +1643,7 @@ export async function getTeacherTodaySchedule(userId: string): Promise<{ schedul
     const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
 
     if (isWeekend) {
-      return { schedule: [], nextClass: null, isWeekend: true }
+      return { schedule: [], currentClass: null, nextClass: null, isWeekend: true }
     }
 
     const { data: academicTeacher } = await adminClient
@@ -1653,7 +1653,7 @@ export async function getTeacherTodaySchedule(userId: string): Promise<{ schedul
       .single()
 
     if (!academicTeacher) {
-      return { schedule: [], nextClass: null, isWeekend: false }
+      return { schedule: [], currentClass: null, nextClass: null, isWeekend: false }
     }
 
     // Usar la fecha local de Bogotá en formato YYYY-MM-DD
@@ -1682,7 +1682,7 @@ export async function getTeacherTodaySchedule(userId: string): Promise<{ schedul
     }
     
     if (!daySlots) {
-      return { schedule: [], nextClass: null, isWeekend: false }
+      return { schedule: [], currentClass: null, nextClass: null, isWeekend: false }
     }
 
     daySlots.sort((a: any, b: any) => parseInt(a.period_id) - parseInt(b.period_id))
@@ -1742,7 +1742,7 @@ export async function getTeacherTodaySchedule(userId: string): Promise<{ schedul
     }
 
     const nowTimeStr = bogotaDate.toTimeString().substring(0,5)
-    let foundCurrent = false
+    let currentClass = null
     let nextClass = null
 
     for (let i = 0; i < fullDaySlots.length; i++) {
@@ -1750,7 +1750,9 @@ export async function getTeacherTodaySchedule(userId: string): Promise<{ schedul
       if (slot.startTime && slot.endTime) {
         if (nowTimeStr >= slot.startTime && nowTimeStr <= slot.endTime) {
           slot.isCurrent = true
-          foundCurrent = true
+          if (!slot.isFree) {
+            currentClass = { ...slot, isCurrent: true }
+          }
           for (let j = i + 1; j < fullDaySlots.length; j++) {
             if (!fullDaySlots[j].isFree) {
               nextClass = fullDaySlots[j]
@@ -1762,7 +1764,7 @@ export async function getTeacherTodaySchedule(userId: string): Promise<{ schedul
       }
     }
 
-    if (!foundCurrent) {
+    if (!currentClass) {
       for (let i = 0; i < fullDaySlots.length; i++) {
         if (fullDaySlots[i].startTime && nowTimeStr < fullDaySlots[i].startTime && !fullDaySlots[i].isFree) {
           nextClass = fullDaySlots[i]
@@ -1771,10 +1773,10 @@ export async function getTeacherTodaySchedule(userId: string): Promise<{ schedul
       }
     }
 
-    return { schedule: fullDaySlots, nextClass, isWeekend: false }
+    return { schedule: fullDaySlots, currentClass, nextClass, isWeekend: false }
   } catch (error) {
     console.error('Error fetching today schedule:', error)
-    return { schedule: [], nextClass: null, isWeekend: false }
+    return { schedule: [], currentClass: null, nextClass: null, isWeekend: false }
   }
 }
 

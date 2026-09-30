@@ -47,6 +47,7 @@ export default async function TeacherDashboardPage() {
       initialCourses={initialOverview?.courses}
       initialStats={initialOverview?.stats}
       initialTodaySchedule={initialScheduleData?.schedule}
+      initialCurrentClass={initialScheduleData?.currentClass}
       initialNextClass={initialScheduleData?.nextClass}
       initialIsWeekend={initialScheduleData?.isWeekend}
     />

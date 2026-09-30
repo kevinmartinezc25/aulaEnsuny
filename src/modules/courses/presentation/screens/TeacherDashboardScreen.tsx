@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
-import { BookOpen, Users, BrainCircuit, FileText, Upload, Save, X, Edit, Eye, Play, Loader2, Calendar, Clock, CheckCircle2, Search, Filter } from 'lucide-react'
+import { BookOpen, Users, BrainCircuit, FileText, Upload, Save, X, Edit, Eye, Play, Loader2, Calendar, Clock, CheckCircle2, Search, Filter, ArrowRight, Sparkles } from 'lucide-react'
 import { createClient } from '@/core/config/supabase/client'
 import { getTeacherDashboardOverview, TeacherDashboardCourse } from '@/modules/courses/application/teacherActions'
 
@@ -20,6 +20,7 @@ export interface TeacherDashboardProps {
   initialCourses?: TeacherDashboardCourse[];
   initialStats?: any;
   initialTodaySchedule?: any[];
+  initialCurrentClass?: any | null;
   initialNextClass?: any | null;
   initialIsWeekend?: boolean;
 }
@@ -35,9 +36,10 @@ export function TeacherDashboardScreen(props: TeacherDashboardProps) {
     avgGrade: '—'
   })
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([])
-  const [todaySchedule, setTodaySchedule] = useState<any[]>([])
-  const [isWeekend, setIsWeekend] = useState(false)
-  const [nextClass, setNextClass] = useState<any | null>(null)
+  const [todaySchedule, setTodaySchedule] = useState<any[]>(props.initialTodaySchedule || [])
+  const [isWeekend, setIsWeekend] = useState(props.initialIsWeekend || false)
+  const [currentClass, setCurrentClass] = useState<any | null>(props.initialCurrentClass || null)
+  const [nextClass, setNextClass] = useState<any | null>(props.initialNextClass || null)
   const [completedClasses, setCompletedClasses] = useState(0)
   const [totalClasses, setTotalClasses] = useState(0)
 
@@ -107,6 +109,82 @@ export function TeacherDashboardScreen(props: TeacherDashboardProps) {
     }
   }, [searchParams])
 
+  // Función para evaluar clase en curso y siguiente clase a partir del horario
+  const evaluateSchedule = React.useCallback((slots: any[]) => {
+    if (!slots || slots.length === 0) {
+      return { updatedSlots: [], curr: null, next: null, completed: 0, total: 0 }
+    }
+
+    const now = new Date()
+    const currentMinutes = now.getHours() * 60 + now.getMinutes()
+    let curr: any = null
+    let next: any = null
+    let completed = 0
+
+    const updatedSlots = slots.map((cls) => {
+      let isOngoing = false
+      let startMins = 0
+      let endMins = 0
+
+      if (cls.startTime && cls.startTime.includes(':')) {
+        const [sh, sm] = cls.startTime.split(':')
+        startMins = parseInt(sh, 10) * 60 + parseInt(sm, 10)
+
+        endMins = startMins + 55
+        if (cls.endTime && cls.endTime.includes(':')) {
+          const [eh, em] = cls.endTime.split(':')
+          endMins = parseInt(eh, 10) * 60 + parseInt(em, 10)
+        }
+
+        isOngoing = currentMinutes >= startMins && currentMinutes <= endMins
+
+        if (currentMinutes >= endMins && !cls.isFree) {
+          completed++
+        }
+
+        if (isOngoing && !cls.isFree && !curr) {
+          const duration = Math.max(1, endMins - startMins)
+          const elapsed = Math.max(0, currentMinutes - startMins)
+          const remaining = Math.max(0, endMins - currentMinutes)
+          const progress = Math.min(100, Math.round((elapsed / duration) * 100))
+          curr = { ...cls, isOngoing: true, startMins, endMins, duration, elapsed, remaining, progress }
+        }
+      }
+
+      return { ...cls, isCurrent: isOngoing }
+    })
+
+    // Buscar la siguiente clase no libre posterior al horario actual
+    for (const cls of updatedSlots) {
+      if (!cls.isFree && cls.startTime && cls.startTime.includes(':')) {
+        const [sh, sm] = cls.startTime.split(':')
+        const startMins = parseInt(sh, 10) * 60 + parseInt(sm, 10)
+
+        if (curr) {
+          if (cls.period > curr.period || startMins >= (curr.endMins || 0)) {
+            next = cls
+            break
+          }
+        } else {
+          if (startMins > currentMinutes) {
+            next = cls
+            break
+          }
+        }
+      }
+    }
+
+    const total = updatedSlots.filter((s: any) => !s.isFree).length
+
+    return {
+      updatedSlots,
+      curr,
+      next,
+      completed,
+      total
+    }
+  }, [])
+
   // Carga de datos dinámicos desde Supabase o fallback a Mock en Modo Demo
   useEffect(() => {
     async function loadTeacherData() {
@@ -166,40 +244,15 @@ export function TeacherDashboardScreen(props: TeacherDashboardProps) {
               setIsWeekend(props.initialIsWeekend)
             }
             if (props.initialTodaySchedule && props.initialTodaySchedule.length > 0) {
-              const fullDaySlots = [...props.initialTodaySchedule]
-              const now = new Date()
-              const currentMinutes = now.getHours() * 60 + now.getMinutes()
-              let next = null
-              let completed = 0
-
-              for (const cls of fullDaySlots) {
-                if (cls.startTime && cls.startTime.includes(':')) {
-                   const [sh, sm] = cls.startTime.split(':')
-                   const startMins = parseInt(sh, 10) * 60 + parseInt(sm, 10)
-                   
-                   let endMins = startMins + 55
-                   if (cls.endTime && cls.endTime.includes(':')) {
-                     const [eh, em] = cls.endTime.split(':')
-                     endMins = parseInt(eh, 10) * 60 + parseInt(em, 10)
-                   }
-                   
-                   const isOngoing = currentMinutes >= startMins && currentMinutes <= endMins
-                   cls.isCurrent = isOngoing
-
-                   if (currentMinutes >= endMins) {
-                     if (!cls.isFree) completed++
-                   }
-                   
-                   if (currentMinutes < endMins && !next && !cls.isFree) {
-                     next = { ...cls, isOngoing }
-                   }
-                }
-              }
-              
-              setTodaySchedule(fullDaySlots)
-              setNextClass(next || props.initialNextClass)
-              setCompletedClasses(completed)
-              setTotalClasses(fullDaySlots.filter(s => !s.isFree).length)
+              const res = evaluateSchedule(props.initialTodaySchedule)
+              setTodaySchedule(res.updatedSlots)
+              setCurrentClass(res.curr || props.initialCurrentClass || null)
+              setNextClass(res.next || props.initialNextClass || null)
+              setCompletedClasses(res.completed)
+              setTotalClasses(res.total)
+            } else if (props.initialNextClass || props.initialCurrentClass) {
+              setCurrentClass(props.initialCurrentClass || null)
+              setNextClass(props.initialNextClass || null)
             }
           } catch(e) {
             console.error('Error procesando horario de hoy:', e)
@@ -223,6 +276,19 @@ export function TeacherDashboardScreen(props: TeacherDashboardProps) {
 
     loadTeacherData()
   }, [])
+
+  // Actualizar periódicamente el estado de la clase en curso / tiempo restante cada minuto
+  useEffect(() => {
+    if (todaySchedule.length === 0) return
+    const timer = setInterval(() => {
+      const res = evaluateSchedule(todaySchedule)
+      setTodaySchedule(res.updatedSlots)
+      setCurrentClass(res.curr)
+      setNextClass(res.next)
+      setCompletedClasses(res.completed)
+    }, 60000)
+    return () => clearInterval(timer)
+  }, [todaySchedule, evaluateSchedule])
 
   // Validar y parsear URL de Youtube
   useEffect(() => {
@@ -319,38 +385,156 @@ export function TeacherDashboardScreen(props: TeacherDashboardProps) {
       {activeTab === 'general' && (
         <div className="space-y-8">
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {/* Próxima clase / Clase en Curso */}
-            <div className={`col-span-1 sm:col-span-2 rounded-2xl border p-6 text-white transition-all duration-300 ${
-              nextClass?.isOngoing
+            {/* Card Dual: Clase Actual (Gran parte del tamaño) + Siguiente Clase (Cápsula Flotante Embebida) */}
+            <div className={`col-span-1 sm:col-span-2 rounded-2xl border transition-all duration-300 relative text-white ${
+              currentClass
                 ? 'border-emerald-500 bg-gradient-to-r from-emerald-600 to-teal-700 shadow-[0_8px_30px_rgba(16,185,129,0.3)]'
                 : 'border-blue-500 bg-gradient-to-r from-blue-600 to-indigo-700 shadow-[0_8px_30px_rgba(59,130,246,0.3)]'
             }`}>
-              <p className={`text-[10px] font-bold uppercase tracking-widest mb-2 ${
-                nextClass?.isOngoing ? 'text-emerald-200' : 'text-blue-200'
-              }`}>
-                {nextClass?.isOngoing ? (
-                  'Clase en Curso'
-                ) : nextClass ? (
-                  'Siguiente Clase'
-                ) : (
-                  'Sin Asignación de Clases'
-                )}
-              </p>
-              <div className="flex items-center gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm border border-white/20">
-                  <Calendar className="h-6 w-6 text-white" />
+              <div className="flex flex-col md:flex-row items-stretch h-full p-2 sm:p-2.5 md:p-2.5 gap-2.5">
+                {/* PARTE PRINCIPAL: EN QUÉ CLASE ESTÁ (Gran parte del tamaño) */}
+                <div className="flex-1 p-3.5 sm:p-4 md:p-3.5 md:py-3 flex flex-col justify-between">
+                  <div>
+                    {/* Header: Estado y Badge */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 mb-2 sm:mb-2.5">
+                      <div className="flex items-center gap-2">
+                        {currentClass ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/25 border-2 border-white/40 text-white text-[10px] sm:text-[11px] font-extrabold tracking-wide backdrop-blur-md shadow-xs">
+                            <span className="relative flex h-2 w-2">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-300 opacity-90"></span>
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-200"></span>
+                            </span>
+                            AHORA • EN CURSO ({currentClass.period}ª HORA)
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/20 border-2 border-white/30 text-white text-[10px] sm:text-[11px] font-bold tracking-wide backdrop-blur-md">
+                            <Clock className="h-3 w-3 text-blue-200" />
+                            {isWeekend
+                              ? 'FIN DE SEMANA'
+                              : totalClasses > 0 && completedClasses >= totalClasses
+                                ? 'JORNADA CONCLUIDA'
+                                : 'AHORA • SIN CLASE ACTIVA'}
+                          </span>
+                        )}
+                      </div>
+
+                      {currentClass?.remaining !== undefined && currentClass.remaining > 0 && (
+                        <span className="text-[10px] sm:text-[11px] font-semibold text-emerald-100 bg-white/25 px-2 py-0.5 rounded-full border border-white/30 backdrop-blur-xs">
+                          Termina en ~{currentClass.remaining} min
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Contenido de la clase actual */}
+                    {currentClass ? (
+                      <div className="space-y-1">
+                        <h2 className="text-xl sm:text-2xl md:text-2xl font-extrabold tracking-tight text-white leading-tight">
+                          {currentClass.subject}
+                        </h2>
+                        <div className="flex flex-wrap items-center gap-2.5 text-xs sm:text-sm text-emerald-100 font-medium pt-0.5">
+                          <span className="inline-flex items-center gap-1 bg-white/20 px-2 py-0.5 rounded-lg border border-white/20 backdrop-blur-xs">
+                            <Users className="h-3 w-3 text-emerald-200" />
+                            Grupo {currentClass.group}
+                          </span>
+                          <span className="inline-flex items-center gap-1 bg-white/20 px-2 py-0.5 rounded-lg border border-white/20 backdrop-blur-xs">
+                            <Clock className="h-3 w-3 text-emerald-200" />
+                            {currentClass.startTime}{currentClass.endTime ? ` - ${currentClass.endTime}` : ''}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-0.5 py-0.5">
+                        <h2 className="text-lg sm:text-xl font-bold tracking-tight text-white">
+                          {isWeekend
+                            ? 'Día de Descanso'
+                            : totalClasses > 0 && completedClasses >= totalClasses
+                              ? '¡Jornada de Hoy Finalizada!'
+                              : 'Tiempo de Receso o Libre'}
+                        </h2>
+                        <p className="text-xs sm:text-[13px] text-blue-100 font-normal">
+                          {isWeekend
+                            ? 'No tienes clases programadas para el fin de semana.'
+                            : totalClasses > 0 && completedClasses >= totalClasses
+                              ? 'Has completado todas tus clases asignadas para el día de hoy.'
+                              : 'No estás impartiendo clase en este instante. Consulta tu siguiente clase en la tarjeta lateral.'}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Barra de progreso de la clase actual */}
+                  {currentClass && currentClass.progress !== undefined && (
+                    <div className="mt-2.5 pt-1.5">
+                      <div className="flex justify-between items-center text-[9px] sm:text-[10px] uppercase tracking-wider text-emerald-200 font-bold mb-1">
+                        <span>Progreso de la sesión</span>
+                        <span>{currentClass.progress}%</span>
+                      </div>
+                      <div className="w-full bg-white/20 rounded-full h-1.5 overflow-hidden">
+                        <div
+                          className="bg-white h-1.5 rounded-full transition-all duration-500 ease-out"
+                          style={{ width: `${currentClass.progress}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <h3 className="text-2xl font-bold">
-                    {nextClass ? nextClass.subject : 'Sin clases pendientes'}
-                  </h3>
-                  <p className={`text-sm font-medium ${
-                    nextClass?.isOngoing ? 'text-emerald-100' : 'text-blue-100'
+
+                {/* PARTE SECUNDARIA: CÁPSULA FLOTANTE EMBEBIDA EN VERDE COMPLETO SÓLIDO */}
+                <div className="md:w-60 lg:w-68 shrink-0 flex">
+                  <div className={`w-full rounded-2xl border-2 p-3 sm:p-3.5 md:p-3 md:py-3.5 flex flex-col justify-between transition-all shadow-xl ${
+                    currentClass
+                      ? 'bg-emerald-900 border-emerald-400 shadow-[0_10px_30px_rgba(6,78,59,0.6)]'
+                      : 'bg-emerald-600 border-emerald-300 shadow-[0_10px_30px_rgba(16,185,129,0.5)]'
                   }`}>
-                    {nextClass 
-                      ? `${nextClass.startTime}${nextClass.endTime ? ` - ${nextClass.endTime}` : ''} • Grupo ${nextClass.group}` 
-                      : (isWeekend ? 'Día libre por fin de semana' : 'Jornada completada o sin asignaciones hoy')}
-                  </p>
+                    <div>
+                      {/* Cabecera de la cápsula */}
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-950/40 border border-emerald-300/60 text-[10px] font-extrabold uppercase tracking-wider text-white shadow-xs">
+                          <Clock className="h-3 w-3 text-emerald-200" />
+                          <span>Próxima Clase</span>
+                        </span>
+                        <span className="text-[10px] sm:text-[11px] font-bold text-emerald-100 flex items-center gap-1">
+                          <span>Siguiente</span>
+                          <ArrowRight className="h-3 w-3 text-emerald-200" />
+                        </span>
+                      </div>
+
+                      {nextClass ? (
+                        <div className="space-y-1.5">
+                          <h3 className="text-sm sm:text-base font-bold text-white line-clamp-1 drop-shadow-xs">
+                            {nextClass.subject}
+                          </h3>
+                          <p className="text-xs text-emerald-100 font-medium flex items-center gap-1.5">
+                            <Users className="h-3.5 w-3.5 text-emerald-200" />
+                            Grupo {nextClass.group}
+                          </p>
+                          <div className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-bold text-white bg-emerald-950/40 px-2 py-0.5 rounded-md border border-emerald-300/50 mt-0.5 shadow-xs">
+                            <Clock className="h-3 w-3 text-emerald-200" />
+                            {nextClass.startTime}{nextClass.endTime ? ` - ${nextClass.endTime}` : ''}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-1 py-0.5">
+                          <p className="text-xs sm:text-sm font-semibold text-white flex items-center gap-1.5">
+                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-200 shrink-0" />
+                            Sin clases pendientes
+                          </p>
+                          <p className="text-[11px] text-emerald-100">
+                            {isWeekend ? 'Buen fin de semana.' : 'No hay más clases programadas hoy.'}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {nextClass && (
+                      <div className="pt-2 mt-2 border-t border-emerald-400/40 flex items-center justify-between text-[10px] sm:text-[11px] text-emerald-100 font-medium">
+                        <span>Horario regular</span>
+                        <span className="text-white font-extrabold bg-emerald-950/50 border border-emerald-300/60 px-2.5 py-0.5 rounded-md">
+                          {nextClass.period}ª Hora
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
