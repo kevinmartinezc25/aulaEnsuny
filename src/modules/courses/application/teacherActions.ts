@@ -71,7 +71,18 @@ export interface TeacherCourseStats {
   averageGrade: number
   activeStudents: number
   atRiskStudents: number
-  chartData: { name: string; promedio: number }[]
+  unassessedStudents: number
+  evaluatedStudents: number
+  chartData: {
+    name: string
+    range: string
+    label: string
+    desempeno: string
+    count: number
+    percentage: number
+    color: string
+    promedio?: number
+  }[]
 }
 
 export async function getTeacherCourseStats(courseId: string): Promise<TeacherCourseStats> {
@@ -96,6 +107,8 @@ export async function getTeacherCourseStats(courseId: string): Promise<TeacherCo
       averageGrade: 0,
       activeStudents: 0,
       atRiskStudents: 0,
+      unassessedStudents: 0,
+      evaluatedStudents: 0,
       chartData: []
     }
   }
@@ -131,144 +144,183 @@ export async function getTeacherCourseStats(courseId: string): Promise<TeacherCo
     }
   }
 
-  // 4. Fetch students count (matching student_courses with fallback to grade_level & group_name)
+  // 4. Fetch actual enrolled students (matching student_courses with fallback to grade_level & group_name)
   let studentsCount = 0
   const { data: enrolledData, error: enrollErr } = await supabase
     .from('student_courses')
     .select('student_id')
     .eq('course_id', courseId)
 
-  if (!enrollErr && enrolledData) {
+  if (!enrollErr && enrolledData && enrolledData.length > 0) {
     studentsCount = enrolledData.length
+  } else if (course.grade_level) {
+    // Fallback: Count students from profiles matching grade and group
+    let query = supabase
+      .from('profiles')
+      .select('id', { count: 'exact', head: true })
+      .eq('grade_level', course.grade_level)
+
+    if (course.group_name) {
+      query = query.eq('group_name', course.group_name)
+    }
+
+    const { count: groupStudentsCount } = await query
+    studentsCount = groupStudentsCount || 0
   }
 
 
-  // 5. Fetch gradebook/performance metrics
+  // 5. Fetch gradebook/performance metrics & student historical averages
   let activeStudents = studentsCount
   let atRiskStudents = 0
   let averageGrade = 0.0
 
+  const studentAverages: Record<string, { sum: number; count: number }> = {}
+
+  // 5.1 Fetch student_period_grades
   const { data: periodGrades } = await supabase
     .from('student_period_grades')
-    .select('final_grade')
+    .select('final_grade, student_id')
     .eq('course_id', courseId)
 
   if (periodGrades && periodGrades.length > 0) {
-    const sum = periodGrades.reduce((acc, curr) => acc + Number(curr.final_grade), 0)
-    averageGrade = sum / periodGrades.length
-    
-    activeStudents = periodGrades.filter(g => Number(g.final_grade) >= 3.0).length
-    atRiskStudents = periodGrades.filter(g => Number(g.final_grade) < 3.0).length
-  } else {
-    // Try student_lesson_grades table
-    const { data: stdGrades } = await supabase
-      .from('student_lesson_grades')
-      .select('grade, student_id')
-      .eq('course_id', courseId)
-    
-    if (stdGrades && stdGrades.length > 0) {
-      const sum = stdGrades.reduce((acc, curr) => acc + Number(curr.grade), 0)
-      averageGrade = sum / stdGrades.length
-
-      // Group by student to find pass/fail count
-      const studentAverages: Record<string, { sum: number, count: number }> = {}
-      stdGrades.forEach(g => {
+    periodGrades.forEach(g => {
+      if (g.student_id && g.final_grade !== null) {
         if (!studentAverages[g.student_id]) {
           studentAverages[g.student_id] = { sum: 0, count: 0 }
         }
-        studentAverages[g.student_id].sum += Number(g.grade)
+        studentAverages[g.student_id].sum += Number(g.final_grade)
         studentAverages[g.student_id].count++
-      })
+      }
+    })
+  }
 
-      let approved = 0
-      let atRisk = 0
-      
-      Object.values(studentAverages).forEach(student => {
-        const avg = student.sum / student.count
-        if (avg >= 3.0) approved++
-        else atRisk++
-      })
-      
-      // If some students have no grades, they are not counted in approved or atRisk yet, or we can count them as atRisk/unassessed.
-      // We will only count students with grades for the risk metric, or consider unassessed as active.
-      // Usually, it's better to show only assessed students, but to keep the bar full we can scale.
-      activeStudents = approved
-      atRiskStudents = atRisk
-    } else {
-      activeStudents = 0
-      atRiskStudents = 0
+  // 5.2 Fetch lesson grades
+  let lessonIds: string[] = []
+  if (modules && modules.length > 0) {
+    const moduleIds = modules.map(m => m.id)
+    const { data: lessons } = await supabase
+      .from('lessons')
+      .select('id')
+      .in('module_id', moduleIds)
+    if (lessons && lessons.length > 0) {
+      lessonIds = lessons.map(l => l.id)
     }
   }
 
-  // 6. Fetch chart data from student_period_grades
-  const chartData: { name: string; promedio: number }[] = []
-  const { data: periodGradesWithPeriods } = await supabase
-    .from('student_period_grades')
-    .select('final_grade, academic_periods(name)')
-    .eq('course_id', courseId)
-    
-  if (periodGradesWithPeriods && periodGradesWithPeriods.length > 0) {
-    const periodMap: Record<string, { sum: number; count: number }> = {}
-    periodGradesWithPeriods.forEach((pg: any) => {
-      const pName = pg.academic_periods?.name || 'General'
-      if (!periodMap[pName]) {
-        periodMap[pName] = { sum: 0, count: 0 }
-      }
-      periodMap[pName].sum += Number(pg.final_grade)
-      periodMap[pName].count++
-    })
-    
-    Object.entries(periodMap).forEach(([name, val]) => {
-      chartData.push({
-        name,
-        promedio: parseFloat((val.sum / val.count).toFixed(2))
-      })
-    })
+  let stdGradesQuery = supabase
+    .from('student_lesson_grades')
+    .select('grade, student_id')
+
+  if (lessonIds.length > 0) {
+    stdGradesQuery = stdGradesQuery.or(`course_id.eq.${courseId},lesson_id.in.(${lessonIds.join(',')})`)
   } else {
-    // Fallback: Fetch real grades directly and group them dynamically by date/week
-    const { data: stdGrades } = await supabase
-      .from('student_lesson_grades')
-      .select('grade, updated_at')
-      .eq('course_id', courseId)
-    
-    if (stdGrades && stdGrades.length > 0) {
-      const sorted = [...stdGrades].sort((a, b) => new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime())
-      
-      const dates = sorted.map(g => new Date(g.updated_at).getTime())
-      const minDate = Math.min(...dates)
-      const maxDate = Math.max(...dates)
-      const diffDays = (maxDate - minDate) / (1000 * 60 * 60 * 24)
+    stdGradesQuery = stdGradesQuery.eq('course_id', courseId)
+  }
 
-      const grouped: Record<string, { sum: number; count: number }> = {}
-      sorted.forEach(g => {
-        const d = new Date(g.updated_at)
-        const key = diffDays > 60
-          ? d.toLocaleDateString('es-ES', { month: 'short' })
-          : d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
+  const { data: stdGrades } = await stdGradesQuery
 
-        if (!grouped[key]) {
-          grouped[key] = { sum: 0, count: 0 }
+  // Use lesson grades if period grades is empty or for students without period grades
+  if (stdGrades && stdGrades.length > 0) {
+    if (Object.keys(studentAverages).length === 0) {
+      stdGrades.forEach(g => {
+        if (g.student_id && g.grade !== null) {
+          if (!studentAverages[g.student_id]) {
+            studentAverages[g.student_id] = { sum: 0, count: 0 }
+          }
+          studentAverages[g.student_id].sum += Number(g.grade)
+          studentAverages[g.student_id].count++
         }
-        grouped[key].sum += Number(g.grade)
-        grouped[key].count++
       })
-
-      Object.entries(grouped).forEach(([name, val]) => {
-        chartData.push({
-          name,
-          promedio: parseFloat((val.sum / val.count).toFixed(2))
-        })
+    } else {
+      stdGrades.forEach(g => {
+        if (g.student_id && g.grade !== null && !studentAverages[g.student_id]) {
+          studentAverages[g.student_id] = { sum: Number(g.grade), count: 1 }
+        }
       })
-      
-      // If there's only 1 point, Recharts area chart won't draw a line/area properly
-      if (chartData.length === 1) {
-        chartData.unshift({
-          name: 'Inicio',
-          promedio: chartData[0].promedio
-        })
-      }
     }
   }
+
+  // Calculate student averages and distribute into grade ranges:
+  // < 3.0, 3.0 - 3.9, 4.0 - 4.5, 4.6 - 5.0
+  let under3 = 0
+  let range3to39 = 0
+  let range4to45 = 0
+  let range46to5 = 0
+  let allStudentAvgsSum = 0
+
+  const evaluatedStudentIds = Object.keys(studentAverages)
+  const totalEvaluated = evaluatedStudentIds.length
+
+  // Ensure studentsCount reflects at least the number of evaluated students
+  if (totalEvaluated > studentsCount) {
+    studentsCount = totalEvaluated
+  }
+
+  evaluatedStudentIds.forEach(id => {
+    const s = studentAverages[id]
+    const avg = parseFloat((s.sum / s.count).toFixed(2))
+    allStudentAvgsSum += avg
+
+    if (avg < 3.0) {
+      under3++
+    } else if (avg < 4.0) {
+      range3to39++
+    } else if (avg <= 4.5) {
+      range4to45++
+    } else {
+      range46to5++
+    }
+  })
+
+  activeStudents = range3to39 + range4to45 + range46to5
+  atRiskStudents = under3
+  const unassessedStudents = Math.max(0, studentsCount - totalEvaluated)
+
+  if (totalEvaluated > 0) {
+    averageGrade = parseFloat((allStudentAvgsSum / totalEvaluated).toFixed(2))
+  } else {
+    averageGrade = 0.0
+  }
+
+  // 6. Chart data: Distribución por rango de notas
+  const chartData = [
+    {
+      name: '< 3.0',
+      range: '< 3.0',
+      label: 'Menos de 3.0',
+      desempeno: 'Bajo',
+      count: under3,
+      percentage: totalEvaluated > 0 ? parseFloat(((under3 / totalEvaluated) * 100).toFixed(1)) : 0,
+      color: '#EF4444' // Rojo
+    },
+    {
+      name: '3.0 - 3.9',
+      range: '3.0 - 3.9',
+      label: '3.0 a 3.9',
+      desempeno: 'Básico',
+      count: range3to39,
+      percentage: totalEvaluated > 0 ? parseFloat(((range3to39 / totalEvaluated) * 100).toFixed(1)) : 0,
+      color: '#F59E0B' // Amarillo / Ámbar
+    },
+    {
+      name: '4.0 - 4.5',
+      range: '4.0 - 4.5',
+      label: '4.0 a 4.5',
+      desempeno: 'Alto',
+      count: range4to45,
+      percentage: totalEvaluated > 0 ? parseFloat(((range4to45 / totalEvaluated) * 100).toFixed(1)) : 0,
+      color: '#3B82F6' // Azul
+    },
+    {
+      name: '4.6 - 5.0',
+      range: '4.6 - 5.0',
+      label: '4.6 a 5.0',
+      desempeno: 'Superior',
+      count: range46to5,
+      percentage: totalEvaluated > 0 ? parseFloat(((range46to5 / totalEvaluated) * 100).toFixed(1)) : 0,
+      color: '#10B981' // Verde esmeralda
+    }
+  ]
 
   return {
     id: courseId,
@@ -280,6 +332,8 @@ export async function getTeacherCourseStats(courseId: string): Promise<TeacherCo
     averageGrade,
     activeStudents,
     atRiskStudents,
+    unassessedStudents,
+    evaluatedStudents: totalEvaluated,
     chartData
   }
 }

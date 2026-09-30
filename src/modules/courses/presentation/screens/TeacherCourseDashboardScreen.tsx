@@ -3,9 +3,21 @@
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Users, FolderOpen, TrendingUp, HelpCircle } from 'lucide-react'
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import dynamic from 'next/dynamic'
 import { getTeacherCourseStats, TeacherCourseStats } from '../../application/teacherActions'
 import { getCourseJoinCode } from '../../application/joinRequestsActions'
+
+const TeacherCourseGradeDistributionChart = dynamic(
+  () => import('../components/TeacherCourseGradeDistributionChart'),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-[280px] w-full flex items-center justify-center">
+        <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-blue-600"></div>
+      </div>
+    )
+  }
+)
 
 export function TeacherCourseDashboardScreen({ courseId }: { courseId: string }) {
   const [stats, setStats] = useState<TeacherCourseStats | null>(null)
@@ -44,6 +56,8 @@ export function TeacherCourseDashboardScreen({ courseId }: { courseId: string })
     { title: 'Estudiantes', value: stats.studentsCount, icon: Users, color: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-950/30', href: `/teacher/courses/${courseId}/students` },
     { title: 'Promedio del curso', value: stats.averageGrade.toFixed(1), icon: TrendingUp, color: 'text-amber-500 bg-amber-50 dark:bg-amber-950/30', href: `/teacher/courses/${courseId}/grades` },
   ]
+
+  const totalEvaluated = stats.chartData.reduce((acc, curr) => acc + curr.count, 0)
 
   return (
     <div className="space-y-8">
@@ -102,71 +116,177 @@ export function TeacherCourseDashboardScreen({ courseId }: { courseId: string })
         })}
       </div>
 
-      {/* Gráficas y Resumen Adicional */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
-        {/* Gráfico Principal */}
-        <div className="lg:col-span-2 rounded-3xl border border-slate-100 bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.02)] dark:border-slate-800/60 dark:bg-slate-900">
-          <div className="pb-4 border-b border-slate-50 dark:border-slate-800/40 text-left">
-            <h3 className="font-bold text-slate-900 dark:text-white text-base">
-              Rendimiento Histórico Promedio
-            </h3>
-            <p className="text-xs text-slate-400 mt-0.5">Evolución del curso a lo largo de las semanas</p>
-          </div>
-          <div className="h-[300px] mt-6 w-full flex items-center justify-center">
-            {stats.chartData.length === 0 ? (
-              <div className="text-center p-4">
-                <p className="text-xs font-semibold text-slate-400">Sin datos de calificaciones suficientes.</p>
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                <AreaChart data={stats.chartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorPromedio" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" className="dark:stroke-slate-800" />
-                  <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} />
-                  <YAxis stroke="#94a3b8" fontSize={10} domain={[1.0, 5.0]} tickLine={false} />
-                  <Tooltip />
-                  <Area type="monotone" dataKey="promedio" stroke="#3b82f6" strokeWidth={2.5} fillOpacity={1} fill="url(#colorPromedio)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-        </div>
+      {/* Contenedor Centrado al ~70% de ancho en pantalla (max-w-4xl mx-auto) */}
+      <div className="max-w-4xl mx-auto w-full space-y-5">
+        {/* 1. Franja Superior: Estado General del Grupo (Compacto) */}
+        {(() => {
+          const totalStudents = stats.studentsCount > 0 ? stats.studentsCount : 1
+          const approvedPct = Math.round((stats.activeStudents / totalStudents) * 100)
+          const atRiskPct = Math.round((stats.atRiskStudents / totalStudents) * 100)
+          const unassessedCount = stats.unassessedStudents || Math.max(0, stats.studentsCount - (stats.activeStudents + stats.atRiskStudents))
+          const unassessedPct = Math.max(0, 100 - approvedPct - atRiskPct)
 
-        {/* Alertas y Progreso */}
-        <div className="space-y-6">
-          <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.02)] dark:border-slate-800/60 dark:bg-slate-900">
-            <h3 className="font-bold text-slate-900 dark:text-white text-base mb-4">Estado del Grupo</h3>
-            
-            <div className="space-y-5">
-              <div>
-                <div className="flex justify-between text-xs font-medium mb-1.5">
-                  <span className="text-slate-600 dark:text-slate-400">Estudiantes Aprobados</span>
-                  <span className="text-emerald-600 dark:text-emerald-400">{stats.activeStudents}</span>
+          return (
+            <div className="rounded-3xl border border-slate-100 bg-white p-4 sm:p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] dark:border-slate-800/60 dark:bg-slate-900 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2.5 border-b border-slate-100 dark:border-slate-800/50">
+                <div className="text-left">
+                  <h3 className="font-bold text-slate-900 dark:text-white text-base">
+                    Estado General del Grupo
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Consolidado de rendimiento académico y aprobación global del curso
+                  </p>
                 </div>
-                <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                  <div className="h-full rounded-full bg-emerald-500" style={{ width: `${stats.studentsCount > 0 ? (stats.activeStudents / stats.studentsCount) * 100 : 0}%` }}></div>
+                <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+                  <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/50 dark:border-slate-700/50">
+                    {stats.studentsCount} {stats.studentsCount === 1 ? 'Matriculado' : 'Matriculados'}
+                  </span>
+                  <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-800/50">
+                    {stats.evaluatedStudents || (stats.activeStudents + stats.atRiskStudents)} Evaluados ({Math.min(100, Math.round(((stats.evaluatedStudents || (stats.activeStudents + stats.atRiskStudents)) / totalStudents) * 100))}%)
+                  </span>
                 </div>
               </div>
 
-              <div>
-                <div className="flex justify-between text-xs font-medium mb-1.5">
-                  <span className="text-slate-600 dark:text-slate-400">Estudiantes en Riesgo</span>
-                  <span className="text-red-600 dark:text-red-400">{stats.atRiskStudents}</span>
+              {/* Barra de progreso segmentada continua estilo Apple */}
+              <div className="space-y-1">
+                <div className="h-3 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden flex p-0.5 gap-0.5 shadow-inner">
+                  {stats.activeStudents > 0 && (
+                    <div 
+                      className="h-full rounded-l-full bg-emerald-500 transition-all duration-500" 
+                      style={{ 
+                        width: `${(stats.activeStudents / totalStudents) * 100}%`,
+                        borderTopRightRadius: stats.atRiskStudents === 0 && unassessedCount === 0 ? '9999px' : '2px',
+                        borderBottomRightRadius: stats.atRiskStudents === 0 && unassessedCount === 0 ? '9999px' : '2px'
+                      }}
+                      title={`Aprobados: ${stats.activeStudents} (${approvedPct}%)`}
+                    />
+                  )}
+                  {stats.atRiskStudents > 0 && (
+                    <div 
+                      className="h-full bg-red-500 transition-all duration-500" 
+                      style={{ 
+                        width: `${(stats.atRiskStudents / totalStudents) * 100}%`,
+                        borderTopLeftRadius: stats.activeStudents === 0 ? '9999px' : '2px',
+                        borderBottomLeftRadius: stats.activeStudents === 0 ? '9999px' : '2px',
+                        borderTopRightRadius: unassessedCount === 0 ? '9999px' : '2px',
+                        borderBottomRightRadius: unassessedCount === 0 ? '9999px' : '2px'
+                      }}
+                      title={`En Riesgo: ${stats.atRiskStudents} (${atRiskPct}%)`}
+                    />
+                  )}
+                  {unassessedCount > 0 && (
+                    <div 
+                      className="h-full rounded-r-full bg-slate-300 dark:bg-slate-700 transition-all duration-500" 
+                      style={{ 
+                        width: `${(unassessedCount / totalStudents) * 100}%`,
+                        borderTopLeftRadius: stats.activeStudents === 0 && stats.atRiskStudents === 0 ? '9999px' : '2px',
+                        borderBottomLeftRadius: stats.activeStudents === 0 && stats.atRiskStudents === 0 ? '9999px' : '2px'
+                      }}
+                      title={`Sin Calificaciones: ${unassessedCount} (${unassessedPct}%)`}
+                    />
+                  )}
                 </div>
-                <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                  <div className="h-full rounded-full bg-red-500" style={{ width: `${stats.studentsCount > 0 ? (stats.atRiskStudents / stats.studentsCount) * 100 : 0}%` }}></div>
+              </div>
+
+              {/* Indicadores KPI horizontales compactos */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-0.5">
+                <div className="flex items-center gap-3 p-2.5 sm:p-3 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-100/60 dark:border-emerald-900/30">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500 text-white font-bold text-sm shadow-xs">
+                    {stats.activeStudents}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-emerald-950 dark:text-emerald-300 truncate">
+                      Aprobados (≥ 3.0)
+                    </p>
+                    <p className="text-[11px] font-medium text-emerald-700/80 dark:text-emerald-400/80">
+                      {approvedPct}% del total matriculado
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 p-2.5 sm:p-3 rounded-2xl bg-red-50/60 dark:bg-red-950/20 border border-red-100/60 dark:border-red-900/30">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-500 text-white font-bold text-sm shadow-xs">
+                    {stats.atRiskStudents}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-red-950 dark:text-red-300 truncate">
+                      En Riesgo (&lt; 3.0)
+                    </p>
+                    <p className="text-[11px] font-medium text-red-700/80 dark:text-red-400/80">
+                      {atRiskPct}% requiere refuerzo
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 p-2.5 sm:p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-400 dark:bg-slate-600 text-white font-bold text-sm shadow-xs">
+                    {unassessedCount}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-slate-800 dark:text-slate-300 truncate">
+                      Sin Calificaciones
+                    </p>
+                    <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                      {unassessedCount === 0 ? '100% evaluado' : `${unassessedPct}% pendiente`}
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
+          )
+        })()}
+
+        {/* 2. Gráfica Principal: Barras por Rango de Notas (Compacta) */}
+        <div className="w-full rounded-3xl border border-slate-100 bg-white p-4 sm:p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] dark:border-slate-800/60 dark:bg-slate-900 flex flex-col justify-between">
+          <div>
+            <div className="pb-3 border-b border-slate-100 dark:border-slate-800/50 space-y-2.5">
+              <div className="text-left">
+                <h3 className="font-bold text-slate-900 dark:text-white text-base">
+                  Rendimiento Histórico Promedio
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Distribución de estudiantes por rango de notas acumulado
+                </p>
+              </div>
+
+              {/* Leyenda Visual de Rangos (Debajo del título, responsive) */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-0.5">
+                <div className="flex items-center justify-center sm:justify-start gap-1.5 px-2.5 py-1 rounded-xl bg-red-50/80 text-red-700 dark:bg-red-950/30 dark:text-red-400 border border-red-200/50 dark:border-red-900/40 text-[11px] font-semibold">
+                  <span className="h-2 w-2 rounded-full bg-red-500 shrink-0"></span>
+                  <span className="truncate">&lt; 3.0 Bajo</span>
+                </div>
+                <div className="flex items-center justify-center sm:justify-start gap-1.5 px-2.5 py-1 rounded-xl bg-amber-50/80 text-amber-800 dark:bg-amber-950/30 dark:text-amber-400 border border-amber-200/50 dark:border-amber-900/40 text-[11px] font-semibold">
+                  <span className="h-2 w-2 rounded-full bg-amber-500 shrink-0"></span>
+                  <span className="truncate">3.0 - 3.9 Básico</span>
+                </div>
+                <div className="flex items-center justify-center sm:justify-start gap-1.5 px-2.5 py-1 rounded-xl bg-blue-50/80 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400 border border-blue-200/50 dark:border-blue-900/40 text-[11px] font-semibold">
+                  <span className="h-2 w-2 rounded-full bg-blue-500 shrink-0"></span>
+                  <span className="truncate">4.0 - 4.5 Alto</span>
+                </div>
+                <div className="flex items-center justify-center sm:justify-start gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-50/80 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-900/40 text-[11px] font-semibold">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0"></span>
+                  <span className="truncate">4.6 - 5.0 Superior</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 w-full">
+              <TeacherCourseGradeDistributionChart data={stats.chartData} />
+            </div>
+          </div>
+
+          {/* Mini Resumen Inferior */}
+          <div className="mt-3 pt-3 border-t border-slate-50 dark:border-slate-800/40 grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+            {stats.chartData.map((item) => (
+              <div key={item.range} className="p-2 rounded-xl bg-slate-50/70 dark:bg-slate-800/40">
+                <p className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 truncate">{item.label}</p>
+                <p className="text-sm font-bold mt-0.5" style={{ color: item.color }}>
+                  {item.count} <span className="text-[11px] font-medium opacity-80">({item.percentage}%)</span>
+                </p>
+              </div>
+            ))}
           </div>
         </div>
-
       </div>
     </div>
   )
