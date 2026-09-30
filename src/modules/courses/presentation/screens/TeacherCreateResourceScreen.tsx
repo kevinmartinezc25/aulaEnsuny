@@ -267,7 +267,7 @@ export function TeacherCreateResourceScreen({ courseId, resourceId, courseName =
         }
 
         toast.success(resourceId ? 'Foro actualizado correctamente' : 'Foro creado correctamente')
-        router.push(`/teacher/courses/${courseId}/resources`)
+        router.push(type === 'forum' ? `/teacher/courses/${courseId}/forums` : `/teacher/courses/${courseId}/resources`)
         router.refresh()
       } catch (err: any) {
         const errorMsg = err?.message || err?.details || (typeof err === 'object' ? JSON.stringify(err) : String(err))

@@ -3,22 +3,62 @@
 import { createClient, createAdminClient } from '@/core/config/supabase/server'
 
 export async function getCourseIdBySlug(slugOrId: string): Promise<string | null> {
+  if (!slugOrId || slugOrId === 'undefined' || slugOrId === 'null') return null
+
   const supabase = createAdminClient()
+  const raw = String(slugOrId).trim()
+  let decoded = raw
+  try {
+    decoded = decodeURIComponent(raw)
+  } catch {
+    decoded = raw
+  }
   
   // First, check if the string itself is a valid UUID
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-  if (uuidRegex.test(slugOrId)) {
-    return slugOrId
+  if (uuidRegex.test(raw)) {
+    return raw
+  }
+  if (uuidRegex.test(decoded)) {
+    return decoded
   }
 
-  const { data, error } = await supabase
+  // Check by slug with exact match
+  const { data: exactSlug } = await supabase
     .from('courses')
     .select('id')
-    .eq('slug', slugOrId)
-    .single()
-    
-  if (error || !data) return null
-  return data.id
+    .eq('slug', raw)
+    .maybeSingle()
+
+  if (exactSlug?.id) return exactSlug.id
+
+  if (decoded !== raw) {
+    const { data: decodedSlug } = await supabase
+      .from('courses')
+      .select('id')
+      .eq('slug', decoded)
+      .maybeSingle()
+
+    if (decodedSlug?.id) return decodedSlug.id
+  }
+
+  // Case-insensitive match on slug
+  const { data: ilikeSlug } = await supabase
+    .from('courses')
+    .select('id')
+    .ilike('slug', decoded)
+    .maybeSingle()
+
+  if (ilikeSlug?.id) return ilikeSlug.id
+
+  // Also check if id directly matches
+  const { data: byId } = await supabase
+    .from('courses')
+    .select('id')
+    .eq('id', raw)
+    .maybeSingle()
+
+  return byId?.id || null
 }
 
 export interface TeacherCourseStats {
@@ -256,6 +296,8 @@ export interface CourseModule {
     status?: 'active' | 'draft'
     duration?: string
     sort_order?: number
+    created_at?: string
+    due_date?: string
   }[]
 }
 
@@ -312,7 +354,9 @@ export async function getCourseModules(courseId: string): Promise<CourseModule[]
           type,
           status: 'active' as const,
           duration: l.video_url ? '10 min' : undefined,
-          sort_order: l.sort_order || 0
+          sort_order: l.sort_order || 0,
+          created_at: l.created_at || undefined,
+          due_date: l.due_date || undefined
         })
       }
     }
@@ -341,20 +385,31 @@ export async function getCourseModules(courseId: string): Promise<CourseModule[]
           type: resourceType,
           status: 'active' as const,
           duration: r.file_size ? `${(r.file_size / 1024 / 1024).toFixed(1)} MB` : undefined,
-          sort_order: (r as any).sort_order || 0
+          sort_order: (r as any).sort_order || 0,
+          created_at: r.created_at || undefined
         })
       }
     }
 
+    // Deduplicate lessons by ID to prevent duplicate React keys or duplicate records
+    const seenLessonIds = new Set<string>()
+    const uniqueLessonsList: any[] = []
+    for (const item of lessonsList) {
+      if (!seenLessonIds.has(item.id)) {
+        seenLessonIds.add(item.id)
+        uniqueLessonsList.push(item)
+      }
+    }
+
     // Sort combined lessonsList by sort_order
-    lessonsList.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+    uniqueLessonsList.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
 
     modulesWithLessons.push({
       id: m.id,
       title: m.title,
       order: m.sort_order,
-      lessonsCount: lessonsList.length,
-      lessons: lessonsList
+      lessonsCount: uniqueLessonsList.length,
+      lessons: uniqueLessonsList
     })
   }
 
@@ -1163,15 +1218,20 @@ export async function linkForumToModule(
 ): Promise<{ lessonId: string; title: string }> {
   const supabase = createAdminClient()
 
+  // Note: forums table does not have 'title', it references 'lessons' table
   const { data: dbForum, error: fErr } = await supabase
     .from('forums')
-    .select('id, title, lesson_id')
+    .select('id, lesson_id, lessons(id, title)')
     .eq('id', forumId)
     .maybeSingle()
 
   if (fErr || !dbForum) {
+    console.error('Error fetching forum in linkForumToModule:', fErr)
     throw new Error(fErr?.message || 'Foro no encontrado')
   }
+
+  const lessonObj = Array.isArray(dbForum.lessons) ? dbForum.lessons[0] : dbForum.lessons
+  const forumTitle = lessonObj?.title || 'Foro de debate'
 
   let lessonId = dbForum.lesson_id
 
@@ -1184,20 +1244,26 @@ export async function linkForumToModule(
       })
       .eq('id', lessonId)
 
-    if (error) throw new Error(error.message)
+    if (error) {
+      console.error('Error updating lesson module_id in linkForumToModule:', error)
+      throw new Error(error.message)
+    }
   } else {
     const { data: newLesson, error: lErr } = await supabase
       .from('lessons')
       .insert({
         module_id: moduleId,
-        title: dbForum.title || 'Foro de debate',
+        title: forumTitle,
         type: 'forum',
         sort_order: sortOrder,
       })
       .select('id, title')
       .single()
 
-    if (lErr || !newLesson) throw new Error(lErr?.message || 'Error creando lección para foro')
+    if (lErr || !newLesson) {
+      console.error('Error creating lesson for forum in linkForumToModule:', lErr)
+      throw new Error(lErr?.message || 'Error creando lección para foro')
+    }
     lessonId = newLesson.id
 
     const { error: updErr } = await supabase
@@ -1205,12 +1271,15 @@ export async function linkForumToModule(
       .update({ lesson_id: lessonId })
       .eq('id', forumId)
 
-    if (updErr) throw new Error(updErr.message)
+    if (updErr) {
+      console.error('Error updating forum lesson_id in linkForumToModule:', updErr)
+      throw new Error(updErr.message)
+    }
   }
 
   return {
     lessonId,
-    title: dbForum.title || 'Foro de debate',
+    title: forumTitle,
   }
 }
 
@@ -1251,15 +1320,18 @@ export async function getCourseLinkableItems(courseId: string) {
 
       const { data: dbForums } = await supabase
         .from('forums')
-        .select('id, lessons!inner(title)')
+        .select('id, lessons(title)')
         .in('lesson_id', lIds)
 
       if (dbForums) {
-        forums = dbForums.map((f: any) => ({
-          id: f.id,
-          name: f.lessons?.title || 'Foro de Discusión',
-          type: 'forum'
-        }))
+        forums = dbForums.map((f: any) => {
+          const lObj = Array.isArray(f.lessons) ? f.lessons[0] : f.lessons
+          return {
+            id: f.id,
+            name: lObj?.title || 'Foro de Discusión',
+            type: 'forum'
+          }
+        })
       }
     }
   }

@@ -59,6 +59,7 @@ export function TeacherCourseModulesScreen({ courseId }: { courseId: string }) {
   const [availableQuizzes, setAvailableQuizzes] = useState<any[]>([])
   const [availableResources, setAvailableResources] = useState<any[]>([])
   const [availableForums, setAvailableForums] = useState<any[]>([])
+  const [isLinking, setIsLinking] = useState(false)
   
   // States for Editing and Dropdowns
   const [editingModuleId, setEditingModuleId] = useState<string | null>(null)
@@ -302,93 +303,129 @@ export function TeacherCourseModulesScreen({ courseId }: { courseId: string }) {
   }
 
   const handleLinkQuiz = async (quizId: string) => {
+    if (isLinking) return
     const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL ||
       process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
     const list = isDemoMode ? MOCK_QUIZZES : availableQuizzes
     const quiz = list.find(q => q.id === quizId)
-    if (!quiz) return
-    
+    if (!quiz || !quizModalModuleId) return
+
+    const targetModule = modules.find(m => m.id === quizModalModuleId)
+    if (targetModule && targetModule.lessons.some(l => l.id === quizId)) {
+      toast.info('Este quiz ya está en este módulo')
+      setIsQuizModalOpen(false)
+      setQuizModalModuleId(null)
+      return
+    }
+
+    setIsLinking(true)
     let lessonId = `quiz_${Date.now()}`
 
     let nextSortOrder = 1
-    const targetModule = modules.find(m => m.id === quizModalModuleId)
     if (targetModule && targetModule.lessons.length > 0) {
       nextSortOrder = Math.max(...targetModule.lessons.map(l => (l as any).sort_order || 0)) + 1
     }
 
-    if (!isDemoMode && quizModalModuleId) {
-      try {
+    try {
+      if (!isDemoMode && quizModalModuleId) {
         const linked = await linkQuizToModule(quizModalModuleId, quizId, nextSortOrder)
         lessonId = linked.lessonId
-      } catch (err: any) {
-        console.error('Error linking quiz:', err)
-        toast.error('No se pudo vincular el quiz en la base de datos')
+      }
+
+      if (targetModule && targetModule.lessons.some(l => l.id === lessonId)) {
+        toast.info('Este quiz ya está en este módulo')
+        setIsQuizModalOpen(false)
+        setQuizModalModuleId(null)
         return
       }
-    }
 
-    const newLesson = {
-      id: lessonId,
-      title: quiz.title,
-      type: 'quiz' as const,
-      duration: quiz.duration,
-      sort_order: nextSortOrder
-    }
+      const newLesson = {
+        id: lessonId,
+        title: quiz.title,
+        type: 'quiz' as const,
+        duration: quiz.duration,
+        sort_order: nextSortOrder
+      }
 
-    setModules(prev => prev.map(m => 
-      m.id === quizModalModuleId
-        ? { ...m, lessons: [...m.lessons, newLesson], lessonsCount: m.lessonsCount + 1 }
-        : m
-    ))
-    
-    setIsQuizModalOpen(false)
-    setQuizModalModuleId(null)
-    toast.success('Quiz vinculado correctamente')
+      setModules(prev => prev.map(m => {
+        if (m.id !== quizModalModuleId) return m
+        if (m.lessons.some(l => l.id === newLesson.id)) return m
+        return {
+          ...m,
+          lessons: [...m.lessons, newLesson],
+          lessonsCount: m.lessons.length + 1
+        }
+      }))
+
+      setIsQuizModalOpen(false)
+      setQuizModalModuleId(null)
+      toast.success('Quiz vinculado correctamente')
+    } catch (err: any) {
+      console.error('Error linking quiz:', err)
+      toast.error('No se pudo vincular el quiz en la base de datos')
+    } finally {
+      setIsLinking(false)
+    }
   }
 
   const handleLinkResource = async (resourceId: string) => {
+    if (isLinking) return
     const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL ||
       process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
     const list = isDemoMode ? MOCK_RESOURCES : availableResources
     const resource = list.find(r => r.id === resourceId)
-    if (!resource) return
+    if (!resource || !resourceModalModuleId) return
 
-    let nextSortOrder = 1
     const targetModule = modules.find(m => m.id === resourceModalModuleId)
+    if (targetModule && targetModule.lessons.some(l => l.id === resourceId)) {
+      toast.info('Este recurso ya está en este módulo')
+      setIsResourceModalOpen(false)
+      setResourceModalModuleId(null)
+      return
+    }
+
+    setIsLinking(true)
+    let nextSortOrder = 1
     if (targetModule && targetModule.lessons.length > 0) {
       nextSortOrder = Math.max(...targetModule.lessons.map(l => (l as any).sort_order || 0)) + 1
     }
 
-    if (!isDemoMode && resourceModalModuleId) {
-      try {
+    try {
+      if (!isDemoMode && resourceModalModuleId) {
         await linkResourceToModule(resourceModalModuleId, resourceId, nextSortOrder)
-      } catch (err: any) {
-        console.error('Error al vincular recurso:', err)
-        toast.error('No se pudo vincular el recurso en la base de datos')
-        return
       }
-    }
-    
-    const newLesson = {
-      id: resource.id,
-      title: resource.name,
-      type: resource.type,
-      duration: resource.size,
-      sort_order: nextSortOrder
-    }
 
-    setModules(prev => prev.map(m => 
-      m.id === resourceModalModuleId
-        ? { ...m, lessons: [...m.lessons, newLesson], lessonsCount: m.lessonsCount + 1 }
-        : m
-    ))
-    
-    setIsResourceModalOpen(false)
-    setResourceModalModuleId(null)
-    toast.success('Recurso vinculado correctamente')
+      const newLesson = {
+        id: resource.id,
+        title: resource.name,
+        type: resource.type,
+        duration: resource.size,
+        sort_order: nextSortOrder
+      }
+
+      setModules(prev => prev.map(m => {
+        if (m.id !== resourceModalModuleId) return m
+        if (m.lessons.some(l => l.id === newLesson.id)) return m
+        return {
+          ...m,
+          lessons: [...m.lessons, newLesson],
+          lessonsCount: m.lessons.length + 1
+        }
+      }))
+
+      setIsResourceModalOpen(false)
+      setResourceModalModuleId(null)
+      toast.success('Recurso vinculado correctamente')
+    } catch (err: any) {
+      console.error('Error al vincular recurso:', err)
+      toast.error('No se pudo vincular el recurso en la base de datos')
+    } finally {
+      setIsLinking(false)
+    }
   }
 
   const handleLinkForum = async (forumId: string) => {
+    if (isLinking) return
     const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL ||
       process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
     const list = isDemoMode ? [
@@ -396,44 +433,67 @@ export function TeacherCourseModulesScreen({ courseId }: { courseId: string }) {
       { id: 'f2', name: 'Dudas y Consultas: Módulo Cinemática' }
     ] : availableForums
     const forum = list.find(f => f.id === forumId)
-    if (!forum) return
+    if (!forum || !forumModalModuleId) return
 
+    const targetModule = modules.find(m => m.id === forumModalModuleId)
+    if (targetModule && targetModule.lessons.some(l => l.id === forumId)) {
+      toast.info('Este foro ya está en este módulo')
+      setIsForumModalOpen(false)
+      setForumModalModuleId(null)
+      return
+    }
+
+    setIsLinking(true)
     let lessonId = `forum_${Date.now()}`
 
     let nextSortOrder = 1
-    const targetModule = modules.find(m => m.id === forumModalModuleId)
     if (targetModule && targetModule.lessons.length > 0) {
       nextSortOrder = Math.max(...targetModule.lessons.map(l => (l as any).sort_order || 0)) + 1
     }
 
-    if (!isDemoMode && forumModalModuleId) {
-      try {
+    let forumTitle = forum.name
+
+    try {
+      if (!isDemoMode && forumModalModuleId) {
         const linked = await linkForumToModule(forumModalModuleId, forumId, nextSortOrder)
         lessonId = linked.lessonId
-      } catch (err: any) {
-        console.error('Error linking forum:', err)
-        toast.error('No se pudo vincular el foro en la base de datos')
+        if (linked.title) forumTitle = linked.title
+      }
+
+      if (targetModule && targetModule.lessons.some(l => l.id === lessonId)) {
+        toast.info('Este foro ya está en este módulo')
+        setIsForumModalOpen(false)
+        setForumModalModuleId(null)
         return
       }
+
+      const newLesson = {
+        id: lessonId,
+        title: forumTitle,
+        type: 'forum' as const,
+        duration: 'Foro de debate',
+        sort_order: nextSortOrder
+      }
+
+      setModules(prev => prev.map(m => {
+        if (m.id !== forumModalModuleId) return m
+        if (m.lessons.some(l => l.id === newLesson.id)) return m
+        return {
+          ...m,
+          lessons: [...m.lessons, newLesson],
+          lessonsCount: m.lessons.length + 1
+        }
+      }))
+
+      setIsForumModalOpen(false)
+      setForumModalModuleId(null)
+      toast.success('Foro vinculado correctamente')
+    } catch (err: any) {
+      console.error('Error linking forum:', err)
+      toast.error(err?.message || 'No se pudo vincular el foro en la base de datos')
+    } finally {
+      setIsLinking(false)
     }
-
-    const newLesson = {
-      id: lessonId,
-      title: forum.name,
-      type: 'forum' as const,
-      duration: 'Foro de debate',
-      sort_order: nextSortOrder
-    }
-
-    setModules(prev => prev.map(m =>
-      m.id === forumModalModuleId
-        ? { ...m, lessons: [...m.lessons, newLesson], lessonsCount: m.lessonsCount + 1 }
-        : m
-    ))
-
-    setIsForumModalOpen(false)
-    setForumModalModuleId(null)
-    toast.success('Foro vinculado correctamente')
   }
 
   // --- Handlers for Module Config ---
@@ -671,69 +731,89 @@ export function TeacherCourseModulesScreen({ courseId }: { courseId: string }) {
                     transition={{ duration: 0.2 }}
                     className="overflow-hidden rounded-b-2xl border-t border-slate-50 dark:border-slate-800/40 bg-slate-50/30 dark:bg-slate-900/50 p-4"
                   >
-                    <Reorder.Group
-                      axis="y"
-                      values={mod.lessons}
-                      onReorder={(newOrder) => handleReorderLessons(mod.id, newOrder)}
-                      className="space-y-2"
-                    >
-                      {mod.lessons.map((lesson) => (
-                        <Reorder.Item 
-                          key={lesson.id}
-                          value={lesson}
-                          className="group flex items-center justify-between rounded-xl border border-slate-100 bg-white p-3 hover:border-blue-100 hover:shadow-sm dark:border-slate-800 dark:bg-slate-950 dark:hover:border-slate-700 transition-all cursor-grab active:cursor-grabbing relative"
+                    {(() => {
+                      const uniqueLessons = mod.lessons.filter((lesson, index, self) =>
+                        index === self.findIndex((l) => l.id === lesson.id)
+                      )
+
+                      return (
+                        <Reorder.Group
+                          axis="y"
+                          values={uniqueLessons}
+                          onReorder={(newOrder) => handleReorderLessons(mod.id, newOrder)}
+                          className="space-y-2"
                         >
-                          <div className="flex items-center gap-3">
-                            <div className="text-slate-200 hover:text-slate-400 dark:text-slate-700 dark:hover:text-slate-500">
-                              <GripVertical className="h-4 w-4 pointer-events-none" />
-                            </div>
-                            <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-slate-50 dark:bg-slate-900">
-                              {getLessonIcon(lesson.type)}
-                            </div>
-                            <div>
-                              <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2">
-                                {lesson.title}
-                                {lesson.status === 'draft' && (
-                                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500 uppercase dark:bg-slate-800 dark:text-slate-400">
-                                    Borrador
-                                  </span>
+                          {uniqueLessons.map((lesson) => (
+                            <Reorder.Item 
+                              key={lesson.id}
+                              value={lesson}
+                              className="group flex items-center justify-between rounded-xl border border-slate-100 bg-white p-3 hover:border-blue-100 hover:shadow-sm dark:border-slate-800 dark:bg-slate-950 dark:hover:border-slate-700 transition-all cursor-grab active:cursor-grabbing relative"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="text-slate-200 hover:text-slate-400 dark:text-slate-700 dark:hover:text-slate-500">
+                                  <GripVertical className="h-4 w-4 pointer-events-none" />
+                                </div>
+                                <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-slate-50 dark:bg-slate-900">
+                                  {getLessonIcon(lesson.type)}
+                                </div>
+                                <div>
+                                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2">
+                                    {lesson.title}
+                                    {lesson.status === 'draft' && (
+                                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500 uppercase dark:bg-slate-800 dark:text-slate-400">
+                                        Borrador
+                                      </span>
+                                    )}
+                                  </p>
+                                  <div className="flex flex-wrap items-center gap-2 mt-0.5 text-[11px] font-medium text-slate-400">
+                                    {lesson.created_at && (
+                                      <span>
+                                        Publicado: {new Date(lesson.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                      </span>
+                                    )}
+                                    {lesson.created_at && (lesson.duration || lesson.due_date) && <span>•</span>}
+                                    {lesson.duration && <span>{lesson.duration}</span>}
+                                    {lesson.duration && lesson.due_date && <span>•</span>}
+                                    {lesson.due_date && (
+                                      <span className="text-amber-600 dark:text-amber-400 font-semibold">
+                                        Límite: {new Date(lesson.due_date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              {/* Acciones de Lección (solo on hover en desktop) */}
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                {lesson.type === 'forum' && (
+                                  <button 
+                                    onClick={() => handleGoToForumBoard(lesson.id)}
+                                    className="p-1.5 rounded text-slate-400 hover:bg-pink-50 hover:text-pink-650 dark:hover:bg-slate-800 dark:hover:text-pink-400"
+                                    title="Ir al foro (iniciar/ver discusiones)"
+                                  >
+                                    <MessageSquare className="h-3.5 w-3.5" />
+                                  </button>
                                 )}
-                              </p>
-                              {lesson.duration && (
-                                <p className="text-[10px] font-medium text-slate-400">{lesson.duration}</p>
-                              )}
-                            </div>
-                          </div>
-                          
-                          {/* Acciones de Lección (solo on hover en desktop) */}
-                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            {lesson.type === 'forum' && (
-                              <button 
-                                onClick={() => handleGoToForumBoard(lesson.id)}
-                                className="p-1.5 rounded text-slate-400 hover:bg-pink-50 hover:text-pink-650 dark:hover:bg-slate-800 dark:hover:text-pink-400"
-                                title="Ir al foro (iniciar/ver discusiones)"
-                              >
-                                <MessageSquare className="h-3.5 w-3.5" />
-                              </button>
-                            )}
-                            <button 
-                              onClick={() => handleOpenConfig(mod.id, lesson)}
-                              className="p-1.5 rounded text-slate-400 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-slate-800 dark:hover:text-blue-400"
-                              title="Configuración del recurso"
-                            >
-                              <Settings2 className="h-3.5 w-3.5" />
-                            </button>
-                            <button 
-                              onClick={() => handleDeleteLesson(mod.id, lesson.id)}
-                              className="p-1.5 rounded text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-slate-800 dark:hover:text-red-400"
-                              title="Eliminar recurso"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        </Reorder.Item>
-                      ))}
-                    </Reorder.Group>
+                                <button 
+                                  onClick={() => handleOpenConfig(mod.id, lesson)}
+                                  className="p-1.5 rounded text-slate-400 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-slate-800 dark:hover:text-blue-400"
+                                  title="Configuración del recurso"
+                                >
+                                  <Settings2 className="h-3.5 w-3.5" />
+                                </button>
+                                <button 
+                                  onClick={() => handleDeleteLesson(mod.id, lesson.id)}
+                                  className="p-1.5 rounded text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-slate-800 dark:hover:text-red-400"
+                                  title="Eliminar recurso"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            </Reorder.Item>
+                          ))}
+                        </Reorder.Group>
+                      )
+                    })()}
 
                     {/* Botón Añadir Lección Rápido */}
                     <div className="pt-2 mt-2 relative">
@@ -812,27 +892,49 @@ export function TeacherCourseModulesScreen({ courseId }: { courseId: string }) {
                 <p className="text-sm text-slate-500 mb-6">Selecciona un quiz de tu banco para añadirlo a este módulo.</p>
                 
                 <div className="space-y-3 overflow-y-auto max-h-[50vh] pr-2">
-                  {availableQuizzes.map(quiz => (
-                    <div 
-                      key={quiz.id} 
-                      onClick={() => handleLinkQuiz(quiz.id)}
-                      className="group flex items-center justify-between rounded-xl border border-slate-100 p-4 hover:border-blue-500 hover:bg-blue-50 dark:border-slate-800 dark:hover:border-blue-500 dark:hover:bg-blue-900/20 cursor-pointer transition-all" 
-                    >
-                      <div>
-                        <h4 className="font-semibold text-slate-900 dark:text-white">{quiz.title}</h4>
-                        <div className="flex items-center gap-2 mt-1.5 text-xs text-slate-500">
-                          <span className="flex items-center gap-1"><HelpCircle className="h-3.5 w-3.5"/> {quiz.duration}</span>
-                          <span>•</span>
-                          <span className={`${quiz.status === 'active' ? 'text-emerald-600' : 'text-slate-400'}`}>
-                            {quiz.status === 'active' ? 'Activo' : 'Borrador'}
-                          </span>
+                  {availableQuizzes.map(quiz => {
+                    const isAlreadyLinked = modules
+                      .find(m => m.id === quizModalModuleId)
+                      ?.lessons.some(l => l.id === quiz.id)
+
+                    return (
+                      <div 
+                        key={quiz.id} 
+                        onClick={() => {
+                          if (isAlreadyLinked || isLinking) return
+                          handleLinkQuiz(quiz.id)
+                        }}
+                        className={`group flex items-center justify-between rounded-xl border p-4 transition-all ${
+                          isAlreadyLinked 
+                            ? 'border-slate-100 bg-slate-50/70 opacity-60 cursor-not-allowed dark:border-slate-800 dark:bg-slate-900/40'
+                            : 'border-slate-100 hover:border-blue-500 hover:bg-blue-50 dark:border-slate-800 dark:hover:border-blue-500 dark:hover:bg-blue-900/20 cursor-pointer'
+                        }`} 
+                      >
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-semibold text-slate-900 dark:text-white">{quiz.title}</h4>
+                            {isAlreadyLinked && (
+                              <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                                Ya en este módulo
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 mt-1.5 text-xs text-slate-500">
+                            <span className="flex items-center gap-1"><HelpCircle className="h-3.5 w-3.5"/> {quiz.duration}</span>
+                            <span>•</span>
+                            <span className={`${quiz.status === 'active' ? 'text-emerald-600' : 'text-slate-400'}`}>
+                              {quiz.status === 'active' ? 'Activo' : 'Borrador'}
+                            </span>
+                          </div>
                         </div>
+                        {!isAlreadyLinked && (
+                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-50 text-slate-400 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors dark:bg-slate-800 dark:group-hover:bg-blue-900/40">
+                            <Plus className="h-4 w-4" />
+                          </div>
+                        )}
                       </div>
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-50 text-slate-400 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors dark:bg-slate-800 dark:group-hover:bg-blue-900/40">
-                        <Plus className="h-4 w-4" />
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                   {availableQuizzes.length === 0 && (
                     <div className="text-center py-8 text-sm text-slate-500 dark:text-slate-400">
                       No hay quizzes disponibles para vincular.
@@ -872,25 +974,47 @@ export function TeacherCourseModulesScreen({ courseId }: { courseId: string }) {
                 <p className="text-sm text-slate-500 mb-6">Selecciona un archivo de tu Biblioteca de Recursos para añadirlo a este módulo.</p>
                 
                 <div className="space-y-3 overflow-y-auto max-h-[50vh] pr-2">
-                  {availableResources.map(resource => (
-                    <div 
-                      key={resource.id} 
-                      onClick={() => handleLinkResource(resource.id)}
-                      className="group flex items-center justify-between rounded-xl border border-slate-100 p-4 hover:border-blue-500 hover:bg-blue-50 dark:border-slate-800 dark:hover:border-blue-500 dark:hover:bg-blue-900/20 cursor-pointer transition-all" 
-                    >
-                      <div>
-                        <h4 className="font-semibold text-slate-900 dark:text-white">{resource.name}</h4>
-                        <div className="flex items-center gap-2 mt-1.5 text-xs text-slate-500">
-                          <span className="flex items-center gap-1"><FileText className="h-3.5 w-3.5"/> {resource.type.toUpperCase()}</span>
-                          <span>•</span>
-                          <span>{resource.size}</span>
+                  {availableResources.map(resource => {
+                    const isAlreadyLinked = modules
+                      .find(m => m.id === resourceModalModuleId)
+                      ?.lessons.some(l => l.id === resource.id)
+
+                    return (
+                      <div 
+                        key={resource.id} 
+                        onClick={() => {
+                          if (isAlreadyLinked || isLinking) return
+                          handleLinkResource(resource.id)
+                        }}
+                        className={`group flex items-center justify-between rounded-xl border p-4 transition-all ${
+                          isAlreadyLinked 
+                            ? 'border-slate-100 bg-slate-50/70 opacity-60 cursor-not-allowed dark:border-slate-800 dark:bg-slate-900/40'
+                            : 'border-slate-100 hover:border-blue-500 hover:bg-blue-50 dark:border-slate-800 dark:hover:border-blue-500 dark:hover:bg-blue-900/20 cursor-pointer'
+                        }`} 
+                      >
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-semibold text-slate-900 dark:text-white">{resource.name}</h4>
+                            {isAlreadyLinked && (
+                              <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                                Ya en este módulo
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 mt-1.5 text-xs text-slate-500">
+                            <span className="flex items-center gap-1"><FileText className="h-3.5 w-3.5"/> {resource.type.toUpperCase()}</span>
+                            <span>•</span>
+                            <span>{resource.size}</span>
+                          </div>
                         </div>
+                        {!isAlreadyLinked && (
+                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-50 text-slate-400 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors dark:bg-slate-800 dark:group-hover:bg-blue-900/40">
+                            <Plus className="h-4 w-4" />
+                          </div>
+                        )}
                       </div>
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-50 text-slate-400 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors dark:bg-slate-800 dark:group-hover:bg-blue-900/40">
-                        <Plus className="h-4 w-4" />
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                   {availableResources.length === 0 && (
                     <div className="text-center py-8 text-sm text-slate-500 dark:text-slate-400">
                       No hay archivos disponibles para vincular.
@@ -930,23 +1054,45 @@ export function TeacherCourseModulesScreen({ courseId }: { courseId: string }) {
                 <p className="text-sm text-slate-500 mb-6">Selecciona un foro de tu biblioteca para añadirlo a este módulo.</p>
                 
                 <div className="space-y-3 overflow-y-auto max-h-[50vh] pr-2">
-                  {availableForums.map(forum => (
-                    <div 
-                      key={forum.id} 
-                      onClick={() => handleLinkForum(forum.id)}
-                      className="group flex items-center justify-between rounded-xl border border-slate-100 p-4 hover:border-blue-500 hover:bg-blue-50 dark:border-slate-800 dark:hover:border-blue-500 dark:hover:bg-blue-900/20 cursor-pointer transition-all" 
-                    >
-                      <div>
-                        <h4 className="font-semibold text-slate-900 dark:text-white">{forum.name}</h4>
-                        <div className="flex items-center gap-2 mt-1.5 text-xs text-slate-500">
-                          <span className="flex items-center gap-1"><BookOpen className="h-3.5 w-3.5 text-pink-500"/> Foro</span>
+                  {availableForums.map(forum => {
+                    const isAlreadyLinked = modules
+                      .find(m => m.id === forumModalModuleId)
+                      ?.lessons.some(l => l.id === forum.id)
+
+                    return (
+                      <div 
+                        key={forum.id} 
+                        onClick={() => {
+                          if (isAlreadyLinked || isLinking) return
+                          handleLinkForum(forum.id)
+                        }}
+                        className={`group flex items-center justify-between rounded-xl border p-4 transition-all ${
+                          isAlreadyLinked 
+                            ? 'border-slate-100 bg-slate-50/70 opacity-60 cursor-not-allowed dark:border-slate-800 dark:bg-slate-900/40'
+                            : 'border-slate-100 hover:border-blue-500 hover:bg-blue-50 dark:border-slate-800 dark:hover:border-blue-500 dark:hover:bg-blue-900/20 cursor-pointer'
+                        }`} 
+                      >
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-semibold text-slate-900 dark:text-white">{forum.name}</h4>
+                            {isAlreadyLinked && (
+                              <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                                Ya en este módulo
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 mt-1.5 text-xs text-slate-500">
+                            <span className="flex items-center gap-1"><BookOpen className="h-3.5 w-3.5 text-pink-500"/> Foro</span>
+                          </div>
                         </div>
+                        {!isAlreadyLinked && (
+                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-50 text-slate-400 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors dark:bg-slate-800 dark:group-hover:bg-blue-900/40">
+                            <Plus className="h-4 w-4" />
+                          </div>
+                        )}
                       </div>
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-50 text-slate-400 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors dark:bg-slate-800 dark:group-hover:bg-blue-900/40">
-                        <Plus className="h-4 w-4" />
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                   {availableForums.length === 0 && (
                     <div className="text-center py-8 text-sm text-slate-500 dark:text-slate-400">
                       No hay foros disponibles para vincular. Puedes crearlos en la sección de Recursos.

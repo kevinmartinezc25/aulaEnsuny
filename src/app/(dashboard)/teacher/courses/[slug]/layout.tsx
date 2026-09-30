@@ -32,13 +32,16 @@ export default function TeacherCourseLayout({
   params: Promise<{ slug: string }> | { slug: string }
 }) {
   const pathname = usePathname()
+  const routeParams = useParams()
   
-  // En Next.js 15, params es una promesa. Lo desenvolvemos si es necesario.
-  const resolvedParams = params && typeof (params as any).then === 'function' 
-    ? React.use(params as Promise<{ slug: string }>) 
-    : (params as { slug: string })
+  // En Next.js 15, en Client Components de layout la fuente fiable es useParams()
+  const slugFromParams = routeParams?.slug as string | undefined
+  const slugFromPath = pathname.startsWith('/teacher/courses/') 
+    ? pathname.split('/teacher/courses/')[1]?.split('/')[0] 
+    : undefined
 
-  const courseSlug = resolvedParams?.slug
+  const rawSlug = slugFromParams || slugFromPath || ''
+  const courseSlug = rawSlug ? decodeURIComponent(rawSlug) : ''
 
   const [course, setCourse] = useState<{ title: string; subject: string } | null>(null)
   
@@ -54,7 +57,7 @@ export default function TeacherCourseLayout({
         } else {
           query = query.eq('slug', courseSlug)
         }
-        const { data } = await query.single()
+        const { data } = await query.maybeSingle()
         if (data) {
           setCourse(data)
         }
