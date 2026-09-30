@@ -39,13 +39,14 @@ import { AttendanceTable } from '@/components/planilla-asistida/AttendanceTable'
 import { AttendanceDashboard } from '@/components/planilla-asistida/AttendanceDashboard'
 import { getAssistedSessions, getAssistedAttendance } from '../../application/attendanceActions'
 import { exportPlanillaToExcel } from '../../application/exportUtils'
+import { PlanillaGeneralAverageDashboard } from '../components/PlanillaGeneralAverageDashboard'
 
 interface PlanillaAsistidaDetailScreenProps {
   subjectId: string
 }
 
 export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDetailScreenProps) {
-  const [activeTab, setActiveTab] = useState<'planilla' | 'actividades' | 'estudiantes' | 'asistencia' | 'configuracion'>('planilla')
+  const [activeTab, setActiveTab] = useState<'planilla' | 'promedio' | 'actividades' | 'estudiantes' | 'asistencia' | 'configuracion'>('planilla')
   const [students, setStudents] = useState<{ id: string, number: number, fullName: string, directoryId?: string }[]>([])
   const [isSaving, setIsSaving] = useState(false)
   const [isLoadingFromDir, setIsLoadingFromDir] = useState(false)
@@ -64,7 +65,7 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
   const initializeStore = usePlanillaStore(state => state.initialize)
   const storeState = usePlanillaStore()
 
-  const handleTabChange = async (newTab: 'planilla' | 'actividades' | 'estudiantes' | 'asistencia' | 'configuracion') => {
+  const handleTabChange = async (newTab: 'planilla' | 'promedio' | 'actividades' | 'estudiantes' | 'asistencia' | 'configuracion') => {
     if (activeTab === newTab) return
     if (storeState.hasUnsavedChanges || storeState.dirtyGrades.length > 0 || storeState.dirtyAttendance.length > 0) {
       await storeState.saveChanges()
@@ -346,30 +347,28 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
           
           {/* Tabs */}
           <div className="flex items-center gap-5 overflow-x-auto custom-scrollbar flex-1 xl:ml-6">
-            <button 
-              onClick={() => handleTabChange('planilla')}
-              className={`pb-2 text-[13px] font-semibold border-b-2 transition-colors whitespace-nowrap ${activeTab === 'planilla' ? 'border-emerald-600 text-emerald-700 dark:text-emerald-500' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-            >
-              Planilla
-            </button>
-            <button 
-              onClick={() => handleTabChange('asistencia')}
-              className={`pb-2 text-[13px] font-semibold border-b-2 transition-colors whitespace-nowrap ${activeTab === 'asistencia' ? 'border-emerald-600 text-emerald-700 dark:text-emerald-500' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-            >
-              Asistencia
-            </button>
-            <button 
-              onClick={() => handleTabChange('estudiantes')}
-              className={`pb-2 text-[13px] font-semibold border-b-2 transition-colors whitespace-nowrap ${activeTab === 'estudiantes' ? 'border-emerald-600 text-emerald-700 dark:text-emerald-500' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-            >
-              Estudiantes
-            </button>
-            <button 
-              onClick={() => handleTabChange('actividades')}
-              className={`pb-2 text-[13px] font-semibold border-b-2 transition-colors whitespace-nowrap ${activeTab === 'actividades' ? 'border-emerald-600 text-emerald-700 dark:text-emerald-500' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-            >
-              Estructura
-            </button>
+            {[
+              { id: 'planilla', label: 'Planilla' },
+              { id: 'asistencia', label: 'Asistencia' },
+              { id: 'estudiantes', label: 'Estudiantes' },
+              { id: 'actividades', label: 'Estructura' },
+              { id: 'promedio', label: 'Promedio General' },
+            ].map((tab) => {
+              const isActive = activeTab === tab.id
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => handleTabChange(tab.id as any)}
+                  className={`pb-2 text-[13px] font-semibold border-b-2 transition-colors whitespace-nowrap ${
+                    isActive
+                      ? 'border-emerald-600 text-emerald-700 dark:text-emerald-500'
+                      : 'border-transparent text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              )
+            })}
           </div>
           
           <div className="flex items-center pb-2 xl:pb-1 shrink-0">
@@ -382,7 +381,7 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
       </div>
 
       {/* Contenido Principal Scrollable */}
-      <div className={`flex-1 ${['planilla', 'asistencia'].includes(activeTab) ? 'overflow-hidden flex flex-col p-2 sm:p-4' : 'overflow-auto p-6'}`}>
+      <div className={`flex-1 ${['planilla', 'asistencia'].includes(activeTab) ? 'overflow-hidden flex flex-col p-2 sm:p-4' : activeTab === 'promedio' ? 'overflow-hidden flex flex-col p-0' : 'overflow-auto p-6'}`}>
         {activeTab === 'estudiantes' && (
           <div className="max-w-5xl mx-auto space-y-6">
             {/* Tarjeta de Control Principal */}
@@ -926,6 +925,10 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
               </>
             )}
           </div>
+        )}
+
+        {activeTab === 'promedio' && (
+          <PlanillaGeneralAverageDashboard subjectName={subjectData?.name} />
         )}
       </div>
 
