@@ -1773,6 +1773,10 @@ export async function getTeacherTodaySchedule(userId: string): Promise<{ schedul
       }
     }
 
+    if (nextClass && currentClass && (nextClass.id === currentClass.id || nextClass.period === currentClass.period)) {
+      nextClass = null
+    }
+
     return { schedule: fullDaySlots, currentClass, nextClass, isWeekend: false }
   } catch (error) {
     console.error('Error fetching today schedule:', error)

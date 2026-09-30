@@ -35,11 +35,16 @@ export function TeacherDashboardScreen(props: TeacherDashboardProps) {
     quizzesCount: 0,
     avgGrade: '—'
   })
+  const initialCurrent = props.initialCurrentClass || null
+  const initialNext = (props.initialNextClass && (!initialCurrent || (props.initialNextClass.id !== initialCurrent.id && props.initialNextClass.period !== initialCurrent.period)))
+    ? props.initialNextClass
+    : null
+
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([])
   const [todaySchedule, setTodaySchedule] = useState<any[]>(props.initialTodaySchedule || [])
   const [isWeekend, setIsWeekend] = useState(props.initialIsWeekend || false)
-  const [currentClass, setCurrentClass] = useState<any | null>(props.initialCurrentClass || null)
-  const [nextClass, setNextClass] = useState<any | null>(props.initialNextClass || null)
+  const [currentClass, setCurrentClass] = useState<any | null>(initialCurrent)
+  const [nextClass, setNextClass] = useState<any | null>(initialNext)
   const [completedClasses, setCompletedClasses] = useState(0)
   const [totalClasses, setTotalClasses] = useState(0)
 
@@ -154,14 +159,17 @@ export function TeacherDashboardScreen(props: TeacherDashboardProps) {
       return { ...cls, isCurrent: isOngoing }
     })
 
-    // Buscar la siguiente clase no libre posterior al horario actual
+    // Buscar la siguiente clase no libre posterior a la clase actual o al momento actual
     for (const cls of updatedSlots) {
       if (!cls.isFree && cls.startTime && cls.startTime.includes(':')) {
         const [sh, sm] = cls.startTime.split(':')
         const startMins = parseInt(sh, 10) * 60 + parseInt(sm, 10)
 
         if (curr) {
-          if (cls.period > curr.period || startMins >= (curr.endMins || 0)) {
+          const clsPeriod = parseInt(cls.period, 10) || 0
+          const currPeriod = parseInt(curr.period, 10) || 0
+          // Debe ser estrictamente un período posterior y no la misma clase
+          if (clsPeriod > currPeriod && cls.id !== curr.id && startMins >= (curr.endMins || 0)) {
             next = cls
             break
           }
@@ -172,6 +180,11 @@ export function TeacherDashboardScreen(props: TeacherDashboardProps) {
           }
         }
       }
+    }
+
+    // Regla estricta de unicidad: la siguiente clase nunca puede ser la misma clase actual
+    if (next && curr && (next.id === curr.id || next.period === curr.period)) {
+      next = null
     }
 
     const total = updatedSlots.filter((s: any) => !s.isFree).length
@@ -246,13 +259,17 @@ export function TeacherDashboardScreen(props: TeacherDashboardProps) {
             if (props.initialTodaySchedule && props.initialTodaySchedule.length > 0) {
               const res = evaluateSchedule(props.initialTodaySchedule)
               setTodaySchedule(res.updatedSlots)
-              setCurrentClass(res.curr || props.initialCurrentClass || null)
-              setNextClass(res.next || props.initialNextClass || null)
+              setCurrentClass(res.curr)
+              setNextClass(res.next)
               setCompletedClasses(res.completed)
               setTotalClasses(res.total)
             } else if (props.initialNextClass || props.initialCurrentClass) {
-              setCurrentClass(props.initialCurrentClass || null)
-              setNextClass(props.initialNextClass || null)
+              const c = props.initialCurrentClass || null
+              const n = (props.initialNextClass && (!c || (props.initialNextClass.id !== c.id && props.initialNextClass.period !== c.period)))
+                ? props.initialNextClass
+                : null
+              setCurrentClass(c)
+              setNextClass(n)
             }
           } catch(e) {
             console.error('Error procesando horario de hoy:', e)
@@ -385,159 +402,193 @@ export function TeacherDashboardScreen(props: TeacherDashboardProps) {
       {activeTab === 'general' && (
         <div className="space-y-8">
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {/* Card Dual: Clase Actual (Gran parte del tamaño) + Siguiente Clase (Cápsula Flotante Embebida) */}
-            <div className={`col-span-1 sm:col-span-2 rounded-2xl border transition-all duration-300 relative text-white ${
-              currentClass
-                ? 'border-emerald-500 bg-gradient-to-r from-emerald-600 to-teal-700 shadow-[0_8px_30px_rgba(16,185,129,0.3)]'
-                : 'border-blue-500 bg-gradient-to-r from-blue-600 to-indigo-700 shadow-[0_8px_30px_rgba(59,130,246,0.3)]'
-            }`}>
-              <div className="flex flex-col md:flex-row items-stretch h-full p-2 sm:p-2.5 md:p-2.5 gap-2.5">
-                {/* PARTE PRINCIPAL: EN QUÉ CLASE ESTÁ (Gran parte del tamaño) */}
-                <div className="flex-1 p-3.5 sm:p-4 md:p-3.5 md:py-3 flex flex-col justify-between">
-                  <div>
-                    {/* Header: Estado y Badge */}
-                    <div className="flex flex-wrap items-center justify-between gap-2 mb-2 sm:mb-2.5">
-                      <div className="flex items-center gap-2">
-                        {currentClass ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/25 border-2 border-white/40 text-white text-[10px] sm:text-[11px] font-extrabold tracking-wide backdrop-blur-md shadow-xs">
-                            <span className="relative flex h-2 w-2">
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-300 opacity-90"></span>
-                              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-200"></span>
+            {/* Card Principal: Si la jornada ha finalizado (sin clase actual ni siguiente), tarjeta unificada a ancho completo */}
+            {(() => {
+              const isSameClass = nextClass && currentClass && (nextClass.id === currentClass.id || nextClass.period === currentClass.period)
+              const effectiveNextClass = isSameClass ? null : nextClass
+              const isFinishedDay = !currentClass && !effectiveNextClass
+
+              if (isFinishedDay) {
+                return (
+                  <div className="col-span-1 sm:col-span-2 rounded-2xl border border-blue-500 bg-gradient-to-r from-blue-600 to-indigo-700 shadow-[0_8px_30px_rgba(59,130,246,0.3)] p-5 sm:p-6 text-white flex items-center justify-center text-center transition-all duration-300">
+                    <h2 className="text-base sm:text-lg md:text-xl font-bold tracking-tight text-white">
+                      Jornada finalizada, no tiene más clases programadas.
+                    </h2>
+                  </div>
+                )
+              }
+
+              return (
+                <div className={`col-span-1 sm:col-span-2 rounded-2xl border transition-all duration-300 relative text-white ${
+                  currentClass
+                    ? 'border-emerald-500 bg-gradient-to-r from-emerald-600 to-teal-700 shadow-[0_8px_30px_rgba(16,185,129,0.3)]'
+                    : 'border-blue-500 bg-gradient-to-r from-blue-600 to-indigo-700 shadow-[0_8px_30px_rgba(59,130,246,0.3)]'
+                }`}>
+                  <div className="flex flex-col md:flex-row items-stretch h-full p-2 sm:p-2.5 md:p-2.5 gap-2.5">
+                    {/* PARTE PRINCIPAL: EN QUÉ CLASE ESTÁ (Gran parte del tamaño) */}
+                    <div className="flex-1 p-3.5 sm:p-4 md:p-3.5 md:py-3 flex flex-col justify-between">
+                      <div>
+                        {/* Header: Estado y Badge */}
+                        <div className="flex flex-wrap items-center justify-between gap-2 mb-2 sm:mb-2.5">
+                          <div className="flex items-center gap-2">
+                            {currentClass ? (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/25 border-2 border-white/40 text-white text-[10px] sm:text-[11px] font-extrabold tracking-wide backdrop-blur-md shadow-xs">
+                                <span className="relative flex h-2 w-2">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-300 opacity-90"></span>
+                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-200"></span>
+                                </span>
+                                AHORA • EN CURSO ({currentClass.period}ª HORA)
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/20 border-2 border-white/30 text-white text-[10px] sm:text-[11px] font-bold tracking-wide backdrop-blur-md">
+                                <Clock className="h-3 w-3 text-blue-200" />
+                                AHORA • SIN CLASE ACTIVA
+                              </span>
+                            )}
+                          </div>
+
+                          {currentClass?.remaining !== undefined && currentClass.remaining > 0 && (
+                            <span className="text-[10px] sm:text-[11px] font-semibold text-emerald-100 bg-white/25 px-2 py-0.5 rounded-full border border-white/30 backdrop-blur-xs">
+                              Termina en ~{currentClass.remaining} min
                             </span>
-                            AHORA • EN CURSO ({currentClass.period}ª HORA)
-                          </span>
+                          )}
+                        </div>
+
+                        {/* Contenido de la clase actual */}
+                        {currentClass ? (
+                          <div className="space-y-1">
+                            <h2 className="text-xl sm:text-2xl md:text-2xl font-extrabold tracking-tight text-white leading-tight">
+                              {currentClass.subject}
+                            </h2>
+                            <div className="flex flex-wrap items-center gap-2.5 text-xs sm:text-sm text-emerald-100 font-medium pt-0.5">
+                              <span className="inline-flex items-center gap-1 bg-white/20 px-2 py-0.5 rounded-lg border border-white/20 backdrop-blur-xs">
+                                <Users className="h-3 w-3 text-emerald-200" />
+                                Grupo {currentClass.group}
+                              </span>
+                              <span className="inline-flex items-center gap-1 bg-white/20 px-2 py-0.5 rounded-lg border border-white/20 backdrop-blur-xs">
+                                <Clock className="h-3 w-3 text-emerald-200" />
+                                {currentClass.startTime}{currentClass.endTime ? ` - ${currentClass.endTime}` : ''}
+                              </span>
+                            </div>
+                          </div>
                         ) : (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/20 border-2 border-white/30 text-white text-[10px] sm:text-[11px] font-bold tracking-wide backdrop-blur-md">
-                            <Clock className="h-3 w-3 text-blue-200" />
-                            {isWeekend
-                              ? 'FIN DE SEMANA'
-                              : totalClasses > 0 && completedClasses >= totalClasses
-                                ? 'JORNADA CONCLUIDA'
-                                : 'AHORA • SIN CLASE ACTIVA'}
-                          </span>
+                          <div className="space-y-0.5 py-0.5">
+                            <h2 className="text-lg sm:text-xl font-bold tracking-tight text-white">
+                              Tiempo de Receso o Libre
+                            </h2>
+                            <p className="text-xs sm:text-[13px] text-blue-100 font-normal">
+                              No estás impartiendo clase en este instante. Consulta tu próxima clase en la tarjeta lateral.
+                            </p>
+                          </div>
                         )}
                       </div>
 
-                      {currentClass?.remaining !== undefined && currentClass.remaining > 0 && (
-                        <span className="text-[10px] sm:text-[11px] font-semibold text-emerald-100 bg-white/25 px-2 py-0.5 rounded-full border border-white/30 backdrop-blur-xs">
-                          Termina en ~{currentClass.remaining} min
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Contenido de la clase actual */}
-                    {currentClass ? (
-                      <div className="space-y-1">
-                        <h2 className="text-xl sm:text-2xl md:text-2xl font-extrabold tracking-tight text-white leading-tight">
-                          {currentClass.subject}
-                        </h2>
-                        <div className="flex flex-wrap items-center gap-2.5 text-xs sm:text-sm text-emerald-100 font-medium pt-0.5">
-                          <span className="inline-flex items-center gap-1 bg-white/20 px-2 py-0.5 rounded-lg border border-white/20 backdrop-blur-xs">
-                            <Users className="h-3 w-3 text-emerald-200" />
-                            Grupo {currentClass.group}
-                          </span>
-                          <span className="inline-flex items-center gap-1 bg-white/20 px-2 py-0.5 rounded-lg border border-white/20 backdrop-blur-xs">
-                            <Clock className="h-3 w-3 text-emerald-200" />
-                            {currentClass.startTime}{currentClass.endTime ? ` - ${currentClass.endTime}` : ''}
-                          </span>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-0.5 py-0.5">
-                        <h2 className="text-lg sm:text-xl font-bold tracking-tight text-white">
-                          {isWeekend
-                            ? 'Día de Descanso'
-                            : totalClasses > 0 && completedClasses >= totalClasses
-                              ? '¡Jornada de Hoy Finalizada!'
-                              : 'Tiempo de Receso o Libre'}
-                        </h2>
-                        <p className="text-xs sm:text-[13px] text-blue-100 font-normal">
-                          {isWeekend
-                            ? 'No tienes clases programadas para el fin de semana.'
-                            : totalClasses > 0 && completedClasses >= totalClasses
-                              ? 'Has completado todas tus clases asignadas para el día de hoy.'
-                              : 'No estás impartiendo clase en este instante. Consulta tu siguiente clase en la tarjeta lateral.'}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Barra de progreso de la clase actual */}
-                  {currentClass && currentClass.progress !== undefined && (
-                    <div className="mt-2.5 pt-1.5">
-                      <div className="flex justify-between items-center text-[9px] sm:text-[10px] uppercase tracking-wider text-emerald-200 font-bold mb-1">
-                        <span>Progreso de la sesión</span>
-                        <span>{currentClass.progress}%</span>
-                      </div>
-                      <div className="w-full bg-white/20 rounded-full h-1.5 overflow-hidden">
-                        <div
-                          className="bg-white h-1.5 rounded-full transition-all duration-500 ease-out"
-                          style={{ width: `${currentClass.progress}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* PARTE SECUNDARIA: CÁPSULA FLOTANTE EMBEBIDA EN VERDE COMPLETO SÓLIDO */}
-                <div className="md:w-60 lg:w-68 shrink-0 flex">
-                  <div className={`w-full rounded-2xl border-2 p-3 sm:p-3.5 md:p-3 md:py-3.5 flex flex-col justify-between transition-all shadow-xl ${
-                    currentClass
-                      ? 'bg-emerald-900 border-emerald-400 shadow-[0_10px_30px_rgba(6,78,59,0.6)]'
-                      : 'bg-emerald-600 border-emerald-300 shadow-[0_10px_30px_rgba(16,185,129,0.5)]'
-                  }`}>
-                    <div>
-                      {/* Cabecera de la cápsula */}
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-950/40 border border-emerald-300/60 text-[10px] font-extrabold uppercase tracking-wider text-white shadow-xs">
-                          <Clock className="h-3 w-3 text-emerald-200" />
-                          <span>Próxima Clase</span>
-                        </span>
-                        <span className="text-[10px] sm:text-[11px] font-bold text-emerald-100 flex items-center gap-1">
-                          <span>Siguiente</span>
-                          <ArrowRight className="h-3 w-3 text-emerald-200" />
-                        </span>
-                      </div>
-
-                      {nextClass ? (
-                        <div className="space-y-1.5">
-                          <h3 className="text-sm sm:text-base font-bold text-white line-clamp-1 drop-shadow-xs">
-                            {nextClass.subject}
-                          </h3>
-                          <p className="text-xs text-emerald-100 font-medium flex items-center gap-1.5">
-                            <Users className="h-3.5 w-3.5 text-emerald-200" />
-                            Grupo {nextClass.group}
-                          </p>
-                          <div className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-bold text-white bg-emerald-950/40 px-2 py-0.5 rounded-md border border-emerald-300/50 mt-0.5 shadow-xs">
-                            <Clock className="h-3 w-3 text-emerald-200" />
-                            {nextClass.startTime}{nextClass.endTime ? ` - ${nextClass.endTime}` : ''}
+                      {/* Barra de progreso de la clase actual */}
+                      {currentClass && currentClass.progress !== undefined && (
+                        <div className="mt-2.5 pt-1.5">
+                          <div className="flex justify-between items-center text-[9px] sm:text-[10px] uppercase tracking-wider text-emerald-200 font-bold mb-1">
+                            <span>Progreso de la sesión</span>
+                            <span>{currentClass.progress}%</span>
+                          </div>
+                          <div className="w-full bg-white/20 rounded-full h-1.5 overflow-hidden">
+                            <div
+                              className="bg-white h-1.5 rounded-full transition-all duration-500 ease-out"
+                              style={{ width: `${currentClass.progress}%` }}
+                            />
                           </div>
                         </div>
-                      ) : (
-                        <div className="space-y-1 py-0.5">
-                          <p className="text-xs sm:text-sm font-semibold text-white flex items-center gap-1.5">
-                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-200 shrink-0" />
-                            Sin clases pendientes
-                          </p>
-                          <p className="text-[11px] text-emerald-100">
-                            {isWeekend ? 'Buen fin de semana.' : 'No hay más clases programadas hoy.'}
-                          </p>
-                        </div>
                       )}
                     </div>
 
-                    {nextClass && (
-                      <div className="pt-2 mt-2 border-t border-emerald-400/40 flex items-center justify-between text-[10px] sm:text-[11px] text-emerald-100 font-medium">
-                        <span>Horario regular</span>
-                        <span className="text-white font-extrabold bg-emerald-950/50 border border-emerald-300/60 px-2.5 py-0.5 rounded-md">
-                          {nextClass.period}ª Hora
-                        </span>
+                    {/* PARTE SECUNDARIA: CÁPSULA FLOTANTE EMBEBIDA */}
+                    <div className="md:w-60 lg:w-68 shrink-0 flex">
+                      <div className={`w-full rounded-2xl border-2 p-3 sm:p-3.5 md:p-3 md:py-3.5 flex flex-col justify-between transition-all shadow-xl ${
+                        currentClass
+                          ? 'bg-gradient-to-r from-blue-600 to-indigo-700 border-blue-400 shadow-[0_10px_30px_rgba(59,130,246,0.4)]'
+                          : 'bg-emerald-600 border-emerald-300 shadow-[0_10px_30px_rgba(16,185,129,0.5)]'
+                      }`}>
+                        <div>
+                          {/* Cabecera de la cápsula */}
+                          <div className="flex items-center mb-2">
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider shadow-xs ${
+                              currentClass
+                                ? 'bg-blue-950/40 border border-blue-300/60 text-white'
+                                : 'bg-emerald-950/40 border border-emerald-300/60 text-white'
+                            }`}>
+                              <Clock className={`h-3 w-3 ${currentClass ? 'text-blue-200' : 'text-emerald-200'}`} />
+                              <span>Próxima Clase</span>
+                            </span>
+                          </div>
+
+                          {effectiveNextClass ? (
+                            <div className="space-y-1.5">
+                              <h3 className="text-sm sm:text-base font-bold text-white line-clamp-1 drop-shadow-xs">
+                                {effectiveNextClass.subject}
+                              </h3>
+                              <p className={`text-xs font-medium flex items-center gap-1.5 ${
+                                currentClass ? 'text-blue-100' : 'text-emerald-100'
+                              }`}>
+                                <Users className={`h-3.5 w-3.5 ${currentClass ? 'text-blue-200' : 'text-emerald-200'}`} />
+                                Grupo {effectiveNextClass.group}
+                              </p>
+                              <div className={`inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-bold text-white px-2 py-0.5 rounded-md mt-0.5 shadow-xs ${
+                                currentClass
+                                  ? 'bg-blue-950/40 border border-blue-300/50'
+                                  : 'bg-emerald-950/40 border border-emerald-300/50'
+                              }`}>
+                                <Clock className={`h-3 w-3 ${currentClass ? 'text-blue-200' : 'text-emerald-200'}`} />
+                                {effectiveNextClass.startTime}{effectiveNextClass.endTime ? ` - ${effectiveNextClass.endTime}` : ''}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="space-y-1 py-1">
+                              <p className="text-xs sm:text-sm font-bold text-white leading-snug">
+                                No tiene más clases programadas
+                              </p>
+                              <p className={`text-[11px] ${currentClass ? 'text-blue-100' : 'text-emerald-100'}`}>
+                                Última clase de la jornada de hoy.
+                              </p>
+                            </div>
+                          )}
+                        </div>
+
+                        {effectiveNextClass ? (
+                          <div className={`pt-2 mt-2 border-t flex items-center justify-between text-[10px] sm:text-[11px] font-medium ${
+                            currentClass
+                              ? 'border-blue-400/40 text-blue-100'
+                              : 'border-emerald-400/40 text-emerald-100'
+                          }`}>
+                            <span>Horario regular</span>
+                            <span className={`text-white font-extrabold px-2.5 py-0.5 rounded-md border ${
+                              currentClass
+                                ? 'bg-blue-950/50 border border-blue-300/60'
+                                : 'bg-emerald-950/50 border border-emerald-300/60'
+                            }`}>
+                              {effectiveNextClass.period}ª Hora
+                            </span>
+                          </div>
+                        ) : (
+                          <div className={`pt-2 mt-2 border-t flex items-center justify-between text-[10px] sm:text-[11px] font-medium ${
+                            currentClass
+                              ? 'border-blue-400/40 text-blue-100'
+                              : 'border-emerald-400/40 text-emerald-100'
+                          }`}>
+                            <span>Jornada</span>
+                            <span className={`text-white font-extrabold px-2.5 py-0.5 rounded-md border ${
+                              currentClass
+                                ? 'bg-blue-950/50 border border-blue-300/60'
+                                : 'bg-emerald-950/50 border border-emerald-300/60'
+                            }`}>
+                              Final de jornada
+                            </span>
+                          </div>
+                        )}
                       </div>
-                    )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
+              )
+            })()}
             
             {/* Progreso de Jornada */}
             <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.02)] dark:border-slate-800/60 dark:bg-slate-900 flex flex-col justify-center relative overflow-hidden">
