@@ -868,84 +868,150 @@ export async function getAdminDashboardStats() {
     const [
       { data: dbProfiles, error: profilesErr },
       { data: dbCourses, error: coursesErr },
-      { data: dbGrades, error: gradesErr },
+      { data: dbAulaGrades },
       { count: quizAttemptsCount, error: attemptsErr },
-      { count: resourcesCount, error: resErr }
+      { count: resourcesCount },
+      { data: dbAssistedGrades }
     ] = await Promise.all([
       adminClient.from('profiles').select('id, first_name, last_name, roles!inner(name)'),
       adminClient.from('courses').select('id, title, status, subject, grade_level'),
+      // Tabla del Aula Virtual (puede estar vacía si no usan módulo de quizzes)
       adminClient.from('grades').select('score, student_id, course_id, created_at'),
       adminClient.from('quiz_attempts').select('*', { count: 'exact', head: true }),
-      adminClient.from('resources').select('*', { count: 'exact', head: true })
+      adminClient.from('resources').select('*', { count: 'exact', head: true }),
+      // Tabla de Planilla Asistida: fuente principal de calificaciones académicas
+      adminClient.from('assisted_grades').select(`
+        id, student_id, grade_value, created_at,
+        assisted_students (
+          id, full_name,
+          assisted_subjects (
+            id, name, grade, group_number
+          )
+        )
+      `)
     ])
 
     if (profilesErr) throw profilesErr
     if (coursesErr) throw coursesErr
-    if (gradesErr) throw gradesErr
     if (attemptsErr) throw attemptsErr
 
     const students = ((dbProfiles as any[]) || []).filter(p => p.roles?.name === 'student')
     const teachers = ((dbProfiles as any[]) || []).filter(p => p.roles?.name === 'teacher')
     const activeCoursesCount = (dbCourses || []).filter(c => c.status === 'active').length
-    const gradesCount = dbGrades?.length || 0
-    const totalScore = dbGrades?.reduce((sum, g) => sum + Number(g.score), 0) || 0
-    const avgGradeVal = gradesCount > 0 ? (totalScore / gradesCount).toFixed(1) : '0.0'
     const quizzesCount = quizAttemptsCount || 0
     const resourcesTotal = resourcesCount || 0
 
-    // 5. Historial de rendimiento mensual
-    const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
-    const gradesByMonth: Record<string, { sum: number; count: number }> = {}
-    dbGrades?.forEach(g => {
-      const date = new Date(g.created_at)
-      const monthName = months[date.getMonth()]
-      if (!gradesByMonth[monthName]) {
-        gradesByMonth[monthName] = { sum: 0, count: 0 }
-      }
-      gradesByMonth[monthName].sum += Number(g.score)
-      gradesByMonth[monthName].count += 1
-    })
+    // ─── Calificaciones Reales: Planilla Asistida (assisted_grades) ───────────
+    const assistedCount = dbAssistedGrades?.length || 0
+    const aulaCount = dbAulaGrades?.length || 0
 
-    // Obtener los últimos 6 meses de forma dinámica basados en la fecha de hoy
-    const generatedPerformanceData = []
-    const today = new Date()
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(today.getFullYear(), today.getMonth() - i, 1)
-      const monthName = months[d.getMonth()]
-      const item = gradesByMonth[monthName]
-      generatedPerformanceData.push({
-        month: monthName,
-        promedio: item && item.count > 0 ? Number((item.sum / item.count).toFixed(1)) : 0.0
-      })
+    // Promedio Institucional: priorizar assisted_grades si tiene datos, sino usar grades del Aula Virtual
+    let avgGradeVal = '0.0'
+    if (assistedCount > 0) {
+      const totalAssisted = (dbAssistedGrades || []).reduce((sum, g) => sum + Number(g.grade_value), 0)
+      avgGradeVal = (totalAssisted / assistedCount).toFixed(1)
+    } else if (aulaCount > 0) {
+      const totalAula = (dbAulaGrades || []).reduce((sum, g) => sum + Number(g.score), 0)
+      avgGradeVal = (totalAula / aulaCount).toFixed(1)
     }
 
-    // 6. Calcular estudiantes en riesgo (< 3.0 promedio)
-    const studentGrades: Record<string, { sum: number; count: number }> = {}
-    dbGrades?.forEach(g => {
-      if (!studentGrades[g.student_id]) {
-        studentGrades[g.student_id] = { sum: 0, count: 0 }
-      }
-      studentGrades[g.student_id].sum += Number(g.score)
-      studentGrades[g.student_id].count += 1
-    })
+    // ─── 5. Historial de Rendimiento Mensual (últimos 6 meses) ────────────────
+    const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+    const gradesByMonthYear: Record<string, { sum: number; count: number }> = {}
 
-    const generatedAtRisk: any[] = []
-    students.forEach(s => {
-      const gradesInfo = studentGrades[s.id]
-      if (gradesInfo && gradesInfo.count > 0) {
-        const avg = Number((gradesInfo.sum / gradesInfo.count).toFixed(2))
-        if (avg < 3.0) {
-          const name = `${s.first_name} ${s.last_name || ''}`.trim()
-          const initials = `${s.first_name[0] || ''}${s.last_name ? s.last_name[0] : ''}`.toUpperCase()
-          generatedAtRisk.push({
-            name,
-            grade: s.grade_level ? `Grado ${s.grade_level}` : 'Sin Grado',
-            avg,
-            initials
-          })
-        }
+    const addToMonthBucket = (dateStr: string, value: number) => {
+      const d = new Date(dateStr)
+      if (isNaN(d.getTime())) return
+      const key = `${d.getFullYear()}-${d.getMonth()}`
+      if (!gradesByMonthYear[key]) gradesByMonthYear[key] = { sum: 0, count: 0 }
+      gradesByMonthYear[key].sum += value
+      gradesByMonthYear[key].count += 1
+    }
+
+    if (assistedCount > 0) {
+      dbAssistedGrades!.forEach(g => addToMonthBucket(g.created_at, Number(g.grade_value)))
+    } else {
+      dbAulaGrades?.forEach(g => addToMonthBucket(g.created_at, Number(g.score)))
+    }
+
+    const generatedPerformanceData = []
+    const today = new Date()
+    const globalAvg = Number(avgGradeVal) || 4.0
+    let lastKnownAvg = globalAvg
+
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(today.getFullYear(), today.getMonth() - i, 1)
+      const key = `${d.getFullYear()}-${d.getMonth()}`
+      const item = gradesByMonthYear[key]
+      const monthName = months[d.getMonth()]
+      if (item && item.count > 0) {
+        lastKnownAvg = Number((item.sum / item.count).toFixed(1))
       }
-    })
+      generatedPerformanceData.push({ month: monthName, promedio: lastKnownAvg })
+    }
+
+    // ─── 6. Estudiantes en Riesgo (promedio < 3.0) ────────────────────────────
+    const generatedAtRisk: any[] = []
+
+    if (assistedCount > 0) {
+      interface StudentRiskAgg { name: string; grade: string; sum: number; count: number }
+      const assistedStudentMap = new Map<string, StudentRiskAgg>()
+
+      dbAssistedGrades!.forEach(ag => {
+        const student = ag.assisted_students as any
+        if (!student) return
+        const sid = student.id || ag.student_id
+        const subject = student.assisted_subjects as any
+
+        if (!assistedStudentMap.has(sid)) {
+          const rawName: string = student.full_name || 'Estudiante'
+          const formattedName = rawName
+            .toLowerCase()
+            .split(' ')
+            .filter(Boolean)
+            .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
+            .join(' ')
+          const gradeLabel = subject?.grade
+            ? `Grado ${subject.grade}°${subject.group_number ? ` · Grupo ${subject.group_number}` : ''}`
+            : 'Sin Grado'
+          assistedStudentMap.set(sid, { name: formattedName, grade: gradeLabel, sum: 0, count: 0 })
+        }
+
+        const s = assistedStudentMap.get(sid)!
+        s.sum += Number(ag.grade_value)
+        s.count += 1
+      })
+
+      assistedStudentMap.forEach((s) => {
+        if (s.count > 0) {
+          const avg = Number((s.sum / s.count).toFixed(2))
+          if (avg < 3.0) {
+            const parts = s.name.split(' ')
+            const initials = ((parts[0]?.[0] || 'E') + (parts[1]?.[0] || '')).toUpperCase()
+            generatedAtRisk.push({ name: s.name, grade: s.grade, avg, initials })
+          }
+        }
+      })
+    } else {
+      // Fallback: usar tabla grades del Aula Virtual
+      const studentGradesMap: Record<string, { sum: number; count: number }> = {}
+      dbAulaGrades?.forEach(g => {
+        if (!studentGradesMap[g.student_id]) studentGradesMap[g.student_id] = { sum: 0, count: 0 }
+        studentGradesMap[g.student_id].sum += Number(g.score)
+        studentGradesMap[g.student_id].count += 1
+      })
+      students.forEach(s => {
+        const gi = studentGradesMap[s.id]
+        if (gi && gi.count > 0) {
+          const avg = Number((gi.sum / gi.count).toFixed(2))
+          if (avg < 3.0) {
+            const name = `${s.first_name} ${s.last_name || ''}`.trim()
+            const initials = `${s.first_name[0] || ''}${s.last_name ? s.last_name[0] : ''}`.toUpperCase()
+            generatedAtRisk.push({ name, grade: 'Sin Grado', avg, initials })
+          }
+        }
+      })
+    }
 
     // 7 + 8 + 9. Paralelizar todas las queries secundarias en un solo Promise.all
     // (antes eran ~8 queries secuenciales; ahora se ejecutan simultáneamente)
@@ -984,7 +1050,7 @@ export async function getAdminDashboardStats() {
     })
 
     const generatedTopCourses = (dbCourses || []).map(c => {
-      const courseGrades = dbGrades?.filter(g => g.course_id === c.id) || []
+      const courseGrades = dbAulaGrades?.filter(g => g.course_id === c.id) || []
       const studentsInCourse = dashCourseCounts[c.id] || 0
       const completionPct = courseGrades.length > 0
         ? Math.min(Math.round((courseGrades.filter(g => Number(g.score) >= 3.0).length / courseGrades.length) * 100), 100)
@@ -1006,8 +1072,8 @@ export async function getAdminDashboardStats() {
 
     // A. Progreso de lecciones
     dbProgress?.forEach((p: { completed_at: string | null }) => addActivityDate(p.completed_at))
-    // B. Calificaciones asentadas
-    dbGrades?.forEach(g => addActivityDate(g.created_at))
+    // B. Calificaciones del Aula Virtual (si existen)
+    dbAulaGrades?.forEach(g => addActivityDate(g.created_at))
     // C. Intentos de quizzes
     dbAttempts?.forEach((a: { completed_at: string | null; started_at: string | null }) => addActivityDate(a.completed_at || a.started_at))
     // D. Bitácora de auditoría de notas

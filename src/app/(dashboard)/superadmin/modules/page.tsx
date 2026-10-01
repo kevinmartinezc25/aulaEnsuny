@@ -50,7 +50,7 @@ const ROLE_PRESETS = [
     keys: [
       'teachers', 'students', 'courses', 'grade-levels',
       'schedules', 'evaluations', 'academic-registry',
-      'academic-reports', 'permissions', 'institutional-agenda',
+      'academic-reports', 'permissions', 'early-alerts', 'institutional-agenda',
       'calendar', 'notifications'
     ]
   },
