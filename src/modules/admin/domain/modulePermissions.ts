@@ -38,6 +38,7 @@ export const ALL_ADMIN_MODULES: AdminModuleDefinition[] = [
 
   // Gestión Institucional
   { key: 'permissions', name: 'Permisos Docentes', section: 'Gestión Institucional', description: 'Flujo de revisión, aprobación y cobertura de ausencias docentes.', href: '/admin/permissions' },
+  { key: 'early-alerts', name: 'Alertas Tempranas', section: 'Gestión Institucional', description: 'Identificación y seguimiento de estudiantes con bajo rendimiento académico desde Planilla Asistida.', href: '/admin/early-alerts' },
   { key: 'disciplinary', name: 'Convivencia', section: 'Gestión Institucional', description: 'Seguimiento disciplinario, actas de compromiso y citaciones.', href: '/admin/disciplinary' },
   { key: 'elections', name: 'Elecciones', section: 'Gestión Institucional', description: 'Gobierno escolar, personería y votaciones electrónicas.', href: '/admin/elections' },
 

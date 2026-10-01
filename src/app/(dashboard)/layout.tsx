@@ -7,7 +7,7 @@ import {
   PanelLeftClose, PanelLeftOpen, Moon, Sun, LayoutDashboard, Users, GraduationCap,
   ClipboardList, BarChart2, BellRing, FolderOpen, ShieldCheck, ShieldAlert, UserCog, Activity, ChevronRight, FileText, CalendarDays, Download,
   Layers, FileCheck2, FileSpreadsheet, Vote, CalendarCheck, SlidersHorizontal, CheckSquare,
-  Building2, UserCircle, BarChart
+  Building2, UserCircle, BarChart, AlertTriangle
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
@@ -41,6 +41,7 @@ const ADMIN_NAV = [
     section: 'Gestión Institucional',
     items: [
       { name: 'Permisos Docentes', href: '/admin/permissions', icon: FileCheck2 },
+      { name: 'Alertas Tempranas', href: '/admin/early-alerts', icon: AlertTriangle },
       { name: 'Convivencia', href: '/admin/disciplinary', icon: ShieldAlert },
       { name: 'Elecciones', href: '/admin/elections', icon: Vote },
     ],
