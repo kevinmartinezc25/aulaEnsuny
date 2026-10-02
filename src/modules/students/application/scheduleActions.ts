@@ -292,9 +292,11 @@ export async function getStudentDashboardSchedule(): Promise<StudentDashboardSch
     const dayKey = normalizeDayToKey(slot.day_of_week)
     if (!dayKey) continue
 
-    const startSlot = defaultTimeSlots.find(t => t.id === slot.period_id)
-    const endPeriod = slot.period_id + (slot.duration || 1) - 1
-    const endSlot = defaultTimeSlots.find(t => t.id === endPeriod)
+    const numPeriodId = parseInt(slot.period_id, 10)
+    const startSlot = defaultTimeSlots.find(t => t.id === numPeriodId || t.id?.toString() === slot.period_id?.toString())
+    const slotDuration = parseInt(slot.duration, 10) || 1
+    const endPeriod = (isNaN(numPeriodId) ? 1 : numPeriodId) + slotDuration - 1
+    const endSlot = defaultTimeSlots.find(t => t.id === endPeriod || t.id?.toString() === endPeriod?.toString())
 
     formattedSchedule[dayKey].push({
       id: slot.id,
@@ -304,7 +306,7 @@ export async function getStudentDashboardSchedule(): Promise<StudentDashboardSch
       teacher: slot.teacher?.full_name || 'Trabajo Autónomo',
       location: slot.classroom?.name || undefined,
       group: slot.group?.name || targetGroupName || undefined,
-      period: slot.period_id,
+      period: isNaN(numPeriodId) ? slot.period_id : numPeriodId,
       color: slot.subject?.color || '#059669',
       isNovedad: slot.isNovedad || false
     })
