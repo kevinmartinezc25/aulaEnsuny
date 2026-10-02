@@ -228,12 +228,73 @@ export async function getStudentDashboardSchedule(): Promise<StudentDashboardSch
     5: 'viernes'
   }
 
+  // 4.5. Obtener Novedades (sch_daily_overrides) para el día de hoy
+  const todayDateStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' })
+  const { data: overrideSlots } = await supabase
+    .from('sch_daily_overrides')
+    .select(`
+      id,
+      day_of_week,
+      period_id,
+      duration,
+      group_id,
+      subject_id,
+      teacher_id,
+      group:sch_groups(id, name),
+      teacher:academic_teachers(id, full_name),
+      subject:sch_subjects(id, name, color, room_type),
+      classroom:sch_classrooms(id, name)
+    `)
+    .eq('target_date', todayDateStr)
+    .eq('group_id', targetGroupId)
+
+  let finalSlots = slots as any[]
+
+  if (overrideSlots && overrideSlots.length > 0) {
+    const normalizeDay = (day: any): string => {
+      if (!day) return ''
+      const d = day.toString().trim()
+      const map: Record<string, string> = {
+        'lunes': '1', 'martes': '2', 'miércoles': '3', 'miercoles': '3', 'jueves': '4', 'viernes': '5',
+        '1': '1', '2': '2', '3': '3', '4': '4', '5': '5'
+      }
+      return map[d.toLowerCase()] || d
+    }
+
+    const todayDayOfWeek = normalizeDay(overrideSlots[0].day_of_week)
+    const filteredRegular = finalSlots.filter(s => normalizeDay(s.day_of_week) !== todayDayOfWeek)
+    
+    const mappedOverrides = overrideSlots.map(s => {
+      const isIdentical = finalSlots.some(r => 
+        normalizeDay(r.day_of_week) === normalizeDay(s.day_of_week) &&
+        r.period_id?.toString() === s.period_id?.toString() &&
+        r.teacher_id === s.teacher_id &&
+        r.subject_id === s.subject_id &&
+        (r.classroom as any)?.name === (s.classroom as any)?.name
+      )
+      return { ...s, isNovedad: !isIdentical }
+    })
+
+    finalSlots = [...filteredRegular, ...mappedOverrides]
+  }
+
   const formattedSchedule: ScheduleData = {
     lunes: [], martes: [], miercoles: [], jueves: [], viernes: []
   }
 
-  for (const slot of (slots as any[])) {
-    const dayKey = dayKeyMap[slot.day_of_week]
+  const normalizeToKey = (day: any): ScheduleDayKey | null => {
+    if (!day) return null
+    const d = day.toString().trim().toLowerCase()
+    if (d === '1' || d === 'lunes') return 'lunes'
+    if (d === '2' || d === 'martes') return 'martes'
+    if (d === '3' || d === 'miércoles' || d === 'miercoles') return 'miercoles'
+    if (d === '4' || d === 'jueves') return 'jueves'
+    if (d === '5' || d === 'viernes') return 'viernes'
+    return null
+  }
+
+  for (const slot of finalSlots) {
+    const dayKey = normalizeToKey(slot.day_of_week)
     if (!dayKey) continue
 
     const startSlot = defaultTimeSlots.find(t => t.id === slot.period_id)
@@ -249,7 +310,8 @@ export async function getStudentDashboardSchedule(): Promise<StudentDashboardSch
       location: slot.classroom?.name || undefined,
       group: slot.group?.name || targetGroupName || undefined,
       period: slot.period_id,
-      color: slot.subject?.color || '#059669'
+      color: slot.subject?.color || '#059669',
+      isNovedad: slot.isNovedad || false
     })
   }
 

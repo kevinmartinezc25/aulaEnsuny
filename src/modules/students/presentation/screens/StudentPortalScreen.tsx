@@ -366,12 +366,21 @@ export function StudentPortalScreen() {
                 <div className='flex-[7] p-3 sm:p-4.5 md:px-6 flex flex-col justify-center'>
                   <div className='flex items-center justify-between gap-2 mb-1.5'>
                     {currentClass ? (
-                      <span className='inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-950/50 border border-emerald-500/30 text-emerald-200 text-[9px] sm:text-[10px] font-extrabold tracking-wide'>
-                        <span className='relative flex h-1.5 w-1.5'>
-                          <span className='animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75'></span>
-                          <span className='relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500'></span>
-                        </span>
-                        EN CURSO ({currentClass.period}ª)
+                      <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[9px] sm:text-[10px] font-extrabold tracking-wide ${currentClass.isNovedad ? 'bg-amber-950/50 border-amber-500/50 text-amber-200' : 'bg-emerald-950/50 border-emerald-500/30 text-emerald-200'}`}>
+                        {currentClass.isNovedad ? (
+                          <>
+                            <ShieldAlert className='h-3 w-3 text-amber-400' />
+                            NOVEDAD ({currentClass.period}ª)
+                          </>
+                        ) : (
+                          <>
+                            <span className='relative flex h-1.5 w-1.5'>
+                              <span className='animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75'></span>
+                              <span className='relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500'></span>
+                            </span>
+                            EN CURSO ({currentClass.period}ª)
+                          </>
+                        )}
                       </span>
                     ) : (
                       <span className='inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-slate-900/40 border border-slate-600/30 text-slate-300 text-[9px] sm:text-[10px] font-bold tracking-wide'>
@@ -425,8 +434,8 @@ export function StudentPortalScreen() {
                 {/* 30% Derecha: Próxima Clase */}
                 <div className='flex-[3] p-3 sm:p-4.5 md:px-5 bg-gradient-to-r from-blue-600 to-indigo-700 flex flex-col justify-center'>
                   <div className='mb-1'>
-                    <span className='inline-flex items-center gap-1 text-[8px] sm:text-[9px] font-extrabold uppercase tracking-wider text-blue-200'>
-                      <Clock className='h-2.5 w-2.5' />
+                    <span className={`inline-flex items-center gap-1 text-[8px] sm:text-[9px] font-extrabold uppercase tracking-wider ${effectiveNextClass?.isNovedad ? 'text-amber-300' : 'text-blue-200'}`}>
+                      {effectiveNextClass?.isNovedad ? <ShieldAlert className='h-2.5 w-2.5' /> : <Clock className='h-2.5 w-2.5' />}
                       {effectiveNextClass ? `Próxima (${effectiveNextClass.period}°)` : 'Próxima'}
                     </span>
                   </div>
