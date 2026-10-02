@@ -74,7 +74,7 @@ export function StudentAttendanceClientView({
   const [selectedPeriod, setSelectedPeriod] = useState<string>('all')
 
   // Filtros de Nivel 2 (Trazabilidad)
-  const [traceFilter, setTraceFilter] = useState<'all' | 'A' | 'T' | 'I' | 'E'>('all')
+  const [traceFilter, setTraceFilter] = useState<'all' | 'A' | 'T' | 'I' | 'E' | 'NONE'>('all')
 
   // Períodos disponibles
   const availablePeriods = useMemo(() => {
@@ -185,31 +185,40 @@ export function StudentAttendanceClientView({
             </div>
 
             {/* Porcentaje de asistencia en la materia */}
-            {selectedSubjectSummary && (
-              <div className="flex items-center gap-3 sm:self-center bg-slate-50 dark:bg-slate-800/60 px-4 py-2.5 rounded-2xl border border-slate-200/60 dark:border-slate-700/60">
-                <div className="text-right">
-                  <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Asistencia</div>
-                  <div className={`text-lg font-black ${
-                    selectedSubjectSummary.attendancePercentage >= 80 
-                      ? 'text-emerald-600 dark:text-emerald-400' 
+            {selectedSubjectSummary && (() => {
+              const evaluatedCount = selectedSubjectSummary.attendedCount + (selectedSubjectSummary.tardyCount || 0) + selectedSubjectSummary.unjustifiedAbsences + selectedSubjectSummary.excusedAbsences
+              const hasEvaluated = evaluatedCount > 0
+
+              return (
+                <div className="flex items-center gap-3 sm:self-center bg-slate-50 dark:bg-slate-800/60 px-4 py-2.5 rounded-2xl border border-slate-200/60 dark:border-slate-700/60">
+                  <div className="text-right">
+                    <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Asistencia</div>
+                    <div className={`font-black ${
+                      !hasEvaluated
+                        ? 'text-sm sm:text-base text-slate-400 dark:text-slate-500 font-semibold'
+                        : selectedSubjectSummary.attendancePercentage >= 80 
+                        ? 'text-lg text-emerald-600 dark:text-emerald-400' 
+                        : selectedSubjectSummary.attendancePercentage >= 60 
+                        ? 'text-lg text-amber-600 dark:text-amber-400' 
+                        : 'text-lg text-rose-600 dark:text-rose-400'
+                    }`}>
+                      {hasEvaluated ? `${selectedSubjectSummary.attendancePercentage}%` : 'Sin registros'}
+                    </div>
+                  </div>
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm ${
+                    !hasEvaluated
+                      ? 'bg-slate-200/60 dark:bg-slate-800 text-slate-400 dark:text-slate-500'
+                      : selectedSubjectSummary.attendancePercentage >= 80 
+                      ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' 
                       : selectedSubjectSummary.attendancePercentage >= 60 
-                      ? 'text-amber-600 dark:text-amber-400' 
-                      : 'text-rose-600 dark:text-rose-400'
+                      ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400' 
+                      : 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
                   }`}>
-                    {selectedSubjectSummary.attendancePercentage}%
+                    {hasEvaluated ? <Percent className="h-4 w-4" /> : <Clock className="h-4 w-4" />}
                   </div>
                 </div>
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm ${
-                  selectedSubjectSummary.attendancePercentage >= 80 
-                    ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' 
-                    : selectedSubjectSummary.attendancePercentage >= 60 
-                    ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400' 
-                    : 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
-                }`}>
-                  <Percent className="h-4 w-4" />
-                </div>
-              </div>
-            )}
+              )
+            })()}
           </div>
 
           {/* Tarjetas de Resumen de la Asignatura */}
@@ -334,6 +343,19 @@ export function StudentAttendanceClientView({
               <AlertCircle className="h-3.5 w-3.5" />
               Excusas ({selectedSubjectSummary?.excusedAbsences || 0})
             </button>
+            {selectedSubjectSummary && selectedSubjectSummary.unrecordedCount > 0 && (
+              <button
+                onClick={() => setTraceFilter('NONE')}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                  traceFilter === 'NONE'
+                    ? 'bg-slate-700 text-white shadow-sm'
+                    : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50'
+                }`}
+              >
+                <Clock className="h-3.5 w-3.5 opacity-60" />
+                Sin registrar ({selectedSubjectSummary.unrecordedCount})
+              </button>
+            )}
           </div>
 
           {/* Listado de Sesiones / Fechas */}
@@ -501,10 +523,42 @@ export function StudentAttendanceClientView({
 
           {/* ── Métricas de resumen rápido ── */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5 sm:gap-4">
-            <div className="col-span-2 md:col-span-1 rounded-xl sm:rounded-2xl bg-emerald-50 dark:bg-emerald-900/10 p-3.5 sm:p-5 border border-emerald-100 dark:border-emerald-900/30 flex flex-col justify-between">
-              <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-1">General</span>
-              <span className="text-2xl sm:text-3xl font-black text-emerald-700 dark:text-emerald-300">{summary.overallPercentage}%</span>
-            </div>
+            {(() => {
+              const totalEvaluated = summary.totalAttended + (summary.totalTardy || 0) + summary.totalUnjustified + summary.totalExcused
+              const hasData = totalEvaluated > 0
+              return (
+                <div className={`col-span-2 md:col-span-1 rounded-xl sm:rounded-2xl p-3.5 sm:p-5 border flex flex-col justify-between ${
+                  !hasData
+                    ? 'bg-slate-50 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800'
+                    : summary.overallPercentage >= 80
+                    ? 'bg-emerald-50 dark:bg-emerald-900/10 border-emerald-100 dark:border-emerald-900/30'
+                    : summary.overallPercentage >= 60
+                    ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-100 dark:border-amber-900/30'
+                    : 'bg-rose-50 dark:bg-rose-900/10 border-rose-100 dark:border-rose-900/30'
+                }`}>
+                  <span className={`text-[10px] sm:text-xs font-semibold uppercase tracking-wider mb-1 ${
+                    !hasData
+                      ? 'text-slate-400 dark:text-slate-500'
+                      : summary.overallPercentage >= 80
+                      ? 'text-emerald-600 dark:text-emerald-400'
+                      : summary.overallPercentage >= 60
+                      ? 'text-amber-600 dark:text-amber-400'
+                      : 'text-rose-600 dark:text-rose-400'
+                  }`}>General</span>
+                  <span className={`${
+                    !hasData
+                      ? 'text-base sm:text-xl font-bold text-slate-400 dark:text-slate-500'
+                      : summary.overallPercentage >= 80
+                      ? 'text-2xl sm:text-3xl font-black text-emerald-700 dark:text-emerald-300'
+                      : summary.overallPercentage >= 60
+                      ? 'text-2xl sm:text-3xl font-black text-amber-700 dark:text-amber-300'
+                      : 'text-2xl sm:text-3xl font-black text-rose-700 dark:text-rose-300'
+                  }`}>
+                    {hasData ? `${summary.overallPercentage}%` : 'Sin registros'}
+                  </span>
+                </div>
+              )
+            })()}
             <div className="rounded-xl sm:rounded-2xl bg-white dark:bg-slate-900 p-3.5 sm:p-5 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
               <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Materias</span>
               <span className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">{summary.totalSubjects}</span>
@@ -583,6 +637,8 @@ export function StudentAttendanceClientView({
             <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-4 md:gap-5">
               {filteredSubjects.map((sub, index) => {
                 const hasSessions = sub.totalSessions > 0
+                const evaluatedCount = sub.attendedCount + (sub.tardyCount || 0) + sub.unjustifiedAbsences + sub.excusedAbsences
+                const hasEvaluated = evaluatedCount > 0
                 const hasAbsences = sub.unjustifiedAbsences > 0
 
                 return (
@@ -630,13 +686,15 @@ export function StudentAttendanceClientView({
                           {hasSessions ? `${sub.totalSessions} clases` : 'Sin clases'}
                         </span>
                         <span className={`font-black ml-1 shrink-0 ${
-                          sub.attendancePercentage >= 80
+                          !hasEvaluated
+                            ? 'text-slate-400 dark:text-slate-500 font-medium text-[10px] sm:text-[11px]'
+                            : sub.attendancePercentage >= 80
                             ? 'text-emerald-600 dark:text-emerald-400'
                             : sub.attendancePercentage >= 60
                             ? 'text-amber-600 dark:text-amber-400'
                             : 'text-rose-600 dark:text-rose-400'
                         }`}>
-                          {hasSessions ? `${sub.attendancePercentage}%` : 'N/A'}
+                          {hasEvaluated ? `${sub.attendancePercentage}%` : 'Sin registros'}
                         </span>
                       </div>
 
@@ -644,13 +702,15 @@ export function StudentAttendanceClientView({
                       <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 sm:h-2 overflow-hidden">
                         <div
                           className={`h-full rounded-full transition-all duration-500 ${
-                            sub.attendancePercentage >= 80
+                            !hasEvaluated
+                              ? 'bg-slate-300 dark:bg-slate-700'
+                              : sub.attendancePercentage >= 80
                               ? 'bg-emerald-500'
                               : sub.attendancePercentage >= 60
                               ? 'bg-amber-500'
                               : 'bg-rose-500'
                           }`}
-                          style={{ width: `${hasSessions ? sub.attendancePercentage : 0}%` }}
+                          style={{ width: `${hasEvaluated ? sub.attendancePercentage : 0}%` }}
                         />
                       </div>
 

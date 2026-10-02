@@ -366,13 +366,25 @@ export function StudentPortalScreen() {
                 <div className='flex-[7] p-3 sm:p-4.5 md:px-6 flex flex-col justify-center'>
                   <div className='flex items-center justify-between gap-2 mb-1.5'>
                     {currentClass ? (
-                      <span className='inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-950/50 border border-emerald-500/30 text-emerald-200 text-[9px] sm:text-[10px] font-extrabold tracking-wide'>
-                        <span className='relative flex h-1.5 w-1.5'>
-                          <span className='animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75'></span>
-                          <span className='relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500'></span>
-                        </span>
-                        EN CURSO ({currentClass.period}ª)
-                      </span>
+                      <div className='flex items-center gap-1.5'>
+                        {currentClass.isNovedad ? (
+                          <span className='inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-500/25 border border-amber-400/40 text-amber-200 text-[9px] sm:text-[10px] font-black tracking-wide'>
+                            <span className='relative flex h-1.5 w-1.5'>
+                              <span className='animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75'></span>
+                              <span className='relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-400'></span>
+                            </span>
+                            ⚠️ NOVEDAD ({currentClass.period}ª)
+                          </span>
+                        ) : (
+                          <span className='inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-950/50 border border-emerald-500/30 text-emerald-200 text-[9px] sm:text-[10px] font-extrabold tracking-wide'>
+                            <span className='relative flex h-1.5 w-1.5'>
+                              <span className='animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75'></span>
+                              <span className='relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500'></span>
+                            </span>
+                            EN CURSO ({currentClass.period}ª)
+                          </span>
+                        )}
+                      </div>
                     ) : (
                       <span className='inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-slate-900/40 border border-slate-600/30 text-slate-300 text-[9px] sm:text-[10px] font-bold tracking-wide'>
                         <Clock className='h-2.5 w-2.5 text-slate-400' />
@@ -424,11 +436,16 @@ export function StudentPortalScreen() {
 
                 {/* 30% Derecha: Próxima Clase */}
                 <div className='flex-[3] p-3 sm:p-4.5 md:px-5 bg-gradient-to-r from-blue-600 to-indigo-700 flex flex-col justify-center'>
-                  <div className='mb-1'>
+                  <div className='mb-1 flex items-center justify-between gap-1'>
                     <span className='inline-flex items-center gap-1 text-[8px] sm:text-[9px] font-extrabold uppercase tracking-wider text-blue-200'>
                       <Clock className='h-2.5 w-2.5' />
                       {effectiveNextClass ? `Próxima (${effectiveNextClass.period}°)` : 'Próxima'}
                     </span>
+                    {effectiveNextClass?.isNovedad && (
+                      <span className='inline-flex items-center px-1.5 py-0.5 rounded bg-amber-400/25 border border-amber-300/40 text-[8px] font-black text-amber-200'>
+                        ⚠️ NOVEDAD
+                      </span>
+                    )}
                   </div>
 
                   {effectiveNextClass ? (

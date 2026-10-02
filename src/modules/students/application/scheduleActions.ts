@@ -13,6 +13,7 @@ export interface StudentDashboardScheduleResponse {
   groupName: string
   groupId: string | null
   schedule: ScheduleData
+  hasNovedadesToday?: boolean
   directoryGradeLevel?: string | null
   directoryGroupName?: string | null
   error?: string
@@ -147,45 +148,62 @@ export async function getStudentDashboardSchedule(): Promise<StudentDashboardSch
     }
   }
 
-  // 4. Consultar el horario del grupo
+  // 4. Consultar el horario del grupo (horario regular y novedades de hoy)
   const emptySchedule: ScheduleData = {
     lunes: [], martes: [], miercoles: [], jueves: [], viernes: []
   }
 
-  const { data: slots, error } = await supabase
-    .from('sch_schedule_slots')
-    .select(`
-      id,
-      day_of_week,
-      period_id,
-      duration,
-      group_id,
-      subject_id,
-      teacher_id,
-      group:sch_groups(id, name),
-      teacher:academic_teachers(id, full_name),
-      subject:sch_subjects(id, name, color, room_type),
-      classroom:sch_classrooms(id, name)
-    `)
-    .eq('group_id', targetGroupId)
-    .order('period_id', { ascending: true })
+  // Obtenemos la fecha actual en formato YYYY-MM-DD local (Bogotá/Colombia)
+  const todayBogotaStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' })
+  const bogotaDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Bogota' }))
+  const bogotaDow = bogotaDate.getDay() // 0 = Domingo, 1 = Lunes, ..., 5 = Viernes
 
-  if (error) {
-    console.error('Error al consultar horario de grupo para estudiante:', error)
-    return {
-      success: false,
-      hasGroup: true,
-      isPublished: Boolean(isGloballyPublished),
-      groupName: targetGroupName,
-      groupId: targetGroupId,
-      directoryGradeLevel: activeGradeLevel,
-      directoryGroupName: activeGroupName,
-      schedule: emptySchedule,
-      error: 'Error al consultar el horario en la base de datos.'
-    }
+  const [regularRes, overridesRes] = await Promise.all([
+    supabase
+      .from('sch_schedule_slots')
+      .select(`
+        id,
+        day_of_week,
+        period_id,
+        duration,
+        group_id,
+        subject_id,
+        teacher_id,
+        group:sch_groups(id, name),
+        teacher:academic_teachers(id, full_name),
+        subject:sch_subjects(id, name, color, room_type),
+        classroom:sch_classrooms(id, name)
+      `)
+      .eq('group_id', targetGroupId)
+      .order('period_id', { ascending: true }),
+    supabase
+      .from('sch_daily_overrides')
+      .select(`
+        id,
+        day_of_week,
+        period_id,
+        duration,
+        group_id,
+        subject_id,
+        teacher_id,
+        group:sch_groups(id, name),
+        teacher:academic_teachers(id, full_name),
+        subject:sch_subjects(id, name, color, room_type),
+        classroom:sch_classrooms(id, name)
+      `)
+      .eq('target_date', todayBogotaStr)
+      .eq('group_id', targetGroupId)
+      .order('period_id', { ascending: true })
+  ])
+
+  const slots = regularRes.data || []
+  const overrideSlots = overridesRes.data || []
+
+  if (regularRes.error) {
+    console.error('Error al consultar horario de grupo para estudiante:', regularRes.error)
   }
 
-  if (!slots || slots.length === 0) {
+  if (slots.length === 0 && overrideSlots.length === 0) {
     return {
       success: true,
       hasGroup: true,
@@ -194,7 +212,8 @@ export async function getStudentDashboardSchedule(): Promise<StudentDashboardSch
       groupId: targetGroupId,
       directoryGradeLevel: activeGradeLevel,
       directoryGroupName: activeGroupName,
-      schedule: emptySchedule
+      schedule: emptySchedule,
+      hasNovedadesToday: false
     }
   }
 
@@ -220,20 +239,32 @@ export async function getStudentDashboardSchedule(): Promise<StudentDashboardSch
     customPeriods
   ).filter(s => s.type === 'period')
 
-  const dayKeyMap: Record<number, ScheduleDayKey> = {
-    1: 'lunes',
-    2: 'martes',
-    3: 'miercoles',
-    4: 'jueves',
-    5: 'viernes'
+  const normalizeDayToKey = (day: any): ScheduleDayKey | null => {
+    if (!day) return null
+    const str = day.toString().toLowerCase().trim()
+    const map: Record<string, ScheduleDayKey> = {
+      '1': 'lunes', 'lunes': 'lunes',
+      '2': 'martes', 'martes': 'martes',
+      '3': 'miercoles', 'miércoles': 'miercoles',
+      '4': 'jueves', 'jueves': 'jueves',
+      '5': 'viernes', 'viernes': 'viernes'
+    }
+    return map[str] || null
   }
+
+  const todayDayKey: ScheduleDayKey | null = 
+    bogotaDow === 1 ? 'lunes' :
+    bogotaDow === 2 ? 'martes' :
+    bogotaDow === 3 ? 'miercoles' :
+    bogotaDow === 4 ? 'jueves' :
+    bogotaDow === 5 ? 'viernes' : null
 
   const formattedSchedule: ScheduleData = {
     lunes: [], martes: [], miercoles: [], jueves: [], viernes: []
   }
 
   for (const slot of (slots as any[])) {
-    const dayKey = dayKeyMap[slot.day_of_week]
+    const dayKey = normalizeDayToKey(slot.day_of_week)
     if (!dayKey) continue
 
     const startSlot = defaultTimeSlots.find(t => t.id === slot.period_id)
@@ -249,8 +280,49 @@ export async function getStudentDashboardSchedule(): Promise<StudentDashboardSch
       location: slot.classroom?.name || undefined,
       group: slot.group?.name || targetGroupName || undefined,
       period: slot.period_id,
-      color: slot.subject?.color || '#059669'
+      color: slot.subject?.color || '#059669',
+      isNovedad: false
     })
+  }
+
+  let hasNovedadesToday = false
+
+  // Si hay novedades para hoy, sustituimos las clases del día actual
+  if (overrideSlots && overrideSlots.length > 0) {
+    hasNovedadesToday = true
+    const dayKeyForOverrides = normalizeDayToKey(overrideSlots[0].day_of_week) || todayDayKey
+
+    if (dayKeyForOverrides) {
+      const regularDaySlots = (slots as any[]).filter(s => normalizeDayToKey(s.day_of_week) === dayKeyForOverrides)
+
+      const overrideMapped = (overrideSlots as any[]).map(slot => {
+        const startSlot = defaultTimeSlots.find(t => t.id === slot.period_id)
+        const endPeriod = slot.period_id + (slot.duration || 1) - 1
+        const endSlot = defaultTimeSlots.find(t => t.id === endPeriod)
+
+        const isIdentical = regularDaySlots.some(r =>
+          r.period_id?.toString() === slot.period_id?.toString() &&
+          r.teacher_id === slot.teacher_id &&
+          r.subject_id === slot.subject_id &&
+          (r.classroom as any)?.name === (slot.classroom as any)?.name
+        )
+
+        return {
+          id: slot.id,
+          startTime: startSlot?.startTime || `Bloque ${slot.period_id}`,
+          endTime: endSlot?.endTime || startSlot?.endTime || '',
+          subject: slot.subject?.name || 'Materia sin asignar',
+          teacher: slot.teacher?.full_name || 'Trabajo Autónomo',
+          location: slot.classroom?.name || undefined,
+          group: slot.group?.name || targetGroupName || undefined,
+          period: slot.period_id,
+          color: slot.subject?.color || '#059669',
+          isNovedad: !isIdentical
+        }
+      })
+
+      formattedSchedule[dayKeyForOverrides] = overrideMapped
+    }
   }
 
   return {
@@ -261,6 +333,7 @@ export async function getStudentDashboardSchedule(): Promise<StudentDashboardSch
     groupId: targetGroupId,
     directoryGradeLevel: activeGradeLevel,
     directoryGroupName: activeGroupName,
-    schedule: formattedSchedule
+    schedule: formattedSchedule,
+    hasNovedadesToday
   }
 }

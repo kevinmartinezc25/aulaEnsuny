@@ -127,7 +127,7 @@ export async function getStudentAttendanceOverview(): Promise<StudentAttendanceO
         totalTardy: 0,
         totalUnjustified: 0,
         totalExcused: 0,
-        overallPercentage: 100
+        overallPercentage: 0
       },
       subjects: []
     }
@@ -211,7 +211,7 @@ export async function getStudentAttendanceOverview(): Promise<StudentAttendanceO
         totalTardy: 0,
         totalUnjustified: 0,
         totalExcused: 0,
-        overallPercentage: 100
+        overallPercentage: 0
       },
       subjects: [],
       resolvedGrade: gradeDisplay,
@@ -230,7 +230,7 @@ export async function getStudentAttendanceOverview(): Promise<StudentAttendanceO
         totalTardy: 0,
         totalUnjustified: 0,
         totalExcused: 0,
-        overallPercentage: 100
+        overallPercentage: 0
       },
       subjects: [],
       resolvedGrade: gradeDisplay,
@@ -351,7 +351,8 @@ export async function getStudentAttendanceOverview(): Promise<StudentAttendanceO
     let unrecorded = 0
 
     sessions.forEach(sess => {
-      const status = attendanceMap.get(sess.id)
+      const rawStatus = attendanceMap.get(sess.id)
+      const status = rawStatus ? rawStatus.trim().toUpperCase() : undefined
       if (status === 'A') attended++
       else if (status === 'T') tardy++
       else if (status === 'I') unjustified++
@@ -365,8 +366,9 @@ export async function getStudentAttendanceOverview(): Promise<StudentAttendanceO
     totalAllExcused += excused
 
     // Porcentaje: (asistencias + tardanzas) / sesiones evaluadas con registro
+    // Si un estudiante no tiene registro de asistencia (sin estado), no debe sumar en el porcentaje (0%)
     const evaluatedSessions = attended + tardy + unjustified + excused
-    let percentage = 100
+    let percentage = 0
     if (evaluatedSessions > 0) {
       percentage = Math.round(((attended + tardy) / evaluatedSessions) * 100)
     }
@@ -395,7 +397,7 @@ export async function getStudentAttendanceOverview(): Promise<StudentAttendanceO
   const totalEvaluated = totalAllAttended + totalAllTardy + totalAllUnjustified + totalAllExcused
   const overallPercentage = totalEvaluated > 0
     ? Math.round(((totalAllAttended + totalAllTardy) / totalEvaluated) * 100)
-    : 100
+    : 0
 
   return {
     summary: {
@@ -563,7 +565,7 @@ export async function getStudentSubjectAttendanceTraceability(
   const totalEvaluated = attended + tardy + unjustified + excused
   const attendancePercentage = totalEvaluated > 0
     ? Math.round(((attended + tardy) / totalEvaluated) * 100)
-    : 100
+    : 0
 
   return {
     subject: {
