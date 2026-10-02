@@ -252,18 +252,43 @@ export async function getStudentDashboardSchedule(): Promise<StudentDashboardSch
     return map[str] || null
   }
 
-  const todayDayKey: ScheduleDayKey | null = 
-    bogotaDow === 1 ? 'lunes' :
-    bogotaDow === 2 ? 'martes' :
-    bogotaDow === 3 ? 'miercoles' :
-    bogotaDow === 4 ? 'jueves' :
-    bogotaDow === 5 ? 'viernes' : null
+  let finalSlots = slots as any[]
+  let hasNovedadesToday = false
+
+  const normalizeDay = (day: any): string => {
+    if (!day) return ''
+    const d = day.toString().trim()
+    const map: Record<string, string> = {
+      'lunes': '1', 'martes': '2', 'miércoles': '3', 'miercoles': '3', 'jueves': '4', 'viernes': '5',
+      '1': '1', '2': '2', '3': '3', '4': '4', '5': '5'
+    }
+    return map[d.toLowerCase()] || d
+  }
+
+  if (overrideSlots && overrideSlots.length > 0) {
+    hasNovedadesToday = true
+    const todayDayOfWeek = normalizeDay(overrideSlots[0].day_of_week)
+    const filteredRegular = finalSlots.filter(s => normalizeDay(s.day_of_week) !== todayDayOfWeek)
+
+    const mappedOverrides = overrideSlots.map(s => {
+      const isIdentical = finalSlots.some(r => 
+        normalizeDay(r.day_of_week) === normalizeDay(s.day_of_week) &&
+        r.period_id?.toString() === s.period_id?.toString() &&
+        r.teacher_id === s.teacher_id &&
+        r.subject_id === s.subject_id &&
+        (r.classroom as any)?.name === (s.classroom as any)?.name
+      )
+      return { ...s, isNovedad: !isIdentical }
+    })
+
+    finalSlots = [...filteredRegular, ...mappedOverrides]
+  }
 
   const formattedSchedule: ScheduleData = {
     lunes: [], martes: [], miercoles: [], jueves: [], viernes: []
   }
 
-  for (const slot of (slots as any[])) {
+  for (const slot of finalSlots) {
     const dayKey = normalizeDayToKey(slot.day_of_week)
     if (!dayKey) continue
 
@@ -281,48 +306,8 @@ export async function getStudentDashboardSchedule(): Promise<StudentDashboardSch
       group: slot.group?.name || targetGroupName || undefined,
       period: slot.period_id,
       color: slot.subject?.color || '#059669',
-      isNovedad: false
+      isNovedad: slot.isNovedad || false
     })
-  }
-
-  let hasNovedadesToday = false
-
-  // Si hay novedades para hoy, sustituimos las clases del día actual
-  if (overrideSlots && overrideSlots.length > 0) {
-    hasNovedadesToday = true
-    const dayKeyForOverrides = normalizeDayToKey(overrideSlots[0].day_of_week) || todayDayKey
-
-    if (dayKeyForOverrides) {
-      const regularDaySlots = (slots as any[]).filter(s => normalizeDayToKey(s.day_of_week) === dayKeyForOverrides)
-
-      const overrideMapped = (overrideSlots as any[]).map(slot => {
-        const startSlot = defaultTimeSlots.find(t => t.id === slot.period_id)
-        const endPeriod = slot.period_id + (slot.duration || 1) - 1
-        const endSlot = defaultTimeSlots.find(t => t.id === endPeriod)
-
-        const isIdentical = regularDaySlots.some(r =>
-          r.period_id?.toString() === slot.period_id?.toString() &&
-          r.teacher_id === slot.teacher_id &&
-          r.subject_id === slot.subject_id &&
-          (r.classroom as any)?.name === (slot.classroom as any)?.name
-        )
-
-        return {
-          id: slot.id,
-          startTime: startSlot?.startTime || `Bloque ${slot.period_id}`,
-          endTime: endSlot?.endTime || startSlot?.endTime || '',
-          subject: slot.subject?.name || 'Materia sin asignar',
-          teacher: slot.teacher?.full_name || 'Trabajo Autónomo',
-          location: slot.classroom?.name || undefined,
-          group: slot.group?.name || targetGroupName || undefined,
-          period: slot.period_id,
-          color: slot.subject?.color || '#059669',
-          isNovedad: !isIdentical
-        }
-      })
-
-      formattedSchedule[dayKeyForOverrides] = overrideMapped
-    }
   }
 
   return {
