@@ -7,6 +7,8 @@ import { TrendingUp, CalendarDays, ShieldAlert, Activity, BookOpen, ChevronRight
 import { createClient } from '@/core/config/supabase/client'
 import { StudentVirtualCourseModal } from '../components/StudentVirtualCourseModal'
 import { getStudentEmailStatus } from '../../application/studentEmailActions'
+import { getStudentDashboardSchedule } from '../../application/scheduleActions'
+import { Clock, Users } from 'lucide-react'
 
 import { useUserSessionStore } from '@/store/useUserSessionStore'
 
@@ -43,6 +45,101 @@ export function StudentPortalScreen() {
   const [hasCourses, setHasCourses] = useState(false)
   const [hasEmail, setHasEmail] = useState(false)
   const [isVirtualModalOpen, setIsVirtualModalOpen] = useState(false)
+  // Schedule state
+  const [todaySchedule, setTodaySchedule] = useState<any[]>([])
+  const [isWeekend, setIsWeekend] = useState(false)
+  const [currentClass, setCurrentClass] = useState<any | null>(null)
+  const [nextClass, setNextClass] = useState<any | null>(null)
+  const [completedClasses, setCompletedClasses] = useState(0)
+  const [totalClasses, setTotalClasses] = useState(0)
+
+  // Función para evaluar clase en curso y siguiente clase a partir del horario
+  const evaluateSchedule = React.useCallback((slots: any[]) => {
+    if (!slots || slots.length === 0) {
+      return { updatedSlots: [], curr: null, next: null, completed: 0, total: 0 }
+    }
+
+    const currentNow = new Date()
+    const currentMinutes = currentNow.getHours() * 60 + currentNow.getMinutes()
+    let curr: any = null
+    let next: any = null
+    let completed = 0
+
+    const updatedSlots = slots.map((cls) => {
+      let isOngoing = false
+      let startMins = 0
+      let endMins = 0
+
+      if (cls.startTime && cls.startTime.includes(':')) {
+        const [sh, sm] = cls.startTime.split(':')
+        startMins = parseInt(sh, 10) * 60 + parseInt(sm, 10)
+
+        endMins = startMins + 55
+        if (cls.endTime && cls.endTime.includes(':')) {
+          const [eh, em] = cls.endTime.split(':')
+          endMins = parseInt(eh, 10) * 60 + parseInt(em, 10)
+        }
+
+        isOngoing = currentMinutes >= startMins && currentMinutes <= endMins
+
+        if (currentMinutes >= endMins && !cls.isFree) {
+          completed++
+        }
+
+        if (isOngoing && !cls.isFree && !curr) {
+          const duration = Math.max(1, endMins - startMins)
+          const elapsed = Math.max(0, currentMinutes - startMins)
+          const remaining = Math.max(0, endMins - currentMinutes)
+          const progress = Math.min(100, Math.round((elapsed / duration) * 100))
+          curr = { ...cls, isOngoing: true, startMins, endMins, duration, elapsed, remaining, progress }
+        }
+      }
+
+      return { ...cls, isCurrent: isOngoing }
+    })
+
+    for (const cls of updatedSlots) {
+      if (!cls.isFree && cls.startTime && cls.startTime.includes(':')) {
+        const [sh, sm] = cls.startTime.split(':')
+        const startMins = parseInt(sh, 10) * 60 + parseInt(sm, 10)
+
+        if (curr) {
+          const clsPeriod = parseInt(cls.period, 10) || 0
+          const currPeriod = parseInt(curr.period, 10) || 0
+          if (clsPeriod > currPeriod && cls.id !== curr.id && startMins >= (curr.endMins || 0)) {
+            next = cls
+            break
+          }
+        } else {
+          if (startMins > currentMinutes) {
+            next = cls
+            break
+          }
+        }
+      }
+    }
+
+    if (next && curr && (next.id === curr.id || next.period === curr.period)) {
+      next = null
+    }
+
+    const total = updatedSlots.filter((s: any) => !s.isFree).length
+
+    return { updatedSlots, curr, next, completed, total }
+  }, [])
+
+  useEffect(() => {
+    if (todaySchedule.length === 0) return
+    const timer = setInterval(() => {
+      const res = evaluateSchedule(todaySchedule)
+      setTodaySchedule(res.updatedSlots)
+      setCurrentClass(res.curr)
+      setNextClass(res.next)
+      setCompletedClasses(res.completed)
+    }, 60000)
+    return () => clearInterval(timer)
+  }, [todaySchedule, evaluateSchedule])
+
   // Si ya tenemos sesión precacheada, no bloquear la pantalla con skeleton
   const [loading, setLoading] = useState(!sessionUser)
 
@@ -79,7 +176,7 @@ export function StudentPortalScreen() {
         const userId = currentUser.id
 
         // Ejecutar consultas en PARALELO para evitar efecto cascada
-        const [enrollmentRes, coursesRes, emailStatusRes] = await Promise.allSettled([
+        const [enrollmentRes, coursesRes, emailStatusRes, scheduleRes] = await Promise.allSettled([
           supabase
             .from('student_enrollments')
             .select('jornada, group_name, grade_level, academic_year')
@@ -93,7 +190,8 @@ export function StudentPortalScreen() {
             .select('id')
             .eq('student_id', userId)
             .limit(1),
-          getStudentEmailStatus()
+          getStudentEmailStatus(),
+          getStudentDashboardSchedule()
         ])
 
         let name = currentUser.name || 'Estudiante'
@@ -120,6 +218,29 @@ export function StudentPortalScreen() {
           if (status.hasEmail) setHasEmail(true)
           if (status.fullName && status.fullName !== 'Estudiante' && name === 'Estudiante') {
             name = status.fullName
+          }
+        }
+
+        if (scheduleRes.status === 'fulfilled' && scheduleRes.value.success) {
+          const todayDate = new Date()
+          const dow = todayDate.getDay() // 0 = Domingo, 1 = Lunes
+          setIsWeekend(dow === 0 || dow === 6)
+          
+          let dayKey: 'lunes' | 'martes' | 'miercoles' | 'jueves' | 'viernes' | null = null
+          if (dow === 1) dayKey = 'lunes'
+          else if (dow === 2) dayKey = 'martes'
+          else if (dow === 3) dayKey = 'miercoles'
+          else if (dow === 4) dayKey = 'jueves'
+          else if (dow === 5) dayKey = 'viernes'
+
+          if (dayKey && scheduleRes.value.schedule) {
+            const todayArr = scheduleRes.value.schedule[dayKey] || []
+            const res = evaluateSchedule(todayArr)
+            setTodaySchedule(res.updatedSlots)
+            setCurrentClass(res.curr)
+            setNextClass(res.next)
+            setCompletedClasses(res.completed)
+            setTotalClasses(res.total)
           }
         }
 
@@ -174,15 +295,14 @@ export function StudentPortalScreen() {
         initial={{ opacity: 0, y: shouldReduceMotion ? 0 : 18 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ type: 'spring', damping: 26, stiffness: 220 }}
-        className='relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br from-[#1F4E31] via-[#163a24] to-[#0f2819] p-4.5 sm:p-7 text-white shadow-[0_8px_32px_rgba(31,78,49,0.22)] border border-emerald-600/20'
+        className='relative overflow-hidden rounded-2xl sm:rounded-3xl bg-[#317C76] dark:bg-slate-900 p-4.5 sm:p-7 shadow-sm border border-[#215a55] dark:border-slate-800'
       >
-        <div className='pointer-events-none absolute top-0 right-0 w-48 sm:w-56 h-48 sm:h-56 rounded-full bg-emerald-400/10 blur-3xl' />
-        <div className='pointer-events-none absolute bottom-0 left-6 sm:left-8 w-32 sm:w-40 h-32 sm:h-40 rounded-full bg-teal-400/10 blur-2xl' />
+        <div className='pointer-events-none absolute top-0 right-0 w-48 sm:w-56 h-48 sm:h-56 rounded-full bg-white/10 dark:bg-slate-800/50 blur-3xl' />
+        <div className='pointer-events-none absolute bottom-0 left-6 sm:left-8 w-32 sm:w-40 h-32 sm:h-40 rounded-full bg-teal-200/10 dark:bg-slate-800/30 blur-2xl' />
         
-        {/* Botón de Configuración de Cuenta (Engranaje) Reubicado arriba a la derecha */}
         <Link
           href='/student/settings'
-          className='absolute top-3.5 right-3.5 sm:top-5 sm:right-5 z-20 h-9 w-9 sm:h-11 sm:w-11 rounded-xl sm:rounded-2xl bg-white/10 hover:bg-white/20 active:scale-95 border border-white/15 flex items-center justify-center text-white transition-all duration-200 shadow-sm backdrop-blur-xs'
+          className='absolute top-3.5 right-3.5 sm:top-5 sm:right-5 z-20 h-9 w-9 sm:h-11 sm:w-11 rounded-xl sm:rounded-2xl bg-white/10 hover:bg-white/20 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 border border-white/20 dark:border-slate-700 flex items-center justify-center text-white dark:text-slate-400 transition-all duration-200 shadow-sm'
           title='Configuración de Cuenta'
           aria-label='Configuración de Cuenta'
         >
@@ -190,14 +310,14 @@ export function StudentPortalScreen() {
         </Link>
 
         <div className='relative z-10 flex items-start gap-3 sm:gap-4 pr-11 sm:pr-14'>
-          <div className='h-11 w-11 sm:h-14 sm:w-14 shrink-0 rounded-xl sm:rounded-2xl bg-white/15 border border-white/20 flex items-center justify-center text-base sm:text-xl font-black shadow-inner mt-0.5 sm:mt-0'>
+          <div className='h-11 w-11 sm:h-14 sm:w-14 shrink-0 rounded-xl sm:rounded-2xl bg-white/15 dark:bg-slate-800 border border-white/20 dark:border-slate-700 flex items-center justify-center text-base sm:text-xl font-black shadow-inner text-white dark:text-slate-200 mt-0.5 sm:mt-0'>
             {avatarInitials}
           </div>
           <div className='flex-1 min-w-0'>
-            <p className='text-emerald-200/80 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider mb-0.5'>
+            <p className='text-teal-50 dark:text-slate-400 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider mb-0.5 opacity-90'>
               {getGreeting()}
             </p>
-            <h1 className='text-base sm:text-2xl font-black text-white tracking-tight leading-snug sm:leading-tight break-words'>
+            <h1 className='text-base sm:text-2xl font-black text-white dark:text-white tracking-tight leading-snug sm:leading-tight break-words'>
               {name}
             </h1>
           </div>
@@ -207,13 +327,132 @@ export function StudentPortalScreen() {
           {chips.map((l, i) => (
             <span
               key={i}
-              className='inline-flex items-center px-2 sm:px-3 py-0.5 sm:py-1 rounded-lg sm:rounded-xl bg-white/10 border border-white/15 text-[10px] sm:text-[11px] font-semibold text-emerald-100 tracking-wide'
+              className='inline-flex items-center px-2 sm:px-3 py-0.5 sm:py-1 rounded-lg sm:rounded-xl bg-white/10 dark:bg-slate-800 border border-white/15 dark:border-slate-700 text-[10px] sm:text-[11px] font-semibold text-white dark:text-slate-300 tracking-wide'
             >
               {l}
             </span>
           ))}
         </div>
       </motion.div>
+
+      {/* Tarjeta de Horario (Clase Actual / Siguiente) */}
+      {!loading && !isWeekend && totalClasses > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: shouldReduceMotion ? 0 : 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: 'spring', damping: 26, stiffness: 220, delay: 0.1 }}
+          className='relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-r from-emerald-600 to-teal-700 text-white shadow-[0_8px_32px_rgba(16,185,129,0.22)] border border-emerald-500/30 w-full'
+        >
+          <div className='pointer-events-none absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-white/5 via-transparent to-transparent opacity-50' />
+
+          {(() => {
+            const isSameClass = nextClass && currentClass && (nextClass.id === currentClass.id || nextClass.period === currentClass.period)
+            const effectiveNextClass = isSameClass ? null : nextClass
+            const isFinishedDay = !currentClass && !effectiveNextClass && totalClasses > 0
+
+            if (isFinishedDay) {
+              return (
+                <div className='p-5 sm:p-7 text-center'>
+                  <h2 className='text-base sm:text-lg font-bold tracking-tight text-emerald-50'>
+                    Jornada finalizada, no tienes más clases hoy.
+                  </h2>
+                </div>
+              )
+            }
+
+            return (
+              <div className='flex flex-row h-full divide-x divide-emerald-600/30'>
+                {/* 70% Izquierda: Clase Actual */}
+                <div className='flex-[7] p-3 sm:p-4.5 md:px-6 flex flex-col justify-center'>
+                  <div className='flex items-center justify-between gap-2 mb-1.5'>
+                    {currentClass ? (
+                      <span className='inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-950/50 border border-emerald-500/30 text-emerald-200 text-[9px] sm:text-[10px] font-extrabold tracking-wide'>
+                        <span className='relative flex h-1.5 w-1.5'>
+                          <span className='animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75'></span>
+                          <span className='relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500'></span>
+                        </span>
+                        EN CURSO ({currentClass.period}ª)
+                      </span>
+                    ) : (
+                      <span className='inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-slate-900/40 border border-slate-600/30 text-slate-300 text-[9px] sm:text-[10px] font-bold tracking-wide'>
+                        <Clock className='h-2.5 w-2.5 text-slate-400' />
+                        SIN CLASE
+                      </span>
+                    )}
+                    {currentClass?.remaining !== undefined && currentClass.remaining > 0 && (
+                      <span className='hidden sm:inline-flex text-[9px] sm:text-[10px] font-semibold text-emerald-100 bg-white/10 px-2 py-0.5 rounded-lg border border-white/10'>
+                        Quedan ~{currentClass.remaining} min
+                      </span>
+                    )}
+                  </div>
+
+                  {currentClass ? (
+                    <div className='space-y-0.5'>
+                      <h2 className='text-sm sm:text-lg md:text-xl font-black text-white leading-tight line-clamp-1'>
+                        {currentClass.subject}
+                      </h2>
+                      <div className='flex flex-wrap items-center gap-1.5 text-[9px] sm:text-[11px] text-emerald-200/80 font-medium'>
+                        <span className='inline-flex items-center gap-1 bg-white/5 px-1.5 py-0.5 rounded border border-white/5'>
+                          <Users className='h-2.5 w-2.5 sm:h-3 sm:w-3 text-emerald-300/80' />
+                          {currentClass.teacher?.split(' ')[0] || 'Autónomo'}
+                        </span>
+                        <span className='inline-flex items-center gap-1 bg-white/5 px-1.5 py-0.5 rounded border border-white/5'>
+                          <Clock className='h-2.5 w-2.5 sm:h-3 sm:w-3 text-emerald-300/80' />
+                          {currentClass.startTime} - {currentClass.endTime}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <h2 className='text-sm sm:text-lg md:text-xl font-bold tracking-tight text-white leading-tight'>
+                        Tiempo de Receso o Libre
+                      </h2>
+                      <p className='text-[9px] sm:text-xs text-emerald-200/70 font-medium mt-0.5 hidden sm:block'>
+                        Aprovecha para repasar. Consulta tu próxima clase a la derecha.
+                      </p>
+                    </div>
+                  )}
+
+                  {currentClass && currentClass.progress !== undefined && (
+                    <div className='mt-2'>
+                      <div className='w-full bg-black/20 rounded-full h-1 overflow-hidden'>
+                        <div className='bg-emerald-400 h-1 rounded-full transition-all duration-500 ease-out' style={{ width: `${currentClass.progress}%` }} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 30% Derecha: Próxima Clase */}
+                <div className='flex-[3] p-3 sm:p-4.5 md:px-5 bg-gradient-to-r from-blue-600 to-indigo-700 flex flex-col justify-center'>
+                  <div className='mb-1'>
+                    <span className='inline-flex items-center gap-1 text-[8px] sm:text-[9px] font-extrabold uppercase tracking-wider text-blue-200'>
+                      <Clock className='h-2.5 w-2.5' />
+                      {effectiveNextClass ? `Próxima (${effectiveNextClass.period}°)` : 'Próxima'}
+                    </span>
+                  </div>
+
+                  {effectiveNextClass ? (
+                    <div className='space-y-0.5'>
+                      <h3 className='text-xs sm:text-sm font-bold text-white line-clamp-1 leading-snug'>
+                        {effectiveNextClass.subject}
+                      </h3>
+                      <div className='inline-flex items-center gap-1 text-[8px] sm:text-[10px] font-bold text-blue-100 bg-white/10 px-1.5 py-0.5 rounded border border-white/10'>
+                        {effectiveNextClass.startTime}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className='space-y-0.5'>
+                      <p className='text-xs sm:text-sm font-bold text-blue-50 leading-snug'>
+                        Fin jornada
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })()}
+        </motion.div>
+      )}
 
       {/* Título de Sección */}
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }}>
