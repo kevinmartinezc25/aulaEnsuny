@@ -25,6 +25,30 @@ export interface TeacherDashboardProps {
   initialIsWeekend?: boolean;
 }
 
+function parseTimeToMinutes(timeStr: string | null | undefined): number | null {
+  if (!timeStr || typeof timeStr !== 'string') return null
+  const clean = timeStr.trim().toUpperCase()
+  if (!clean.includes(':')) return null
+
+  const isPM = clean.includes('PM')
+  const isAM = clean.includes('AM')
+  const timeOnly = clean.replace(/[AP]M/, '').trim()
+  const [hStr, mStr] = timeOnly.split(':')
+  let hours = parseInt(hStr, 10)
+  const minutes = parseInt(mStr, 10)
+
+  if (isNaN(hours) || isNaN(minutes)) return null
+
+  if (isPM && hours < 12) hours += 12
+  if (isAM && hours === 12) hours = 0
+
+  return hours * 60 + minutes
+}
+
+function getBogotaDate(): Date {
+  return new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Bogota' }))
+}
+
 export function TeacherDashboardScreen(props: TeacherDashboardProps) {
   const [courses, setCourses] = useState<TeacherDashboardCourse[]>(props.initialCourses || [])
   const [teacherName, setTeacherName] = useState(props.initialTeacherName || 'Prof. Docente')
@@ -120,28 +144,23 @@ export function TeacherDashboardScreen(props: TeacherDashboardProps) {
       return { updatedSlots: [], curr: null, next: null, completed: 0, total: 0 }
     }
 
-    const now = new Date()
-    const currentMinutes = now.getHours() * 60 + now.getMinutes()
+    const bogotaNow = getBogotaDate()
+    const currentMinutes = bogotaNow.getHours() * 60 + bogotaNow.getMinutes()
     let curr: any = null
     let next: any = null
     let completed = 0
 
     const updatedSlots = slots.map((cls) => {
       let isOngoing = false
-      let startMins = 0
-      let endMins = 0
+      const startMins = parseTimeToMinutes(cls.startTime)
+      let endMins = parseTimeToMinutes(cls.endTime)
 
-      if (cls.startTime && cls.startTime.includes(':')) {
-        const [sh, sm] = cls.startTime.split(':')
-        startMins = parseInt(sh, 10) * 60 + parseInt(sm, 10)
-
-        endMins = startMins + 55
-        if (cls.endTime && cls.endTime.includes(':')) {
-          const [eh, em] = cls.endTime.split(':')
-          endMins = parseInt(eh, 10) * 60 + parseInt(em, 10)
+      if (startMins !== null) {
+        if (endMins === null || endMins <= startMins) {
+          endMins = startMins + 55
         }
 
-        isOngoing = currentMinutes >= startMins && currentMinutes <= endMins
+        isOngoing = currentMinutes >= startMins && currentMinutes < endMins
 
         if (currentMinutes >= endMins && !cls.isFree) {
           completed++
@@ -156,14 +175,17 @@ export function TeacherDashboardScreen(props: TeacherDashboardProps) {
         }
       }
 
-      return { ...cls, isCurrent: isOngoing }
+      return { ...cls, isCurrent: isOngoing, startMins, endMins }
     })
 
     // Buscar la siguiente clase no libre posterior a la clase actual o al momento actual
     for (const cls of updatedSlots) {
-      if (!cls.isFree && cls.startTime && cls.startTime.includes(':')) {
-        const [sh, sm] = cls.startTime.split(':')
-        const startMins = parseInt(sh, 10) * 60 + parseInt(sm, 10)
+      if (!cls.isFree) {
+        const startMins = cls.startMins !== undefined && cls.startMins !== null
+          ? cls.startMins
+          : parseTimeToMinutes(cls.startTime)
+
+        if (startMins === null) continue
 
         if (curr) {
           const clsPeriod = parseInt(cls.period, 10) || 0

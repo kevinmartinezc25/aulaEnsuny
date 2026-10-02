@@ -42,14 +42,28 @@ export const useUserSessionStore = create<UserSessionState>()(
 
       initSession: async (forceRefresh = false) => {
         const state = get()
-        // Si ya está inicializado con usuario y no se fuerza refresco, devolver inmediato
-        if (state.user && state.isInitialized && !forceRefresh) {
-          return state.user
-        }
 
         // Si ya hay una petición en curso, devolverla para no duplicar llamadas
         if (activeFetchPromise) {
           return activeFetchPromise
+        }
+
+        // Si no se fuerza refresco y ya está inicializado, verificar que el authUser real coincida
+        if (state.user && state.isInitialized && !forceRefresh && typeof window !== 'undefined') {
+          try {
+            const isDemo = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
+            if (!isDemo) {
+              const supabase = createClient()
+              const { data: { user: authUser } } = await supabase.auth.getUser()
+              if (authUser && authUser.id === state.user.id) {
+                return state.user
+              }
+            } else {
+              return state.user
+            }
+          } catch {
+            return state.user
+          }
         }
 
         const runFetch = async (): Promise<SessionUser | null> => {

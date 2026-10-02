@@ -29,6 +29,30 @@ function getGreeting(): string {
   return 'Buenas noches'
 }
 
+function parseTimeToMinutes(timeStr: string | null | undefined): number | null {
+  if (!timeStr || typeof timeStr !== 'string') return null
+  const clean = timeStr.trim().toUpperCase()
+  if (!clean.includes(':')) return null
+
+  const isPM = clean.includes('PM')
+  const isAM = clean.includes('AM')
+  const timeOnly = clean.replace(/[AP]M/, '').trim()
+  const [hStr, mStr] = timeOnly.split(':')
+  let hours = parseInt(hStr, 10)
+  const minutes = parseInt(mStr, 10)
+
+  if (isNaN(hours) || isNaN(minutes)) return null
+
+  if (isPM && hours < 12) hours += 12
+  if (isAM && hours === 12) hours = 0
+
+  return hours * 60 + minutes
+}
+
+function getBogotaDate(): Date {
+  return new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Bogota' }))
+}
+
 export function StudentPortalScreen() {
   const shouldReduceMotion = useReducedMotion()
   const sessionUser = useUserSessionStore(state => state.user)
@@ -42,6 +66,20 @@ export function StudentPortalScreen() {
     academicYear: new Date().getFullYear().toString(),
     avatarInitials: getInitials(sessionUser?.name || 'E')
   }))
+
+  // Sincronizar de inmediato si cambia el sessionUser en el store
+  useEffect(() => {
+    if (sessionUser?.name && sessionUser.name !== 'Estudiante') {
+      setInfo(prev => ({
+        ...prev,
+        name: sessionUser.name,
+        group: sessionUser.group || prev.group,
+        gradeLevel: sessionUser.grade || prev.gradeLevel,
+        avatarInitials: getInitials(sessionUser.name)
+      }))
+    }
+  }, [sessionUser])
+
   const [hasCourses, setHasCourses] = useState(false)
   const [hasEmail, setHasEmail] = useState(false)
   const [isVirtualModalOpen, setIsVirtualModalOpen] = useState(false)
@@ -59,28 +97,23 @@ export function StudentPortalScreen() {
       return { updatedSlots: [], curr: null, next: null, completed: 0, total: 0 }
     }
 
-    const currentNow = new Date()
-    const currentMinutes = currentNow.getHours() * 60 + currentNow.getMinutes()
+    const bogotaNow = getBogotaDate()
+    const currentMinutes = bogotaNow.getHours() * 60 + bogotaNow.getMinutes()
     let curr: any = null
     let next: any = null
     let completed = 0
 
     const updatedSlots = slots.map((cls) => {
       let isOngoing = false
-      let startMins = 0
-      let endMins = 0
+      const startMins = parseTimeToMinutes(cls.startTime)
+      let endMins = parseTimeToMinutes(cls.endTime)
 
-      if (cls.startTime && cls.startTime.includes(':')) {
-        const [sh, sm] = cls.startTime.split(':')
-        startMins = parseInt(sh, 10) * 60 + parseInt(sm, 10)
-
-        endMins = startMins + 55
-        if (cls.endTime && cls.endTime.includes(':')) {
-          const [eh, em] = cls.endTime.split(':')
-          endMins = parseInt(eh, 10) * 60 + parseInt(em, 10)
+      if (startMins !== null) {
+        if (endMins === null || endMins <= startMins) {
+          endMins = startMins + 55
         }
 
-        isOngoing = currentMinutes >= startMins && currentMinutes <= endMins
+        isOngoing = currentMinutes >= startMins && currentMinutes < endMins
 
         if (currentMinutes >= endMins && !cls.isFree) {
           completed++
@@ -95,13 +128,17 @@ export function StudentPortalScreen() {
         }
       }
 
-      return { ...cls, isCurrent: isOngoing }
+      return { ...cls, isCurrent: isOngoing, startMins, endMins }
     })
 
+    // Buscar la siguiente clase no libre posterior a la clase actual o al momento actual
     for (const cls of updatedSlots) {
-      if (!cls.isFree && cls.startTime && cls.startTime.includes(':')) {
-        const [sh, sm] = cls.startTime.split(':')
-        const startMins = parseInt(sh, 10) * 60 + parseInt(sm, 10)
+      if (!cls.isFree) {
+        const startMins = cls.startMins !== undefined && cls.startMins !== null 
+          ? cls.startMins 
+          : parseTimeToMinutes(cls.startTime)
+
+        if (startMins === null) continue
 
         if (curr) {
           const clsPeriod = parseInt(cls.period, 10) || 0
@@ -161,19 +198,35 @@ export function StudentPortalScreen() {
           return
         }
 
-        // Obtener usuario del store o inicializarlo si aún no está
-        let currentUser = sessionUser
-        if (!currentUser) {
-          currentUser = await initSession()
-        }
+        const supabase = createClient()
+        const { data: { user: authUser } } = await supabase.auth.getUser()
 
-        if (!currentUser) {
+        if (!authUser) {
           setLoading(false)
           return
         }
 
-        const supabase = createClient()
-        const userId = currentUser.id
+        // Actualización inmediata con los metadatos de la sesión activa
+        const metaFirst = authUser.user_metadata?.first_name || ''
+        const metaLast = authUser.user_metadata?.last_name || ''
+        const metaName = (metaFirst + ' ' + metaLast).trim()
+        if (metaName) {
+          setInfo(prev => ({
+            ...prev,
+            name: metaName,
+            group: authUser.user_metadata?.group_name || prev.group,
+            gradeLevel: authUser.user_metadata?.grade_level || prev.gradeLevel,
+            avatarInitials: getInitials(metaName)
+          }))
+        }
+
+        // Sincronizar usuario con el store si cambió de cuenta
+        let currentUser = sessionUser
+        if (!currentUser || currentUser.id !== authUser.id) {
+          currentUser = await initSession(true)
+        }
+
+        const userId = authUser.id
 
         // Ejecutar consultas en PARALELO para evitar efecto cascada
         const [enrollmentRes, coursesRes, emailStatusRes, scheduleRes] = await Promise.allSettled([
@@ -194,9 +247,9 @@ export function StudentPortalScreen() {
           getStudentDashboardSchedule()
         ])
 
-        let name = currentUser.name || 'Estudiante'
-        let group = currentUser.group || '-'
-        let gradeLevel = currentUser.grade || '-'
+        let name = currentUser?.name || metaName || 'Estudiante'
+        let group = currentUser?.group || authUser.user_metadata?.group_name || '-'
+        let gradeLevel = currentUser?.grade || authUser.user_metadata?.grade_level || '-'
         let jornada = 'Mañana'
         let academicYear = new Date().getFullYear().toString()
 
@@ -216,14 +269,14 @@ export function StudentPortalScreen() {
           const status = emailStatusRes.value
           if (status.hasCourses) setHasCourses(true)
           if (status.hasEmail) setHasEmail(true)
-          if (status.fullName && status.fullName !== 'Estudiante' && name === 'Estudiante') {
+          if (status.fullName && status.fullName !== 'Estudiante') {
             name = status.fullName
           }
         }
 
         if (scheduleRes.status === 'fulfilled' && scheduleRes.value.success) {
-          const todayDate = new Date()
-          const dow = todayDate.getDay() // 0 = Domingo, 1 = Lunes
+          const bogotaDate = getBogotaDate()
+          const dow = bogotaDate.getDay() // 0 = Domingo, 1 = Lunes
           setIsWeekend(dow === 0 || dow === 6)
           
           let dayKey: 'lunes' | 'martes' | 'miercoles' | 'jueves' | 'viernes' | null = null
@@ -433,11 +486,16 @@ export function StudentPortalScreen() {
 
                 {/* 30% Derecha: Próxima Clase */}
                 <div className='flex-[3] p-3 sm:p-4.5 md:px-5 bg-gradient-to-r from-blue-600 to-indigo-700 flex flex-col justify-center'>
-                  <div className='mb-1'>
+                  <div className='mb-1 flex items-center justify-between gap-1'>
                     <span className={`inline-flex items-center gap-1 text-[8px] sm:text-[9px] font-extrabold uppercase tracking-wider ${effectiveNextClass?.isNovedad ? 'text-amber-300' : 'text-blue-200'}`}>
                       {effectiveNextClass?.isNovedad ? <ShieldAlert className='h-2.5 w-2.5' /> : <Clock className='h-2.5 w-2.5' />}
                       {effectiveNextClass ? `Próxima (${effectiveNextClass.period}°)` : 'Próxima'}
                     </span>
+                    {effectiveNextClass?.isNovedad && (
+                      <span className='inline-flex items-center px-1.5 py-0.5 rounded bg-amber-400/25 border border-amber-300/40 text-[8px] font-black text-amber-200'>
+                        ⚠️ NOVEDAD
+                      </span>
+                    )}
                   </div>
 
                   {effectiveNextClass ? (
