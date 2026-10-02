@@ -317,9 +317,9 @@ export async function logout() {
 /**
  * Solicitar enlace de recuperación de contraseña.
  */
-export async function recoverPassword(email: string) {
-  if (!email || !z.string().email().safeParse(email).success) {
-    return { error: 'Por favor ingresa un correo electrónico válido.' }
+export async function recoverPassword(identifier: string) {
+  if (!identifier || identifier.trim().length < 4) {
+    return { error: 'Por favor ingresa un documento de identidad o correo válido.' }
   }
 
   const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL || 
@@ -329,9 +329,19 @@ export async function recoverPassword(email: string) {
     return { success: true, isDemo: true }
   }
 
+  const emailToUse = await resolveAuthEmail(identifier)
+
+  if (!emailToUse) {
+    return { error: 'No encontramos una cuenta asociada a este documento o correo.' }
+  }
+
+  if (emailToUse.endsWith('@estudiante.ensuny.edu.co')) {
+    return { error: 'Su perfil no tiene correo actualizado, comunicarse con el administrador o Docente para actualizar el correo.' }
+  }
+
   const supabase = await createClient()
 
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+  const { error } = await supabase.auth.resetPasswordForEmail(emailToUse, {
     redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/auth/callback?next=/recovery/reset`,
   })
 

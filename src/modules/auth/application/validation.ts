@@ -15,7 +15,7 @@ export function isEmailIdentifier(value: string): boolean {
 export type LoginInput = z.infer<typeof loginSchema>
 
 export const recoveryRequestSchema = z.object({
-  email: z.string().email('Por favor ingresa un correo electrónico válido.'),
+  identifier: z.string().min(4, 'Ingresa tu documento de identidad o correo electrónico.'),
 })
 
 export type RecoveryRequestInput = z.infer<typeof recoveryRequestSchema>

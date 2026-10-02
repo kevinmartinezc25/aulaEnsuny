@@ -15,7 +15,8 @@ import { Loader2, AlertCircle, CheckCircle2, Moon, Sun, ArrowLeft } from 'lucide
 export function RecoveryRequestScreen() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
-  const [submittedEmail, setSubmittedEmail] = useState('')
+  const [submittedIdentifier, setSubmittedIdentifier] = useState('')
+  const [isDemoMode, setIsDemoMode] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
   useEffect(() => {
@@ -39,7 +40,7 @@ export function RecoveryRequestScreen() {
   } = useForm<RecoveryRequestInput>({
     resolver: zodResolver(recoveryRequestSchema),
     defaultValues: {
-      email: '',
+      identifier: '',
     },
   })
 
@@ -47,16 +48,19 @@ export function RecoveryRequestScreen() {
     setIsLoading(true)
     setErrorMsg(null)
     setSuccessMsg(null)
-    setSubmittedEmail(data.email)
+    setSubmittedIdentifier(data.identifier)
     try {
-      const response = await recoverPassword(data.email)
+      const response = await recoverPassword(data.identifier)
       if (response?.error) {
         setErrorMsg(response.error)
         return
       }
+      if (response?.isDemo) {
+        setIsDemoMode(true)
+      }
 
       setSuccessMsg(
-        'Hemos enviado un enlace de recuperación a tu correo electrónico. Por favor, revisa tu bandeja de entrada.'
+        'Hemos enviado las instrucciones a tu correo electrónico registrado. Por favor, revisa tu bandeja de entrada.'
       )
     } catch {
       setErrorMsg('Ocurrió un error inesperado al intentar solicitar la recuperación. Por favor reintenta.')
@@ -135,7 +139,7 @@ export function RecoveryRequestScreen() {
                   ¿Olvidaste tu contraseña?
                 </h1>
                 <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                  Ingresa tu correo electrónico institucional y te enviaremos las instrucciones para restablecer tu contraseña.
+                  Ingresa tu documento de identidad o correo electrónico y te enviaremos las instrucciones para restablecer tu contraseña.
                 </p>
               </div>
 
@@ -159,10 +163,15 @@ export function RecoveryRequestScreen() {
                   <div className="flex items-start gap-2.5 rounded-xl bg-emerald-50 p-3.5 text-sm text-emerald-800 border border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/30">
                     <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400 mt-1" />
                     <div className="flex-1 space-y-2">
-                      <p className="font-medium text-emerald-900 dark:text-emerald-400">Hemos enviado un enlace de recuperación a:</p>
+                      <p className="font-medium text-emerald-900 dark:text-emerald-400">Hemos enviado las instrucciones a tu correo registrado asociado con:</p>
                       <div className="py-1.5 px-3 bg-emerald-100/60 dark:bg-emerald-950/40 rounded-lg font-semibold text-emerald-950 dark:text-emerald-200 text-center break-all select-all border border-emerald-200/50 dark:border-emerald-900/20">
-                        {submittedEmail}
+                        {submittedIdentifier}
                       </div>
+                      {isDemoMode && (
+                        <p className="text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 p-2 rounded border border-amber-200 dark:border-amber-900/50">
+                          Nota: El sistema está en Modo Demo. No se enviarán correos reales.
+                        </p>
+                      )}
                       <p className="text-emerald-800/90 dark:text-emerald-400/90">Por favor, revisa tu bandeja de entrada para continuar.</p>
                     </div>
                   </div>
@@ -179,19 +188,19 @@ export function RecoveryRequestScreen() {
                 <form onSubmit={handleSubmit(onSubmit)}>
                   <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
                     <motion.div variants={itemVariants} className="space-y-1.5">
-                      <Label htmlFor="email" className="text-slate-700 dark:text-slate-300 font-semibold text-sm">
-                        Correo electrónico
+                      <Label htmlFor="identifier" className="text-slate-700 dark:text-slate-300 font-semibold text-sm">
+                        Documento de Identidad o Correo
                       </Label>
                       <Input
-                        id="email"
-                        type="email"
-                        placeholder="ejemplo@colegio.edu"
+                        id="identifier"
+                        type="text"
+                        placeholder="Tu número de documento o correo"
                         className={`rounded-lg border-slate-200/80 bg-slate-50/50 py-4 sm:py-5 text-sm focus:bg-white focus:ring-[#1F4E31] dark:border-slate-800 dark:bg-slate-950/50 ${
-                          errors.email ? 'border-red-500 focus:ring-red-500' : ''
+                          errors.identifier ? 'border-red-500 focus:ring-red-500' : ''
                         }`}
-                        {...register('email')}
+                        {...register('identifier')}
                       />
-                      {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email.message}</p>}
+                      {errors.identifier && <p className="text-xs text-red-500 mt-1">{errors.identifier.message}</p>}
                     </motion.div>
 
                     <motion.div variants={itemVariants} className="pt-2">
