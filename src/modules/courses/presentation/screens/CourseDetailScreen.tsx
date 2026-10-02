@@ -1353,7 +1353,7 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
     } catch (err: any) {
       console.error('[FileUpload] Error:', err)
       const errorMsg = err.message || 'Error al subir el archivo'
-      if (errorMsg.includes('failed to fetch') || errorMsg.includes('red al contactar')) {
+      if (errorMsg.toLowerCase().includes('failed to fetch') || errorMsg.toLowerCase().includes('red al contactar')) {
         toast.error('Error de red o archivo muy pesado. Por favor, revisa tu conexión e intenta de nuevo.')
       } else {
         toast.error(errorMsg)
