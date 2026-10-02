@@ -126,6 +126,11 @@ function isContentEmpty(content: string): boolean {
   return trimmed === '' || trimmed === '<p><br></p>' || trimmed === '<p></p>'
 }
 
+export function isLessonExpired(dueDate?: string): boolean {
+  if (!dueDate) return false
+  return new Date() > new Date(dueDate)
+}
+
 export function CourseDetailScreen({ courseId }: { courseId: string }) {
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false)
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false)
@@ -585,7 +590,7 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
 
     // Auto-mark file resources as completed when student opens them
     if (lesson.type === 'file' && userRole === 'student' && lesson.status !== 'completed' && lesson.status !== 'graded') {
-      handleMarkAsCompleted(lesson.id)
+      handleMarkAsCompleted(lesson.id, undefined, true)
     }
   }
 
@@ -608,7 +613,7 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
     }
   }
 
-  const getStatusColor = (status?: LessonStatus) => {
+  const getStatusColor = (status?: LessonStatus, dueDate?: string) => {
     switch (status) {
       case 'completed':
         return 'text-emerald-600 dark:text-emerald-400'
@@ -620,11 +625,14 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
         return 'text-red-600 dark:text-red-400'
       case 'pending':
       default:
+        if (isLessonExpired(dueDate)) {
+          return 'text-slate-500 dark:text-slate-400 opacity-80'
+        }
         return 'text-slate-400 dark:text-slate-500'
     }
   }
 
-  const renderStatusIcon = (status?: LessonStatus, className = "h-3.5 w-3.5", countsForProgress?: boolean) => {
+  const renderStatusIcon = (status?: LessonStatus, className = "h-3.5 w-3.5", countsForProgress?: boolean, dueDate?: string) => {
     switch (status) {
       case 'completed':
         return <CheckCircle className={className} />
@@ -636,23 +644,28 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
         return <AlertCircle className={className} />
       case 'pending':
       default:
+        if (isLessonExpired(dueDate)) {
+          return <AlertCircle className={className} />
+        }
         if (countsForProgress === false) return <MessageSquare className={className} />
         return <div className={`rounded-full border border-current ${className}`} style={{ borderWidth: '1.5px' }} />
     }
   }
 
-  const getStatusText = (status?: LessonStatus, type?: Lesson['type'], countsForProgress?: boolean) => {
+  const getStatusText = (status?: LessonStatus, type?: Lesson['type'], countsForProgress?: boolean, dueDate?: string) => {
     switch (status) {
       case 'completed':
-        return 'Completado'
       case 'submitted':
-        return 'Entregado'
+        return type === 'task' || type === 'forum' ? 'Enviado' : 'Completado'
       case 'graded':
         return 'Calificado'
       case 'late':
         return 'Retrasado'
       case 'pending':
       default:
+        if (isLessonExpired(dueDate)) {
+          return 'Actividad cerrada'
+        }
         if (countsForProgress === false) return 'Consultas (Opcional)'
         if (type === 'quiz') return 'Pendiente'
         if (type === 'task') return 'Por entregar'
@@ -1339,7 +1352,12 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
       setTaskFile(null)
     } catch (err: any) {
       console.error('[FileUpload] Error:', err)
-      toast.error(err.message || 'Error al subir el archivo')
+      const errorMsg = err.message || 'Error al subir el archivo'
+      if (errorMsg.includes('failed to fetch') || errorMsg.includes('red al contactar')) {
+        toast.error('Error de red o archivo muy pesado. Por favor, revisa tu conexión e intenta de nuevo.')
+      } else {
+        toast.error(errorMsg)
+      }
     } finally {
       setTaskFileUploading(false)
     }
@@ -1361,12 +1379,12 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
     return null
   }
 
-  const handleMarkAsCompleted = async (lessonId: string, submissionText?: string) => {
+  const handleMarkAsCompleted = async (lessonId: string, submissionText?: string, isFileResource?: boolean) => {
     const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL ||
       process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
 
-    // Check if this is a resource (PDF)
-    const isResource = activeLesson?.type === 'file' && activeLesson?.id === lessonId
+    // Check if this is a resource (PDF) - handle both explicit flag and fallback to state
+    const isResource = isFileResource ?? (activeLesson?.type === 'file' && activeLesson?.id === lessonId)
 
     if (isResource && !isDemoMode) {
       try {
@@ -1466,9 +1484,10 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
 
       // Reload all course data for statistics refresh
       loadCourseData()
-    } catch (e) {
-      console.error(e)
+    } catch (e: any) {
+      console.error('[handleMarkAsCompleted] Error:', e?.message || e, e)
       toast.error('No se pudo marcar la lección como completada')
+      throw e
     }
   }
 
@@ -1644,11 +1663,11 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
                         <div className="flex-1 min-w-0 text-left space-y-1">
                           <p className={`truncate ${isActive ? 'text-blue-600 dark:text-blue-400 font-bold' : 'text-slate-700 dark:text-slate-300 font-semibold'}`}>{lesson.title}</p>
                           <div className="flex items-center gap-1.5 mt-1 text-[10px] text-slate-500">
-                            <span className="capitalize">{lesson.type === 'video' ? 'Video' : lesson.type === 'task' ? 'Tarea' : lesson.type === 'quiz' ? 'Quiz' : 'Foro'}</span>
+                            <span className="capitalize">{lesson.type === 'video' ? 'Video' : lesson.type === 'task' ? 'Tarea' : lesson.type === 'quiz' ? 'Quiz' : lesson.type === 'file' ? 'Documento' : lesson.type === 'reading' ? 'Lectura' : 'Foro'}</span>
                             <span>•</span>
-                            <div className={`flex items-center gap-1 font-bold ${getStatusColor(lesson.status)}`}>
-                              {renderStatusIcon(lesson.status, "h-3 w-3 shrink-0", lesson.countsForProgress)}
-                              <span>{getStatusText(lesson.status, lesson.type, lesson.countsForProgress)}</span>
+                            <div className={`flex items-center gap-1 font-bold ${getStatusColor(lesson.status, lesson.dueDate)}`}>
+                              {renderStatusIcon(lesson.status, "h-3 w-3 shrink-0", lesson.countsForProgress, lesson.dueDate)}
+                              <span>{getStatusText(lesson.status, lesson.type, lesson.countsForProgress, lesson.dueDate)}</span>
                             </div>
                           </div>
                         </div>
@@ -1971,12 +1990,12 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
                         <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">
                           {activeLesson.title}
                         </h1>
-                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold ${getStatusColor(activeLesson.status)} bg-opacity-20`}>
-                          {getStatusText(activeLesson.status, activeLesson.type, activeLesson.countsForProgress)}
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold ${getStatusColor(activeLesson.status, activeLesson.dueDate)} bg-opacity-20`}>
+                          {getStatusText(activeLesson.status, activeLesson.type, activeLesson.countsForProgress, activeLesson.dueDate)}
                         </span>
                       </div>
                       <p className="mt-1.5 text-sm text-slate-600 dark:text-slate-400 max-w-2xl">
-                        {activeLesson.type === 'video' ? 'Visualiza el siguiente material de video y presta atención a los conceptos.' : activeLesson.type === 'task' ? 'Lee las instrucciones y sube tu entrega antes de la fecha límite.' : activeLesson.type === 'forum' ? 'Participa en el foro respondiendo la pregunta planteada por el docente.' : 'Resuelve el cuestionario para evaluar tus conocimientos sobre el tema.'}
+                        {activeLesson.type === 'video' ? 'Visualiza el siguiente material de video y presta atención a los conceptos.' : activeLesson.type === 'task' ? 'Lee las instrucciones y sube tu entrega antes de la fecha límite.' : activeLesson.type === 'forum' ? 'Participa en el foro respondiendo la pregunta planteada por el docente.' : activeLesson.type === 'file' ? 'Documento o archivo de estudio.' : 'Resuelve el cuestionario para evaluar tus conocimientos sobre el tema.'}
                       </p>
                       <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] font-medium text-slate-500 dark:text-slate-400">
                         <span className="flex items-center gap-1.5 capitalize font-semibold text-slate-700 dark:text-slate-200">
@@ -2283,6 +2302,14 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
                             )
                           })()
                         }
+                      </div>
+                    ) : isLessonExpired(activeLesson.dueDate) && activeLesson.status !== 'completed' && activeLesson.status !== 'graded' && activeLesson.status !== 'submitted' ? (
+                      <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-700 dark:border-red-900/30 dark:bg-red-950/20 dark:text-red-400">
+                        <div className="flex items-center gap-2 font-bold mb-1">
+                          <AlertCircle className="h-5 w-5" />
+                          <p>Esta actividad ha caducado</p>
+                        </div>
+                        <p className="text-sm">Dudas, comunicarse con el Docente.</p>
                       </div>
                     ) : activeLesson.submissionType === 'file' ? (
                       <div className="space-y-4">
@@ -2832,7 +2859,7 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
                         {/* Reply Form */}
                         {activeThread.isLocked || isForumClosedForStudent ? (
                           <div className="rounded-2xl bg-slate-50 dark:bg-slate-900/50 p-5 border border-dashed text-center text-xs text-slate-500">
-                            {isForumClosedForStudent ? 'La fecha límite ha expirado y no se admiten nuevas participaciones.' : 'Este tema de discusión ha sido bloqueado por el docente y no admite nuevas respuestas.'}
+                            {isForumClosedForStudent ? 'Esta actividad ha caducado. Dudas, comunicarse con el Docente.' : 'Este tema de discusión ha sido bloqueado por el docente y no admite nuevas respuestas.'}
                           </div>
                         ) : (
                           <form onSubmit={(e) => handleCreateReply(e)} className="space-y-3 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800/80 p-5 sm:p-6 shadow-sm">

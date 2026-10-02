@@ -398,12 +398,14 @@ export function StudentDashboardScreen() {
               <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
                 Mis cursos
               </h2>
-              <div className="flex items-center gap-3">
-                <Link href="/student/join-course" className="inline-flex items-center gap-1 text-xs font-semibold text-[#1F4E31] hover:underline dark:text-[#388E59]">
-                  <PlusCircle className="h-3.5 w-3.5" /> Agregar curso
+              <div className="flex items-center gap-3 sm:gap-4">
+                <Link href="/student/virtual-grades" className="text-[11px] sm:text-xs font-semibold text-blue-600 hover:underline dark:text-blue-400 flex items-center gap-0.5">
+                  <span className="hidden sm:inline">Ver </span>Calificaciones <ArrowRight className="h-3 w-3" />
                 </Link>
-                <Link href="/student/virtual-grades" className="text-xs font-semibold text-blue-600 hover:underline dark:text-blue-400 flex items-center gap-0.5">
-                  Calificaciones <ArrowRight className="h-3 w-3" />
+                <Link href="/student/join-course" className="inline-flex items-center gap-1.5 rounded-xl bg-[#1F4E31] px-3 sm:px-4 py-2 text-[11px] sm:text-xs font-bold text-white shadow-sm hover:bg-[#153823] active:scale-95 transition-all dark:bg-[#2d7348] dark:hover:bg-[#1F4E31]">
+                  <PlusCircle className="h-4 w-4" /> 
+                  <span className="hidden sm:inline">Agregar curso</span>
+                  <span className="sm:hidden">Agregar</span>
                 </Link>
               </div>
             </div>
