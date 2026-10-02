@@ -148,10 +148,76 @@ export async function login(input: LoginInput) {
   const supabase = await createClient()
 
   // Resolver el email oficial de Supabase Auth
-  const emailToUse = await resolveAuthEmail(identifier)
+  let emailToUse = await resolveAuthEmail(identifier)
+
   if (!emailToUse) {
-    return {
-      error: 'No encontramos una cuenta asociada a este documento o correo. Verifica que estés matriculado en aulaEnsuny.'
+    const trimmedId = identifier.trim()
+    const trimmedPass = password.trim()
+
+    // Verificamos si es probable que sea el primer ingreso (documento y contraseña coinciden)
+    if (trimmedId && trimmedId.length >= 5 && (trimmedId === trimmedPass || trimmedId.replace(/\D/g, '') === trimmedPass)) {
+      const adminClient = createAdminClient()
+      const docDigits = trimmedId.replace(/\D/g, '')
+      const docAlphanumeric = trimmedId.replace(/[^0-9a-zA-Z]/g, '')
+      
+      const variants = Array.from(new Set([trimmedId, docDigits, docAlphanumeric])).filter(Boolean)
+      const dirOrQuery = variants.map(v => `document_id.eq.${v}`).join(',')
+      
+      const { data: dir } = await adminClient
+        .from('student_directory')
+        .select('id, document_id, first_name, last_name, grade_level, group_name')
+        .or(dirOrQuery)
+        .is('profile_id', null)
+        .limit(1)
+        .maybeSingle()
+        
+      if (dir) {
+        // Encontramos al estudiante importado sin cuenta virtual.
+        // Generamos un correo ficticio y creamos la cuenta en Supabase Auth on-the-fly.
+        const dummyEmail = `${dir.document_id || docDigits}@estudiante.ensuny.edu.co`.toLowerCase()
+        
+        const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
+          email: dummyEmail,
+          password: password,
+          email_confirm: true,
+          user_metadata: {
+            first_name: dir.first_name,
+            last_name: dir.last_name,
+            role_name: 'student',
+            grade_level: dir.grade_level,
+          }
+        })
+        
+        if (!createError && newUser?.user) {
+          const studentId = newUser.user.id
+          
+          // Vincular el directorio con el nuevo usuario
+          await adminClient
+            .from('student_directory')
+            .update({ profile_id: studentId })
+            .eq('id', dir.id)
+            
+          // Actualizar el perfil básico (creado por el trigger de Supabase)
+          await adminClient
+            .from('profiles')
+            .update({
+              first_name: dir.first_name,
+              last_name: dir.last_name,
+              grade_level: dir.grade_level,
+              group_name: dir.group_name,
+              status: 'active'
+            })
+            .eq('id', studentId)
+            
+          emailToUse = dummyEmail
+        }
+      }
+    }
+
+    if (!emailToUse) {
+      return {
+        error: 'No encontramos una cuenta asociada a este documento o correo. Verifica que estés matriculado en aulaEnsuny.'
+      }
     }
   }
 
