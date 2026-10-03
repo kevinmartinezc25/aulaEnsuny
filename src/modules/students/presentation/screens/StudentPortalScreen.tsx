@@ -3,12 +3,12 @@
 import React, { useEffect, useState } from 'react'
 import { motion, useReducedMotion, Variants } from 'framer-motion'
 import Link from 'next/link'
-import { TrendingUp, CalendarDays, ShieldAlert, Activity, BookOpen, ChevronRight, Settings } from 'lucide-react'
+import { TrendingUp, CalendarDays, ShieldAlert, Activity, BookOpen, ChevronRight, Settings, Clock, Users, Sparkles } from 'lucide-react'
 import { createClient } from '@/core/config/supabase/client'
 import { StudentVirtualCourseModal } from '../components/StudentVirtualCourseModal'
 import { getStudentEmailStatus } from '../../application/studentEmailActions'
 import { getStudentDashboardSchedule } from '../../application/scheduleActions'
-import { Clock, Users } from 'lucide-react'
+import { getColombianHoliday, type ColombianHoliday } from '@/lib/colombianHolidays'
 
 import { useUserSessionStore } from '@/store/useUserSessionStore'
 
@@ -85,7 +85,12 @@ export function StudentPortalScreen() {
   const [isVirtualModalOpen, setIsVirtualModalOpen] = useState(false)
   // Schedule state
   const [todaySchedule, setTodaySchedule] = useState<any[]>([])
-  const [isWeekend, setIsWeekend] = useState(false)
+  const [isWeekend, setIsWeekend] = useState(() => {
+    const d = getBogotaDate().getDay()
+    return d === 0 || d === 6
+  })
+  const [dayOfWeekNumber, setDayOfWeekNumber] = useState<number>(() => getBogotaDate().getDay())
+  const [colombianHoliday, setColombianHoliday] = useState<ColombianHoliday | null>(() => getColombianHoliday(getBogotaDate()))
   const [currentClass, setCurrentClass] = useState<any | null>(null)
   const [nextClass, setNextClass] = useState<any | null>(null)
   const [completedClasses, setCompletedClasses] = useState(0)
@@ -134,8 +139,8 @@ export function StudentPortalScreen() {
     // Buscar la siguiente clase no libre posterior a la clase actual o al momento actual
     for (const cls of updatedSlots) {
       if (!cls.isFree) {
-        const startMins = cls.startMins !== undefined && cls.startMins !== null 
-          ? cls.startMins 
+        const startMins = cls.startMins !== undefined && cls.startMins !== null
+          ? cls.startMins
           : parseTimeToMinutes(cls.startTime)
 
         if (startMins === null) continue
@@ -166,7 +171,7 @@ export function StudentPortalScreen() {
   }, [])
 
   useEffect(() => {
-    if (todaySchedule.length === 0) return
+    if (todaySchedule.length === 0 || isWeekend || colombianHoliday) return
     const timer = setInterval(() => {
       const res = evaluateSchedule(todaySchedule)
       setTodaySchedule(res.updatedSlots)
@@ -175,7 +180,7 @@ export function StudentPortalScreen() {
       setCompletedClasses(res.completed)
     }, 60000)
     return () => clearInterval(timer)
-  }, [todaySchedule, evaluateSchedule])
+  }, [todaySchedule, evaluateSchedule, isWeekend, colombianHoliday])
 
   // Si ya tenemos sesión precacheada, no bloquear la pantalla con skeleton
   const [loading, setLoading] = useState(!sessionUser)
@@ -189,11 +194,16 @@ export function StudentPortalScreen() {
           const ck = gc('aulaensuny-demo-session')
           if (ck) {
             const s = JSON.parse(decodeURIComponent(ck))
-            const full = ((s.first_name||'') + ' ' + (s.last_name||'')).trim()
-            setInfo({ name: full||'Estudiante', group: 'Demo 10-A', gradeLevel: s.grade_level||'10', jornada: 'Mañana', academicYear: new Date().getFullYear().toString(), avatarInitials: getInitials(full||'E') })
+            const full = ((s.first_name || '') + ' ' + (s.last_name || '')).trim()
+            setInfo({ name: full || 'Estudiante', group: 'Demo 10-A', gradeLevel: s.grade_level || '10', jornada: 'Mañana', academicYear: new Date().getFullYear().toString(), avatarInitials: getInitials(full || 'E') })
             setHasCourses(true)
             setHasEmail(true)
           }
+          const bogotaDate = getBogotaDate()
+          const dow = bogotaDate.getDay()
+          setDayOfWeekNumber(dow)
+          setIsWeekend(dow === 0 || dow === 6)
+          setColombianHoliday(getColombianHoliday(bogotaDate))
           setLoading(false)
           return
         }
@@ -274,27 +284,29 @@ export function StudentPortalScreen() {
           }
         }
 
-        if (scheduleRes.status === 'fulfilled' && scheduleRes.value.success) {
-          const bogotaDate = getBogotaDate()
-          const dow = bogotaDate.getDay() // 0 = Domingo, 1 = Lunes
-          setIsWeekend(dow === 0 || dow === 6)
-          
-          let dayKey: 'lunes' | 'martes' | 'miercoles' | 'jueves' | 'viernes' | null = null
-          if (dow === 1) dayKey = 'lunes'
-          else if (dow === 2) dayKey = 'martes'
-          else if (dow === 3) dayKey = 'miercoles'
-          else if (dow === 4) dayKey = 'jueves'
-          else if (dow === 5) dayKey = 'viernes'
+        const bogotaDate = getBogotaDate()
+        const dow = bogotaDate.getDay() // 0 = Domingo, 1 = Lunes
+        setDayOfWeekNumber(dow)
+        const isWk = dow === 0 || dow === 6
+        setIsWeekend(isWk)
+        const holiday = getColombianHoliday(bogotaDate)
+        setColombianHoliday(holiday)
 
-          if (dayKey && scheduleRes.value.schedule) {
-            const todayArr = scheduleRes.value.schedule[dayKey] || []
-            const res = evaluateSchedule(todayArr)
-            setTodaySchedule(res.updatedSlots)
-            setCurrentClass(res.curr)
-            setNextClass(res.next)
-            setCompletedClasses(res.completed)
-            setTotalClasses(res.total)
-          }
+        let dayKey: 'lunes' | 'martes' | 'miercoles' | 'jueves' | 'viernes' | null = null
+        if (dow === 1) dayKey = 'lunes'
+        else if (dow === 2) dayKey = 'martes'
+        else if (dow === 3) dayKey = 'miercoles'
+        else if (dow === 4) dayKey = 'jueves'
+        else if (dow === 5) dayKey = 'viernes'
+
+        if (!isWk && !holiday && dayKey && scheduleRes.status === 'fulfilled' && scheduleRes.value.success && scheduleRes.value.schedule) {
+          const todayArr = scheduleRes.value.schedule[dayKey] || []
+          const res = evaluateSchedule(todayArr)
+          setTodaySchedule(res.updatedSlots)
+          setCurrentClass(res.curr)
+          setNextClass(res.next)
+          setCompletedClasses(res.completed)
+          setTotalClasses(res.total)
         }
 
         setInfo({ name, group, gradeLevel, jornada, academicYear, avatarInitials: getInitials(name) })
@@ -348,11 +360,11 @@ export function StudentPortalScreen() {
         initial={{ opacity: 0, y: shouldReduceMotion ? 0 : 18 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ type: 'spring', damping: 26, stiffness: 220 }}
-        className='relative overflow-hidden rounded-2xl sm:rounded-3xl bg-[#317C76] dark:bg-slate-900 p-4.5 sm:p-7 shadow-sm border border-[#215a55] dark:border-slate-800'
+        className='relative overflow-hidden rounded-2xl sm:rounded-3xl bg-[#0D5F4E] dark:bg-slate-900 p-4.5 sm:p-7 shadow-sm border border-[#0a4639] dark:border-slate-800'
       >
         <div className='pointer-events-none absolute top-0 right-0 w-48 sm:w-56 h-48 sm:h-56 rounded-full bg-white/10 dark:bg-slate-800/50 blur-3xl' />
         <div className='pointer-events-none absolute bottom-0 left-6 sm:left-8 w-32 sm:w-40 h-32 sm:h-40 rounded-full bg-teal-200/10 dark:bg-slate-800/30 blur-2xl' />
-        
+
         <Link
           href='/student/settings'
           className='absolute top-3.5 right-3.5 sm:top-5 sm:right-5 z-20 h-9 w-9 sm:h-11 sm:w-11 rounded-xl sm:rounded-2xl bg-white/10 hover:bg-white/20 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 border border-white/20 dark:border-slate-700 flex items-center justify-center text-white dark:text-slate-400 transition-all duration-200 shadow-sm'
@@ -388,27 +400,112 @@ export function StudentPortalScreen() {
         </div>
       </motion.div>
 
-      {/* Tarjeta de Horario (Clase Actual / Siguiente) */}
-      {!loading && !isWeekend && totalClasses > 0 && (
+      {/* Tarjeta de Horario (Clase Actual / Siguiente / Fin de semana / Festivo) */}
+      {!loading && (
         <motion.div
           initial={{ opacity: 0, y: shouldReduceMotion ? 0 : 18 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ type: 'spring', damping: 26, stiffness: 220, delay: 0.1 }}
-          className='relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-r from-emerald-600 to-teal-700 text-white shadow-[0_8px_32px_rgba(16,185,129,0.22)] border border-emerald-500/30 w-full'
+          className={`relative overflow-hidden rounded-2xl sm:rounded-3xl text-white w-full ${
+            !isWeekend && !colombianHoliday && totalClasses > 0 && (currentClass || nextClass)
+              ? 'bg-gradient-to-r from-emerald-600 to-teal-700 border border-emerald-500/40 shadow-[0_8px_32px_rgba(16,185,129,0.22)]'
+              : 'bg-gradient-to-r from-blue-600 to-indigo-700 border border-blue-500 shadow-[0_8px_30px_rgba(59,130,246,0.3)]'
+          }`}
         >
-          <div className='pointer-events-none absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-white/5 via-transparent to-transparent opacity-50' />
+          <div className='pointer-events-none absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-white/10 via-transparent to-transparent opacity-60' />
 
           {(() => {
+            // CASO 1: Festivo oficial en Colombia
+            if (colombianHoliday) {
+              return (
+                <div className='relative z-10 p-4.5 sm:p-6'>
+                  <div className='space-y-1.5 min-w-0'>
+                    <div className='flex items-center gap-2'>
+                      <span className='inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-400/25 border border-amber-300/40 text-amber-100 text-[10px] sm:text-[11px] font-extrabold tracking-wide shadow-xs backdrop-blur-md'>
+                        <CalendarDays className='h-3 w-3 text-amber-300' />
+                        FESTIVO EN COLOMBIA
+                      </span>
+                    </div>
+                    <h2 className='text-base sm:text-xl font-black text-white tracking-tight leading-tight'>
+                      Sin clases programadas · {colombianHoliday.name}
+                    </h2>
+                    <p className='text-xs sm:text-sm text-blue-100 font-medium leading-relaxed max-w-2xl'>
+                      Hoy no hay jornada académica por ser día festivo oficial en el calendario nacional. ¡Disfruta de tu descanso!
+                    </p>
+                  </div>
+                </div>
+              )
+            }
+
+            // CASO 2: Fin de semana (Sábado o Domingo)
+            if (isWeekend) {
+              const isSaturday = dayOfWeekNumber === 6
+              return (
+                <div className='relative z-10 p-4.5 sm:p-6'>
+                  <div className='space-y-1.5 min-w-0'>
+                    <div className='flex items-center gap-2'>
+                      <span className='inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/20 border border-white/30 text-white text-[10px] sm:text-[11px] font-extrabold tracking-wide shadow-xs backdrop-blur-md'>
+                        <Sparkles className='h-3 w-3 text-amber-300' />
+                        {isSaturday ? 'SÁBADO' : 'DOMINGO'} · FIN DE SEMANA
+                      </span>
+                    </div>
+                    <h2 className='text-base sm:text-xl font-black text-white tracking-tight leading-tight'>
+                      Sin clases programadas
+                    </h2>
+                    <p className='text-xs sm:text-sm text-blue-100 font-medium leading-relaxed max-w-2xl'>
+                      {isSaturday
+                        ? '¡Feliz sábado! Aprovecha el fin de semana para recargar energías, compartir en familia o adelantar repasos.'
+                        : '¡Feliz domingo! Prepara tus cuadernos y actividades para iniciar la semana con la mejor energía mañana.'}
+                    </p>
+                  </div>
+                </div>
+              )
+            }
+
+            // CASO 3: Día de semana ordinario sin clases programadas
+            if (totalClasses === 0) {
+              return (
+                <div className='relative z-10 p-4.5 sm:p-6'>
+                  <div className='space-y-1.5 min-w-0'>
+                    <div className='flex items-center gap-2'>
+                      <span className='inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/20 border border-white/30 text-white text-[10px] sm:text-[11px] font-bold tracking-wide backdrop-blur-md'>
+                        <Clock className='h-3 w-3 text-blue-200' />
+                        HORARIO ESCOLAR
+                      </span>
+                    </div>
+                    <h2 className='text-base sm:text-xl font-black text-white tracking-tight leading-tight'>
+                      Sin clases programadas para hoy
+                    </h2>
+                    <p className='text-xs sm:text-sm text-blue-100 font-medium leading-relaxed max-w-2xl'>
+                      No tienes asignaturas registradas para la jornada de hoy.
+                    </p>
+                  </div>
+                </div>
+              )
+            }
+
+            // CASO 4: Día de semana con clases programadas
             const isSameClass = nextClass && currentClass && (nextClass.id === currentClass.id || nextClass.period === currentClass.period)
             const effectiveNextClass = isSameClass ? null : nextClass
             const isFinishedDay = !currentClass && !effectiveNextClass && totalClasses > 0
 
             if (isFinishedDay) {
               return (
-                <div className='p-5 sm:p-7 text-center'>
-                  <h2 className='text-base sm:text-lg font-bold tracking-tight text-emerald-50'>
-                    Jornada finalizada, no tienes más clases hoy.
-                  </h2>
+                <div className='relative z-10 p-4.5 sm:p-6'>
+                  <div className='space-y-1.5 min-w-0'>
+                    <div className='flex items-center gap-2'>
+                      <span className='inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/20 border border-white/30 text-white text-[10px] sm:text-[11px] font-bold tracking-wide backdrop-blur-md'>
+                        <Clock className='h-3 w-3 text-blue-200' />
+                        JORNADA FINALIZADA
+                      </span>
+                    </div>
+                    <h2 className='text-base sm:text-xl font-black text-white tracking-tight leading-tight'>
+                      No tienes más clases por hoy
+                    </h2>
+                    <p className='text-xs sm:text-sm text-blue-100 font-medium leading-relaxed max-w-2xl'>
+                      Has completado todas las asignaturas de la jornada escolar. ¡Buen trabajo!
+                    </p>
+                  </div>
                 </div>
               )
             }
@@ -541,8 +638,8 @@ export function StudentPortalScreen() {
 
           return (
             <motion.div key={mod.id} variants={iv}>
-              <Link 
-                href={mod.href} 
+              <Link
+                href={mod.href}
                 onClick={(e) => {
                   if (isCourses && !hasEmail) {
                     e.preventDefault()
@@ -560,7 +657,7 @@ export function StudentPortalScreen() {
                   ].join(' ')}
                 >
                   <div className='pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/80 to-transparent' />
-                  
+
                   <div className='flex items-start justify-between mb-2.5 sm:mb-3'>
                     <div
                       className={[

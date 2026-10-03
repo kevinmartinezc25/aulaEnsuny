@@ -2,12 +2,11 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import { usePlanillaStore } from '@/store/usePlanillaStore'
-import { Plus, Trash2, Edit2, CalendarDays } from 'lucide-react'
+import { Plus, Trash2, Edit2, CalendarDays, Lock, Unlock, MoreVertical } from 'lucide-react'
 import { CreateSessionModal } from '@/modules/planilla-asistida/presentation/components/CreateSessionModal'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { deleteAssistedSession, AssistedSession, toggleAssistedSessionLock } from '@/modules/planilla-asistida/application/attendanceActions'
-import { Lock, Unlock } from 'lucide-react'
 
 interface AttendanceTableProps {
   subjectId: string
@@ -18,9 +17,27 @@ export function AttendanceTable({ subjectId }: AttendanceTableProps) {
   const [isTogglingLock, setIsTogglingLock] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [sessionToEdit, setSessionToEdit] = useState<AssistedSession | null>(null)
+  const [activeMenuSessionId, setActiveMenuSessionId] = useState<string | null>(null)
   
   // Para permitir desbloquear temporalmente clases pasadas que se auto-bloquean
   const [unlockedPastSessions, setUnlockedPastSessions] = useState<Set<string>>(new Set())
+
+  // Cerrar menú contextual al hacer clic fuera
+  useEffect(() => {
+    if (!activeMenuSessionId) return
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as HTMLElement
+      if (!target.closest('[data-session-menu]')) {
+        setActiveMenuSessionId(null)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('touchstart', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('touchstart', handleClickOutside)
+    }
+  }, [activeMenuSessionId])
 
   // Handlers
   const handleOpenEdit = (session: AssistedSession) => {
@@ -216,46 +233,126 @@ export function AttendanceTable({ subjectId }: AttendanceTableProps) {
               </th>
               {sessions.map(session => {
                 const locked = isSessionLocked(session)
+                const isMenuOpen = activeMenuSessionId === session.id
                 return (
-                <th key={session.id} className={`relative px-1 py-2 font-semibold border-b border-r border-slate-200 dark:border-slate-800 text-center w-[85px] min-w-[85px] max-w-[85px] group overflow-hidden ${locked ? 'bg-slate-100 dark:bg-slate-800/60' : ''}`}>
-                  <div className="flex flex-col items-center justify-center">
-                    <span className={`mb-1 ${locked ? 'text-slate-500 dark:text-slate-400' : 'text-slate-900 dark:text-white'}`}>
-                      {(() => {
-                        const [year, month, day] = session.date.split('-');
-                        const localDate = new Date(Number(year), Number(month) - 1, Number(day));
-                        return localDate.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
-                      })()}
-                    </span>
-                    {session.topic && (
-                      <span className="text-[10px] font-normal text-slate-400 truncate w-full px-1" title={session.topic}>
-                        {session.topic}
-                      </span>
-                    )}
-                    <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-50 dark:bg-slate-900 rounded shadow-sm border border-slate-200 dark:border-slate-700 p-0.5 z-10">
+                <th 
+                  key={session.id} 
+                  className={`relative px-1 py-1.5 font-semibold border-b border-r border-slate-200 dark:border-slate-800 text-center w-[96px] min-w-[96px] max-w-[96px] ${
+                    locked ? 'bg-slate-100/90 dark:bg-slate-800/60' : 'bg-slate-50 dark:bg-slate-900'
+                  } ${isMenuOpen ? 'z-40' : 'z-20'}`}
+                >
+                  <div className="flex flex-col items-center justify-center relative" data-session-menu={isMenuOpen ? "true" : undefined}>
+                    {/* Fila superior: Candado (si bloqueado) + Fecha + Menú ⋮ */}
+                    <div className="flex items-center justify-between w-full gap-0.5 px-0.5">
+                      <div className="flex items-center gap-1 min-w-0 flex-1 justify-center pl-0.5">
+                        {locked && (
+                          <span title={session.is_locked ? "Clase bloqueada" : "Clase pasada (auto-bloqueada)"} className="shrink-0">
+                            <Lock className="h-3 w-3 text-amber-500 dark:text-amber-400" />
+                          </span>
+                        )}
+                        <span className={`text-xs font-bold truncate ${locked ? 'text-slate-500 dark:text-slate-400' : 'text-slate-900 dark:text-white'}`}>
+                          {(() => {
+                            const [year, month, day] = session.date.split('-');
+                            const localDate = new Date(Number(year), Number(month) - 1, Number(day));
+                            return localDate.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
+                          })()}
+                        </span>
+                      </div>
+
                       <button 
-                        onClick={() => handleToggleLock(session)}
-                        disabled={isTogglingLock === session.id}
-                        className={`p-1 rounded bg-white/50 dark:bg-slate-800/50 ${session.is_locked ? 'text-amber-500 hover:text-amber-600' : 'text-slate-300 hover:text-emerald-500'}`}
-                        title={session.is_locked ? 'Desbloquear asistencia' : 'Bloquear asistencia'}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setActiveMenuSessionId(prev => prev === session.id ? null : session.id)
+                        }}
+                        className={`p-1 rounded-md transition-colors shrink-0 ${
+                          isMenuOpen 
+                            ? 'bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-100' 
+                            : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800'
+                        }`}
+                        title="Opciones de clase"
+                        aria-label="Opciones de clase"
                       >
-                        {session.is_locked ? <Lock className="h-3 w-3" /> : <Unlock className="h-3 w-3" />}
-                      </button>
-                      <button 
-                        onClick={() => handleOpenEdit(session)}
-                        disabled={session.is_locked}
-                        className={`p-1 rounded bg-white/50 dark:bg-slate-800/50 ${session.is_locked ? 'text-slate-200 dark:text-slate-700 cursor-not-allowed' : 'text-slate-300 hover:text-emerald-500'}`}
-                        title="Editar clase"
-                      >
-                        <Edit2 className="h-3 w-3" />
-                      </button>
-                      <button 
-                        onClick={() => handleDeleteSession(session.id)}
-                        className="p-1 text-slate-300 hover:text-red-500 rounded bg-white/50 dark:bg-slate-800/50"
-                        title="Eliminar clase"
-                      >
-                        <Trash2 className="h-3 w-3" />
+                        <MoreVertical className="h-3.5 w-3.5" />
                       </button>
                     </div>
+
+                    {/* Fila inferior: Tópico / Tema */}
+                    {session.topic ? (
+                      <span className="text-[10px] font-normal text-slate-400 dark:text-slate-500 truncate w-full px-0.5 mt-0.5 block text-center" title={session.topic}>
+                        {session.topic}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-normal text-transparent select-none mt-0.5 block">
+                        -
+                      </span>
+                    )}
+
+                    {/* Menú Dropdown Contextual */}
+                    {isMenuOpen && (
+                      <div 
+                        className="absolute top-full left-1/2 -translate-x-1/2 mt-1 w-44 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl py-1 z-50 text-left animate-in fade-in zoom-in-95 duration-100"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {/* Opción 1: Bloquear / Desbloquear */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveMenuSessionId(null)
+                            handleToggleLock(session)
+                          }}
+                          disabled={isTogglingLock === session.id}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                        >
+                          {locked ? (
+                            <>
+                              <Unlock className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                              <span>Desbloquear clase</span>
+                            </>
+                          ) : (
+                            <>
+                              <Lock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                              <span>Bloquear clase</span>
+                            </>
+                          )}
+                        </button>
+
+                        {/* Opción 2: Editar clase */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveMenuSessionId(null)
+                            handleOpenEdit(session)
+                          }}
+                          disabled={locked}
+                          className={`w-full flex items-center gap-2 px-3 py-2 text-xs transition-colors ${
+                            locked 
+                              ? 'text-slate-400 dark:text-slate-600 cursor-not-allowed' 
+                              : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+                          }`}
+                          title={locked ? "Desbloquea la clase para editarla" : "Editar clase"}
+                        >
+                          <Edit2 className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
+                          <span>Editar clase</span>
+                        </button>
+
+                        {/* Separador */}
+                        <div className="my-1 border-t border-slate-100 dark:border-slate-800" />
+
+                        {/* Opción 3: Eliminar clase */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveMenuSessionId(null)
+                            handleDeleteSession(session.id)
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 shrink-0" />
+                          <span>Eliminar clase</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </th>
               )})}
@@ -299,7 +396,7 @@ export function AttendanceTable({ subjectId }: AttendanceTableProps) {
                     return (
                       <td 
                         key={session.id} 
-                        className={`border-r border-slate-100 dark:border-slate-800 p-0 text-center select-none transition-colors w-[85px] min-w-[85px] max-w-[85px] overflow-hidden ${locked ? 'bg-slate-100 dark:bg-slate-800/60 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                        className={`border-r border-slate-100 dark:border-slate-800 p-0 text-center select-none transition-colors w-[96px] min-w-[96px] max-w-[96px] overflow-hidden ${locked ? 'bg-slate-100 dark:bg-slate-800/60 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800'}`}
                         onClick={() => handleToggleAttendance(student.id, session)}
                       >
                         <div className="w-full h-10 flex items-center justify-center p-1 relative">
