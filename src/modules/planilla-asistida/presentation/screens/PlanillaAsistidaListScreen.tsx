@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Plus, Search, FileSpreadsheet, MoreVertical, Edit2, Trash2, Loader2 } from 'lucide-react'
+import { Plus, Search, FileSpreadsheet, MoreVertical, Edit2, Trash2, Loader2, Users, ArrowRight } from 'lucide-react'
 import { getAssistedSubjects, deleteAssistedSubject, AssistedSubject } from '../../application/actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -166,25 +166,25 @@ export function PlanillaAsistidaListScreen({ initialSubjects }: PlanillaAsistida
           </div>
         </div>
         
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full pt-2 border-t border-slate-100 dark:border-slate-800">
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1">Materia</label>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 w-full pt-2 border-t border-slate-100 dark:border-slate-800">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 ml-0.5">Materia</label>
             <select
               value={selectedSubject}
               onChange={(e) => setSelectedSubject(e.target.value)}
-              className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 h-10 rounded-xl px-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-slate-700 dark:text-slate-300 w-full"
+              className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 h-9 sm:h-10 rounded-xl px-2.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-slate-700 dark:text-slate-300 w-full truncate"
             >
               <option value="all">Todas las materias</option>
               {uniqueSubjects.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1">Grado</label>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 ml-0.5">Grado</label>
             <select
               value={selectedGrade}
               onChange={(e) => setSelectedGrade(e.target.value)}
-              className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 h-10 rounded-xl px-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-slate-700 dark:text-slate-300 w-full"
+              className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 h-9 sm:h-10 rounded-xl px-2.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-slate-700 dark:text-slate-300 w-full truncate"
             >
               <option value="all">Todos los grados</option>
               {uniqueGrades.map(g => (
@@ -195,12 +195,12 @@ export function PlanillaAsistidaListScreen({ initialSubjects }: PlanillaAsistida
             </select>
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1">Grupo</label>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 ml-0.5">Grupo</label>
             <select
               value={selectedGroup}
               onChange={(e) => setSelectedGroup(e.target.value)}
-              className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 h-10 rounded-xl px-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-slate-700 dark:text-slate-300 w-full"
+              className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 h-9 sm:h-10 rounded-xl px-2.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-slate-700 dark:text-slate-300 w-full truncate"
             >
               <option value="all">Todos los grupos</option>
               {uniqueGroups.map(g => <option key={g} value={g}>Grupo {g}</option>)}
@@ -210,32 +210,38 @@ export function PlanillaAsistidaListScreen({ initialSubjects }: PlanillaAsistida
       </div>
 
       {isLoading ? (
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:gap-5 lg:gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3].map(i => (
             <div key={i} className="h-48 rounded-2xl bg-slate-100 dark:bg-slate-800/50 animate-pulse border border-slate-100 dark:border-slate-800"></div>
           ))}
         </div>
       ) : filteredSubjects.length > 0 ? (
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:gap-5 lg:gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {filteredSubjects.map((subject, index) => (
             <motion.div
               key={subject.id}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05 }}
-              className="group flex flex-col justify-between overflow-hidden rounded-[22px] border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-[18px] shadow-sm hover:shadow-md transition-all duration-200 relative"
+              className="group flex flex-col justify-between rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 sm:p-5 shadow-xs hover:shadow-md hover:border-emerald-300 dark:hover:border-emerald-700/60 transition-all duration-200 relative"
             >
               <div className="space-y-3">
                 <div className="flex items-start justify-between gap-2.5">
-                  <h3 className="font-bold text-[19px] text-emerald-950 dark:text-emerald-400 line-clamp-2 leading-tight">
-                    {subject.name}
-                  </h3>
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                    <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 shrink-0 border border-emerald-100 dark:border-emerald-900/50">
+                      <FileSpreadsheet className="h-4 w-4" />
+                    </div>
+                    <h3 className="font-bold text-sm sm:text-base text-slate-900 dark:text-white line-clamp-2 leading-snug" title={subject.name}>
+                      {subject.name}
+                    </h3>
+                  </div>
                   
                   <div className="relative shrink-0">
                     <button 
                       onClick={(e) => toggleDropdown(subject.id, e)}
                       disabled={deletingId === subject.id}
-                      className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 p-1 -mr-2 rounded-lg transition-colors"
+                      className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-1.5 -mr-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                      title="Opciones"
                     >
                       {deletingId === subject.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreVertical className="h-4 w-4" />}
                     </button>
@@ -262,44 +268,53 @@ export function PlanillaAsistidaListScreen({ initialSubjects }: PlanillaAsistida
                   </div>
                 </div>
 
-                <div className="flex justify-between items-start">
-                  <div className="flex flex-col">
-                    <div className="flex gap-5 text-xs font-bold text-teal-800 dark:text-teal-500 mb-0.5">
-                      <span>Grado:</span>
-                      <span>Grupo:</span>
-                    </div>
-                    <div className="text-[34px] leading-none font-extrabold text-teal-700 dark:text-teal-400 tracking-tighter">
+                {/* Bloque Grado y Grupo */}
+                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-2.5 sm:p-3 border border-slate-100 dark:border-slate-800 grid grid-cols-2 divide-x divide-slate-200 dark:divide-slate-700 text-center">
+                  <div className="px-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-teal-800/70 dark:text-teal-400/70 block">
+                      Grado
+                    </span>
+                    <span className="text-2xl sm:text-[28px] font-black text-teal-700 dark:text-teal-400 tracking-tight leading-none mt-0.5 block truncate">
                       {subject.grade === 12 ? 'PFC-12' : subject.grade === 13 ? 'PFC-13' : subject.grade === 0 ? 'Nivelatorio' : (subject.grade || '-')}
-                      <span className="text-teal-600/50 mx-2.5 font-light">-</span>
-                      {subject.group_number || '1'}
-                    </div>
+                    </span>
                   </div>
-
-                  <div className="flex flex-col gap-1.5 shrink-0 pt-0.5">
-                    {subject.period && (
-                      <span className="inline-flex items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 px-2.5 py-0.5 text-[11px] font-semibold tracking-wide">
-                        Periodo {subject.period}
-                      </span>
-                    )}
-                    <span className="inline-flex items-center justify-center rounded-full bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 px-2.5 py-0.5 text-[11px] font-semibold tracking-wide">
-                      {subject.students_count || 0} estudiante{(subject.students_count || 0) !== 1 ? 's' : ''}
+                  <div className="px-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-teal-800/70 dark:text-teal-400/70 block">
+                      Grupo
+                    </span>
+                    <span className="text-2xl sm:text-[28px] font-black text-teal-700 dark:text-teal-400 tracking-tight leading-none mt-0.5 block truncate">
+                      {subject.group_number !== undefined && subject.group_number !== null ? subject.group_number : '1'}
                     </span>
                   </div>
                 </div>
+
+                {/* Fila de Badges: Periodo y Estudiantes */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {subject.period && (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/40">
+                      Periodo {subject.period}
+                    </span>
+                  )}
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/40">
+                    <Users className="h-3 w-3 shrink-0" />
+                    <span>{subject.students_count || 0} {subject.students_count === 1 ? 'estudiante' : 'estudiantes'}</span>
+                  </span>
+                </div>
                 
                 {subject.description && (
-                  <p className="text-[13px] font-medium text-slate-800 dark:text-slate-300 line-clamp-2 mt-1.5">
+                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed px-0.5 mt-2" title={subject.description}>
                     {subject.description}
                   </p>
                 )}
               </div>
 
-              <div className="mt-3.5 pt-3.5 border-t border-slate-200 dark:border-slate-800">
+              <div className="mt-3.5 pt-3 border-t border-slate-100 dark:border-slate-800">
                 <Link
                   href={`/teacher/planilla-asistida/${subject.id}`}
-                  className="flex w-full items-center justify-center rounded-full bg-emerald-500 px-3.5 py-2 text-[13px] font-bold text-white hover:bg-emerald-600 transition-colors shadow-sm"
+                  className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 px-3.5 py-2.5 text-xs sm:text-sm font-bold text-white transition-all shadow-xs hover:shadow-sm"
                 >
-                  Abrir Planilla
+                  <span>Abrir Planilla</span>
+                  <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
                 </Link>
               </div>
             </motion.div>

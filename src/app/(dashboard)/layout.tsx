@@ -1405,7 +1405,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           isDocsPage ? 'overflow-hidden p-0'
           : isCourseSection ? 'overflow-y-auto p-0 h-[calc(100vh-4rem)]'
           : isStudentPortal ? 'overflow-x-hidden p-0 sm:p-4 md:p-8'
-          : 'overflow-y-auto p-6 md:p-8'
+          : 'overflow-y-auto p-4 sm:p-5 md:p-6 lg:p-8'
         }`}>
           <div className={`h-full ${
             isDocsPage ? '' 

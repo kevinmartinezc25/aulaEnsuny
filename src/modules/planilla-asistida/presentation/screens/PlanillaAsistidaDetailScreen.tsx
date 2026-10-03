@@ -381,7 +381,7 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
       </div>
 
       {/* Contenido Principal Scrollable */}
-      <div className={`flex-1 ${['planilla', 'asistencia'].includes(activeTab) ? 'overflow-hidden flex flex-col p-2 sm:p-4' : activeTab === 'promedio' ? 'overflow-hidden flex flex-col p-0' : 'overflow-auto p-6'}`}>
+      <div className={`flex-1 ${['planilla', 'asistencia'].includes(activeTab) ? 'overflow-hidden flex flex-col p-2 sm:p-4' : activeTab === 'promedio' ? 'overflow-hidden flex flex-col p-0' : 'overflow-auto p-3.5 sm:p-6'}`}>
         {activeTab === 'estudiantes' && (
           <div className="max-w-5xl mx-auto space-y-6">
             {/* Tarjeta de Control Principal */}
@@ -765,38 +765,46 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
         )}
 
         {activeTab === 'actividades' && (
-          <div className="max-w-5xl mx-auto space-y-6">
-            <div className="flex items-center justify-between">
+          <div className="max-w-5xl mx-auto space-y-4 sm:space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
               <div>
-                <h2 className="text-lg font-bold text-slate-900 dark:text-white">Logros y Actividades</h2>
-                <p className="text-sm text-slate-500">
+                <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                  Logros y Actividades
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
                   Configura los logros de tu materia. Cada logro tiene un Hacer (35%), Saber (35%) y Ser (30%).
                 </p>
               </div>
-              <Button onClick={() => setIsAchievementModalOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white">
-                <Plus className="h-4 w-4 mr-2" />
+              <Button 
+                onClick={() => setIsAchievementModalOpen(true)} 
+                className="bg-emerald-600 hover:bg-emerald-700 text-white shrink-0 shadow-sm w-full sm:w-auto justify-center"
+              >
+                <Plus className="h-4 w-4 mr-1.5" />
                 Nuevo Logro
               </Button>
             </div>
 
             {storeState.achievements.length === 0 ? (
-              <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 py-16 px-4 text-center">
-                <h3 className="mb-2 text-lg font-bold text-slate-900 dark:text-white">Sin logros</h3>
-                <p className="mb-6 max-w-sm text-sm text-slate-500">Crea tu primer logro (desempeño) para comenzar a organizar tus actividades.</p>
-                <Button onClick={() => setIsAchievementModalOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+              <div className="flex flex-col items-center justify-center rounded-2xl sm:rounded-3xl border border-dashed border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 py-12 sm:py-16 px-4 text-center">
+                <h3 className="mb-2 text-base sm:text-lg font-bold text-slate-900 dark:text-white">Sin logros</h3>
+                <p className="mb-6 max-w-sm text-xs sm:text-sm text-slate-500">Crea tu primer logro (desempeño) para comenzar a organizar tus actividades.</p>
+                <Button onClick={() => setIsAchievementModalOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white w-full sm:w-auto">
                   <Plus className="h-4 w-4 mr-2" /> Crear Logro
                 </Button>
               </div>
             ) : (
-              <div className="space-y-6">
+              <div className="space-y-4 sm:space-y-6">
                 {storeState.achievements.map((ach) => (
-                  <div key={ach.id} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-                    <div className="bg-emerald-50 dark:bg-emerald-950/30 px-6 py-4 border-b border-emerald-100 dark:border-emerald-900/50 flex justify-between items-center group">
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="font-bold text-emerald-900 dark:text-emerald-300">{ach.name}</h3>
+                  <div key={ach.id} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs sm:shadow-sm overflow-hidden">
+                    <div className="bg-emerald-50 dark:bg-emerald-950/30 p-3.5 sm:px-6 sm:py-4 border-b border-emerald-100 dark:border-emerald-900/50 flex items-start sm:items-center justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                          <h3 className="font-bold text-emerald-950 dark:text-emerald-300 text-sm sm:text-base leading-snug break-words">
+                            {ach.name}
+                          </h3>
                           {ach.code_config && ach.code_config.type !== 'none' && (
-                            <span className="bg-emerald-100 text-emerald-800 dark:bg-emerald-800/60 dark:text-emerald-200 text-[10px] sm:text-xs px-2 py-0.5 rounded flex items-center gap-1 font-semibold border border-emerald-200 dark:border-emerald-700">
+                            <span className="bg-emerald-100 text-emerald-800 dark:bg-emerald-800/60 dark:text-emerald-200 text-[10px] sm:text-xs px-2 py-0.5 rounded-md flex items-center gap-1 font-semibold border border-emerald-200 dark:border-emerald-700 shrink-0">
                               {ach.code_config.type === 'single' ? (
                                 <>Cód: <span className="font-bold">{ach.code_config.singleCode}</span></>
                               ) : (
@@ -811,58 +819,82 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
                             </span>
                           )}
                         </div>
-                        {ach.description && <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-1">{ach.description}</p>}
+                        {ach.description && <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-1 leading-relaxed break-words">{ach.description}</p>}
                       </div>
-                      <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center gap-1 shrink-0 bg-white/70 dark:bg-slate-900/60 p-0.5 sm:p-1 rounded-xl border border-emerald-200/60 dark:border-emerald-800/40">
                         <button 
                           onClick={() => {
                             setEditingAchievement({ id: ach.id, name: ach.name, description: ach.description || '', code_config: ach.code_config })
                             setIsAchievementModalOpen(true)
                           }}
-                          className="p-2 text-emerald-600 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 rounded-lg"
+                          className="p-1.5 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 rounded-lg transition-colors"
+                          title="Editar logro"
+                          aria-label="Editar logro"
                         >
                           <Edit2 className="h-4 w-4" />
                         </button>
                         <button 
                           onClick={() => handleDeleteAchievement(ach.id, ach.name)}
-                          className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg"
+                          className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                          title="Eliminar logro"
+                          aria-label="Eliminar logro"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
                     </div>
-                    <div className="grid grid-cols-3 divide-x divide-slate-100 dark:divide-slate-800">
+                    <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-100 dark:divide-slate-800">
                       {(['hacer', 'saber', 'ser'] as const).map((comp) => {
                         const compActivities = storeState.activities.filter(a => a.achievement_id === ach.id && a.component_type === comp)
                         const percentage = comp === 'ser' ? '30%' : '35%'
+                        const badgeColors = {
+                          hacer: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900/50',
+                          saber: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900/50',
+                          ser: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/50'
+                        }
+                        const dotColors = {
+                          hacer: 'bg-blue-500',
+                          saber: 'bg-amber-500',
+                          ser: 'bg-emerald-500'
+                        }
                         return (
-                          <div key={comp} className="p-4">
-                            <div className="flex justify-between items-center mb-3">
-                              <h4 className="font-semibold text-sm uppercase text-slate-700 dark:text-slate-300">
-                                {comp} ({percentage})
-                              </h4>
+                          <div key={comp} className="p-3.5 sm:p-4 bg-white dark:bg-slate-900">
+                            <div className="flex justify-between items-center mb-2.5">
+                              <div className="flex items-center gap-1.5">
+                                <span className={`w-2 h-2 rounded-full ${dotColors[comp]}`} />
+                                <h4 className="font-bold text-xs sm:text-sm uppercase text-slate-800 dark:text-slate-200 tracking-wide">
+                                  {comp}
+                                </h4>
+                                <span className={`text-[10px] sm:text-xs font-semibold px-1.5 py-0.5 rounded border ${badgeColors[comp]}`}>
+                                  {percentage}
+                                </span>
+                              </div>
                               <button 
                                 onClick={() => {
                                   setSelectedAchievementId(ach.id)
                                   setSelectedComponent(comp)
                                   setIsActivityModalOpen(true)
                                 }}
-                                className="text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-md p-1"
+                                className="inline-flex items-center gap-1 text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:text-emerald-300 dark:hover:bg-emerald-900/60 rounded-lg px-2 py-1 text-xs font-medium transition-colors border border-emerald-200/60 dark:border-emerald-800/40"
+                                title={`Agregar actividad a ${comp}`}
                               >
-                                <Plus className="h-4 w-4" />
+                                <Plus className="h-3.5 w-3.5" />
+                                <span className="text-[11px] font-semibold">Actividad</span>
                               </button>
                             </div>
-                            <div className="space-y-2">
+                            <div className="space-y-1.5 sm:space-y-2">
                               {compActivities.length === 0 ? (
-                                <p className="text-xs text-slate-400 italic">Sin actividades</p>
+                                <div className="py-3 px-2 text-center rounded-xl bg-slate-50/60 dark:bg-slate-800/30 border border-dashed border-slate-200/80 dark:border-slate-800 text-xs text-slate-400 italic">
+                                  Sin actividades registradas
+                                </div>
                               ) : (
                                 compActivities.map(act => (
-                                  <div key={act.id} className="text-sm bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-md px-3 py-2 flex items-center justify-between group/act">
-                                    <div className="flex items-center gap-2 truncate">
-                                      <GripVertical className="h-4 w-4 text-slate-300 shrink-0" />
-                                      <span className="truncate">{act.name}</span>
+                                  <div key={act.id} className="text-xs sm:text-sm bg-slate-50 dark:bg-slate-800/70 hover:bg-slate-100/80 dark:hover:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60 rounded-xl px-2.5 sm:px-3 py-2 flex items-center justify-between gap-2 transition-colors">
+                                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                                      <GripVertical className="h-3.5 w-3.5 text-slate-300 dark:text-slate-600 shrink-0" />
+                                      <span className="truncate font-medium text-slate-700 dark:text-slate-200">{act.name}</span>
                                     </div>
-                                    <div className="flex items-center gap-1 opacity-0 group-hover/act:opacity-100 shrink-0">
+                                    <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
                                       <button 
                                         onClick={() => {
                                           setEditingActivity({ id: act.id, name: act.name })
@@ -870,15 +902,19 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
                                           setSelectedComponent(comp)
                                           setIsActivityModalOpen(true)
                                         }}
-                                        className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md"
+                                        className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:text-slate-400 dark:hover:text-emerald-400 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                                        title="Editar actividad"
+                                        aria-label="Editar actividad"
                                       >
-                                        <Edit2 className="h-3 w-3" />
+                                        <Edit2 className="h-3.5 w-3.5" />
                                       </button>
                                       <button 
                                         onClick={() => handleDeleteActivity(act.id, act.name)}
-                                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-md"
+                                        className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 dark:text-slate-400 dark:hover:text-red-400 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                                        title="Eliminar actividad"
+                                        aria-label="Eliminar actividad"
                                       >
-                                        <Trash2 className="h-3 w-3" />
+                                        <Trash2 className="h-3.5 w-3.5" />
                                       </button>
                                     </div>
                                   </div>
