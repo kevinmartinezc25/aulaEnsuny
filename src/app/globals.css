@@ -241,11 +241,7 @@
 .dark .portal-student-bg {
   background-color: #0C1512;
 }
-@media (prefers-color-scheme: dark) {
-  .portal-student-bg:not([data-force-light]) {
-    background-color: #0C1512;
-  }
-}
+
 
 /* ══════════════════════════════════════════════════════════════════
    TOKENS INSTITUCIONALES — Portal Académico Estudiantil
@@ -298,33 +294,7 @@
   --ps-dot-glow:  0 0 8px #12A374, 0 0 20px rgba(18,163,116,0.4);
 }
 
-/* ── Tema Oscuro: preferencia del sistema ── */
-@media (prefers-color-scheme: dark) {
-  .portal-student:not([data-force-light]) {
-    --ps-bg:        #0C1512;
-    --ps-tile:      #15221D;
-    --ps-tile-b:    #22352D;
-    --ps-ink:       #EAF4EF;
-    --ps-mute:      #8AA399;
-    --ps-hi:        #0B2B20;
-    --ps-hi-ink:    #FFFFFF;
-    --ps-hi-mute:   #A3C9B8;
-    --ps-hi-go-bg:  rgba(255,255,255,0.12);
-    --ps-hi-go-ink: #FFFFFF;
-    --ps-hi-go-b:   rgba(255,255,255,0.08);
-    --ps-acc:       #5EE0B0;
-    --ps-hero:      #13392C;
-    --ps-hero-ink:  #EAF4EF;
-    --ps-hero-mute: #8AA399;
-    --ps-nxt-bg:    rgba(233,150,42,0.12);
-    --ps-nxt-ink:   #f0b469;
-    --ps-nxt-mute:  rgba(233,150,42,0.85);
-    --ps-chip-bg:   rgba(255,255,255,0.08);
-    --ps-chip-ink:  #EAF4EF;
-    --ps-chip-b:    rgba(255,255,255,0.12);
-    --ps-dot-glow:  0 0 8px #5EE0B0, 0 0 20px rgba(94,224,176,0.4);
-  }
-}
+
 
 /* ── Tema Oscuro: toggle manual (.dark en <html>) ── */
 .dark .portal-student {
