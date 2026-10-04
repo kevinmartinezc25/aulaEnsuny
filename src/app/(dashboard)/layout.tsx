@@ -1307,6 +1307,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
                 </button>
 
+                {isStudent && (
+                  <Link
+                    href="/student/settings"
+                    className="rounded-full p-2 text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white bg-slate-100/70 hover:bg-slate-200/70 dark:bg-slate-800/70 dark:hover:bg-slate-800 border border-slate-200/50 dark:border-white/10 active:scale-90 duration-100 ease-out cursor-pointer shrink-0"
+                    title="Configuración"
+                    aria-label="Configuración"
+                  >
+                    <Settings className="h-4 w-4" />
+                  </Link>
+                )}
+
                 <div className="relative hidden sm:block">
                   <button
                     onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
@@ -1404,13 +1415,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <main className={`flex-1 min-w-0 ${
           isDocsPage ? 'overflow-hidden p-0'
           : isCourseSection ? 'overflow-y-auto p-0 h-[calc(100vh-4rem)]'
-          : isStudentPortal ? 'overflow-x-hidden p-0 sm:p-4 md:p-8'
+          : isStudentPortal ? 'overflow-x-hidden p-0 portal-student-bg'
           : 'overflow-y-auto p-4 sm:p-5 md:p-6 lg:p-8'
         }`}>
           <div className={`h-full ${
             isDocsPage ? '' 
             : isCourseSection ? 'w-full'
-            : isStudentPortal ? 'w-full lg:w-[70%] mx-auto'
+            : isStudentPortal ? 'w-full'
             : 'w-full max-w-[1600px] mx-auto'
           }`}>
             {children}
