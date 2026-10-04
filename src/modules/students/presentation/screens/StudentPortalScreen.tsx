@@ -3,71 +3,90 @@
 import React, { useEffect, useState } from 'react'
 import { motion, useReducedMotion, Variants } from 'framer-motion'
 import Link from 'next/link'
-import { TrendingUp, CalendarDays, ShieldAlert, Activity, BookOpen, ChevronRight, Settings, Clock, Users, Sparkles } from 'lucide-react'
+import {
+  TrendingUp, CalendarDays, ShieldAlert, Activity, BookOpen, ChevronRight
+} from 'lucide-react'
 import { createClient } from '@/core/config/supabase/client'
 import { StudentVirtualCourseModal } from '../components/StudentVirtualCourseModal'
 import { getStudentEmailStatus } from '../../application/studentEmailActions'
 import { getStudentDashboardSchedule } from '../../application/scheduleActions'
 import { getColombianHoliday, type ColombianHoliday } from '@/lib/colombianHolidays'
-
 import { useUserSessionStore } from '@/store/useUserSessionStore'
 
-interface StudentInfo { name: string; group: string; gradeLevel: string; jornada: string; academicYear: string; avatarInitials: string }
+/* ─── Types ─────────────────────────────────────────────────────────── */
+interface StudentInfo {
+  name: string; group: string; gradeLevel: string
+  jornada: string; academicYear: string; avatarInitials: string
+}
+interface ModuleCard {
+  id: string; title: string; description: string; href: string; icon: React.ElementType
+}
 
-interface ModuleCard { id: string; title: string; description: string; href: string; icon: React.ElementType; bgColor: string; iconColor: string; borderColor: string }
-
+/* ─── Helpers (sin cambios respecto a la versión original) ───────────── */
 function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/)
   if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
   return parts[0]?.[0]?.toUpperCase() ?? 'E'
 }
-
 function getGreeting(): string {
   const h = new Date().getHours()
-  if (h < 12) return 'Buenos días'
-  if (h < 18) return 'Buenas tardes'
-  return 'Buenas noches'
+  if (h < 12) return 'Buenos días,'
+  if (h < 18) return 'Buenas tardes,'
+  return 'Buenas noches,'
 }
-
-function parseTimeToMinutes(timeStr: string | null | undefined): number | null {
-  if (!timeStr || typeof timeStr !== 'string') return null
-  const clean = timeStr.trim().toUpperCase()
-  if (!clean.includes(':')) return null
-
-  const isPM = clean.includes('PM')
-  const isAM = clean.includes('AM')
-  const timeOnly = clean.replace(/[AP]M/, '').trim()
-  const [hStr, mStr] = timeOnly.split(':')
-  let hours = parseInt(hStr, 10)
-  const minutes = parseInt(mStr, 10)
-
-  if (isNaN(hours) || isNaN(minutes)) return null
-
-  if (isPM && hours < 12) hours += 12
-  if (isAM && hours === 12) hours = 0
-
-  return hours * 60 + minutes
+function parseTimeToMinutes(t: string | null | undefined): number | null {
+  if (!t || typeof t !== 'string') return null
+  const c = t.trim().toUpperCase()
+  if (!c.includes(':')) return null
+  const isPM = c.includes('PM'), isAM = c.includes('AM')
+  const [hStr, mStr] = c.replace(/[AP]M/, '').trim().split(':')
+  let h = parseInt(hStr, 10); const m = parseInt(mStr, 10)
+  if (isNaN(h) || isNaN(m)) return null
+  if (isPM && h < 12) h += 12
+  if (isAM && h === 12) h = 0
+  return h * 60 + m
 }
-
 function getBogotaDate(): Date {
   return new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Bogota' }))
 }
 
+/* ─── Module cards ───────────────────────────────────────────────────── */
+const BASE_MODULES: ModuleCard[] = [
+  { id: 'grades',       title: 'Calificaciones',    description: 'Resultados por periodo, área y competencia.',      href: '/student/grades',       icon: TrendingUp },
+  { id: 'schedule',     title: 'Mi Horario',         description: 'Clases según tu grupo y matrícula activa.',         href: '/student/schedule',     icon: CalendarDays },
+  { id: 'disciplinary', title: 'Convivencia',        description: 'Seguimiento institucional de convivencia escolar.', href: '/student/disciplinary', icon: ShieldAlert },
+  { id: 'attendance',   title: 'Asistencia Escolar', description: 'Asistencias, ausencias y porcentajes.',            href: '/student/attendance',   icon: Activity },
+]
+const VIRTUAL: ModuleCard = {
+  id: 'courses', title: 'Campus Virtual', description: 'Cursos, contenidos y actividades en línea.',
+  href: '/student/courses', icon: BookOpen,
+}
+
+const ICON_LIGHT: Record<string, string> = {
+  grades: '#1a7a58', schedule: '#2563eb', disciplinary: '#7c3aed', attendance: '#0284c7', courses: '#0d7a5f',
+}
+const ICON_DARK: Record<string, string> = {
+  grades: '#5EE0B0', schedule: '#93c5fd', disciplinary: '#c4b5fd', attendance: '#7dd3fc', courses: '#5EE0B0',
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   COMPONENT
+   ═══════════════════════════════════════════════════════════════════════ */
 export function StudentPortalScreen() {
   const shouldReduceMotion = useReducedMotion()
-  const sessionUser = useUserSessionStore(state => state.user)
-  const initSession = useUserSessionStore(state => state.initSession)
+  const sessionUser = useUserSessionStore(s => s.user)
+  const initSession = useUserSessionStore(s => s.initSession)
 
+  /* ── Student info ────────────────────────────────────────────────── */
   const [info, setInfo] = useState<StudentInfo>(() => ({
     name: sessionUser?.name || 'Estudiante',
     group: sessionUser?.group || '-',
     gradeLevel: sessionUser?.grade || '-',
     jornada: 'Mañana',
     academicYear: new Date().getFullYear().toString(),
-    avatarInitials: getInitials(sessionUser?.name || 'E')
+    avatarInitials: getInitials(sessionUser?.name || 'E'),
   }))
 
-  // Sincronizar de inmediato si cambia el sessionUser en el store
   useEffect(() => {
     if (sessionUser?.name && sessionUser.name !== 'Estudiante') {
       setInfo(prev => ({
@@ -75,116 +94,81 @@ export function StudentPortalScreen() {
         name: sessionUser.name,
         group: sessionUser.group || prev.group,
         gradeLevel: sessionUser.grade || prev.gradeLevel,
-        avatarInitials: getInitials(sessionUser.name)
+        avatarInitials: getInitials(sessionUser.name),
       }))
     }
   }, [sessionUser])
 
-  const [hasCourses, setHasCourses] = useState(false)
-  const [hasEmail, setHasEmail] = useState(false)
+  /* ── Campus / schedule state ─────────────────────────────────────── */
+  const [hasCourses, setHasCourses]             = useState(false)
+  const [hasEmail,   setHasEmail]               = useState(false)
   const [isVirtualModalOpen, setIsVirtualModalOpen] = useState(false)
-  // Schedule state
-  const [todaySchedule, setTodaySchedule] = useState<any[]>([])
-  const [isWeekend, setIsWeekend] = useState(() => {
-    const d = getBogotaDate().getDay()
-    return d === 0 || d === 6
-  })
-  const [dayOfWeekNumber, setDayOfWeekNumber] = useState<number>(() => getBogotaDate().getDay())
+  const [todaySchedule, setTodaySchedule]       = useState<any[]>([])
+  const [isWeekend, setIsWeekend]               = useState(() => { const d = getBogotaDate().getDay(); return d === 0 || d === 6 })
+  const [dayOfWeekNumber, setDayOfWeekNumber]   = useState<number>(() => getBogotaDate().getDay())
   const [colombianHoliday, setColombianHoliday] = useState<ColombianHoliday | null>(() => getColombianHoliday(getBogotaDate()))
-  const [currentClass, setCurrentClass] = useState<any | null>(null)
-  const [nextClass, setNextClass] = useState<any | null>(null)
+  const [currentClass, setCurrentClass]         = useState<any | null>(null)
+  const [nextClass,    setNextClass]            = useState<any | null>(null)
   const [completedClasses, setCompletedClasses] = useState(0)
-  const [totalClasses, setTotalClasses] = useState(0)
+  const [totalClasses, setTotalClasses]         = useState(0)
+  const [loading, setLoading]                   = useState(!sessionUser)
 
-  // Función para evaluar clase en curso y siguiente clase a partir del horario
+  /* ── Dark mode detection ─────────────────────────────────────────── */
+  const [isDark, setIsDark] = useState(false)
+  useEffect(() => {
+    const check = () => setIsDark(document.documentElement.classList.contains('dark'))
+    check()
+    const obs = new MutationObserver(check)
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+    return () => obs.disconnect()
+  }, [])
+
+  /* ── Schedule evaluator (lógica original intacta) ────────────────── */
   const evaluateSchedule = React.useCallback((slots: any[]) => {
-    if (!slots || slots.length === 0) {
-      return { updatedSlots: [], curr: null, next: null, completed: 0, total: 0 }
-    }
-
-    const bogotaNow = getBogotaDate()
-    const currentMinutes = bogotaNow.getHours() * 60 + bogotaNow.getMinutes()
-    let curr: any = null
-    let next: any = null
-    let completed = 0
-
-    const updatedSlots = slots.map((cls) => {
+    if (!slots?.length) return { updatedSlots: [], curr: null, next: null, completed: 0, total: 0 }
+    const now = getBogotaDate()
+    const cur = now.getHours() * 60 + now.getMinutes()
+    let curr: any = null, next: any = null, completed = 0
+    const updatedSlots = slots.map(cls => {
       let isOngoing = false
-      const startMins = parseTimeToMinutes(cls.startTime)
-      let endMins = parseTimeToMinutes(cls.endTime)
-
-      if (startMins !== null) {
-        if (endMins === null || endMins <= startMins) {
-          endMins = startMins + 55
-        }
-
-        isOngoing = currentMinutes >= startMins && currentMinutes < endMins
-
-        if (currentMinutes >= endMins && !cls.isFree) {
-          completed++
-        }
-
+      const sm = parseTimeToMinutes(cls.startTime)
+      let em = parseTimeToMinutes(cls.endTime)
+      if (sm !== null) {
+        if (em === null || em <= sm) em = sm + 55
+        isOngoing = cur >= sm && cur < em
+        if (cur >= em && !cls.isFree) completed++
         if (isOngoing && !cls.isFree && !curr) {
-          const duration = Math.max(1, endMins - startMins)
-          const elapsed = Math.max(0, currentMinutes - startMins)
-          const remaining = Math.max(0, endMins - currentMinutes)
-          const progress = Math.min(100, Math.round((elapsed / duration) * 100))
-          curr = { ...cls, isOngoing: true, startMins, endMins, duration, elapsed, remaining, progress }
+          const dur = Math.max(1, em - sm)
+          curr = { ...cls, isOngoing: true, startMins: sm, endMins: em, duration: dur, elapsed: Math.max(0, cur - sm), remaining: Math.max(0, em - cur), progress: Math.min(100, Math.round(((cur - sm) / dur) * 100)) }
         }
       }
-
-      return { ...cls, isCurrent: isOngoing, startMins, endMins }
+      return { ...cls, isCurrent: isOngoing, startMins: sm, endMins: em }
     })
-
-    // Buscar la siguiente clase no libre posterior a la clase actual o al momento actual
     for (const cls of updatedSlots) {
       if (!cls.isFree) {
-        const startMins = cls.startMins !== undefined && cls.startMins !== null
-          ? cls.startMins
-          : parseTimeToMinutes(cls.startTime)
-
-        if (startMins === null) continue
-
+        const sm = cls.startMins ?? parseTimeToMinutes(cls.startTime)
+        if (sm === null) continue
         if (curr) {
-          const clsPeriod = parseInt(cls.period, 10) || 0
-          const currPeriod = parseInt(curr.period, 10) || 0
-          if (clsPeriod > currPeriod && cls.id !== curr.id && startMins >= (curr.endMins || 0)) {
-            next = cls
-            break
-          }
+          if ((parseInt(cls.period, 10) || 0) > (parseInt(curr.period, 10) || 0) && cls.id !== curr.id && sm >= (curr.endMins || 0)) { next = cls; break }
         } else {
-          if (startMins > currentMinutes) {
-            next = cls
-            break
-          }
+          if (sm > cur) { next = cls; break }
         }
       }
     }
-
-    if (next && curr && (next.id === curr.id || next.period === curr.period)) {
-      next = null
-    }
-
-    const total = updatedSlots.filter((s: any) => !s.isFree).length
-
-    return { updatedSlots, curr, next, completed, total }
+    if (next && curr && (next.id === curr.id || next.period === curr.period)) next = null
+    return { updatedSlots, curr, next, completed, total: updatedSlots.filter((s: any) => !s.isFree).length }
   }, [])
 
   useEffect(() => {
-    if (todaySchedule.length === 0 || isWeekend || colombianHoliday) return
-    const timer = setInterval(() => {
-      const res = evaluateSchedule(todaySchedule)
-      setTodaySchedule(res.updatedSlots)
-      setCurrentClass(res.curr)
-      setNextClass(res.next)
-      setCompletedClasses(res.completed)
+    if (!todaySchedule.length || isWeekend || colombianHoliday) return
+    const t = setInterval(() => {
+      const r = evaluateSchedule(todaySchedule)
+      setTodaySchedule(r.updatedSlots); setCurrentClass(r.curr); setNextClass(r.next); setCompletedClasses(r.completed)
     }, 60000)
-    return () => clearInterval(timer)
+    return () => clearInterval(t)
   }, [todaySchedule, evaluateSchedule, isWeekend, colombianHoliday])
 
-  // Si ya tenemos sesión precacheada, no bloquear la pantalla con skeleton
-  const [loading, setLoading] = useState(!sessionUser)
-
+  /* ── Data load (lógica original intacta) ────────────────────────── */
   useEffect(() => {
     async function load() {
       try {
@@ -193,548 +177,659 @@ export function StudentPortalScreen() {
           const gc = (n: string) => { const v = '; ' + document.cookie; const p = v.split('; ' + n + '='); if (p.length === 2) return p.pop()?.split(';').shift(); return null }
           const ck = gc('aulaensuny-demo-session')
           if (ck) {
-            const s = JSON.parse(decodeURIComponent(ck))
-            const full = ((s.first_name || '') + ' ' + (s.last_name || '')).trim()
+            const s = JSON.parse(decodeURIComponent(ck)); const full = ((s.first_name || '') + ' ' + (s.last_name || '')).trim()
             setInfo({ name: full || 'Estudiante', group: 'Demo 10-A', gradeLevel: s.grade_level || '10', jornada: 'Mañana', academicYear: new Date().getFullYear().toString(), avatarInitials: getInitials(full || 'E') })
-            setHasCourses(true)
-            setHasEmail(true)
+            setHasCourses(true); setHasEmail(true)
           }
-          const bogotaDate = getBogotaDate()
-          const dow = bogotaDate.getDay()
-          setDayOfWeekNumber(dow)
-          setIsWeekend(dow === 0 || dow === 6)
-          setColombianHoliday(getColombianHoliday(bogotaDate))
-          setLoading(false)
-          return
+          const bd = getBogotaDate(); const dow = bd.getDay()
+          setDayOfWeekNumber(dow); setIsWeekend(dow === 0 || dow === 6); setColombianHoliday(getColombianHoliday(bd))
+          setLoading(false); return
         }
-
         const supabase = createClient()
         const { data: { user: authUser } } = await supabase.auth.getUser()
-
-        if (!authUser) {
-          setLoading(false)
-          return
-        }
-
-        // Actualización inmediata con los metadatos de la sesión activa
-        const metaFirst = authUser.user_metadata?.first_name || ''
-        const metaLast = authUser.user_metadata?.last_name || ''
-        const metaName = (metaFirst + ' ' + metaLast).trim()
-        if (metaName) {
-          setInfo(prev => ({
-            ...prev,
-            name: metaName,
-            group: authUser.user_metadata?.group_name || prev.group,
-            gradeLevel: authUser.user_metadata?.grade_level || prev.gradeLevel,
-            avatarInitials: getInitials(metaName)
-          }))
-        }
-
-        // Sincronizar usuario con el store si cambió de cuenta
+        if (!authUser) { setLoading(false); return }
+        const mf = authUser.user_metadata?.first_name || '', ml = authUser.user_metadata?.last_name || ''
+        const metaName = (mf + ' ' + ml).trim()
+        if (metaName) setInfo(prev => ({ ...prev, name: metaName, group: authUser.user_metadata?.group_name || prev.group, gradeLevel: authUser.user_metadata?.grade_level || prev.gradeLevel, avatarInitials: getInitials(metaName) }))
         let currentUser = sessionUser
-        if (!currentUser || currentUser.id !== authUser.id) {
-          currentUser = await initSession(true)
-        }
-
-        const userId = authUser.id
-
-        // Ejecutar consultas en PARALELO para evitar efecto cascada
-        const [enrollmentRes, coursesRes, emailStatusRes, scheduleRes] = await Promise.allSettled([
-          supabase
-            .from('student_enrollments')
-            .select('jornada, group_name, grade_level, academic_year')
-            .eq('student_id', userId)
-            .eq('enrollment_status', 'active')
-            .order('academic_year', { ascending: false })
-            .limit(1)
-            .maybeSingle(),
-          supabase
-            .from('student_courses')
-            .select('id')
-            .eq('student_id', userId)
-            .limit(1),
+        if (!currentUser || currentUser.id !== authUser.id) currentUser = await initSession(true)
+        const uid = authUser.id
+        const [er, cr, esr, sr] = await Promise.allSettled([
+          supabase.from('student_enrollments').select('jornada,group_name,grade_level,academic_year').eq('student_id', uid).eq('enrollment_status', 'active').order('academic_year', { ascending: false }).limit(1).maybeSingle(),
+          supabase.from('student_courses').select('id').eq('student_id', uid).limit(1),
           getStudentEmailStatus(),
-          getStudentDashboardSchedule()
+          getStudentDashboardSchedule(),
         ])
-
         let name = currentUser?.name || metaName || 'Estudiante'
         let group = currentUser?.group || authUser.user_metadata?.group_name || '-'
         let gradeLevel = currentUser?.grade || authUser.user_metadata?.grade_level || '-'
-        let jornada = 'Mañana'
-        let academicYear = new Date().getFullYear().toString()
-
-        if (enrollmentRes.status === 'fulfilled' && enrollmentRes.value.data) {
-          const en = enrollmentRes.value.data
-          if (en.jornada) jornada = en.jornada
-          if (en.group_name) group = en.group_name
-          if (en.grade_level) gradeLevel = en.grade_level
-          if (en.academic_year) academicYear = String(en.academic_year)
-        }
-
-        if (coursesRes.status === 'fulfilled' && coursesRes.value.data) {
-          setHasCourses(coursesRes.value.data.length > 0)
-        }
-
-        if (emailStatusRes.status === 'fulfilled' && emailStatusRes.value) {
-          const status = emailStatusRes.value
-          if (status.hasCourses) setHasCourses(true)
-          if (status.hasEmail) setHasEmail(true)
-          if (status.fullName && status.fullName !== 'Estudiante') {
-            name = status.fullName
-          }
-        }
-
-        const bogotaDate = getBogotaDate()
-        const dow = bogotaDate.getDay() // 0 = Domingo, 1 = Lunes
-        setDayOfWeekNumber(dow)
-        const isWk = dow === 0 || dow === 6
-        setIsWeekend(isWk)
-        const holiday = getColombianHoliday(bogotaDate)
-        setColombianHoliday(holiday)
-
-        let dayKey: 'lunes' | 'martes' | 'miercoles' | 'jueves' | 'viernes' | null = null
-        if (dow === 1) dayKey = 'lunes'
-        else if (dow === 2) dayKey = 'martes'
-        else if (dow === 3) dayKey = 'miercoles'
-        else if (dow === 4) dayKey = 'jueves'
-        else if (dow === 5) dayKey = 'viernes'
-
-        if (!isWk && !holiday && dayKey && scheduleRes.status === 'fulfilled' && scheduleRes.value.success && scheduleRes.value.schedule) {
-          const todayArr = scheduleRes.value.schedule[dayKey] || []
+        let jornada = 'Mañana', academicYear = new Date().getFullYear().toString()
+        if (er.status === 'fulfilled' && er.value.data) { const e = er.value.data; if (e.jornada) jornada = e.jornada; if (e.group_name) group = e.group_name; if (e.grade_level) gradeLevel = e.grade_level; if (e.academic_year) academicYear = String(e.academic_year) }
+        if (cr.status === 'fulfilled' && cr.value.data) setHasCourses(cr.value.data.length > 0)
+        if (esr.status === 'fulfilled' && esr.value) { const st = esr.value; if (st.hasCourses) setHasCourses(true); if (st.hasEmail) setHasEmail(true); if (st.fullName && st.fullName !== 'Estudiante') name = st.fullName }
+        const bd = getBogotaDate(); const dow = bd.getDay()
+        setDayOfWeekNumber(dow); const isWk = dow === 0 || dow === 6; setIsWeekend(isWk)
+        const holiday = getColombianHoliday(bd); setColombianHoliday(holiday)
+        let dayKey: 'lunes'|'martes'|'miercoles'|'jueves'|'viernes'|null = null
+        if (dow === 1) dayKey = 'lunes'; else if (dow === 2) dayKey = 'martes'; else if (dow === 3) dayKey = 'miercoles'; else if (dow === 4) dayKey = 'jueves'; else if (dow === 5) dayKey = 'viernes'
+        if (!isWk && !holiday && dayKey && sr.status === 'fulfilled' && sr.value.success && sr.value.schedule) {
+          const todayArr = sr.value.schedule[dayKey] || []
           const res = evaluateSchedule(todayArr)
-          setTodaySchedule(res.updatedSlots)
-          setCurrentClass(res.curr)
-          setNextClass(res.next)
-          setCompletedClasses(res.completed)
-          setTotalClasses(res.total)
+          setTodaySchedule(res.updatedSlots); setCurrentClass(res.curr); setNextClass(res.next); setCompletedClasses(res.completed); setTotalClasses(res.total)
         }
-
         setInfo({ name, group, gradeLevel, jornada, academicYear, avatarInitials: getInitials(name) })
-      } catch (e) {
-        console.error('Error cargando portal estudiante:', e)
-      } finally {
-        setLoading(false)
-      }
+      } catch (e) { console.error('Error cargando portal estudiante:', e) }
+      finally { setLoading(false) }
     }
-
     load()
-  }, [sessionUser, initSession])
+  }, [sessionUser, initSession]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const BASE: ModuleCard[] = [
-    { id: 'grades', title: 'Calificaciones', description: 'Resultados por periodo, área y competencia.', href: '/student/grades', icon: TrendingUp, bgColor: 'bg-emerald-50/80 dark:bg-emerald-950/20', iconColor: 'text-emerald-700 dark:text-emerald-400', borderColor: 'border-emerald-200/60 dark:border-emerald-800/40' },
-    { id: 'schedule', title: 'Mi Horario', description: 'Clases según tu grupo y matrícula activa.', href: '/student/schedule', icon: CalendarDays, bgColor: 'bg-blue-50/80 dark:bg-blue-950/20', iconColor: 'text-blue-700 dark:text-blue-400', borderColor: 'border-blue-200/60 dark:border-blue-800/40' },
-    { id: 'disciplinary', title: 'Convivencia', description: 'Seguimiento institucional de convivencia escolar.', href: '/student/disciplinary', icon: ShieldAlert, bgColor: 'bg-violet-50/80 dark:bg-violet-950/20', iconColor: 'text-violet-700 dark:text-violet-400', borderColor: 'border-violet-200/60 dark:border-violet-800/40' },
-    { id: 'attendance', title: 'Asistencia Escolar', description: 'Asistencias, ausencias y porcentajes por periodo.', href: '/student/attendance', icon: Activity, bgColor: 'bg-sky-50/80 dark:bg-sky-950/20', iconColor: 'text-sky-700 dark:text-sky-400', borderColor: 'border-sky-200/60 dark:border-sky-800/40' },
-  ]
-  const VIRTUAL: ModuleCard = { id: 'courses', title: 'Campus Virtual', description: 'Cursos, contenidos y actividades en línea.', href: '/student/courses', icon: BookOpen, bgColor: 'bg-teal-50/80 dark:bg-teal-950/20', iconColor: 'text-teal-700 dark:text-teal-400', borderColor: 'border-teal-200/60 dark:border-teal-800/40' }
-  const modules = [...BASE, VIRTUAL]
-
-  const cv: Variants = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: shouldReduceMotion ? 0 : 0.06, delayChildren: 0.05 } } }
+  /* ── Framer variants ─────────────────────────────────────────────── */
+  const cv: Variants = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: shouldReduceMotion ? 0 : 0.07, delayChildren: 0.08 } } }
   const iv: Variants = { hidden: { opacity: 0, y: shouldReduceMotion ? 0 : 14 }, show: { opacity: 1, y: 0, transition: { type: 'spring', damping: 24, stiffness: 260 } } }
 
+  /* ── Skeleton ────────────────────────────────────────────────────── */
   if (loading) {
     return (
-      <div className='w-[90%] sm:w-full max-w-4xl mx-auto py-5 sm:py-6 space-y-5 px-0 sm:px-4'>
-        <div className='rounded-2xl sm:rounded-3xl bg-gradient-to-br from-emerald-900 to-emerald-950 h-32 sm:h-36 animate-pulse' />
-        <div className='grid grid-cols-2 md:grid-cols-3 gap-2.5 sm:gap-4'>
-          {[1, 2, 3, 4, 5, 6].map(i => (
-            <div key={i} className='rounded-2xl sm:rounded-3xl bg-white dark:bg-slate-900 h-32 sm:h-36 animate-pulse' />
-          ))}
+      <div className="portal-student ps-page">
+        <div className="ps-layout">
+          <div className="ps-left-col">
+            <div className="ps-skeleton ps-skeleton-hero animate-pulse" />
+            <div className="ps-skeleton ps-skeleton-hi animate-pulse" />
+          </div>
+          <div className="ps-right-col">
+            <div className="ps-tiles-grid">
+              {[1,2,3,4].map(i => <div key={i} className="ps-skeleton ps-skeleton-tile animate-pulse" />)}
+            </div>
+            <div className="ps-skeleton ps-skeleton-wide animate-pulse" />
+          </div>
         </div>
       </div>
     )
   }
 
-  const { name, group, gradeLevel, jornada, academicYear, avatarInitials } = info
+  /* ── Derived values ──────────────────────────────────────────────── */
+  const { name, group, gradeLevel, jornada, academicYear } = info
   const chips = [
-    (gradeLevel && gradeLevel !== '-') ? 'Grado ' + gradeLevel : null,
-    (group && group !== '-') ? 'Grupo ' + group : null,
-    jornada ? 'Jornada ' + jornada : null,
-    academicYear ? 'Año ' + academicYear : null
+    (gradeLevel && gradeLevel !== '-') ? `Grado ${gradeLevel}` : null,
+    (group && group !== '-')           ? `Grupo ${group}`      : null,
+    jornada                            ? `Jornada ${jornada}`  : null,
+    academicYear                       ? `Año ${academicYear}` : null,
   ].filter(Boolean) as string[]
 
+  const isSameClass    = nextClass && currentClass && (nextClass.id === currentClass.id || nextClass.period === currentClass.period)
+  const effectiveNext  = isSameClass ? null : nextClass
+  const isFinishedDay  = !currentClass && !effectiveNext && totalClasses > 0
+  const hasActiveClass = !isWeekend && !colombianHoliday && totalClasses > 0 && (currentClass || effectiveNext) && !isFinishedDay
+
+  function resolveHiContent(): { label: string; detail: string } {
+    if (colombianHoliday) return { label: 'Festivo — sin clases',         detail: colombianHoliday.name }
+    if (isWeekend)        return { label: dayOfWeekNumber === 6 ? 'Sábado' : 'Domingo', detail: 'Sin clases programadas' }
+    if (!totalClasses)    return { label: 'Sin horario registrado',        detail: 'No hay clases asignadas para hoy' }
+    if (isFinishedDay)    return { label: 'Jornada finalizada',            detail: '¡Buen trabajo! No hay más clases hoy' }
+    if (currentClass)     return { label: currentClass.subject,            detail: `En curso · ${currentClass.startTime} – ${currentClass.endTime}` }
+    if (effectiveNext)    return { label: effectiveNext.subject,           detail: `Próxima clase · ${effectiveNext.startTime}` }
+    return { label: 'Sin clase en este momento', detail: 'Consulta tu horario completo' }
+  }
+
+  const { label: hiLabel, detail: hiDetail } = resolveHiContent()
+  const ic = (id: string) => isDark ? (ICON_DARK[id] || 'var(--ps-acc)') : (ICON_LIGHT[id] || 'var(--ps-acc)')
+
+  /* ── Render ──────────────────────────────────────────────────────── */
   return (
-    <div className='w-[90%] sm:w-full max-w-4xl mx-auto py-5 sm:py-6 space-y-5 sm:space-y-6 px-0 sm:px-4'>
-      {/* Banner de Bienvenida Institucional */}
+    <div className="portal-student ps-page">
+      {/* ── CSS responsive ── */}
+      <style>{`
+        /* ── Page wrapper ── */
+        .ps-page {
+          padding: 20px 16px 40px;
+          margin: 0 auto;
+          max-width: 680px;
+          box-sizing: border-box;
+        }
+
+        /* ── Outer layout: single-column en móvil/tablet, dos paneles en desktop ── */
+        .ps-layout {
+          display: flex;
+          flex-direction: column;
+          gap: var(--ps-gap);
+        }
+        .ps-left-col, .ps-right-col {
+          display: flex;
+          flex-direction: column;
+          gap: var(--ps-gap);
+          min-width: 0;
+        }
+
+        /* ── Tile grid: siempre 2 columnas ── */
+        .ps-tiles-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: var(--ps-gap);
+        }
+
+        /* ── Tablet (640px+) ── */
+        @media (min-width: 640px) {
+          .ps-page {
+            padding: 24px 28px 48px;
+            max-width: 800px;
+          }
+        }
+
+        /* ── Desktop (1024px+): dos paneles lado a lado ── */
+        @media (min-width: 1024px) {
+          .ps-page {
+            padding: 24px 40px 24px;
+            max-width: 1120px;
+          }
+          .ps-layout {
+            flex-direction: row;
+            align-items: stretch;
+            gap: 16px;
+          }
+          .ps-left-col {
+            flex: 0 0 420px;
+            gap: 12px;
+          }
+          .ps-right-col {
+            flex: 1;
+            gap: 12px;
+          }
+          .ps-tiles-grid {
+            gap: 12px;
+          }
+        }
+
+        /* ── Hero ── */
+        .ps-hero {
+          position: relative;
+          overflow: hidden;
+          background: var(--ps-hero);
+          border-radius: var(--ps-r-hero);
+          padding: 24px 22px 22px;
+          color: var(--ps-hero-ink);
+          flex-shrink: 0;
+        }
+        @media (min-width: 1024px) {
+          .ps-hero {
+            padding: 24px 28px;
+          }
+        }
+
+        .ps-hero-greeting {
+          color: var(--ps-hero-mute);
+          font-size: 15px;
+          font-weight: 500;
+          margin-bottom: 4px;
+          position: relative;
+          z-index: 1;
+        }
+        @media (min-width: 1024px) { .ps-hero-greeting { font-size: 16px; } }
+
+        .ps-hero-name {
+          font-size: clamp(26px, 5vw, 34px);
+          line-height: 1.06;
+          font-weight: 700;
+          letter-spacing: -0.8px;
+          margin-bottom: 20px;
+          word-break: break-word;
+          position: relative;
+          z-index: 1;
+        }
+        @media (min-width: 1024px) {
+          .ps-hero-name {
+            font-size: clamp(30px, 3vw, 40px);
+            margin-bottom: 16px;
+          }
+        }
+
+        .ps-chips-row {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          position: relative;
+          z-index: 1;
+        }
+        .ps-chip {
+          background: var(--ps-chip-bg);
+          border: 1px solid var(--ps-chip-b);
+          color: var(--ps-chip-ink);
+          border-radius: var(--ps-r-pill);
+          padding: 5px 13px;
+          font-size: 13px;
+          font-weight: 500;
+          -webkit-backdrop-filter: blur(8px);
+          backdrop-filter: blur(8px);
+        }
+        @media (min-width: 1024px) {
+          .ps-chip { padding: 6px 15px; font-size: 13.5px; }
+        }
+
+        .ps-watermark {
+          position: absolute;
+          right: -16px;
+          bottom: -24px;
+          width: 170px;
+          opacity: 0.10;
+          pointer-events: none;
+          user-select: none;
+        }
+        @media (min-width: 1024px) {
+          .ps-watermark { width: 220px; right: -20px; bottom: -30px; }
+        }
+
+        /* ── Tile base ── */
+        .ps-tile {
+          position: relative;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          min-height: 152px;
+          padding: 18px;
+          border-radius: var(--ps-r-tile);
+          background: var(--ps-tile);
+          border: 1px solid var(--ps-tile-b);
+          color: var(--ps-ink);
+          text-decoration: none;
+          outline: none;
+          cursor: pointer;
+          height: 100%;
+          box-sizing: border-box;
+        }
+        @media (min-width: 640px)  { .ps-tile { min-height: 164px; padding: 20px; } }
+        @media (min-width: 1024px) { .ps-tile { min-height: 156px; padding: 20px; } }
+
+        .ps-tile-title {
+          font-size: 17px;
+          font-weight: 700;
+          letter-spacing: -0.2px;
+          color: var(--ps-ink);
+          margin-bottom: 2px;
+        }
+        @media (min-width: 1024px) { .ps-tile-title { font-size: 18px; } }
+
+        .ps-tile-desc {
+          font-size: 13px;
+          line-height: 1.4;
+          color: var(--ps-mute);
+        }
+        @media (min-width: 1024px) { .ps-tile-desc { font-size: 13.5px; } }
+
+        .ps-tile-icon { margin-bottom: 12px; }
+
+        .ps-hi-tile {
+          background: var(--ps-hi);
+          border-color: transparent;
+          color: var(--ps-hi-ink);
+          min-height: 150px;
+        @media (min-width: 1024px) {
+          .ps-hi-tile {
+            flex: 1; /* llena el espacio restante en el panel izquierdo */
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+          }
+        }
+
+        .ps-hi-top {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+
+        .ps-pair {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 12px;
+          margin-top: 22px;
+        }
+        .ps-cur {
+          padding: 6px 0;
+        }
+        .ps-nxt {
+          padding: 12px 14px;
+          border-radius: 16px;
+          background: var(--ps-nxt-bg, rgba(233, 150, 42, 0.12));
+        }
+        .ps-cur small {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          margin-bottom: 6px;
+          color: var(--ps-hi-mute);
+          font-size: 13px;
+        }
+        .ps-nxt small {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          margin-bottom: 6px;
+          color: var(--ps-nxt-mute, rgba(233, 150, 42, 0.85));
+          font-size: 13px;
+        }
+        .ps-cur strong {
+          display: block;
+          font-size: 22px;
+          line-height: 1.1;
+          letter-spacing: -0.6px;
+        }
+        .ps-nxt strong {
+          display: block;
+          font-size: 20px;
+          line-height: 1.1;
+          letter-spacing: -0.6px;
+          color: var(--ps-nxt-ink, #f0b469);
+        }
+        .ps-cur .ps-t {
+          display: block;
+          font-size: 13px;
+          color: var(--ps-hi-mute);
+          margin-top: 6px;
+        }
+        .ps-nxt .ps-t {
+          display: block;
+          font-size: 13px;
+          color: var(--ps-nxt-mute, rgba(233, 150, 42, 0.85));
+          margin-top: 6px;
+        }
+        .ps-live {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: #12a374;
+          box-shadow: 0 0 8px #12a374;
+        }
+        @media (prefers-reduced-motion: no-preference) {
+          .ps-live { animation: pslive 2s ease-in-out infinite; }
+          @keyframes pslive { 50% { opacity: 0.35; } }
+        }
+        .ps-bar {
+          height: 4px;
+          border-radius: 2px;
+          background: rgba(255, 255, 255, 0.2);
+          margin-top: 14px;
+          overflow: hidden;
+        }
+        .ps-bar b {
+          display: block;
+          height: 100%;
+          border-radius: 2px;
+          background: var(--ps-hi-ink);
+        }
+        }
+        @media (min-width: 1024px) {
+          .ps-cur strong { font-size: 24px; }
+        }
+
+        .ps-go-btn {
+          width: 40px;
+          height: 40px;
+          border-radius: var(--ps-r-pill);
+          background: var(--ps-hi-go-bg);
+          color: var(--ps-hi-go-ink);
+          border: 1px solid var(--ps-hi-go-b);
+          display: grid;
+          place-items: center;
+          flex-shrink: 0;
+        }
+        @media (min-width: 1024px) { .ps-go-btn { width: 44px; height: 44px; } }
+
+        .ps-hi-dot {
+          position: absolute;
+          top: 18px; right: 18px;
+          width: 9px; height: 9px;
+          border-radius: var(--ps-r-pill);
+          background: var(--ps-hi-ink);
+          opacity: 0.7;
+          box-shadow: 0 0 8px rgba(255,255,255,0.6);
+        }
+
+        /* ── Tile Campus Virtual (ancho completo en su columna) ── */
+        .ps-wide-tile {
+          min-height: 104px;
+        }
+
+        .ps-wide-bottom {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-end;
+          gap: 12px;
+        }
+
+        .ps-dot {
+          position: absolute;
+          top: 18px; right: 18px;
+          width: 9px; height: 9px;
+          border-radius: var(--ps-r-pill);
+          background: var(--ps-acc);
+          box-shadow: var(--ps-dot-glow);
+        }
+
+        .ps-badge {
+          font-size: 12px; font-weight: 600;
+          color: var(--ps-acc);
+          border: 1px solid var(--ps-acc);
+          border-radius: var(--ps-r-pill);
+          padding: 3px 11px;
+          line-height: 1.2;
+          flex-shrink: 0;
+          white-space: nowrap;
+        }
+        .ps-badge-neutral {
+          font-size: 12px; font-weight: 600;
+          color: var(--ps-mute);
+          border: 1px solid var(--ps-tile-b);
+          border-radius: var(--ps-r-pill);
+          padding: 3px 11px;
+          line-height: 1.2;
+          flex-shrink: 0;
+          white-space: nowrap;
+        }
+        .ps-badge-link {
+          font-size: 12px; font-weight: 600;
+          color: var(--ps-acc);
+          border: 1px solid var(--ps-acc);
+          border-radius: var(--ps-r-pill);
+          padding: 3px 11px;
+          line-height: 1.2;
+          flex-shrink: 0;
+          white-space: nowrap;
+          opacity: 0.8;
+        }
+
+        /* ── Footer ── */
+        .ps-footer {
+          padding-top: 12px;
+          padding-bottom: 8px;
+          text-align: center;
+        }
+        .ps-footer-text {
+          font-size: 11px;
+          color: var(--ps-mute);
+          font-weight: 500;
+        }
+
+        /* ── Skeletons ── */
+        .ps-skeleton { border-radius: var(--ps-r-tile); background: var(--ps-tile); opacity: 0.5; }
+        .ps-skeleton-hero { height: 168px; border-radius: var(--ps-r-hero); background: var(--ps-hero); }
+        .ps-skeleton-hi   { height: 136px; }
+        .ps-skeleton-tile { height: 152px; }
+        .ps-skeleton-wide { height: 108px; }
+        @media (min-width: 1024px) {
+          .ps-skeleton-hero { height: 220px; }
+          .ps-skeleton-hi   { height: 180px; }
+          .ps-skeleton-tile { height: 178px; }
+          .ps-skeleton-wide { height: 120px; }
+        }
+
+        /* ── Interacción táctil / press ── */
+        .ps-link {
+          display: block;
+          height: 100%;
+          text-decoration: none;
+          -webkit-tap-highlight-color: transparent;
+        }
+        @media (prefers-reduced-motion: no-preference) {
+          .ps-link:active .ps-tile,
+          .ps-link:active .ps-hi-tile,
+          .ps-link:active .ps-wide-tile {
+            transform: scale(0.97);
+            transition: transform 0.12s cubic-bezier(0.2, 0.8, 0.2, 1);
+          }
+        }
+        .ps-link:focus-visible .ps-tile,
+        .ps-link:focus-visible .ps-hi-tile,
+        .ps-link:focus-visible .ps-wide-tile {
+          outline: 2px solid var(--ps-acc);
+          outline-offset: 3px;
+        }
+      `}</style>
+
       <motion.div
-        initial={{ opacity: 0, y: shouldReduceMotion ? 0 : 18 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ type: 'spring', damping: 26, stiffness: 220 }}
-        className='relative overflow-hidden rounded-2xl sm:rounded-3xl bg-[#0D5F4E] dark:bg-slate-900 p-4.5 sm:p-7 shadow-sm border border-[#0a4639] dark:border-slate-800'
+        className="ps-layout"
+        variants={cv}
+        initial="hidden"
+        animate="show"
       >
-        <div className='pointer-events-none absolute top-0 right-0 w-48 sm:w-56 h-48 sm:h-56 rounded-full bg-white/10 dark:bg-slate-800/50 blur-3xl' />
-        <div className='pointer-events-none absolute bottom-0 left-6 sm:left-8 w-32 sm:w-40 h-32 sm:h-40 rounded-full bg-teal-200/10 dark:bg-slate-800/30 blur-2xl' />
+        {/* ════════════════════════════════
+            PANEL IZQUIERDO
+            Hero + Tile Próxima Clase
+            ════════════════════════════════ */}
+        <div className="ps-left-col">
 
-        <Link
-          href='/student/settings'
-          className='absolute top-3.5 right-3.5 sm:top-5 sm:right-5 z-20 h-9 w-9 sm:h-11 sm:w-11 rounded-xl sm:rounded-2xl bg-white/10 hover:bg-white/20 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 border border-white/20 dark:border-slate-700 flex items-center justify-center text-white dark:text-slate-400 transition-all duration-200 shadow-sm'
-          title='Configuración de Cuenta'
-          aria-label='Configuración de Cuenta'
-        >
-          <Settings className='h-4.5 w-4.5 sm:h-5.5 sm:w-5.5' />
-        </Link>
+          {/* Hero */}
+          <motion.section
+            variants={iv}
+            className="ps-hero"
+            aria-label="Bienvenida al portal"
+          >
+            <img src="/escudo_ensuny.png" alt="" aria-hidden="true" className="ps-watermark" />
+            <p className="ps-hero-greeting">{getGreeting()}</p>
+            <h1 className="ps-hero-name">{name}</h1>
+            <div className="ps-chips-row" role="list" aria-label="Información académica">
+              {chips.map((label, i) => (
+                <span key={i} className="ps-chip" role="listitem">{label}</span>
+              ))}
+            </div>
+          </motion.section>
 
-        <div className='relative z-10 flex items-start gap-3 sm:gap-4 pr-11 sm:pr-14'>
-          <div className='h-11 w-11 sm:h-14 sm:w-14 shrink-0 rounded-xl sm:rounded-2xl bg-white/15 dark:bg-slate-800 border border-white/20 dark:border-slate-700 flex items-center justify-center text-base sm:text-xl font-black shadow-inner text-white dark:text-slate-200 mt-0.5 sm:mt-0'>
-            {avatarInitials}
-          </div>
-          <div className='flex-1 min-w-0'>
-            <p className='text-teal-50 dark:text-slate-400 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider mb-0.5 opacity-90'>
-              {getGreeting()}
-            </p>
-            <h1 className='text-base sm:text-2xl font-black text-white dark:text-white tracking-tight leading-snug sm:leading-tight break-words'>
-              {name}
-            </h1>
-          </div>
-        </div>
-
-        <div className='relative z-10 mt-3 sm:mt-4 flex flex-wrap gap-1.5 sm:gap-2'>
-          {chips.map((l, i) => (
-            <span
-              key={i}
-              className='inline-flex items-center px-2 sm:px-3 py-0.5 sm:py-1 rounded-lg sm:rounded-xl bg-white/10 dark:bg-slate-800 border border-white/15 dark:border-slate-700 text-[10px] sm:text-[11px] font-semibold text-white dark:text-slate-300 tracking-wide'
+          {/* Tile destacado: Próxima Clase / Estado actual */}
+          <motion.div variants={iv} style={{ display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
+            <Link
+              href="/student/schedule"
+              className="ps-link"
+              aria-label={`Horario: ${hiLabel}. ${hiDetail}`}
             >
-              {l}
-            </span>
-          ))}
-        </div>
-      </motion.div>
-
-      {/* Tarjeta de Horario (Clase Actual / Siguiente / Fin de semana / Festivo) */}
-      {!loading && (
-        <motion.div
-          initial={{ opacity: 0, y: shouldReduceMotion ? 0 : 18 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ type: 'spring', damping: 26, stiffness: 220, delay: 0.1 }}
-          className={`relative overflow-hidden rounded-2xl sm:rounded-3xl text-white w-full ${
-            !isWeekend && !colombianHoliday && totalClasses > 0 && (currentClass || nextClass)
-              ? 'bg-gradient-to-r from-emerald-600 to-teal-700 border border-emerald-500/40 shadow-[0_8px_32px_rgba(16,185,129,0.22)]'
-              : 'bg-gradient-to-r from-blue-600 to-indigo-700 border border-blue-500 shadow-[0_8px_30px_rgba(59,130,246,0.3)]'
-          }`}
-        >
-          <div className='pointer-events-none absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-white/10 via-transparent to-transparent opacity-60' />
-
-          {(() => {
-            // CASO 1: Festivo oficial en Colombia
-            if (colombianHoliday) {
-              return (
-                <div className='relative z-10 p-4.5 sm:p-6'>
-                  <div className='space-y-1.5 min-w-0'>
-                    <div className='flex items-center gap-2'>
-                      <span className='inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-400/25 border border-amber-300/40 text-amber-100 text-[10px] sm:text-[11px] font-extrabold tracking-wide shadow-xs backdrop-blur-md'>
-                        <CalendarDays className='h-3 w-3 text-amber-300' />
-                        FESTIVO EN COLOMBIA
-                      </span>
-                    </div>
-                    <h2 className='text-base sm:text-xl font-black text-white tracking-tight leading-tight'>
-                      Sin clases programadas · {colombianHoliday.name}
-                    </h2>
-                    <p className='text-xs sm:text-sm text-blue-100 font-medium leading-relaxed max-w-2xl'>
-                      Hoy no hay jornada académica por ser día festivo oficial en el calendario nacional. ¡Disfruta de tu descanso!
-                    </p>
-                  </div>
+              <div className="ps-tile ps-hi-tile" style={{ justifyContent: 'space-between' }}>
+                <div className="ps-hi-top">
+                  <CalendarDays size={26} aria-hidden="true" style={{ color: 'var(--ps-hi-ink)', opacity: 0.85 }} />
+                  <span className="ps-go-btn" aria-hidden="true">
+                    <ChevronRight size={18} />
+                  </span>
                 </div>
-              )
-            }
 
-            // CASO 2: Fin de semana (Sábado o Domingo)
-            if (isWeekend) {
-              const isSaturday = dayOfWeekNumber === 6
-              return (
-                <div className='relative z-10 p-4.5 sm:p-6'>
-                  <div className='space-y-1.5 min-w-0'>
-                    <div className='flex items-center gap-2'>
-                      <span className='inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/20 border border-white/30 text-white text-[10px] sm:text-[11px] font-extrabold tracking-wide shadow-xs backdrop-blur-md'>
-                        <Sparkles className='h-3 w-3 text-amber-300' />
-                        {isSaturday ? 'SÁBADO' : 'DOMINGO'} · FIN DE SEMANA
-                      </span>
-                    </div>
-                    <h2 className='text-base sm:text-xl font-black text-white tracking-tight leading-tight'>
-                      Sin clases programadas
-                    </h2>
-                    <p className='text-xs sm:text-sm text-blue-100 font-medium leading-relaxed max-w-2xl'>
-                      {isSaturday
-                        ? '¡Feliz sábado! Aprovecha el fin de semana para recargar energías, compartir en familia o adelantar repasos.'
-                        : '¡Feliz domingo! Prepara tus cuadernos y actividades para iniciar la semana con la mejor energía mañana.'}
-                    </p>
-                  </div>
-                </div>
-              )
-            }
-
-            // CASO 3: Día de semana ordinario sin clases programadas
-            if (totalClasses === 0) {
-              return (
-                <div className='relative z-10 p-4.5 sm:p-6'>
-                  <div className='space-y-1.5 min-w-0'>
-                    <div className='flex items-center gap-2'>
-                      <span className='inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/20 border border-white/30 text-white text-[10px] sm:text-[11px] font-bold tracking-wide backdrop-blur-md'>
-                        <Clock className='h-3 w-3 text-blue-200' />
-                        HORARIO ESCOLAR
-                      </span>
-                    </div>
-                    <h2 className='text-base sm:text-xl font-black text-white tracking-tight leading-tight'>
-                      Sin clases programadas para hoy
-                    </h2>
-                    <p className='text-xs sm:text-sm text-blue-100 font-medium leading-relaxed max-w-2xl'>
-                      No tienes asignaturas registradas para la jornada de hoy.
-                    </p>
-                  </div>
-                </div>
-              )
-            }
-
-            // CASO 4: Día de semana con clases programadas
-            const isSameClass = nextClass && currentClass && (nextClass.id === currentClass.id || nextClass.period === currentClass.period)
-            const effectiveNextClass = isSameClass ? null : nextClass
-            const isFinishedDay = !currentClass && !effectiveNextClass && totalClasses > 0
-
-            if (isFinishedDay) {
-              return (
-                <div className='relative z-10 p-4.5 sm:p-6'>
-                  <div className='space-y-1.5 min-w-0'>
-                    <div className='flex items-center gap-2'>
-                      <span className='inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/20 border border-white/30 text-white text-[10px] sm:text-[11px] font-bold tracking-wide backdrop-blur-md'>
-                        <Clock className='h-3 w-3 text-blue-200' />
-                        JORNADA FINALIZADA
-                      </span>
-                    </div>
-                    <h2 className='text-base sm:text-xl font-black text-white tracking-tight leading-tight'>
-                      No tienes más clases por hoy
-                    </h2>
-                    <p className='text-xs sm:text-sm text-blue-100 font-medium leading-relaxed max-w-2xl'>
-                      Has completado todas las asignaturas de la jornada escolar. ¡Buen trabajo!
-                    </p>
-                  </div>
-                </div>
-              )
-            }
-
-            return (
-              <div className='flex flex-row h-full divide-x divide-emerald-600/30'>
-                {/* 70% Izquierda: Clase Actual */}
-                <div className='flex-[7] p-3 sm:p-4.5 md:px-6 flex flex-col justify-center'>
-                  <div className='flex items-center justify-between gap-2 mb-1.5'>
-                    {currentClass ? (
-                      <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[9px] sm:text-[10px] font-extrabold tracking-wide ${currentClass.isNovedad ? 'bg-amber-950/50 border-amber-500/50 text-amber-200' : 'bg-emerald-950/50 border-emerald-500/30 text-emerald-200'}`}>
-                        {currentClass.isNovedad ? (
-                          <>
-                            <ShieldAlert className='h-3 w-3 text-amber-400' />
-                            NOVEDAD ({currentClass.period}ª)
-                          </>
-                        ) : (
-                          <>
-                            <span className='relative flex h-1.5 w-1.5'>
-                              <span className='animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75'></span>
-                              <span className='relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500'></span>
-                            </span>
-                            EN CURSO ({currentClass.period}ª)
-                          </>
-                        )}
-                      </span>
-                    ) : (
-                      <span className='inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-slate-900/40 border border-slate-600/30 text-slate-300 text-[9px] sm:text-[10px] font-bold tracking-wide'>
-                        <Clock className='h-2.5 w-2.5 text-slate-400' />
-                        SIN CLASE
-                      </span>
-                    )}
-                    {currentClass?.remaining !== undefined && currentClass.remaining > 0 && (
-                      <span className='hidden sm:inline-flex text-[9px] sm:text-[10px] font-semibold text-emerald-100 bg-white/10 px-2 py-0.5 rounded-lg border border-white/10'>
-                        Quedan ~{currentClass.remaining} min
-                      </span>
+                <div className="ps-pair" style={(!currentClass && !effectiveNext) ? { gridTemplateColumns: '1fr' } : {}}>
+                  <div className="ps-cur" style={(!currentClass && !effectiveNext) ? { paddingRight: 0 } : {}}>
+                    <small>
+                      {currentClass && <i className="ps-live" aria-hidden="true"></i>}
+                      {currentClass ? 'Clase actual' : (!effectiveNext ? hiLabel : 'Clase actual')}
+                    </small>
+                    <strong>{currentClass ? currentClass.subject : (!effectiveNext ? hiDetail : 'Receso o Libre')}</strong>
+                    {currentClass && (
+                      <>
+                        <span className="ps-t">{currentClass.startTime} – {currentClass.endTime}</span>
+                        <div className="ps-bar"><b style={{ width: `${currentClass.progress}%` }}></b></div>
+                      </>
                     )}
                   </div>
-
-                  {currentClass ? (
-                    <div className='space-y-0.5'>
-                      <h2 className='text-sm sm:text-lg md:text-xl font-black text-white leading-tight line-clamp-1'>
-                        {currentClass.subject}
-                      </h2>
-                      <div className='flex flex-wrap items-center gap-1.5 text-[9px] sm:text-[11px] text-emerald-200/80 font-medium'>
-                        <span className='inline-flex items-center gap-1 bg-white/5 px-1.5 py-0.5 rounded border border-white/5'>
-                          <Users className='h-2.5 w-2.5 sm:h-3 sm:w-3 text-emerald-300/80' />
-                          {currentClass.teacher?.split(' ')[0] || 'Autónomo'}
-                        </span>
-                        <span className='inline-flex items-center gap-1 bg-white/5 px-1.5 py-0.5 rounded border border-white/5'>
-                          <Clock className='h-2.5 w-2.5 sm:h-3 sm:w-3 text-emerald-300/80' />
-                          {currentClass.startTime} - {currentClass.endTime}
-                        </span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div>
-                      <h2 className='text-sm sm:text-lg md:text-xl font-bold tracking-tight text-white leading-tight'>
-                        Tiempo de Receso o Libre
-                      </h2>
-                      <p className='text-[9px] sm:text-xs text-emerald-200/70 font-medium mt-0.5 hidden sm:block'>
-                        Aprovecha para repasar. Consulta tu próxima clase a la derecha.
-                      </p>
-                    </div>
-                  )}
-
-                  {currentClass && currentClass.progress !== undefined && (
-                    <div className='mt-2'>
-                      <div className='w-full bg-black/20 rounded-full h-1 overflow-hidden'>
-                        <div className='bg-emerald-400 h-1 rounded-full transition-all duration-500 ease-out' style={{ width: `${currentClass.progress}%` }} />
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* 30% Derecha: Próxima Clase */}
-                <div className='flex-[3] p-3 sm:p-4.5 md:px-5 bg-gradient-to-r from-blue-600 to-indigo-700 flex flex-col justify-center'>
-                  <div className='mb-1 flex items-center justify-between gap-1'>
-                    <span className={`inline-flex items-center gap-1 text-[8px] sm:text-[9px] font-extrabold uppercase tracking-wider ${effectiveNextClass?.isNovedad ? 'text-amber-300' : 'text-blue-200'}`}>
-                      {effectiveNextClass?.isNovedad ? <ShieldAlert className='h-2.5 w-2.5' /> : <Clock className='h-2.5 w-2.5' />}
-                      {effectiveNextClass ? `Próxima (${effectiveNextClass.period}°)` : 'Próxima'}
-                    </span>
-                    {effectiveNextClass?.isNovedad && (
-                      <span className='inline-flex items-center px-1.5 py-0.5 rounded bg-amber-400/25 border border-amber-300/40 text-[8px] font-black text-amber-200'>
-                        ⚠️ NOVEDAD
-                      </span>
-                    )}
-                  </div>
-
-                  {effectiveNextClass ? (
-                    <div className='space-y-0.5'>
-                      <h3 className='text-xs sm:text-sm font-bold text-white line-clamp-1 leading-snug'>
-                        {effectiveNextClass.subject}
-                      </h3>
-                      <div className='inline-flex items-center gap-1 text-[8px] sm:text-[10px] font-bold text-blue-100 bg-white/10 px-1.5 py-0.5 rounded border border-white/10'>
-                        {effectiveNextClass.startTime}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className='space-y-0.5'>
-                      <p className='text-xs sm:text-sm font-bold text-blue-50 leading-snug'>
-                        Fin jornada
-                      </p>
+                  
+                  {(currentClass || effectiveNext) && (
+                    <div className="ps-nxt">
+                      <small>Clase siguiente</small>
+                      <strong>{effectiveNext ? effectiveNext.subject : 'Ninguna'}</strong>
+                      {effectiveNext && <span className="ps-t">{effectiveNext.startTime} – {effectiveNext.endTime}</span>}
                     </div>
                   )}
                 </div>
               </div>
-            )
-          })()}
-        </motion.div>
-      )}
+            </Link>
+          </motion.div>
+        </div>
 
-      {/* Título de Sección */}
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }}>
-        <h2 className='text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1 mb-2.5 sm:mb-4'>
-          Consulta tu información institucional
-        </h2>
-      </motion.div>
+        {/* ════════════════════════════════
+            PANEL DERECHO
+            Grid 4 módulos + Campus Virtual
+            ════════════════════════════════ */}
+        <div className="ps-right-col">
 
-      {/* Grid de Módulos (2 columnas en móvil, 3 columnas en escritorio) */}
-      <motion.div
-        variants={cv}
-        initial='hidden'
-        animate='show'
-        className='grid grid-cols-2 md:grid-cols-3 gap-2.5 sm:gap-4 md:gap-5'
-      >
-        {modules.map(mod => {
-          const Icon = mod.icon
-          const isCourses = mod.id === 'courses'
-
-          return (
-            <motion.div key={mod.id} variants={iv}>
-              <Link
-                href={mod.href}
-                onClick={(e) => {
-                  if (isCourses && !hasEmail) {
-                    e.preventDefault()
-                    setIsVirtualModalOpen(true)
-                  }
-                }}
-                className='group block h-full'
-              >
-                <div
-                  className={[
-                    'relative h-full rounded-2xl sm:rounded-3xl bg-white dark:bg-slate-900 border',
-                    mod.borderColor,
-                    'shadow-sm hover:shadow-md active:scale-[0.98] transition-all duration-200 hover:-translate-y-0.5',
-                    'p-3.5 sm:p-5 flex flex-col justify-between overflow-hidden cursor-pointer'
-                  ].join(' ')}
-                >
-                  <div className='pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/80 to-transparent' />
-
-                  <div className='flex items-start justify-between mb-2.5 sm:mb-3'>
-                    <div
-                      className={[
-                        'h-9 w-9 sm:h-11 sm:w-11 rounded-xl sm:rounded-2xl',
-                        mod.bgColor,
-                        'border',
-                        mod.borderColor,
-                        'flex items-center justify-center group-hover:scale-105 transition-transform duration-200 shrink-0'
-                      ].join(' ')}
-                    >
-                      <Icon className={'h-4.5 w-4.5 sm:h-5 sm:w-5 ' + mod.iconColor} />
+          {/* Grid 2×2 de módulos */}
+          <div className="ps-tiles-grid">
+            {BASE_MODULES.map(mod => {
+              const Icon = mod.icon
+              return (
+                <motion.div key={mod.id} variants={iv}>
+                  <Link
+                    href={mod.href}
+                    className="ps-link"
+                    aria-label={`${mod.title}: ${mod.description}`}
+                  >
+                    <div className="ps-tile">
+                      <div className="ps-tile-icon">
+                        <Icon size={26} style={{ color: ic(mod.id) }} aria-hidden="true" />
+                      </div>
+                      <div>
+                        <p className="ps-tile-desc">{mod.description}</p>
+                        <p className="ps-tile-title">{mod.title}</p>
+                      </div>
                     </div>
-                    {isCourses && (
-                      hasCourses ? (
-                        <span className='inline-flex items-center px-2 py-0.5 rounded-full bg-teal-50 dark:bg-teal-950/40 border border-teal-200/60 text-[9px] sm:text-[10px] font-bold text-teal-700 dark:text-teal-400 uppercase tracking-wide'>
-                          Activo
-                        </span>
-                      ) : hasEmail ? (
-                        <span className='inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-[9px] sm:text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wide'>
-                          Sin Curso
-                        </span>
-                      ) : (
-                        <span className='inline-flex items-center px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-800/40 text-[9px] sm:text-[10px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wide'>
-                          Vincular Correo
-                        </span>
-                      )
-                    )}
-                  </div>
+                  </Link>
+                </motion.div>
+              )
+            })}
+          </div>
 
-                  <div className='flex-1 min-w-0'>
-                    <h3 className='text-xs sm:text-sm font-bold text-slate-900 dark:text-white tracking-tight mb-1 line-clamp-1'>
-                      {mod.title}
-                    </h3>
-                    <p className='text-[10.5px] sm:text-xs text-slate-500 dark:text-slate-400 leading-snug sm:leading-relaxed line-clamp-2'>
-                      {mod.description}
-                    </p>
-                  </div>
+          {/* Campus Virtual — ancho completo dentro del panel derecho */}
+          <motion.div variants={iv}>
+            <Link
+              href={VIRTUAL.href}
+              className="ps-link"
+              onClick={e => { if (!hasEmail) { e.preventDefault(); setIsVirtualModalOpen(true) } }}
+              aria-label={`Campus Virtual: ${hasCourses ? 'cursos activos' : hasEmail ? 'sin curso activo' : 'vincular correo institucional'}`}
+            >
+              <div className="ps-tile ps-wide-tile">
+                {hasCourses && <span className="ps-dot" aria-hidden="true" />}
 
-                  <div className='mt-3 sm:mt-4 flex items-center justify-end'>
-                    <span
-                      className={[
-                        'inline-flex items-center gap-0.5 sm:gap-1 text-[10px] sm:text-[11px] font-bold',
-                        mod.iconColor,
-                        'opacity-80 group-hover:opacity-100 transition-all duration-200 translate-x-0 sm:translate-x-1 sm:group-hover:translate-x-0'
-                      ].join(' ')}
-                    >
-                      <span>
-                        {isCourses
-                          ? (hasEmail ? 'Entrar' : 'Vincular')
-                          : 'Ver'}
-                      </span>
-                      <ChevronRight className='h-3 w-3 sm:h-3.5 sm:w-3.5' />
-                    </span>
-                  </div>
+                <div className="ps-tile-icon">
+                  <BookOpen size={26} style={{ color: ic('courses') }} aria-hidden="true" />
                 </div>
-              </Link>
-            </motion.div>
-          )
-        })}
+
+                <div className="ps-wide-bottom">
+                  <div>
+                    <p className="ps-tile-desc">{VIRTUAL.description}</p>
+                    <p className="ps-tile-title">{VIRTUAL.title}</p>
+                  </div>
+                  {hasCourses
+                    ? <span className="ps-badge">Activo</span>
+                    : hasEmail
+                      ? <span className="ps-badge-neutral">Sin Curso</span>
+                      : <span className="ps-badge-link">Vincular</span>
+                  }
+                </div>
+              </div>
+            </Link>
+          </motion.div>
+
+        </div>
       </motion.div>
 
-      {/* Pie sutil */}
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }} className='pt-1 pb-4 text-center'>
-        <p className='text-[10px] sm:text-[11px] text-slate-400 dark:text-slate-500 font-medium'>
-          Escuela Normal Superior del Nordeste &middot; aulaEnsuny
-        </p>
-      </motion.div>
 
-      {/* Modal / Bottom Sheet de Requisitos de Campus Virtual */}
+      {/* Modal Campus Virtual */}
       <StudentVirtualCourseModal
         isOpen={isVirtualModalOpen}
         onClose={() => setIsVirtualModalOpen(false)}
-        onEmailUpdated={(_newMail) => {
-          setHasEmail(true)
-        }}
+        onEmailUpdated={() => setHasEmail(true)}
       />
     </div>
   )
 }
-
