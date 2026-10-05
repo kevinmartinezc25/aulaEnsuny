@@ -457,6 +457,14 @@ export function TeacherDashboardScreen(props: TeacherDashboardProps) {
         .td-hero strong { font-size: 24px; line-height: 1.15; font-weight: 700; letter-spacing: -0.9px; max-width: 15em; position: relative; }
         @media(min-width: 760px) { .td-hero strong { font-size: 30px; } }
         
+        .td-pair { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 22px; position: relative; z-index: 1; }
+        @media(min-width: 600px) { .td-pair { grid-template-columns: 1fr 1fr; } }
+        .td-cur { padding: 6px 0; }
+        .td-nxt { padding: 14px 16px; border-radius: 20px; background: rgba(233, 150, 42, 0.12); border: 1px solid rgba(233, 150, 42, 0.25); display: flex; flex-direction: column; justify-content: center; }
+        .td-nxt small { color: rgba(233, 150, 42, 0.85); font-size: 11px; letter-spacing: 1px; font-weight: 700; text-transform: uppercase; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+        .td-nxt strong { display: block; font-size: 20px; line-height: 1.1; letter-spacing: -0.6px; color: #f0b469; margin-bottom: 8px; max-width: 100%; }
+        .td-nxt span { display: flex; align-items: center; gap: 6px; font-size: 13px; color: rgba(233, 150, 42, 0.8); font-weight: 600; }
+        
         .td-prog { background: var(--td-hi); border-color: transparent; color: var(--td-hi-ink); padding: 20px; display: flex; flex-direction: column; justify-content: space-between; min-height: 140px; }
         @media(min-width: 760px) { .td-prog { padding: 26px; min-height: 200px; } }
         .td-prog .wm { position: absolute; right: -24px; top: -24px; width: 150px; height: 150px; opacity: 0.12; stroke-width: 1.5; pointer-events: none; }
@@ -510,8 +518,9 @@ export function TeacherDashboardScreen(props: TeacherDashboardProps) {
         .td-pc { padding: 14px; display: flex; flex-direction: column; gap: 10px; text-decoration: none; color: inherit; position: relative; overflow: hidden; }
         @media(min-width: 600px) { .td-pc { padding: 20px; gap: 14px; } }
         @media(prefers-reduced-motion: no-preference) { .td-pc { transition: transform 0.15s; } .td-pc:active { transform: scale(0.97); } }
-        .td-pc .h { display: flex; align-items: center; gap: 10px; }
-        .td-pc .h .go { background: var(--td-accbg); width: 32px; height: 32px; flex-shrink: 0; }
+        .td-pc .h { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+        @media(min-width: 600px) { .td-pc .h { flex-direction: row; align-items: center; gap: 12px; } }
+        .td-pc .h .go { background: var(--td-accbg); width: 32px; height: 32px; flex-shrink: 0; border-radius: 50%; display: grid; place-items: center; color: var(--td-acc); }
         @media(min-width: 600px) { .td-pc .h .go { width: 40px; height: 40px; } }
         .td-pc h3 { flex: 1; margin: 0; font-size: 14px; font-weight: 700; letter-spacing: -0.3px; line-height: 1.2; color: var(--td-ink); word-break: break-word; hyphens: auto; }
         @media(min-width: 600px) { .td-pc h3 { font-size: 17px; } }
@@ -569,22 +578,27 @@ export function TeacherDashboardScreen(props: TeacherDashboardProps) {
              return (
                  <div className="td-tile td-hero td-c8">
                    <svg className="wm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-                   <small><i style={{ background: currentClass ? 'var(--td-acc)' : '#e9b56a' }}></i> {currentClass ? `EN CURSO (${currentClass.period}ª HORA)` : 'SIN CLASE ACTIVA'}</small>
-                   <strong>{currentClass ? currentClass.subject : 'Tiempo de Receso o Libre'}</strong>
-                   
-                   {currentClass && (
-                     <div style={{ marginTop: '12px', fontSize: '13px', fontWeight: 600, display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-                       <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Users size={16}/> Grupo {currentClass.group}</span>
-                       <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Clock size={16}/> Termina en ~{currentClass.remaining} min</span>
+                   <div className="td-pair">
+                     <div className="td-cur">
+                       <small><i style={{ background: currentClass ? 'var(--td-acc)' : '#e9b56a' }}></i> {currentClass ? `EN CURSO (${currentClass.period}ª HORA)` : 'SIN CLASE ACTIVA'}</small>
+                       <strong>{currentClass ? currentClass.subject : 'Tiempo de Receso o Libre'}</strong>
+                       
+                       {currentClass && (
+                         <div style={{ marginTop: '12px', fontSize: '13px', fontWeight: 600, display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                           <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Users size={16}/> Grupo {currentClass.group}</span>
+                           <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Clock size={16}/> Termina ~{currentClass.remaining} min</span>
+                         </div>
+                       )}
                      </div>
-                   )}
-                   
-                   {effectiveNextClass && (
-                     <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.15)' }}>
-                       <div style={{ fontSize: '11px', fontWeight: 700, opacity: 0.7, marginBottom: '4px', letterSpacing: '1px' }}>PRÓXIMA CLASE</div>
-                       <div style={{ fontSize: '16px', fontWeight: 600 }}>{effectiveNextClass.subject} (Grupo {effectiveNextClass.group})</div>
-                     </div>
-                   )}
+                     
+                     {effectiveNextClass && (
+                       <div className="td-nxt">
+                         <small><Clock size={14}/> PRÓXIMA CLASE</small>
+                         <strong>{effectiveNextClass.subject}</strong>
+                         <span><Users size={14}/> Grupo {effectiveNextClass.group}</span>
+                       </div>
+                     )}
+                   </div>
                  </div>
              )
           })()}

@@ -183,7 +183,7 @@ export function PlanillaAsistidaListScreen({ initialSubjects }: PlanillaAsistida
         .pl-sel select:focus { border-color: var(--pl-acc); }
         .pl-sel svg { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; pointer-events: none; color: var(--pl-mute); }
 
-        .pl-pgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+        .pl-pgrid { display: grid; grid-template-columns: 1fr; gap: 12px; }
         @media(min-width: 600px) { .pl-pgrid { grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 16px; } }
         
         .pl-pc { background: var(--pl-tile); border: 1px solid var(--pl-tile-b); border-radius: 20px; padding: 14px; display: flex; flex-direction: column; gap: 12px; position: relative; overflow: hidden; }

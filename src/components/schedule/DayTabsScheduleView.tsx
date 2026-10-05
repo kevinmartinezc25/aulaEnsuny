@@ -135,6 +135,34 @@ function isClassOngoing(item: ScheduleItem, isToday: boolean, currentMinutes: nu
 // COMPONENTE PRINCIPAL
 // ==========================================
 
+/**
+ * Obtiene la fecha exacta de la semana actual para una clave de día dada
+ */
+function getLocalDateForDayKey(dayKey: ScheduleDayKey): string {
+  const dayIndexMap: Record<ScheduleDayKey, number> = {
+    lunes: 1, martes: 2, miercoles: 3, jueves: 4, viernes: 5, sabado: 6
+  }
+  const targetIndex = dayIndexMap[dayKey]
+  if (!targetIndex) return ''
+
+  const today = new Date()
+  let currentDay = today.getDay()
+  if (currentDay === 0) currentDay = 7 // Domingo = 7 para el cálculo
+
+  const diff = targetIndex - currentDay
+  
+  const targetDate = new Date(today)
+  targetDate.setDate(today.getDate() + diff)
+  
+  const dayNum = targetDate.getDate()
+  let monthStr = targetDate.toLocaleDateString('es-CO', { month: 'short' }).replace(/\./g, '')
+  // Elimina posibles "de " iniciales si la API local los incluye y capitaliza
+  monthStr = monthStr.replace(/^de\s+/i, '').trim()
+  monthStr = monthStr.charAt(0).toUpperCase() + monthStr.slice(1)
+  
+  return `${dayNum} ${monthStr}`
+}
+
 export default function DayTabsScheduleView({
   schedule = {},
   context = { title: 'Mi horario', subtitle: 'Jornada escolar', type: 'student' },
@@ -339,18 +367,23 @@ export default function DayTabsScheduleView({
               aria-selected={isActive}
               aria-controls={`tabpanel-${d.key}`}
               onClick={() => handleDaySelect(d.key)}
-              className={`group relative min-w-0 w-full flex items-center justify-center py-2 sm:py-2.5 px-0.5 sm:px-2 rounded-xl sm:rounded-2xl font-bold transition-all duration-200 select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 overflow-hidden ${
+              className={`group relative min-w-0 w-full flex flex-col items-center justify-center py-2 sm:py-2.5 px-0.5 sm:px-2 rounded-xl sm:rounded-2xl font-bold transition-all duration-200 select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 overflow-hidden ${
                 isActive
                   ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/20'
                   : 'bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
-              <span className="hidden sm:inline text-xs sm:text-sm font-black tracking-tight truncate max-w-full">
-                {d.label}
-              </span>
-              <span className="sm:hidden text-xs font-black uppercase tracking-tight truncate">
-                {d.shortLabel || d.label.substring(0, 3)}
-              </span>
+              <div className="flex flex-col items-center justify-center w-full">
+                <span className="hidden sm:inline text-xs sm:text-sm font-black tracking-tight truncate max-w-full">
+                  {d.label}
+                </span>
+                <span className="sm:hidden text-xs font-black uppercase tracking-tight truncate">
+                  {d.shortLabel || d.label.substring(0, 3)}
+                </span>
+                <span className={`text-[10px] sm:text-[11px] font-semibold mt-0.5 tracking-tight ${isActive ? 'text-indigo-200' : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-500'}`}>
+                  {getLocalDateForDayKey(d.key)}
+                </span>
+              </div>
             </button>
           )
         })}
