@@ -386,732 +386,338 @@ export function TeacherDashboardScreen(props: TeacherDashboardProps) {
   }
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto text-left">
-      {/* Cabecera */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="space-y-1">
-          <div className="flex flex-row items-center gap-3">
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
-              ¡Hola, {teacherName}!
-            </h1>
-            <span className="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400 border border-indigo-200/50 dark:border-indigo-800/30 w-fit">
-              Docente
-            </span>
-          </div>
-          <p className="text-slate-500 dark:text-slate-400">
-            Aquí tienes el resumen y las herramientas de tus clases activas.
-          </p>
-        </div>
+    <div className="td-page">
+      <style>{`
+        .td-page {
+          --td-bg: #e9f0ec;
+          --td-tile: #fff;
+          --td-tile-b: #d9e4de;
+          --td-ink: #10231c;
+          --td-mute: #5f776b;
+          --td-soft: #eef4f0;
+          --td-hi: #123325;
+          --td-hi-ink: #fff;
+          --td-hi-mute: #6f9e8a;
+          --td-hero: #123325;
+          --td-acc: #12a374;
+          --td-accbg: rgba(18,163,116,.12);
+          --td-bad: #e5484d;
+          --td-warn: #d9831a;
+          padding: 20px 16px 40px;
+          margin: 0 auto;
+          max-width: 1100px;
+          color: var(--td-ink);
+        }
+        .dark .td-page {
+          --td-bg: #0c1512;
+          --td-tile: #15221d;
+          --td-tile-b: #22352d;
+          --td-ink: #eaf4ef;
+          --td-mute: #8aa399;
+          --td-soft: #1c2c26;
+          --td-hi: #123325;
+          --td-hi-ink: #fff;
+          --td-hi-mute: #6f9e8a;
+          --td-hero: #123325;
+          --td-acc: #5ee0b0;
+          --td-accbg: rgba(94,224,176,.12);
+          --td-bad: #ff7a85;
+          --td-warn: #f2b04b;
+        }
+        @media(min-width: 760px) { .td-page { padding: 28px 32px 56px; } }
+        
+        .td-h1 { margin:0; font-size: clamp(26px, 5vw, 34px); line-height: 1.05; font-weight: 700; letter-spacing: -1.2px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+        @media(min-width: 760px) { .td-h1 { font-size: 44px; letter-spacing: -1.5px; } }
+        .td-badge { font-size: 13px; font-weight: 700; letter-spacing: 0; color: var(--td-acc); background: var(--td-accbg); border-radius: 99px; padding: 5px 14px; }
+        .td-sub { margin: 10px 0 22px; color: var(--td-mute); font-size: 15px; max-width: 46em; }
+        .td-tabs { display: inline-flex; gap: 4px; padding: 5px; border-radius: 99px; background: var(--td-tile); border: 1px solid var(--td-tile-b); margin-bottom: 22px; overflow-x: auto; max-width: 100%; }
+        .td-tabs button { border: 0; background: transparent; border-radius: 99px; padding: 10px 20px; font-size: 14px; font-weight: 700; color: var(--td-mute); cursor: pointer; white-space: nowrap; transition: all 0.2s; outline: none; }
+        .td-tabs button.on { background: var(--td-hi); color: var(--td-hi-ink); }
+        .td-tabs button:focus-visible { outline: 2px solid var(--td-acc); outline-offset: 2px; }
+        
+        .td-bento { display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; }
+        .td-c8 { grid-column: span 12; }
+        .td-c4 { grid-column: span 12; }
+        .td-c6 { grid-column: span 12; }
+        .td-c12 { grid-column: span 12; }
+        @media(min-width: 900px) {
+          .td-c8 { grid-column: span 8; }
+          .td-c4 { grid-column: span 4; }
+          .td-c6 { grid-column: span 6; }
+        }
+        
+        .td-tile { position: relative; overflow: hidden; background: var(--td-tile); border: 1px solid var(--td-tile-b); border-radius: 24px; }
+        @media(min-width: 760px) { .td-tile { border-radius: 32px; } }
+        
+        .td-hero { background: var(--td-hero); border-color: transparent; color: #fff; padding: 24px; min-height: 200px; display: flex; flex-direction: column; justify-content: flex-end; }
+        @media(min-width: 760px) { .td-hero { padding: 30px 34px; } }
+        .td-hero .wm { position: absolute; right: 26px; top: 50%; transform: translateY(-50%); width: 200px; height: 200px; opacity: 0.1; stroke-width: 3; color: #fff; pointer-events: none; }
+        .td-hero small { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; letter-spacing: 1.4px; color: var(--td-hi-mute); margin-bottom: 10px; }
+        .td-hero small i { width: 8px; height: 8px; border-radius: 50%; background: #e9b56a; flex: none; }
+        .td-hero strong { font-size: 24px; line-height: 1.15; font-weight: 700; letter-spacing: -0.9px; max-width: 15em; position: relative; }
+        @media(min-width: 760px) { .td-hero strong { font-size: 30px; } }
+        
+        .td-prog { background: var(--td-hi); border-color: transparent; color: var(--td-hi-ink); padding: 20px; display: flex; flex-direction: column; justify-content: space-between; min-height: 140px; }
+        @media(min-width: 760px) { .td-prog { padding: 26px; min-height: 200px; } }
+        .td-prog .wm { position: absolute; right: -24px; top: -24px; width: 150px; height: 150px; opacity: 0.12; stroke-width: 1.5; pointer-events: none; }
+        .td-prog small { display: block; font-size: 12px; font-weight: 700; letter-spacing: 1.3px; color: var(--td-hi-mute); text-transform: uppercase; }
+        .td-prog .ic { width: 36px; height: 36px; border-radius: 50%; background: rgba(128,128,128,0.25); display: grid; place-items: center; }
+        @media(min-width: 760px) { .td-prog .ic { width: 44px; height: 44px; } }
+        .td-prog .num { font-size: 42px; line-height: 1; font-weight: 700; letter-spacing: -1.5px; }
+        @media(min-width: 760px) { .td-prog .num { font-size: 56px; letter-spacing: -2px; } }
+        .td-prog .num span { font-size: 16px; color: var(--td-hi-mute); font-weight: 600; letter-spacing: 0; margin-left: 6px; }
+        @media(min-width: 760px) { .td-prog .num span { font-size: 20px; } }
+        .td-bar { height: 7px; border-radius: 4px; background: rgba(128,128,128,0.3); margin-top: 14px; overflow: hidden; }
+        .td-bar b { display: block; height: 100%; width: 0; background: var(--td-hi-ink); transition: width 0.5s ease; }
+        
+        .td-panel { padding: 20px; display: flex; flex-direction: column; min-height: 220px; }
+        @media(min-width: 760px) { .td-panel { padding: 24px; } }
+        .td-ph { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+        .td-ph h2 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.3px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; color: var(--td-ink); }
+        .td-ph p { margin: 4px 0 0; font-size: 13px; color: var(--td-mute); }
+        .td-chip { font-size: 11px; font-weight: 700; letter-spacing: 0.6px; color: var(--td-acc); background: var(--td-accbg); border-radius: 99px; padding: 4px 11px; text-transform: uppercase; }
+        .td-go { width: 38px; height: 38px; border-radius: 50%; background: var(--td-soft); display: grid; place-items: center; color: var(--td-acc); flex: none; }
+        .td-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; color: var(--td-mute); font-size: 14px; border-top: 1px solid var(--td-tile-b); margin-top: 18px; padding-top: 18px; }
+        .td-empty .td-go { width: 48px; height: 48px; color: var(--td-mute); }
+        .td-foot { border-top: 1px solid var(--td-tile-b); margin-top: 16px; padding-top: 14px; }
+        .td-foot a { color: var(--td-acc); font-size: 14px; font-weight: 700; text-decoration: none; }
+        .td-foot a:hover { text-decoration: underline; }
+        
+        .td-event { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--td-tile-b); }
+        .td-event:last-child { border-bottom: none; }
+        .td-event h4 { margin: 0; font-size: 14px; font-weight: 700; color: var(--td-ink); }
+        .td-event p { margin: 2px 0 0; font-size: 11px; color: var(--td-mute); }
+        .td-event-cat { font-size: 10px; font-weight: 700; text-transform: uppercase; padding: 4px 8px; border-radius: 8px; background: var(--td-soft); color: var(--td-mute); }
+
+        .td-sch { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-radius: 16px; border: 1px solid transparent; transition: all 0.2s; margin-top: 12px; }
+        .td-sch.free { border: 1px dashed var(--td-tile-b); background: transparent; }
+        .td-sch.reg { background: var(--td-soft); }
+        .td-sch.curr { background: var(--td-accbg); border-color: var(--td-acc); }
+        .td-sch h4 { margin: 0; font-size: 14px; font-weight: 700; color: var(--td-ink); }
+        .td-sch .info { font-size: 11px; font-weight: 600; color: var(--td-mute); display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+        .td-sch .right { text-align: right; flex-shrink: 0; }
+        .td-sch .right b { display: block; font-size: 12px; color: var(--td-acc); }
+        .td-sch .right span { display: block; font-size: 11px; color: var(--td-mute); margin-top: 2px; }
+        
+        .td-btn { border: 0; background: var(--td-hi); color: var(--td-hi-ink); border-radius: 99px; padding: 12px 22px; font-size: 14px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; transition: transform 0.15s; outline: none; }
+        .td-btn:active { transform: scale(0.96); }
+        .td-btn:focus-visible { outline: 2px solid var(--td-acc); outline-offset: 2px; }
+
+        /* Virtual Campus Grid */
+        .td-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 16px; }
+        @media(min-width: 600px) { .td-grid { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; } }
+        
+        .td-pc { padding: 14px; display: flex; flex-direction: column; gap: 10px; text-decoration: none; color: inherit; position: relative; overflow: hidden; }
+        @media(min-width: 600px) { .td-pc { padding: 20px; gap: 14px; } }
+        @media(prefers-reduced-motion: no-preference) { .td-pc { transition: transform 0.15s; } .td-pc:active { transform: scale(0.97); } }
+        .td-pc .h { display: flex; align-items: center; gap: 10px; }
+        .td-pc .h .go { background: var(--td-accbg); width: 32px; height: 32px; flex-shrink: 0; }
+        @media(min-width: 600px) { .td-pc .h .go { width: 40px; height: 40px; } }
+        .td-pc h3 { flex: 1; margin: 0; font-size: 14px; font-weight: 700; letter-spacing: -0.3px; line-height: 1.2; color: var(--td-ink); word-break: break-word; hyphens: auto; }
+        @media(min-width: 600px) { .td-pc h3 { font-size: 17px; } }
+        .td-pc .p { display: none; font-size: 12px; color: var(--td-mute); -webkit-box-orient: vertical; overflow: hidden; }
+        @media(min-width: 600px) { .td-pc .p { display: -webkit-box; -webkit-line-clamp: 2; font-size: 13px; } }
+        .td-pc .foot { margin-top: auto; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--td-tile-b); padding-top: 10px; font-size: 11px; font-weight: 600; color: var(--td-mute); gap: 6px; flex-wrap: wrap; }
+        @media(min-width: 600px) { .td-pc .foot { padding-top: 12px; font-size: 12px; } }
+        
+        .td-pc-stats { display: none; gap: 8px; }
+        @media(min-width: 600px) { .td-pc-stats { display: flex; } }
+        
+        .td-search { display: flex; align-items: center; gap: 12px; padding: 0 16px; height: 48px; border-radius: 99px; background: var(--td-soft); border: 1px solid var(--td-tile-b); width: 100%; transition: border-color 0.15s; }
+        .td-search:focus-within { border-color: var(--td-acc); }
+        .td-search input { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--td-ink); font: inherit; font-size: 14px; outline: none; }
+        .td-search input::placeholder { color: var(--td-mute); }
+        .td-sel { position: relative; width: 100%; }
+        @media(min-width: 600px) { .td-sel { width: auto; min-width: 200px; } }
+        .td-sel select { appearance: none; background: var(--td-soft); color: var(--td-ink); border: 1px solid var(--td-tile-b); border-radius: 99px; height: 48px; padding: 0 42px 0 16px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; width: 100%; outline: none; transition: border-color 0.15s; }
+        .td-sel select:focus { border-color: var(--td-acc); }
+        .td-sel svg { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--td-mute); }
+        
+        .td-filters { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; }
+        @media(min-width: 600px) { .td-filters { flex-direction: row; align-items: center; } }
+      `}</style>
+      
+      <h1 className="td-h1">
+        ¡Hola, {teacherName}!
+        <span className="td-badge">Docente</span>
+      </h1>
+      <p className="td-sub">Aquí tienes el resumen y las herramientas de tus clases activas.</p>
+
+      <div className="td-tabs" role="tablist">
+        <button className={activeTab === 'general' ? 'on' : ''} onClick={() => setActiveTab('general')} role="tab">Resumen General</button>
+        <button className={activeTab === 'virtual' ? 'on' : ''} onClick={() => setActiveTab('virtual')} role="tab">Aula Virtual</button>
       </div>
 
-      {/* Pestañas de Navegación */}
-      <div className="flex space-x-6 border-b border-slate-200 dark:border-slate-800">
-        <button
-          onClick={() => setActiveTab('general')}
-          className={`pb-3 text-sm font-bold border-b-2 transition-colors ${activeTab === 'general' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'}`}
-        >
-          Resumen General
-        </button>
-        <button
-          onClick={() => setActiveTab('virtual')}
-          className={`pb-3 text-sm font-bold border-b-2 transition-colors ${activeTab === 'virtual' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'}`}
-        >
-          Aula Virtual
-        </button>
-      </div>
-
-      {/* Pestaña: Resumen General */}
       {activeTab === 'general' && (
-        <div className="space-y-8">
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {/* Card Principal: Si la jornada ha finalizado (sin clase actual ni siguiente), tarjeta unificada a ancho completo */}
-            {(() => {
-              const isSameClass = nextClass && currentClass && (nextClass.id === currentClass.id || nextClass.period === currentClass.period)
-              const effectiveNextClass = isSameClass ? null : nextClass
-              const isFinishedDay = !currentClass && !effectiveNextClass
+        <motion.section initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="td-bento">
+          {/* Hero Card */}
+          {(() => {
+             const isSameClass = nextClass && currentClass && (nextClass.id === currentClass.id || nextClass.period === currentClass.period)
+             const effectiveNextClass = isSameClass ? null : nextClass
+             const isFinishedDay = !currentClass && !effectiveNextClass
 
-              if (isFinishedDay) {
-                return (
-                  <div className="col-span-1 sm:col-span-2 rounded-2xl border border-blue-500 bg-gradient-to-r from-blue-600 to-indigo-700 shadow-[0_8px_30px_rgba(59,130,246,0.3)] p-5 sm:p-6 text-white flex items-center justify-center text-center transition-all duration-300">
-                    <h2 className="text-base sm:text-lg md:text-xl font-bold tracking-tight text-white">
-                      Jornada finalizada, no tiene más clases programadas.
-                    </h2>
-                  </div>
-                )
-              }
+             if (isFinishedDay) {
+               return (
+                 <div className="td-tile td-hero td-c8">
+                   <svg className="wm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                   <small><i></i>ESTADO DE LA JORNADA</small>
+                   <strong>Jornada finalizada, no tiene más clases programadas.</strong>
+                 </div>
+               )
+             }
 
-              return (
-                <div className={`col-span-1 sm:col-span-2 rounded-2xl border transition-all duration-300 relative text-white ${
-                  currentClass
-                    ? 'border-emerald-500 bg-gradient-to-r from-emerald-600 to-teal-700 shadow-[0_8px_30px_rgba(16,185,129,0.3)]'
-                    : 'border-blue-500 bg-gradient-to-r from-blue-600 to-indigo-700 shadow-[0_8px_30px_rgba(59,130,246,0.3)]'
-                }`}>
-                  <div className="flex flex-col md:flex-row items-stretch h-full p-2 sm:p-2.5 md:p-2.5 gap-2.5">
-                    {/* PARTE PRINCIPAL: EN QUÉ CLASE ESTÁ (Gran parte del tamaño) */}
-                    <div className="flex-1 p-3.5 sm:p-4 md:p-3.5 md:py-3 flex flex-col justify-between">
-                      <div>
-                        {/* Header: Estado y Badge */}
-                        <div className="flex flex-wrap items-center justify-between gap-2 mb-2 sm:mb-2.5">
-                          <div className="flex items-center gap-2">
-                            {currentClass ? (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/25 border-2 border-white/40 text-white text-[10px] sm:text-[11px] font-extrabold tracking-wide backdrop-blur-md shadow-xs">
-                                <span className="relative flex h-2 w-2">
-                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-300 opacity-90"></span>
-                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-200"></span>
-                                </span>
-                                AHORA • EN CURSO ({currentClass.period}ª HORA)
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/20 border-2 border-white/30 text-white text-[10px] sm:text-[11px] font-bold tracking-wide backdrop-blur-md">
-                                <Clock className="h-3 w-3 text-blue-200" />
-                                AHORA • SIN CLASE ACTIVA
-                              </span>
-                            )}
-                          </div>
+             return (
+                 <div className="td-tile td-hero td-c8">
+                   <svg className="wm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                   <small><i style={{ background: currentClass ? 'var(--td-acc)' : '#e9b56a' }}></i> {currentClass ? `EN CURSO (${currentClass.period}ª HORA)` : 'SIN CLASE ACTIVA'}</small>
+                   <strong>{currentClass ? currentClass.subject : 'Tiempo de Receso o Libre'}</strong>
+                   
+                   {currentClass && (
+                     <div style={{ marginTop: '12px', fontSize: '13px', fontWeight: 600, display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                       <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Users size={16}/> Grupo {currentClass.group}</span>
+                       <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Clock size={16}/> Termina en ~{currentClass.remaining} min</span>
+                     </div>
+                   )}
+                   
+                   {effectiveNextClass && (
+                     <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.15)' }}>
+                       <div style={{ fontSize: '11px', fontWeight: 700, opacity: 0.7, marginBottom: '4px', letterSpacing: '1px' }}>PRÓXIMA CLASE</div>
+                       <div style={{ fontSize: '16px', fontWeight: 600 }}>{effectiveNextClass.subject} (Grupo {effectiveNextClass.group})</div>
+                     </div>
+                   )}
+                 </div>
+             )
+          })()}
 
-                          {currentClass?.remaining !== undefined && currentClass.remaining > 0 && (
-                            <span className="text-[10px] sm:text-[11px] font-semibold text-emerald-100 bg-white/25 px-2 py-0.5 rounded-full border border-white/30 backdrop-blur-xs">
-                              Termina en ~{currentClass.remaining} min
-                            </span>
-                          )}
-                        </div>
+          {/* Progress Card */}
+          <div className="td-tile td-prog td-c4">
+            <svg className="wm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M8 12l3 3 5-6"/></svg>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative' }}>
+              <small>PROGRESO DE HOY</small>
+              <span className="ic"><CheckCircle2 size={24} /></span>
+            </div>
+            <div style={{ position: 'relative' }}>
+              <div className="num">{completedClasses}<span>/ {totalClasses}</span></div>
+              <div className="td-bar"><b style={{ width: totalClasses > 0 ? `${(completedClasses / totalClasses) * 100}%` : '0%' }}></b></div>
+            </div>
+          </div>
 
-                        {/* Contenido de la clase actual */}
-                        {currentClass ? (
-                          <div className="space-y-1">
-                            <h2 className="text-xl sm:text-2xl md:text-2xl font-extrabold tracking-tight text-white leading-tight">
-                              {currentClass.subject}
-                            </h2>
-                            <div className="flex flex-wrap items-center gap-2.5 text-xs sm:text-sm text-emerald-100 font-medium pt-0.5">
-                              <span className="inline-flex items-center gap-1 bg-white/20 px-2 py-0.5 rounded-lg border border-white/20 backdrop-blur-xs">
-                                <Users className="h-3 w-3 text-emerald-200" />
-                                Grupo {currentClass.group}
-                              </span>
-                              <span className="inline-flex items-center gap-1 bg-white/20 px-2 py-0.5 rounded-lg border border-white/20 backdrop-blur-xs">
-                                <Clock className="h-3 w-3 text-emerald-200" />
-                                {currentClass.startTime}{currentClass.endTime ? ` - ${currentClass.endTime}` : ''}
-                              </span>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="space-y-0.5 py-0.5">
-                            <h2 className="text-lg sm:text-xl font-bold tracking-tight text-white">
-                              Tiempo de Receso o Libre
-                            </h2>
-                            <p className="text-xs sm:text-[13px] text-blue-100 font-normal">
-                              No estás impartiendo clase en este instante. Consulta tu próxima clase en la tarjeta lateral.
-                            </p>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Barra de progreso de la clase actual */}
-                      {currentClass && currentClass.progress !== undefined && (
-                        <div className="mt-2.5 pt-1.5">
-                          <div className="flex justify-between items-center text-[9px] sm:text-[10px] uppercase tracking-wider text-emerald-200 font-bold mb-1">
-                            <span>Progreso de la sesión</span>
-                            <span>{currentClass.progress}%</span>
-                          </div>
-                          <div className="w-full bg-white/20 rounded-full h-1.5 overflow-hidden">
-                            <div
-                              className="bg-white h-1.5 rounded-full transition-all duration-500 ease-out"
-                              style={{ width: `${currentClass.progress}%` }}
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* PARTE SECUNDARIA: CÁPSULA FLOTANTE EMBEBIDA */}
-                    <div className="md:w-60 lg:w-68 shrink-0 flex">
-                      <div className={`w-full rounded-2xl border-2 p-3 sm:p-3.5 md:p-3 md:py-3.5 flex flex-col justify-between transition-all shadow-xl ${
-                        currentClass
-                          ? 'bg-gradient-to-r from-blue-600 to-indigo-700 border-blue-400 shadow-[0_10px_30px_rgba(59,130,246,0.4)]'
-                          : 'bg-emerald-600 border-emerald-300 shadow-[0_10px_30px_rgba(16,185,129,0.5)]'
-                      }`}>
-                        <div>
-                          {/* Cabecera de la cápsula */}
-                          <div className="flex items-center mb-2">
-                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider shadow-xs ${
-                              currentClass
-                                ? 'bg-blue-950/40 border border-blue-300/60 text-white'
-                                : 'bg-emerald-950/40 border border-emerald-300/60 text-white'
-                            }`}>
-                              <Clock className={`h-3 w-3 ${currentClass ? 'text-blue-200' : 'text-emerald-200'}`} />
-                              <span>Próxima Clase</span>
-                            </span>
-                          </div>
-
-                          {effectiveNextClass ? (
-                            <div className="space-y-1.5">
-                              <h3 className="text-sm sm:text-base font-bold text-white line-clamp-1 drop-shadow-xs">
-                                {effectiveNextClass.subject}
-                              </h3>
-                              <p className={`text-xs font-medium flex items-center gap-1.5 ${
-                                currentClass ? 'text-blue-100' : 'text-emerald-100'
-                              }`}>
-                                <Users className={`h-3.5 w-3.5 ${currentClass ? 'text-blue-200' : 'text-emerald-200'}`} />
-                                Grupo {effectiveNextClass.group}
-                              </p>
-                              <div className={`inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-bold text-white px-2 py-0.5 rounded-md mt-0.5 shadow-xs ${
-                                currentClass
-                                  ? 'bg-blue-950/40 border border-blue-300/50'
-                                  : 'bg-emerald-950/40 border border-emerald-300/50'
-                              }`}>
-                                <Clock className={`h-3 w-3 ${currentClass ? 'text-blue-200' : 'text-emerald-200'}`} />
-                                {effectiveNextClass.startTime}{effectiveNextClass.endTime ? ` - ${effectiveNextClass.endTime}` : ''}
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="space-y-1 py-1">
-                              <p className="text-xs sm:text-sm font-bold text-white leading-snug">
-                                No tiene más clases programadas
-                              </p>
-                              <p className={`text-[11px] ${currentClass ? 'text-blue-100' : 'text-emerald-100'}`}>
-                                Última clase de la jornada de hoy.
-                              </p>
-                            </div>
-                          )}
-                        </div>
-
-                        {effectiveNextClass ? (
-                          <div className={`pt-2 mt-2 border-t flex items-center justify-between text-[10px] sm:text-[11px] font-medium ${
-                            currentClass
-                              ? 'border-blue-400/40 text-blue-100'
-                              : 'border-emerald-400/40 text-emerald-100'
-                          }`}>
-                            <span>Horario regular</span>
-                            <span className={`text-white font-extrabold px-2.5 py-0.5 rounded-md border ${
-                              currentClass
-                                ? 'bg-blue-950/50 border border-blue-300/60'
-                                : 'bg-emerald-950/50 border border-emerald-300/60'
-                            }`}>
-                              {effectiveNextClass.period}ª Hora
-                            </span>
-                          </div>
-                        ) : (
-                          <div className={`pt-2 mt-2 border-t flex items-center justify-between text-[10px] sm:text-[11px] font-medium ${
-                            currentClass
-                              ? 'border-blue-400/40 text-blue-100'
-                              : 'border-emerald-400/40 text-emerald-100'
-                          }`}>
-                            <span>Jornada</span>
-                            <span className={`text-white font-extrabold px-2.5 py-0.5 rounded-md border ${
-                              currentClass
-                                ? 'bg-blue-950/50 border border-blue-300/60'
-                                : 'bg-emerald-950/50 border border-emerald-300/60'
-                            }`}>
-                              Final de jornada
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )
-            })()}
+          {/* Schedule */}
+          <div className="td-tile td-panel td-c6">
+            <div className="td-ph">
+              <div>
+                <h2>Horario de Hoy <span className="td-chip">{new Date().toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}</span></h2>
+                <p>Clases presenciales del día</p>
+              </div>
+              <span className="td-go"><Calendar size={20} /></span>
+            </div>
             
-            {/* Progreso de Jornada */}
-            <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.02)] dark:border-slate-800/60 dark:bg-slate-900 flex flex-col justify-center relative overflow-hidden">
-              <div className="absolute -top-4 -right-4 p-4 opacity-[0.03] dark:opacity-[0.05] pointer-events-none">
-                <Clock className="h-28 w-28 text-slate-900 dark:text-white" />
-              </div>
-              <div className="flex items-center gap-4 relative z-10">
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl text-indigo-500 bg-indigo-50 dark:bg-indigo-950/30">
-                  <CheckCircle2 className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Progreso de Hoy</p>
-                  <p className="text-3xl font-bold text-slate-900 dark:text-white mt-1">
-                    {completedClasses} <span className="text-sm font-semibold text-slate-400 dark:text-slate-500">/ {totalClasses}</span>
-                  </p>
-                </div>
-              </div>
-              <div className="mt-4 w-full bg-slate-100 rounded-full h-1.5 dark:bg-slate-800 relative z-10">
-                <div 
-                  className="bg-indigo-500 h-1.5 rounded-full transition-all duration-1000" 
-                  style={{ width: `${totalClasses > 0 ? (completedClasses / totalClasses) * 100 : 0}%` }}
-                ></div>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Horario de Hoy */}
-            <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.02)] dark:border-slate-800/60 dark:bg-slate-900 text-left">
-              <div className="pb-4 border-b border-slate-50 dark:border-slate-800/40 flex items-center justify-between">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2.5">
-                    <h3 className="font-bold text-slate-900 dark:text-white text-base">Horario de Hoy</h3>
-                    <span className="text-xs font-bold uppercase tracking-wide text-indigo-600 bg-indigo-50 dark:bg-indigo-500/10 dark:text-indigo-400 px-3 py-1 rounded-full capitalize">
-                      {new Date().toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}
-                    </span>
-                    {todaySchedule.length > 0 && todaySchedule[0].isNovedad && (
-                      <span className="text-xs font-bold uppercase tracking-wide text-amber-600 bg-amber-50 dark:bg-amber-500/10 dark:text-amber-400 px-3 py-1 rounded-full">
-                        Novedad
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-slate-400 mt-0.5">Clases presenciales del día</p>
-                </div>
-                <Calendar className="h-5 w-5 text-indigo-500" />
-              </div>
-              <div className="mt-4 space-y-2.5">
-                {isWeekend ? (
-                  <div className="text-center py-6">
-                    <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">Hoy es fin de semana, no tienes clases programadas.</p>
-                  </div>
-                ) : todaySchedule.length === 0 ? (
-                  <div className="text-center py-6">
-                    <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">No tienes clases asignadas para el día de hoy.</p>
-                  </div>
-                ) : (
-                  todaySchedule.map((cls, idx) => {
-                    const isLast = idx === todaySchedule.length - 1
-                    return (
-                      <div key={cls.id}>
-                        {cls.isFree ? (
-                          <div className="rounded-xl bg-transparent border border-dashed border-slate-200 dark:border-slate-800 p-2.5 px-4 flex items-center justify-between">
-                            <p className="text-[13px] font-medium text-slate-400 dark:text-slate-500 italic">Sin Clase Asignada</p>
-                            <div className="text-right">
-                              <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500">{cls.period}ª Hora</p>
-                              <p className="text-[10px] font-medium text-slate-400 mt-0.5">{cls.startTime}{cls.endTime ? ` - ${cls.endTime}` : ''}</p>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className={`rounded-xl p-2.5 px-4 border-l-4 transition-colors flex items-center justify-between ${
-                            cls.isCurrent
-                              ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-500 ring-1 ring-emerald-500/30'
-                              : 'bg-slate-50 dark:bg-slate-800/50 border-emerald-500 hover:bg-slate-100 dark:hover:bg-slate-800'
-                          }`}>
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <h4 className="text-[13px] font-bold text-slate-800 dark:text-slate-200">{cls.subject}</h4>
-                                {cls.isCurrent && (
-                                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300">
-                                    En curso
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-[11px] font-medium text-slate-500 mt-0.5 flex items-center gap-1.5">
-                                <Users className="h-3 w-3 text-slate-400" /> Grupo {cls.group}
-                              </p>
-                            </div>
-                            <div className="text-right shrink-0 ml-4">
-                              <p className="text-[11px] font-bold text-indigo-500 dark:text-indigo-400">{cls.period}ª Hora</p>
-                              <p className="text-[10px] font-medium text-slate-500 mt-0.5">{cls.startTime}{cls.endTime ? ` - ${cls.endTime}` : ''}</p>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })
-                )}
-              </div>
-            </div>
-
-            {/* Próximas Actividades */}
-            <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.02)] dark:border-slate-800/60 dark:bg-slate-900 text-left">
-              <div className="pb-4 border-b border-slate-50 dark:border-slate-800/40 flex items-center justify-between">
-                <div>
-                  <h3 className="font-bold text-slate-900 dark:text-white text-base">
-                    Próximas Actividades
-                  </h3>
-                  <p className="text-xs text-slate-400 mt-0.5">Agenda Institucional</p>
-                </div>
-                <Calendar className="h-5 w-5 text-blue-500" />
-              </div>
-
-              <div className="mt-4 space-y-4">
-                {upcomingEvents.length === 0 ? (
-                  <p className="text-xs text-slate-400 italic py-2">No hay actividades próximas programadas.</p>
-                ) : (
-                  upcomingEvents.map((event) => {
-                    const dateStr = new Date(event.start_date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
-                    const timeStr = new Date(event.start_date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', hour12: true })
-                    
-                    return (
-                      <div key={event.id} className="flex items-start justify-between border-b border-slate-50 dark:border-slate-850 pb-3 last:border-0 last:pb-0 font-medium">
-                        <div>
-                          <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 line-clamp-1">{event.title}</h4>
-                          <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">{dateStr} • {timeStr}</p>
-                        </div>
-                        <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-lg">
-                          {event.event_categories?.name || 'General'}
-                        </span>
-                      </div>
-                    )
-                  })
-                )}
-              </div>
-
-              <div className="mt-4 pt-3 border-t border-slate-50 dark:border-slate-800/40">
-                <Link 
-                  href="/teacher/institutional-agenda"
-                  className="text-xs font-bold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1"
-                >
-                  <span>Ver Agenda Completa</span>
-                  <span>→</span>
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Pestaña: Aula Virtual */}
-      {activeTab === 'virtual' && (
-        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
-          {/* Grid de Estadísticas (Pequeño Dashboard con Datos Reales) */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-5">
-            {[
-              { title: 'Cursos virtuales', value: stats.coursesCount, icon: BookOpen, color: 'text-blue-500 bg-blue-50 dark:bg-blue-950/30' },
-              { title: 'Alumnos virtuales', value: stats.studentsCount, icon: Users, color: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-950/30' },
-              { title: 'Quizzes evaluados', value: stats.quizzesCount, icon: BrainCircuit, color: 'text-purple-500 bg-purple-50 dark:bg-purple-950/30' },
-            ].map((stat, idx) => {
-              const Icon = stat.icon
-              return (
-                <div
-                  key={stat.title}
-                  className={`rounded-2xl border border-slate-100 bg-white p-3.5 sm:p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] dark:border-slate-800/60 dark:bg-slate-900 ${
-                    idx === 2 ? 'col-span-2 sm:col-span-1' : ''
-                  }`}
-                >
-                  <div className="flex flex-row items-center gap-2.5 sm:gap-4">
-                    <div className={`flex h-9 w-9 sm:h-11 sm:w-11 items-center justify-center rounded-xl ${stat.color} shrink-0`}>
-                      <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider truncate">
-                        {stat.title}
-                      </p>
-                      <p className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mt-0.5">
-                        {stat.value}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-
-          {/* Listado de Cursos */}
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-                  Mis Cursos
-                </h2>
-                {courses.length > 0 && (
-                  <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                    {filteredCourses.length}{filteredCourses.length !== courses.length ? ` de ${courses.length}` : ''} {courses.length === 1 ? 'curso' : 'cursos'}
-                  </span>
-                )}
-              </div>
-
-              {/* Filtros: Búsqueda y Grado */}
-              {courses.length > 0 && (
-                <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
-                  {/* Buscador */}
-                  <div className="relative flex-1 min-w-[170px] sm:w-64">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Buscar curso o materia..."
-                      className="w-full pl-8.5 pr-8 py-1.5 text-xs sm:text-sm rounded-xl border border-slate-200 bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:border-slate-800 dark:bg-slate-900 dark:text-white transition-all shadow-xs"
-                    />
-                    {searchQuery && (
-                      <button
-                        type="button"
-                        onClick={() => setSearchQuery('')}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Selector de Grado */}
-                  {availableGrades.length > 0 && (
-                    <div className="relative min-w-[130px] sm:w-44">
-                      <select
-                        value={selectedGrade}
-                        onChange={(e) => setSelectedGrade(e.target.value)}
-                        className="w-full appearance-none pl-3 pr-8 py-1.5 text-xs sm:text-sm rounded-xl border border-slate-200 bg-white text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 transition-all shadow-xs cursor-pointer"
-                      >
-                        <option value="ALL">Todos los grados</option>
-                        {availableGrades.map((grade) => (
-                          <option key={grade} value={grade}>
-                            {grade.toLowerCase().includes('grado') ? grade : `${grade} Grado`}
-                          </option>
-                        ))}
-                      </select>
-                      <Filter className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
-                    </div>
-                  )}
-
-                  {/* Botón de limpiar filtros cuando hay filtros activos */}
-                  {(searchQuery || selectedGrade !== 'ALL') && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSearchQuery('')
-                        setSelectedGrade('ALL')
-                      }}
-                      className="px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                    >
-                      Limpiar
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {courses.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 p-8 text-center bg-slate-50/50 dark:bg-slate-900/50">
-                <BookOpen className="h-8 w-8 text-slate-400 mx-auto mb-2 opacity-60" />
-                <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">No tienes cursos virtuales asignados</p>
-                <p className="text-xs text-slate-400 mt-1">Los cursos asignados o creados para tus materias aparecerán aquí.</p>
-              </div>
-            ) : filteredCourses.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 p-8 text-center bg-slate-50/50 dark:bg-slate-900/50">
-                <Search className="h-8 w-8 text-slate-400 mx-auto mb-2 opacity-60" />
-                <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">No se encontraron cursos</p>
-                <p className="text-xs text-slate-400 mt-1">No hay cursos que coincidan con la búsqueda o el grado seleccionado.</p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSearchQuery('')
-                    setSelectedGrade('ALL')
-                  }}
-                  className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 transition-colors"
-                >
-                  <X className="h-3.5 w-3.5" />
-                  Restablecer filtros
-                </button>
-              </div>
+            {isWeekend ? (
+              <div className="td-empty"><span className="td-go"><Calendar size={24}/></span>Hoy es fin de semana, no tienes clases programadas.</div>
+            ) : todaySchedule.length === 0 ? (
+              <div className="td-empty"><span className="td-go"><Calendar size={24}/></span>No tienes clases asignadas para el día de hoy.</div>
             ) : (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-3 sm:gap-6">
-                {filteredCourses.map((course) => {
-                  const gradeText = course.gradeLevel
-                    ? course.gradeLevel.toLowerCase().includes('grado')
-                      ? course.gradeLevel
-                      : `${course.gradeLevel} Grado`
-                    : null
-
-                  return (
-                    <div
-                      key={course.id}
-                      className="group relative flex flex-col justify-between overflow-hidden rounded-2xl sm:rounded-3xl border border-slate-200/80 bg-white p-3.5 sm:p-5 shadow-[0_4px_20px_rgb(0,0,0,0.02)] transition-all duration-200 hover:shadow-md hover:border-slate-300 dark:border-slate-800/80 dark:bg-slate-900 text-left"
-                    >
-                      <div className="space-y-2 sm:space-y-2.5">
-                        {/* Badges superiores: Grado (destacado) y Materia */}
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          {gradeText && (
-                            <span className="inline-flex items-center rounded-lg bg-emerald-50 px-2 py-0.5 sm:px-2.5 sm:py-1 text-[9px] sm:text-xs font-bold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/40">
-                              {gradeText}
-                            </span>
-                          )}
-                          <span className="inline-flex items-center rounded-lg bg-blue-50 px-2 py-0.5 sm:px-2.5 sm:py-1 text-[9px] sm:text-xs font-semibold text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/40">
-                            {course.subject}
-                          </span>
-                        </div>
-
-                        {/* Nombre del curso con gran énfasis */}
-                        <h3
-                          className="text-xs sm:text-base font-extrabold text-slate-900 dark:text-white line-clamp-2 leading-snug group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors"
-                          title={course.title}
-                        >
-                          {course.title}
-                        </h3>
-
-                        {/* Descripción del curso */}
-                        <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 line-clamp-2 sm:line-clamp-3 leading-relaxed">
-                          {course.description || 'Sin descripción disponible para este curso.'}
-                        </p>
-
-                        {/* Código de acceso */}
-                        {course.joinCode ? (
-                          <div className="inline-flex items-center gap-1 rounded-full border border-slate-200/80 bg-slate-50 px-2 py-0.5 text-[9px] sm:text-[11px] font-semibold text-slate-600 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300 w-fit">
-                            <span className="hidden sm:inline uppercase tracking-wider text-slate-400 font-bold">Código</span>
-                            <span className="font-mono tracking-wider font-bold">{course.joinCode}</span>
-                          </div>
-                        ) : null}
-                      </div>
-
-                      {/* Metadatos y Botón inferior */}
-                      <div className="mt-3 sm:mt-4 pt-2.5 sm:pt-3 border-t border-slate-100 dark:border-slate-800/80 space-y-2.5 sm:space-y-3">
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-[10px] sm:text-xs text-slate-500 font-medium dark:text-slate-400 gap-1 sm:gap-0">
-                          <span className="flex items-center gap-1 truncate">
-                            <Users className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0 text-slate-400" />
-                            <span>{course.studentsCount} <span className="hidden sm:inline">Alumnos</span><span className="sm:hidden">alum.</span></span>
-                          </span>
-                          <span className="flex items-center gap-1 truncate">
-                            <BookOpen className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0 text-slate-400" />
-                            <span>{course.modulesCount} <span className="hidden sm:inline">Módulos</span><span className="sm:hidden">mód.</span></span>
-                          </span>
-                        </div>
-
-                        <Link
-                          href={`/teacher/courses/${course.slug || course.id}`}
-                          className="w-full flex items-center justify-center gap-1.5 sm:gap-2 rounded-xl bg-slate-900 px-2.5 py-2 sm:px-3 sm:py-2.5 text-[11px] sm:text-xs font-semibold text-white hover:bg-slate-800 active:scale-[0.98] transition-all dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 shadow-xs"
-                        >
-                          <Edit className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />
-                          <span className="sm:hidden">Gestionar</span>
-                          <span className="hidden sm:inline">Gestionar Curso</span>
-                        </Link>
-                      </div>
+              <div style={{ marginTop: '16px' }}>
+                {todaySchedule.map(cls => (
+                  <div key={cls.id} className={`td-sch ${cls.isFree ? 'free' : cls.isCurrent ? 'curr' : 'reg'}`}>
+                    <div>
+                       <h4>{cls.isFree ? <span style={{fontStyle:'italic', color:'var(--td-mute)'}}>Sin Clase Asignada</span> : cls.subject}</h4>
+                       {!cls.isFree && <div className="info"><Users size={14} /> Grupo {cls.group}</div>}
                     </div>
-                  )
-                })}
+                    <div className="right">
+                       <b>{cls.period}ª Hora</b>
+                       <span>{cls.startTime}{cls.endTime ? ` - ${cls.endTime}` : ''}</span>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
-        </div>
+
+          {/* Upcoming Activities */}
+          <div className="td-tile td-panel td-c6">
+            <div className="td-ph">
+              <div>
+                <h2>Próximas Actividades</h2>
+                <p>Agenda Institucional</p>
+              </div>
+              <span className="td-go"><Calendar size={20} /></span>
+            </div>
+            
+            {upcomingEvents.length === 0 ? (
+              <div className="td-empty" style={{ fontStyle: 'italic', fontSize: '13px' }}>No hay actividades próximas programadas.</div>
+            ) : (
+              <div style={{ marginTop: '16px' }}>
+                {upcomingEvents.map(ev => (
+                  <div key={ev.id} className="td-event">
+                    <div>
+                      <h4>{ev.title}</h4>
+                      <p>{new Date(ev.start_date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} • {new Date(ev.start_date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', hour12: true })}</p>
+                    </div>
+                    <span className="td-event-cat">{ev.event_categories?.name || 'General'}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="td-foot"><Link href="/teacher/institutional-agenda">Ver Agenda Completa →</Link></div>
+          </div>
+        </motion.section>
       )}
 
-      {/* Editor/Creador de Lecciones Estilo Notion */}
-      <AnimatePresence>
-        {selectedCourseId && selectedCourse && (
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 30 }}
-            className="rounded-3xl border border-slate-100 bg-white p-6 shadow-[0_15px_40px_rgba(0,0,0,0.03)] dark:border-slate-800/60 dark:bg-slate-900"
-          >
-            <div className="flex items-center justify-between pb-4 border-b border-slate-50 dark:border-slate-800/40">
-              <div className="text-left">
-                <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
-                  Editor Académico
-                </span>
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-                  Diseñar Lección en: {selectedCourse.title}
-                </h3>
+      {activeTab === 'virtual' && (
+        <motion.section initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <div className="td-filters">
+            <label className="td-search">
+              <Search size={20} className="text-slate-400" />
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Buscar curso o materia..."
+              />
+            </label>
+            {availableGrades.length > 0 && (
+              <div className="td-sel">
+                <select value={selectedGrade} onChange={(e) => setSelectedGrade(e.target.value)}>
+                  <option value="ALL">Todos los grados</option>
+                  {availableGrades.map((grade) => (
+                    <option key={grade} value={grade}>
+                      {grade.toLowerCase().includes('grado') ? grade : `${grade} Grado`}
+                    </option>
+                  ))}
+                </select>
+                <Filter size={16} />
               </div>
-              <button
-                onClick={() => setSelectedCourseId(null)}
-                className="p-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-400"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+            )}
+          </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-              {/* Formulario Izquierda */}
-              <div className="space-y-4 text-left">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-400 uppercase dark:text-slate-500">
-                    Título de la lección
-                  </label>
-                  <input
-                    type="text"
-                    value={lessonTitle}
-                    onChange={(e) => setLessonTitle(e.target.value)}
-                    placeholder="Ej. Introducción a la Dinámica Estructural"
-                    className="w-full rounded-xl border border-slate-200 bg-white/50 px-4 py-3 text-sm focus:border-blue-500 focus:bg-white dark:border-slate-800 dark:bg-slate-950/50"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-400 uppercase dark:text-slate-500">
-                    Resumen de clase (Estilo Notion)
-                  </label>
-                  <textarea
-                    rows={6}
-                    value={lessonContent}
-                    onChange={(e) => setLessonContent(e.target.value)}
-                    placeholder="Escribe el resumen conceptual de la lección. Soporta texto explicativo y fórmulas..."
-                    className="w-full rounded-xl border border-slate-200 bg-white/50 px-4 py-3 text-sm focus:border-blue-500 focus:bg-white dark:border-slate-800 dark:bg-slate-950/50"
-                  />
-                </div>
-
-                {/* Subir PDF (Supabase Storage Mockup) */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-400 uppercase dark:text-slate-500">
-                    Material complementario (PDF)
-                  </label>
-                  <div className="flex items-center gap-3">
-                    <label className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 hover:border-blue-500 bg-slate-50/50 px-4 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950/30 cursor-pointer transition-all">
-                      <Upload className="h-4.5 w-4.5" />
-                      <span>{selectedPdfName ? 'Cambiar PDF' : 'Seleccionar PDF'}</span>
-                      <input
-                        type="file"
-                        accept=".pdf"
-                        onChange={handlePdfUpload}
-                        className="hidden"
-                      />
-                    </label>
-                    {selectedPdfName && (
-                      <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                        <FileText className="h-4 w-4" />
-                        {selectedPdfName}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Integración y Validación de YouTube Derecha */}
-              <div className="space-y-4 text-left">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-400 uppercase dark:text-slate-500 flex items-center gap-1.5">
-                    <YoutubeIcon className="h-4 w-4 text-red-500 shrink-0" />
-                    <span>Enlace de Video Instructivo (YouTube)</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={youtubeUrl}
-                    onChange={(e) => setYoutubeUrl(e.target.value)}
-                    placeholder="https://www.youtube.com/watch?v=..."
-                    className="w-full rounded-xl border border-slate-200 bg-white/50 px-4 py-3 text-sm focus:border-blue-500 focus:bg-white dark:border-slate-800 dark:bg-slate-950/50"
-                  />
-                  <p className="text-[10px] text-slate-400 mt-1">
-                    El video no se almacena en el servidor, solo se extrae el ID para reproducción en el reproductor embebido.
-                  </p>
-                </div>
-
-                {/* Previsualización del video en tiempo real */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-400 uppercase dark:text-slate-500">
-                    Previsualización del reproductor
-                  </label>
-                  <div className="aspect-video w-full rounded-2xl border border-slate-200/60 bg-slate-950 overflow-hidden flex items-center justify-center relative dark:border-slate-800">
-                    {youtubeEmbedId ? (
-                      <iframe
-                        src={`https://www.youtube.com/embed/${youtubeEmbedId}`}
-                        title="Youtube Preview"
-                        className="h-full w-full border-0"
-                      />
-                    ) : (
-                      <div className="text-center p-6 text-slate-500">
-                        <Play className="h-8 w-8 text-slate-600 mx-auto mb-2 opacity-55" />
-                        <p className="text-xs font-medium">Ingresa un enlace válido de YouTube para previsualizar el reproductor.</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="pt-2 flex justify-end">
-                  <button
-                    onClick={handleSaveLesson}
-                    disabled={isSaving}
-                    className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.98] transition-all px-6 py-3 text-sm font-semibold text-white"
-                  >
-                    {isSaving ? 'Guardando...' : 'Publicar Lección'}
-                    <Save className="h-4.5 w-4.5" />
-                  </button>
-                </div>
-              </div>
-
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-
+          {filteredCourses.length === 0 ? (
+             <div className="td-tile td-empty" style={{ padding: '40px' }}>
+               <span className="td-go"><Search size={24}/></span>
+               No se encontraron cursos que coincidan.
+             </div>
+          ) : (
+             <div className="td-grid">
+               {filteredCourses.map(course => (
+                 <Link href={`/teacher/courses/${course.slug || course.id}`} key={course.id} className="td-tile td-pc">
+                   <div className="h">
+                     <span className="td-go"><BookOpen size={20} /></span>
+                     <h3>{course.title}</h3>
+                   </div>
+                   <p className="p">{course.description || 'Sin descripción disponible para este curso.'}</p>
+                   <div className="foot">
+                     <span>{course.gradeLevel || 'S/G'}</span>
+                     <span className="td-pc-stats">
+                       <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Users size={14}/> {course.studentsCount}</span>
+                       <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><FileText size={14}/> {course.modulesCount}</span>
+                     </span>
+                   </div>
+                 </Link>
+               ))}
+             </div>
+          )}
+        </motion.section>
+      )}
     </div>
   )
 }

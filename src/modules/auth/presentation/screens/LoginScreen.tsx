@@ -132,7 +132,7 @@ export function LoginScreen() {
       <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:24px_24px] opacity-40 dark:bg-[radial-gradient(#1e293b_1px,transparent_1px)] dark:opacity-30" />
         <div className="absolute -top-32 -left-20 w-[420px] sm:w-[620px] h-[420px] sm:h-[620px] rounded-full bg-emerald-400/15 blur-[120px] dark:bg-emerald-600/15" />
-        <div className="absolute -bottom-32 -right-20 w-[420px] sm:w-[680px] h-[420px] sm:h-[680px] rounded-full bg-[#1F4E31]/15 blur-[130px] dark:bg-emerald-900/20" />
+        <div className="absolute -bottom-32 -right-20 w-[420px] sm:w-[680px] h-[420px] sm:h-[680px] rounded-full bg-[#12a374]/15 blur-[130px] dark:bg-emerald-900/20" />
       </div>
 
       {/* Contenedor principal centrado */}
@@ -218,7 +218,7 @@ export function LoginScreen() {
                     id="identifier"
                     type="text"
                     autoComplete="username"
-                    className={`h-11 rounded-2xl border-slate-200/90 bg-slate-100/60 px-3.5 text-sm transition-all duration-150 hover:bg-slate-100/90 focus:bg-white focus:ring-2 focus:ring-[#1F4E31]/20 focus:border-[#1F4E31] dark:border-white/10 dark:bg-slate-800/50 dark:hover:bg-slate-800/80 dark:focus:bg-slate-900 dark:focus:ring-emerald-500/25 dark:focus:border-emerald-500 ${
+                    className={`h-11 rounded-2xl border-slate-200/90 bg-slate-100/60 px-3.5 text-sm transition-all duration-150 hover:bg-slate-100/90 focus:bg-white focus:ring-2 focus:ring-[#12a374]/20 focus:border-[#12a374] dark:border-white/10 dark:bg-slate-800/50 dark:hover:bg-slate-800/80 dark:focus:bg-slate-900 dark:focus:ring-[#12a374]/25 dark:focus:border-[#12a374] ${
                       errors.identifier ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' : ''
                     }`}
                     {...register('identifier')}
@@ -245,7 +245,7 @@ export function LoginScreen() {
                     </Label>
                     <Link
                       href="/recovery"
-                      className="text-xs font-medium text-[#1F4E31] hover:text-[#153823] transition-colors dark:text-emerald-400 dark:hover:text-emerald-300 active:scale-95 duration-100 inline-block"
+                      className="text-xs font-medium text-[#12a374] hover:text-[#0e855e] transition-colors dark:text-[#12a374] dark:hover:text-[#5ee0b0] active:scale-95 duration-100 inline-block"
                     >
                       ¿Olvidé mi contraseña?
                     </Link>
@@ -255,7 +255,7 @@ export function LoginScreen() {
                       id="password"
                       type={showPassword ? 'text' : 'password'}
                       autoComplete="current-password"
-                      className={`h-11 rounded-2xl border-slate-200/90 bg-slate-100/60 px-3.5 pr-11 text-sm transition-all duration-150 hover:bg-slate-100/90 focus:bg-white focus:ring-2 focus:ring-[#1F4E31]/20 focus:border-[#1F4E31] dark:border-white/10 dark:bg-slate-800/50 dark:hover:bg-slate-800/80 dark:focus:bg-slate-900 dark:focus:ring-emerald-500/25 dark:focus:border-emerald-500 ${
+                      className={`h-11 rounded-2xl border-slate-200/90 bg-slate-100/60 px-3.5 pr-11 text-sm transition-all duration-150 hover:bg-slate-100/90 focus:bg-white focus:ring-2 focus:ring-[#12a374]/20 focus:border-[#12a374] dark:border-white/10 dark:bg-slate-800/50 dark:hover:bg-slate-800/80 dark:focus:bg-slate-900 dark:focus:ring-[#12a374]/25 dark:focus:border-[#12a374] ${
                         errors.password ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' : ''
                       }`}
                       {...register('password')}
@@ -289,7 +289,7 @@ export function LoginScreen() {
                   <Button
                     type="submit"
                     disabled={isLoading}
-                    className="w-full rounded-2xl bg-[#1F4E31] h-11 text-sm text-white font-semibold hover:bg-[#183e27] active:scale-[0.98] active:brightness-95 transition-all duration-100 ease-out shadow-sm shadow-emerald-950/15 dark:bg-emerald-600 dark:hover:bg-emerald-700 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full rounded-2xl bg-[#123325] h-11 text-sm text-white font-semibold hover:bg-[#0f291e] active:scale-[0.98] active:brightness-95 transition-all duration-100 ease-out shadow-sm shadow-[#123325]/15 dark:bg-[#123325] dark:hover:bg-[#0f291e] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isLoading ? (
                       <>
@@ -316,7 +316,7 @@ export function LoginScreen() {
               href="https://www.ensuny.edu.co"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs font-medium text-slate-400 hover:text-[#1F4E31] transition-colors dark:text-slate-500 dark:hover:text-emerald-400 tracking-wide"
+              className="text-xs font-medium text-slate-400 hover:text-[#12a374] transition-colors dark:text-slate-500 dark:hover:text-[#12a374] tracking-wide"
             >
               www.ensuny.edu.co
             </a>

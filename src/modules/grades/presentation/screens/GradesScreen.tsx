@@ -1,46 +1,23 @@
 'use client'
 
 import React, { useState, useEffect, useMemo } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, useReducedMotion, Variants } from 'framer-motion'
 import { 
-  BookOpen, 
-  TrendingUp, 
-  Star, 
-  ClipboardCheck, 
-  Wrench, 
-  ArrowLeft, 
-  Target, 
-  Award, 
-  ChevronRight, 
-  ChevronDown, 
-  Calendar, 
-  User, 
-  FileText,
-  Search,
-  RotateCcw,
-  CheckCircle2,
-  Clock,
-  XCircle,
-  AlertCircle
+  BookOpen, TrendingUp, Star, Wrench, ArrowLeft, 
+  Target, Award, ChevronRight, ChevronDown, 
+  User, FileText, Search, RotateCcw, AlertTriangle, CheckCircle2
 } from 'lucide-react'
 import Link from 'next/link'
 import { getStudentAssistedReport, PlanillaSubjectReport, PlanillaAchievement } from '@/modules/planilla-asistida/application/studentGradesActions'
 
-const COMPONENT_CONFIG: Record<'hacer' | 'saber' | 'ser', { label: string; icon: React.ReactNode; color: string }> = {
-  hacer: { label: 'Hacer', icon: <Wrench className="h-3 w-3" />, color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' },
-  saber: { label: 'Saber', icon: <BookOpen className="h-3 w-3" />, color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' },
-  ser: { label: 'Ser', icon: <Star className="h-3 w-3" />, color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' },
-}
-
-function getLevelBadge(level: string | null) {
-  if (!level || level === '-') return 'bg-slate-100 text-slate-500 dark:bg-slate-800'
-  if (level === 'Superior') return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 font-bold'
-  if (level === 'Alto') return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 font-bold'
-  if (level === 'Básico') return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 font-bold'
-  return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 font-bold'
+const COMPONENT_CONFIG: Record<'hacer' | 'saber' | 'ser', { label: string; icon: React.ReactNode }> = {
+  hacer: { label: 'Hacer', icon: <Wrench size={14} /> },
+  saber: { label: 'Saber', icon: <BookOpen size={14} /> },
+  ser: { label: 'Ser', icon: <Star size={14} /> },
 }
 
 export function GradesScreen() {
+  const shouldReduceMotion = useReducedMotion()
   const [report, setReport] = useState<{
     subjects: PlanillaSubjectReport[]
     generalAverage: number
@@ -52,7 +29,7 @@ export function GradesScreen() {
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null)
   const [selectedAchievementIndex, setSelectedAchievementIndex] = useState<number>(0)
   
-  const [searchTerm, setSearchTerm] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
   const [selectedPeriod, setSelectedPeriod] = useState<string>('all')
 
   useEffect(() => {
@@ -84,12 +61,12 @@ export function GradesScreen() {
   const filteredSubjects = useMemo(() => {
     if (!report?.subjects) return []
     return report.subjects.filter(sub => {
-      const matchesSearch = sub.subjectName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (sub.teacherName && sub.teacherName.toLowerCase().includes(searchTerm.toLowerCase()))
+      const matchesSearch = sub.subjectName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (sub.teacherName && sub.teacherName.toLowerCase().includes(searchQuery.toLowerCase()))
       const matchesPeriod = selectedPeriod === 'all' || sub.period === selectedPeriod
       return matchesSearch && matchesPeriod
     })
-  }, [report?.subjects, searchTerm, selectedPeriod])
+  }, [report?.subjects, searchQuery, selectedPeriod])
 
   const summaryStats = useMemo(() => {
     if (!report?.subjects) return { total: 0, approved: 0, failed: 0 }
@@ -99,93 +76,310 @@ export function GradesScreen() {
     return { total, approved, failed }
   }, [report?.subjects])
 
+  const cv: Variants = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: shouldReduceMotion ? 0 : 0.05, delayChildren: 0.05 } } }
+  const iv: Variants = { hidden: { opacity: 0, y: shouldReduceMotion ? 0 : 12 }, show: { opacity: 1, y: 0, transition: { type: 'spring', damping: 24, stiffness: 260 } } }
+
+  const cssStyles = `
+    .sg-page {
+      --sg-bg: #e9f0ec;
+      --sg-tile: #fff;
+      --sg-tile-b: #d9e4de;
+      --sg-ink: #10231c;
+      --sg-mute: #5f776b;
+      --sg-hi: #0f3d2e;
+      --sg-hi-ink: #fff;
+      --sg-hi-mute: #9fd9bf;
+      --sg-acc: #12a374;
+      --sg-bad: #e5484d;
+      --sg-warn: #d9831a;
+      --sg-hero: #0f3d2e;
+      --sg-soft: #eef4f0;
+      --sg-accbg: rgba(18,163,116,.12);
+      
+      padding: 20px 16px 40px;
+      margin: 0 auto;
+      max-width: 1100px;
+      box-sizing: border-box;
+      color: var(--sg-ink);
+    }
+
+    .dark .sg-page {
+      --sg-bg: #0c1512;
+      --sg-tile: #15221d;
+      --sg-tile-b: #22352d;
+      --sg-ink: #eaf4ef;
+      --sg-mute: #8aa399;
+      --sg-hi: #123325;
+      --sg-hi-ink: #fff;
+      --sg-hi-mute: #6f9e8a;
+      --sg-acc: #5ee0b0;
+      --sg-bad: #ff7a85;
+      --sg-warn: #f2b04b;
+      --sg-hero: #123325;
+      --sg-soft: #1c2c26;
+      --sg-accbg: rgba(94,224,176,.12);
+    }
+
+    @media (min-width: 760px) {
+      .sg-page { padding: 28px 32px 56px; }
+    }
+
+    .sg-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 22px;
+    }
+    .sg-back-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: var(--sg-tile);
+      border: 1px solid var(--sg-tile-b);
+      color: var(--sg-ink);
+      text-decoration: none;
+      transition: transform 0.15s;
+      flex-shrink: 0;
+    }
+    .sg-back-btn:active { transform: scale(0.95); }
+    .sg-back-btn:focus-visible { outline: 2px solid var(--sg-acc); outline-offset: 3px; }
+    
+    .sg-title-area { flex: 1; min-width: 0; }
+    .sg-title {
+      margin: 0;
+      font-size: clamp(24px, 5vw, 34px);
+      line-height: 1.1;
+      font-weight: 700;
+      letter-spacing: -1px;
+    }
+    .sg-subtitle {
+      margin: 4px 0 0;
+      color: var(--sg-mute);
+      font-size: 14px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Stats Grid */
+    .sg-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    @media (min-width: 760px) {
+      .sg-stats { grid-template-columns: repeat(5, 1fr); gap: 16px; }
+    }
+    .sg-stat-tile {
+      background: var(--sg-tile);
+      border: 1px solid var(--sg-tile-b);
+      border-radius: 24px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 110px;
+    }
+    .sg-stat-tile small { font-size: 11px; font-weight: 700; letter-spacing: 1px; color: var(--sg-mute); text-transform: uppercase; margin-bottom: 8px; display: block; }
+    .sg-stat-tile strong { font-size: 32px; font-weight: 700; line-height: 1; color: var(--sg-ink); }
+
+    .sg-stat-hi { background: var(--sg-hi); border-color: transparent; color: var(--sg-hi-ink); grid-column: 1 / -1; min-height: 120px; }
+    @media (min-width: 760px) {
+      .sg-stat-hi { grid-column: span 1; min-height: 110px; }
+    }
+    .sg-stat-hi small { color: var(--sg-hi-mute); }
+    .sg-stat-hi strong { color: var(--sg-hi-ink); }
+
+    /* Tools */
+    .sg-tools {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    @media (min-width: 760px) { .sg-tools { flex-direction: row; align-items: center; } }
+    
+    .sg-search {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 20px;
+      height: 52px;
+      border-radius: 20px;
+      background: var(--sg-tile);
+      border: 1px solid var(--sg-tile-b);
+      width: 100%;
+      transition: border-color 0.15s;
+    }
+    .sg-search:focus-within { border-color: var(--sg-acc); }
+    @media (min-width: 760px) { .sg-search { flex: 1; height: 56px; width: auto; } }
+    .sg-search svg { color: var(--sg-mute); flex: none; }
+    .sg-search input { flex: 1; min-width: 0; background: transparent; border: 0; color: var(--sg-ink); font: inherit; font-size: 15px; outline: none; }
+    .sg-search input::placeholder { color: var(--sg-mute); }
+    
+    .sg-period {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--sg-mute);
+    }
+    .sg-sel { position: relative; }
+    .sg-sel select {
+      appearance: none; background: var(--sg-tile); color: var(--sg-ink);
+      border: 1px solid var(--sg-tile-b); border-radius: 20px;
+      height: 44px; padding: 0 42px 0 18px; font: inherit; font-size: 14px; font-weight: 600;
+      cursor: pointer; outline: none; transition: border-color 0.15s;
+    }
+    .sg-sel select:focus { outline: 2px solid var(--sg-acc); border-color: transparent; }
+    .sg-sel svg { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--sg-mute); }
+
+    /* Cards */
+    .sg-cards {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    @media (min-width: 600px) { .sg-cards { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; } }
+    @media (min-width: 760px) { .sg-cards { gap: 16px; } }
+
+    .sg-card {
+      background: var(--sg-tile); border: 1px solid var(--sg-tile-b);
+      border-radius: 20px; padding: 14px; display: flex; flex-direction: column; gap: 12px;
+      cursor: pointer; text-decoration: none; color: inherit; height: 100%;
+    }
+    @media (min-width: 480px) {
+      .sg-card { padding: 18px; border-radius: 24px; gap: 14px; }
+    }
+    @media (prefers-reduced-motion: no-preference) {
+      .sg-card { transition: transform 0.15s cubic-bezier(0.2, 0.8, 0.2, 1); }
+      .sg-card:active { transform: scale(0.97); }
+    }
+    .sg-card:focus-visible { outline: 2px solid var(--sg-acc); outline-offset: 2px; }
+    
+    .sg-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+    .sg-tag { display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--sg-mute); font-weight: 600; flex-wrap: wrap; }
+    @media (min-width: 480px) { .sg-tag { font-size: 11px; gap: 6px; } }
+    .sg-tag b { background: var(--sg-soft); color: var(--sg-ink); border-radius: 99px; padding: 3px 6px; font-weight: 700; }
+    .sg-go { flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--sg-soft); display: grid; place-items: center; color: var(--sg-mute); }
+    @media (min-width: 480px) { .sg-go { width: 32px; height: 32px; } }
+    .sg-card h3 { margin: 0; font-size: 14px; font-weight: 700; line-height: 1.25; color: var(--sg-ink); word-break: break-word; }
+    @media (min-width: 480px) { .sg-card h3 { font-size: 17px; } }
+    .sg-teacher { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--sg-mute); margin-top: 4px; }
+    @media (min-width: 480px) { .sg-teacher { gap: 6px; font-size: 13px; margin-top: 6px; } }
+    
+    .sg-bar-container { margin-top: auto; border-top: 1px solid var(--sg-tile-b); padding-top: 14px; }
+    .sg-meta { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 8px; font-weight: 600; }
+    .sg-meta span:last-child { color: var(--sg-mute); }
+    .sg-bar { height: 6px; border-radius: 3px; background: var(--sg-soft); overflow: hidden; margin-top: 4px; }
+    .sg-bar b { display: block; height: 100%; border-radius: 3px; background: var(--sg-acc); transition: width 0.5s ease; }
+    
+    .sg-badges { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
+    .sg-badge { font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 99px; background: var(--sg-soft); color: var(--sg-mute); display: flex; align-items: center; gap: 4px; }
+    .sg-badge.ok { background: var(--sg-accbg); color: var(--sg-acc); }
+
+    /* Detail View */
+    .sg-detail-content { max-width: 800px; margin: 0 auto; }
+    .sg-select-large {
+      width: 100%; appearance: none; background: var(--sg-tile); color: var(--sg-ink);
+      border: 1px solid var(--sg-tile-b); border-radius: 20px; padding: 16px 40px 16px 20px;
+      font-size: 15px; font-weight: 700; cursor: pointer; margin-bottom: 24px; outline: none;
+      transition: border-color 0.15s;
+    }
+    .sg-select-large:focus { outline: 2px solid var(--sg-acc); border-color: transparent; }
+    .sg-select-large-wrapper { position: relative; }
+    .sg-select-large-wrapper svg { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--sg-mute); }
+
+    .sg-ach-title { font-size: 20px; font-weight: 700; margin: 0 0 8px; color: var(--sg-ink); line-height: 1.2; }
+    .sg-ach-desc { font-size: 14px; color: var(--sg-mute); margin: 0 0 24px; line-height: 1.5; }
+
+    .sg-comp-card {
+      background: var(--sg-tile); border: 1px solid var(--sg-tile-b); border-radius: 20px;
+      padding: 16px 20px; margin-bottom: 16px;
+    }
+    .sg-comp-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px dashed var(--sg-tile-b); padding-bottom: 12px; }
+    .sg-comp-label { font-size: 13px; font-weight: 700; color: var(--sg-ink); text-transform: uppercase; display: flex; align-items: center; gap: 6px; }
+    .sg-comp-avg { font-size: 14px; font-weight: 700; color: var(--sg-acc); }
+    .sg-comp-avg.bad { color: var(--sg-bad); }
+
+    .sg-act-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; gap: 16px; border-bottom: 1px solid var(--sg-soft); }
+    .sg-act-row:last-child { border-bottom: none; }
+    .sg-act-name { font-size: 14px; font-weight: 600; color: var(--sg-mute); flex: 1; line-height: 1.4; }
+    .sg-act-grade { 
+      font-size: 14px; font-weight: 700; background: var(--sg-soft); color: var(--sg-ink);
+      padding: 6px 14px; border-radius: 12px; min-width: 54px; text-align: center;
+    }
+    .sg-act-grade.bad { background: color-mix(in srgb, var(--sg-bad) 14%, transparent); color: var(--sg-bad); }
+
+    .sg-final-card {
+      background: var(--sg-hero); color: var(--sg-hi-ink);
+      border-radius: 24px; padding: 32px 24px; text-align: center; margin-top: 24px;
+    }
+    .sg-final-title { font-size: 18px; font-weight: 700; margin-bottom: 16px; color: var(--sg-hi-ink); }
+    .sg-final-grade { font-size: 48px; font-weight: 700; line-height: 1; margin-bottom: 8px; color: var(--sg-hi-mute); }
+    .sg-final-grade.bad { color: var(--sg-bad); }
+    .sg-final-level { font-size: 14px; font-weight: 600; color: var(--sg-hi-mute); text-transform: uppercase; letter-spacing: 1px; }
+
+    /* Skeletons */
+    .sg-skel-header { height: 60px; background: var(--sg-tile); border-radius: 12px; opacity: 0.5; margin-bottom: 22px; }
+    .sg-skel-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; margin-bottom: 24px; }
+    .sg-skel-stat { height: 110px; background: var(--sg-tile); border-radius: 24px; opacity: 0.5; }
+    @media (min-width: 760px) {
+      .sg-skel-stats { grid-template-columns: repeat(5, 1fr); gap: 16px; }
+    }
+  `
+
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+      <div className="sg-page">
+        <style>{cssStyles}</style>
+        <div className="sg-skel-header animate-pulse" />
+        <div className="sg-skel-stats">
+          {[1,2,3,4,5].map(i => <div key={i} className="sg-skel-stat animate-pulse" />)}
+        </div>
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="w-[90%] sm:w-full max-w-4xl mx-auto py-5 sm:py-6 space-y-5 sm:space-y-6 px-0 sm:px-4 text-left">
-        <div>
-          <Link 
-            href="/student/dashboard" 
-            className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            <span>Volver al Portal</span>
-          </Link>
-        </div>
-        <div className="text-center py-16 rounded-3xl border border-dashed border-red-200 dark:border-red-900/40 bg-red-50 dark:bg-red-950/10 p-8">
-          <p className="text-red-600 dark:text-red-400 font-semibold">{error}</p>
+      <div className="sg-page">
+        <style>{cssStyles}</style>
+        <div style={{ textAlign: 'center', padding: '40px', background: 'var(--sg-tile)', borderRadius: '24px', color: 'var(--sg-bad)' }}>
+          {error}
         </div>
       </div>
     )
   }
 
-  if (!report || report.subjects.length === 0) {
-    return (
-      <div className="w-[90%] sm:w-full max-w-4xl mx-auto py-5 sm:py-6 space-y-5 sm:space-y-6 px-0 sm:px-4 text-left">
-        <div>
-          <Link 
-            href="/student/dashboard" 
-            className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            <span>Volver al Portal</span>
-          </Link>
-        </div>
-        <div className="space-y-1">
-          <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white flex items-center gap-3">
-            <TrendingUp className="h-8 w-8 text-blue-600 dark:text-blue-400" />
-            Reporte de Calificaciones
-          </h1>
-        </div>
-        <div className="text-center py-16 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-900 p-8">
-          <BookOpen className="mx-auto h-12 w-12 text-slate-300 dark:text-slate-700 mb-4" />
-          <h3 className="text-lg font-bold text-slate-900 dark:text-white">No hay materias disponibles</h3>
-          <p className="text-slate-500 mt-1 max-w-sm mx-auto">
-            Aún no has sido agregado a ninguna planilla asistida o tus docentes no han publicado las planillas para este período.
-          </p>
-        </div>
-      </div>
-    )
-  }
+  const selectedSubject = report?.subjects.find(s => s.subjectId === selectedSubjectId)
 
-  const selectedSubject = report.subjects.find(s => s.subjectId === selectedSubjectId)
-
-  // Vista de Detalle de Materia
   if (selectedSubject) {
     const achievements = selectedSubject.achievements || []
     const activeAchievement = achievements[selectedAchievementIndex] || achievements[0]
-
-    // Componentes estándar: HACER (35%), SABER (35%), SER (30%)
+    
     const COMPONENTS_ORDER = [
       { key: 'hacer' as const, label: 'HACER', percentage: 35 },
       { key: 'saber' as const, label: 'SABER', percentage: 35 },
       { key: 'ser' as const, label: 'SER', percentage: 30 },
     ]
-
+    
     const compStats = COMPONENTS_ORDER.map(comp => {
       const compActivities = activeAchievement?.activities.filter(a => a.componentType === comp.key) || []
       const gradedActivities = compActivities.filter(a => a.grade !== null)
       const average = gradedActivities.length > 0 
         ? gradedActivities.reduce((acc, curr) => acc + (curr.grade || 0), 0) / gradedActivities.length 
         : null
-      return {
-        ...comp,
-        activities: compActivities,
-        average
-      }
+      return { ...comp, activities: compActivities, average }
     })
 
-    // Calcular promedio ponderado del logro
     const activeComps = compStats.filter(c => c.average !== null)
     let achievementAvg: number | null = null
-
     if (activeComps.length > 0) {
       const totalWeight = activeComps.reduce((acc, curr) => acc + curr.percentage, 0)
       const weightedSum = activeComps.reduce((acc, curr) => acc + (curr.average! * curr.percentage), 0)
@@ -194,437 +388,215 @@ export function GradesScreen() {
       achievementAvg = activeAchievement.achievementAverage
     }
 
-    function getPerformanceInfo(avg: number | null) {
-      if (avg === null) {
-        return {
-          level: 'Pendiente',
-          badgeClass: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700',
-          textClass: 'text-slate-600 dark:text-slate-400',
-          cardBorder: 'border-slate-200 dark:border-slate-800',
-          cardBg: 'from-slate-50/40 via-white to-slate-50/20 dark:from-slate-900 dark:via-slate-900 dark:to-slate-900'
-        }
-      }
-      if (avg >= 4.6) {
-        return {
-          level: 'Superior',
-          badgeClass: 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800',
-          textClass: 'text-purple-600 dark:text-purple-400',
-          cardBorder: 'border-purple-200/80 dark:border-purple-800/40',
-          cardBg: 'from-purple-50/20 via-white to-purple-50/10 dark:from-purple-950/10 dark:via-slate-900 dark:to-purple-950/5'
-        }
-      }
-      if (avg >= 4.0) {
-        return {
-          level: 'Alto',
-          badgeClass: 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800',
-          textClass: 'text-blue-600 dark:text-blue-400',
-          cardBorder: 'border-blue-200/80 dark:border-blue-800/40',
-          cardBg: 'from-blue-50/20 via-white to-blue-50/10 dark:from-blue-950/10 dark:via-slate-900 dark:to-blue-950/5'
-        }
-      }
-      if (avg >= 3.0) {
-        return {
-          level: 'Básico',
-          badgeClass: 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-700',
-          textClass: 'text-amber-600 dark:text-amber-500',
-          cardBorder: 'border-amber-200 dark:border-amber-800/50',
-          cardBg: 'from-amber-50/30 via-white to-amber-50/10 dark:from-amber-950/15 dark:via-slate-900 dark:to-amber-950/5'
-        }
-      }
-      return {
-        level: 'Bajo',
-        badgeClass: 'bg-red-100 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800',
-        textClass: 'text-red-600 dark:text-red-400',
-        cardBorder: 'border-red-200/80 dark:border-red-800/40',
-        cardBg: 'from-red-50/20 via-white to-red-50/10 dark:from-red-950/10 dark:via-slate-900 dark:to-red-950/5'
-      }
-    }
-
-    const perf = getPerformanceInfo(achievementAvg)
+    const isFailing = achievementAvg !== null && achievementAvg < 3.0
+    const perfLevel = achievementAvg === null ? 'Pendiente' : achievementAvg >= 4.6 ? 'Superior' : achievementAvg >= 4.0 ? 'Alto' : achievementAvg >= 3.0 ? 'Básico' : 'Bajo'
 
     return (
-      <div className="w-[90%] sm:w-full max-w-4xl mx-auto py-5 sm:py-6 space-y-4 sm:space-y-5 px-0 sm:px-4 overflow-hidden">
-        {/* Barra superior de navegación */}
-        <div className="flex items-center justify-between pb-1">
-          <button 
-            onClick={() => setSelectedSubjectId(null)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Volver a Materias
-          </button>
-          <span className="text-xs font-bold text-slate-500 dark:text-slate-400 truncate max-w-[200px]">
-            {selectedSubject.subjectName}
-          </span>
-        </div>
+      <div className="sg-page">
+        <style>{cssStyles}</style>
+        <div className="sg-detail-content">
+          <motion.header variants={iv} initial="hidden" animate="show" className="sg-header">
+            <button onClick={() => setSelectedSubjectId(null)} className="sg-back-btn" aria-label="Volver">
+              <ArrowLeft size={22} />
+            </button>
+            <div className="sg-title-area">
+              <h1 className="sg-title" style={{ fontSize: '24px' }}>{selectedSubject.subjectName}</h1>
+              <p className="sg-subtitle">Detalle de Calificaciones</p>
+            </div>
+          </motion.header>
 
-        {achievements.length === 0 ? (
-          <div className="text-center py-12 sm:py-16 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-900 p-6 sm:p-8">
-            <Target className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-slate-300 dark:text-slate-700 mb-3 sm:mb-4" />
-            <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">Sin logros registrados</h3>
-            <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-sm mx-auto">
-              El docente aún no ha publicado logros ni actividades evaluativas para esta materia.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {/* 1. Selector Dropdown de Logro (idéntico a la imagen) */}
-            <div className="relative w-full">
-              <select
-                value={selectedAchievementIndex}
-                onChange={(e) => setSelectedAchievementIndex(Number(e.target.value))}
-                className="w-full pl-4 pr-10 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-100 rounded-2xl text-sm font-bold appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500/50 shadow-xs cursor-pointer"
-              >
-                {achievements.map((ach, idx) => (
-                  <option key={ach.achievementId} value={idx}>
-                    Logro {idx + 1}: {ach.name || `Logro ${idx + 1}`}
-                  </option>
-                ))}
-              </select>
-              <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none">
-                <ChevronDown className="h-4 w-4 text-slate-400" />
+          <motion.div variants={cv} initial="hidden" animate="show">
+            {achievements.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px', background: 'var(--sg-tile)', borderRadius: '24px', border: '1px dashed var(--sg-tile-b)', color: 'var(--sg-mute)' }}>
+                El docente aún no ha publicado logros evaluativos.
               </div>
-            </div>
+            ) : (
+              <>
+                <motion.div variants={iv} className="sg-select-large-wrapper">
+                  <select 
+                    value={selectedAchievementIndex} 
+                    onChange={e => setSelectedAchievementIndex(Number(e.target.value))}
+                    className="sg-select-large"
+                  >
+                    {achievements.map((ach, idx) => (
+                      <option key={ach.achievementId} value={idx}>
+                        Logro {idx + 1}: {ach.name || `Logro ${idx + 1}`}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown size={20} />
+                </motion.div>
 
-            {/* 2. Título del Logro */}
-            <div>
-              <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">
-                {activeAchievement?.name || `Logro ${selectedAchievementIndex + 1}`}
-              </h2>
-              {activeAchievement?.description && (
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-                  {activeAchievement.description}
-                </p>
-              )}
-            </div>
+                <motion.div variants={iv}>
+                  <h2 className="sg-ach-title">{activeAchievement?.name || `Logro ${selectedAchievementIndex + 1}`}</h2>
+                  {activeAchievement?.description && <p className="sg-ach-desc">{activeAchievement.description}</p>}
+                </motion.div>
 
-            {/* 3. Cards individuales por componente: HACER, SABER, SER (siempre se muestran) */}
-            <div className="space-y-3.5">
-              {compStats.map((comp) => (
-                <div
-                  key={comp.key}
-                  className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3"
-                >
-                  {/* Encabezado del componente */}
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs sm:text-[13px] font-black text-slate-800 dark:text-slate-200 tracking-wider">
-                      {comp.label} <span className="font-normal text-slate-400">- {comp.percentage}%</span>
-                    </span>
-                    <span className="text-xs sm:text-[13px] font-semibold text-slate-500 dark:text-slate-400">
-                      Promedio: <strong className={`font-bold ${
-                        comp.average !== null && comp.average < 3.0
-                          ? 'text-red-600 dark:text-red-400'
-                          : 'text-teal-600 dark:text-teal-400'
-                      }`}>
-                        {comp.average !== null ? comp.average.toFixed(1) : '—'}
-                      </strong>
-                    </span>
-                  </div>
-
-                  {/* Lista de Actividades y Notas */}
-                  <div className="space-y-2 pt-0.5">
-                    {comp.activities.length === 0 ? (
-                      <div className="py-2 text-center text-xs text-slate-400 dark:text-slate-500 italic">
-                        Sin actividades registradas
+                {compStats.map((comp) => (
+                  <motion.div variants={iv} key={comp.key} className="sg-comp-card">
+                    <div className="sg-comp-head">
+                      <div className="sg-comp-label">
+                        {COMPONENT_CONFIG[comp.key].icon} {comp.label} <span style={{fontWeight:'normal', color:'var(--sg-mute)'}}>{comp.percentage}%</span>
                       </div>
-                    ) : (
-                      comp.activities.map((act) => {
-                        const isFailing = act.grade !== null && act.grade < 3.0
-                        return (
-                          <div
-                            key={act.activityId}
-                            className="flex items-center justify-between py-1 gap-3"
-                          >
-                            <span className="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 flex-1 min-w-0 break-words">
-                              {act.name}
-                            </span>
-                            <div className={`border rounded-xl px-4 py-1.5 min-w-[58px] text-center shrink-0 ${
-                              isFailing
-                                ? 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800/50'
-                                : 'bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-700/60'
-                            }`}>
-                              <span className={`text-xs sm:text-sm font-black ${
-                                isFailing
-                                  ? 'text-red-600 dark:text-red-400'
-                                  : 'text-slate-900 dark:text-white'
-                              }`}>
-                                {act.grade !== null ? act.grade.toFixed(1) : '—'}
-                              </span>
+                      <div className={`sg-comp-avg ${comp.average !== null && comp.average < 3.0 ? 'bad' : ''}`}>
+                        {comp.average !== null ? comp.average.toFixed(1) : '—'}
+                      </div>
+                    </div>
+                    <div>
+                      {comp.activities.length === 0 ? (
+                        <div style={{fontSize:'13px', color:'var(--sg-mute)', fontStyle:'italic', padding: '8px 0'}}>Sin actividades registradas</div>
+                      ) : (
+                        comp.activities.map(act => (
+                          <div key={act.activityId} className="sg-act-row">
+                            <div className="sg-act-name">{act.name}</div>
+                            <div className={`sg-act-grade ${act.grade !== null && act.grade < 3.0 ? 'bad' : ''}`}>
+                              {act.grade !== null ? act.grade.toFixed(1) : '—'}
                             </div>
                           </div>
-                        )
-                      })
-                    )}
+                        ))
+                      )}
+                    </div>
+                  </motion.div>
+                ))}
+
+                <motion.div variants={iv} className="sg-final-card">
+                  <div className="sg-final-title">Promedio del Logro</div>
+                  <div className={`sg-final-grade ${isFailing ? 'bad' : ''}`}>
+                    {achievementAvg !== null ? achievementAvg.toFixed(1) : '—'}
                   </div>
-                </div>
-              ))}
-            </div>
-
-            {/* 4. Card Promedio del Logro (idéntica a la imagen adjunta) */}
-            <div className={`relative overflow-hidden rounded-3xl border ${perf.cardBorder} bg-gradient-to-b ${perf.cardBg} p-6 text-center shadow-xs space-y-2`}>
-              <div className="flex items-center justify-center gap-2">
-                <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
-                  Promedio del Logro
-                </h3>
-                {achievementAvg !== null && (
-                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase border ${perf.badgeClass}`}>
-                    {perf.level}
-                  </span>
-                )}
-              </div>
-
-              <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium max-w-xs mx-auto">
-                Calculado según los porcentajes (Hacer 35%, Saber 35%, Ser 30%)
-              </p>
-
-              <div className={`my-2.5 mx-auto w-fit px-8 py-2 rounded-2xl border shadow-xs ${
-                achievementAvg !== null && achievementAvg < 3.0
-                  ? 'bg-red-50/50 dark:bg-red-950/30 border-red-200 dark:border-red-800/50'
-                  : 'bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700/60'
-              }`}>
-                <span className={`text-3xl sm:text-4xl font-black ${perf.textClass}`}>
-                  {achievementAvg !== null ? achievementAvg.toFixed(1) : '—'}
-                </span>
-              </div>
-
-              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                Desempeño: <span className={`font-black ${perf.textClass}`}>{perf.level}</span>
-              </p>
-            </div>
-          </div>
-        )}
+                  <div className="sg-final-level">Desempeño {perfLevel}</div>
+                </motion.div>
+              </>
+            )}
+          </motion.div>
+        </div>
       </div>
     )
   }
 
-  // Vista Principal (Grid de Materias)
+  // Main View
   return (
-    <div className="w-[90%] sm:w-full max-w-4xl mx-auto py-5 sm:py-6 space-y-5 sm:space-y-6 px-0 sm:px-4 animate-in fade-in duration-200">
-      <div>
-        <Link 
-          href="/student/dashboard" 
-          className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          <span>Volver al Portal</span>
-        </Link>
-      </div>
-
-      {/* Título */}
-      <div>
-        <h1 className="text-[28px] sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight leading-tight mb-1">
-          Reporte de Calificaciones
-        </h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          Registro de notas y desempeño académico por asignaturas
-        </p>
-      </div>
-
-      {/* ── Métricas de resumen rápido (idéntico a /student/attendance) ── */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5 sm:gap-4">
-        <div className="col-span-2 md:col-span-1 rounded-xl sm:rounded-2xl bg-emerald-50 dark:bg-emerald-900/10 p-3.5 sm:p-5 border border-emerald-100 dark:border-emerald-900/30 flex flex-col justify-between">
-          <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-1">General</span>
-          <span className={`font-black text-emerald-700 dark:text-emerald-300 truncate ${report.generalAverage > 0 ? 'text-2xl sm:text-3xl' : 'text-lg sm:text-xl'}`}>
-            {report.generalAverage > 0 ? report.generalAverage.toFixed(1) : 'Pendiente'}
-          </span>
-        </div>
-        <div className="rounded-xl sm:rounded-2xl bg-white dark:bg-slate-900 p-3.5 sm:p-5 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
-          <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Materias</span>
-          <span className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">{summaryStats.total}</span>
-        </div>
-        <div className="rounded-xl sm:rounded-2xl bg-white dark:bg-slate-900 p-3.5 sm:p-5 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
-          <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Desempeño</span>
-          <span className="text-base sm:text-xl font-black text-slate-900 dark:text-white truncate">
-            {report.generalPerformanceLevel || '-'}
-          </span>
-        </div>
-        <div className="rounded-xl sm:rounded-2xl bg-white dark:bg-slate-900 p-3.5 sm:p-5 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
-          <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Aprobadas</span>
-          <span className="text-2xl sm:text-3xl font-black text-emerald-500">{summaryStats.approved}</span>
-        </div>
-        <div className="rounded-xl sm:rounded-2xl bg-white dark:bg-slate-900 p-3.5 sm:p-5 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
-          <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Por Mejorar</span>
-          <span className="text-2xl sm:text-3xl font-black text-rose-500">{summaryStats.failed}</span>
-        </div>
-      </div>
-
-      {/* Filtros y Buscador */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Buscar materia o docente..."
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-white/10 text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 shadow-sm"
-          />
-        </div>
-
-        {availablePeriods.length > 1 && (
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-slate-500">Período:</span>
-            <select
-              value={selectedPeriod}
-              onChange={e => setSelectedPeriod(e.target.value)}
-              className="px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-white/10 text-xs font-semibold text-slate-700 dark:text-slate-300 focus:outline-none"
-            >
-              <option value="all">Todos los períodos</option>
-              {availablePeriods.map(p => (
-                <option key={p} value={p}>Período {p}</option>
-              ))}
-            </select>
+    <div className="sg-page">
+      <style>{cssStyles}</style>
+      <motion.div variants={cv} initial="hidden" animate="show">
+        <motion.header variants={iv} className="sg-header">
+          <Link href="/student/dashboard" className="sg-back-btn" aria-label="Volver">
+            <ArrowLeft size={22} />
+          </Link>
+          <div className="sg-title-area">
+            <h1 className="sg-title">Reporte de Calificaciones</h1>
+            <p className="sg-subtitle">Registro de notas y desempeño académico</p>
           </div>
-        )}
-      </div>
+        </motion.header>
 
-      {/* Grid de Materias */}
-      {filteredSubjects.length === 0 ? (
-        <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 sm:p-12 text-center border border-slate-200/80 dark:border-white/10 shadow-sm space-y-3">
-          <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mx-auto">
-            <BookOpen className="h-7 w-7" />
+        <motion.section variants={iv} className="sg-stats">
+          <div className="sg-stat-tile sg-stat-hi">
+            <small>PROMEDIO GENERAL</small>
+            <strong>{report?.generalAverage && report.generalAverage > 0 ? report.generalAverage.toFixed(1) : '—'}</strong>
           </div>
-          <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">
-            {searchTerm || selectedPeriod !== 'all'
-              ? 'No se encontraron materias con los filtros aplicados'
-              : 'No hay materias registradas en Planilla Asistida'}
-          </h3>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto">
-            {searchTerm || selectedPeriod !== 'all'
-              ? 'Intenta restablecer los filtros para ver todas las asignaturas disponibles.'
-              : 'Actualmente no se registran asignaturas con notas en tu planilla asistida.'}
-          </p>
-          {(searchTerm || selectedPeriod !== 'all') && (
-            <button
-              onClick={() => { setSearchTerm(''); setSelectedPeriod('all') }}
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline pt-1 cursor-pointer"
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-              Restablecer búsqueda
-            </button>
+          <div className="sg-stat-tile">
+            <small>MATERIAS</small>
+            <strong>{summaryStats.total}</strong>
+          </div>
+          <div className="sg-stat-tile">
+            <small>DESEMPEÑO</small>
+            <strong style={{fontSize: '20px', lineHeight: '32px'}}>{report?.generalPerformanceLevel || '—'}</strong>
+          </div>
+          <div className="sg-stat-tile">
+            <small>APROBADAS</small>
+            <strong style={{color: 'var(--sg-acc)'}}>{summaryStats.approved}</strong>
+          </div>
+          <div className="sg-stat-tile">
+            <small>POR MEJORAR</small>
+            <strong style={{color: 'var(--sg-bad)'}}>{summaryStats.failed}</strong>
+          </div>
+        </motion.section>
+
+        <motion.section variants={iv} className="sg-tools">
+          <div className="sg-search">
+            <Search size={20} />
+            <input 
+              type="search" 
+              placeholder="Buscar materia o docente..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          {availablePeriods.length > 1 && (
+            <div className="sg-period">
+              Período:
+              <div className="sg-sel">
+                <select value={selectedPeriod} onChange={e => setSelectedPeriod(e.target.value)}>
+                  <option value="all">Todos los períodos</option>
+                  {availablePeriods.map(p => <option key={p} value={p}>P.{p}</option>)}
+                </select>
+                <ChevronDown size={16} />
+              </div>
+            </div>
           )}
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-4 md:gap-5">
-          {filteredSubjects.map((sub, index) => {
-            const hasGrade = sub.finalAverage !== null && sub.finalAverage !== undefined
-            const avg = sub.finalAverage || 0
-            const progressPct = hasGrade ? Math.min(100, Math.max(0, (avg / 5) * 100)) : 0
+        </motion.section>
 
-            const totalActivities = sub.achievements?.reduce((acc, ach) => acc + (ach.activities?.length || 0), 0) || 0
-            const gradedActivities = sub.achievements?.reduce((acc, ach) => acc + (ach.activities?.filter(a => a.grade !== null).length || 0), 0) || 0
+        <motion.section variants={iv} className="sg-cards">
+          {filteredSubjects.length === 0 ? (
+            <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px', background: 'var(--sg-tile)', borderRadius: '24px', border: '1px dashed var(--sg-tile-b)', color: 'var(--sg-mute)' }}>
+              No hay materias que coincidan con la búsqueda.
+            </div>
+          ) : (
+            filteredSubjects.map((sub) => {
+              const hasGrade = sub.finalAverage !== null && sub.finalAverage !== undefined
+              const avg = sub.finalAverage || 0
+              const progressPct = hasGrade ? Math.min(100, Math.max(0, (avg / 5) * 100)) : 0
+              const isFailing = hasGrade && avg < 3.0
 
-            return (
-              <motion.div
-                key={sub.subjectId}
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.04 }}
-                onClick={() => {
-                  setSelectedSubjectId(sub.subjectId)
-                  setSelectedAchievementIndex(0)
-                }}
-                className="group cursor-pointer bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-white/10 p-3 sm:p-5 hover:border-emerald-500/50 hover:shadow-xl hover:shadow-emerald-900/5 dark:hover:shadow-black/40 transition-all duration-300 flex flex-col justify-between relative overflow-hidden active:scale-[0.98]"
-              >
-                <div className="space-y-2 sm:space-y-3">
-                  <div className="flex items-start justify-between gap-1.5 sm:gap-2">
-                    <div className="space-y-1 min-w-0">
-                      <div className="flex flex-wrap items-center gap-1 sm:gap-1.5">
-                        {sub.period && (
-                          <span className="px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider shrink-0">
-                            P.{sub.period}
-                          </span>
-                        )}
-                        {sub.grade && (
-                          <span className="text-[9px] sm:text-[10px] text-slate-400 font-medium shrink-0">
-                            G{sub.grade}-{sub.groupNumber || 1}
-                          </span>
-                        )}
-                      </div>
-                      <h3 className="font-bold text-xs sm:text-base md:text-lg text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors line-clamp-2 leading-tight break-words">
-                        {sub.subjectName}
-                      </h3>
+              return (
+                <div 
+                  key={sub.subjectId} 
+                  className="sg-card"
+                  onClick={() => {
+                    setSelectedSubjectId(sub.subjectId)
+                    setSelectedAchievementIndex(0)
+                  }}
+                >
+                  <div className="sg-card-head">
+                    <div className="sg-tag">
+                      {sub.period && <b>P.{sub.period}</b>}
+                      {sub.grade && <span>G{sub.grade}-{sub.groupNumber || 1}</span>}
                     </div>
-
-                    <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 group-hover:bg-emerald-600 group-hover:text-white flex items-center justify-center transition-colors shrink-0">
-                      <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
-                    </div>
+                    <span className="sg-go"><ChevronRight size={16} /></span>
                   </div>
-
-                  {sub.teacherName && (
-                    <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                      <User className="h-3 w-3 text-slate-400 shrink-0" />
-                      <span className="line-clamp-1">{sub.teacherName}</span>
-                    </p>
-                  )}
-                </div>
-
-                <div className="mt-3 sm:mt-5 pt-2.5 sm:pt-3.5 border-t border-slate-100 dark:border-slate-800/80 space-y-2 sm:space-y-2.5">
-                  {/* Promedio general */}
-                  <div className="flex items-center justify-between text-[10px] sm:text-xs">
-                    <span className="text-slate-500 dark:text-slate-400 font-medium truncate">
-                      {hasGrade ? 'Promedio' : 'Sin calificar'}
-                    </span>
-                    <span className={`font-black ml-1 shrink-0 ${
-                      hasGrade
-                        ? avg >= 4.0
-                          ? 'text-emerald-600 dark:text-emerald-400'
-                          : avg >= 3.0
-                          ? 'text-amber-600 dark:text-amber-400'
-                          : 'text-rose-600 dark:text-rose-400'
-                        : 'text-slate-400 text-[10px] uppercase tracking-wider'
-                    }`}>
-                      {hasGrade ? avg.toFixed(1) : 'Sin notas'}
-                    </span>
-                  </div>
-
-                  {/* Barra de progreso */}
-                  <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 sm:h-2 overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all duration-500 ${
-                        hasGrade
-                          ? avg >= 4.0
-                            ? 'bg-emerald-500'
-                            : avg >= 3.0
-                            ? 'bg-amber-500'
-                            : 'bg-rose-500'
-                          : 'bg-slate-200 dark:bg-slate-700'
-                      }`}
-                      style={{ width: `${progressPct}%` }}
-                    />
-                  </div>
-
-                  {/* Badges de conteo */}
-                  <div className="flex flex-wrap items-center gap-1 sm:gap-1.5 pt-0.5">
-                    {hasGrade && sub.performanceLevel && sub.performanceLevel !== '-' && (
-                      <span className={`inline-flex items-center gap-0.5 sm:gap-1 px-1.5 py-0.5 rounded-md text-[9px] sm:text-[10px] font-bold ${
-                        avg >= 4.0
-                          ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
-                          : avg >= 3.0
-                          ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
-                          : 'bg-rose-500/15 text-rose-700 dark:text-rose-300'
-                      }`}>
-                        <Award className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" />
-                        {sub.performanceLevel}
-                      </span>
-                    )}
-                    <span className="inline-flex items-center gap-0.5 sm:gap-1 px-1.5 py-0.5 rounded-md text-[9px] sm:text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                      <Target className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" />
-                      {sub.achievements?.length || 0} <span className="hidden sm:inline">{(sub.achievements?.length || 0) === 1 ? 'logro' : 'logros'}</span>
-                    </span>
-                    {totalActivities > 0 && (
-                      <span className="inline-flex items-center gap-0.5 sm:gap-1 px-1.5 py-0.5 rounded-md text-[9px] sm:text-[10px] font-bold bg-blue-500/10 text-blue-700 dark:text-blue-300">
-                        <FileText className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" />
-                        {gradedActivities}/{totalActivities} <span className="hidden sm:inline">act.</span>
-                      </span>
+                  
+                  <div>
+                    <h3>{sub.subjectName}</h3>
+                    {sub.teacherName && (
+                      <div className="sg-teacher"><User size={14} /> {sub.teacherName}</div>
                     )}
                   </div>
+
+                  <div className="sg-bar-container">
+                    <div className="sg-meta">
+                      <span style={{ color: hasGrade ? (isFailing ? 'var(--sg-bad)' : 'var(--sg-ink)') : 'var(--sg-mute)' }}>
+                        {hasGrade ? avg.toFixed(1) : 'Sin notas'}
+                      </span>
+                      <span>Promedio</span>
+                    </div>
+                    <div className="sg-bar">
+                      <b style={{ width: `${progressPct}%`, background: hasGrade ? (isFailing ? 'var(--sg-bad)' : 'var(--sg-acc)') : 'transparent' }}></b>
+                    </div>
+                    <div className="sg-badges">
+                      {hasGrade && sub.performanceLevel && sub.performanceLevel !== '-' && (
+                        <div className={`sg-badge ${!isFailing ? 'ok' : ''}`}>
+                          <Award size={12} /> {sub.performanceLevel}
+                        </div>
+                      )}
+                      <div className="sg-badge"><Target size={12} /> {sub.achievements?.length || 0} logros</div>
+                    </div>
+                  </div>
                 </div>
-              </motion.div>
-            )
-          })}
-        </div>
-      )}
+              )
+            })
+          )}
+        </motion.section>
+      </motion.div>
     </div>
   )
 }

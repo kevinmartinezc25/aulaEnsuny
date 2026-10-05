@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Plus, Search, FileSpreadsheet, MoreVertical, Edit2, Trash2, Loader2, Users, ArrowRight } from 'lucide-react'
+import { Plus, Search, FileSpreadsheet, FileText, MoreVertical, Edit2, Trash2, Loader2, Users, ArrowRight } from 'lucide-react'
 import { getAssistedSubjects, deleteAssistedSubject, AssistedSubject } from '../../application/actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -113,36 +113,154 @@ export function PlanillaAsistidaListScreen({ initialSubjects }: PlanillaAsistida
   }), [subjects, searchQuery, selectedGrade, selectedGroup, selectedSubject, selectedPeriod])
 
   return (
-    <div className="flex-1 space-y-2 p-2 lg:px-4 lg:py-2">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+    <div className="pl-page">
+      <style>{`
+        .pl-page {
+          --pl-bg: #e9f0ec;
+          --pl-tile: #fff;
+          --pl-tile-b: #d9e4de;
+          --pl-ink: #10231c;
+          --pl-mute: #5f776b;
+          --pl-soft: #eef4f0;
+          --pl-hi: #123325;
+          --pl-hi-ink: #fff;
+          --pl-hi-mute: #6f9e8a;
+          --pl-acc: #12a374;
+          --pl-accbg: rgba(18,163,116,.12);
+          --pl-bad: #e5484d;
+          --pl-w: #c97a0e;
+          padding: 20px 16px 40px;
+          margin: 0 auto;
+          max-width: 1100px;
+          color: var(--pl-ink);
+        }
+        .dark .pl-page {
+          --pl-bg: #0c1512;
+          --pl-tile: #15221d;
+          --pl-tile-b: #22352d;
+          --pl-ink: #eaf4ef;
+          --pl-mute: #8aa399;
+          --pl-soft: #1c2c26;
+          --pl-hi: #123325;
+          --pl-hi-ink: #fff;
+          --pl-hi-mute: #6f9e8a;
+          --pl-acc: #5ee0b0;
+          --pl-accbg: rgba(94,224,176,.12);
+          --pl-bad: #ff7a85;
+          --pl-w: #f2b04b;
+        }
+        @media(min-width: 760px) { .pl-page { padding: 28px 32px 56px; } }
+
+        .pl-ptop { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+        .pl-ptop h1 { margin: 0; font-size: clamp(28px, 5vw, 36px); line-height: 1.05; font-weight: 700; letter-spacing: -1.2px; display: flex; align-items: center; gap: 14px; }
+        .pl-ptop h1 .pl-go { width: 48px; height: 48px; background: var(--pl-accbg); border-radius: 50%; display: grid; place-items: center; color: var(--pl-acc); flex: none; }
+        .pl-ptop .pl-sub { margin: 10px 0 0; color: var(--pl-mute); font-size: 15px; max-width: 46em; }
+        
+        .pl-btn { border: 0; background: var(--pl-hi); color: var(--pl-hi-ink); border-radius: 99px; padding: 12px 22px; font-size: 14px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; transition: transform 0.15s; outline: none; }
+        .pl-btn:active { transform: scale(0.96); }
+        .pl-btn:focus-visible { outline: 2px solid var(--pl-acc); outline-offset: 2px; }
+        .pl-btn.pl-add { height: 48px; }
+
+        .pl-tabs { display: inline-flex; gap: 4px; padding: 5px; border-radius: 99px; background: var(--pl-tile); border: 1px solid var(--pl-tile-b); margin-bottom: 22px; overflow-x: auto; max-width: 100%; }
+        .pl-tabs button { border: 0; background: transparent; border-radius: 99px; padding: 10px 20px; font-size: 14px; font-weight: 700; color: var(--pl-mute); cursor: pointer; white-space: nowrap; transition: all 0.2s; outline: none; }
+        .pl-tabs button.on { background: var(--pl-hi); color: var(--pl-hi-ink); }
+        .pl-tabs button:focus-visible { outline: 2px solid var(--pl-acc); outline-offset: 2px; }
+
+        .pl-fil { background: var(--pl-tile); border: 1px solid var(--pl-tile-b); padding: 20px; margin-bottom: 24px; border-radius: 28px; }
+        .pl-frow { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+        .pl-search { flex: 1; min-width: 200px; display: flex; align-items: center; gap: 10px; height: 48px; padding: 0 18px; border-radius: 99px; background: var(--pl-soft); border: 1px solid var(--pl-tile-b); color: var(--pl-mute); transition: border-color 0.15s; }
+        .pl-search input { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--pl-ink); font: inherit; font-size: 14px; outline: 0; }
+        .pl-search input::placeholder { color: var(--pl-mute); }
+        .pl-search:focus-within { border-color: var(--pl-acc); }
+        
+        .pl-count { font-size: 13px; font-weight: 700; color: var(--pl-acc); background: var(--pl-accbg); border-radius: 99px; padding: 11px 16px; white-space: nowrap; }
+        
+        .pl-sels { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--pl-tile-b); }
+        @media(min-width: 760px) { .pl-sels { grid-template-columns: repeat(3, 1fr); } }
+        .pl-sels label { display: block; font-size: 12px; font-weight: 700; color: var(--pl-mute); margin: 0 0 6px 8px; }
+        .pl-sel { position: relative; }
+        .pl-sel select { appearance: none; -webkit-appearance: none; width: 100%; height: 46px; border-radius: 99px; border: 1px solid var(--pl-tile-b); background: var(--pl-soft); color: var(--pl-ink); font: inherit; font-size: 14px; font-weight: 600; padding: 0 40px 0 18px; cursor: pointer; outline: none; transition: border-color 0.15s; }
+        .pl-sel select:focus { border-color: var(--pl-acc); }
+        .pl-sel svg { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; pointer-events: none; color: var(--pl-mute); }
+
+        .pl-pgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+        @media(min-width: 600px) { .pl-pgrid { grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 16px; } }
+        
+        .pl-pc { background: var(--pl-tile); border: 1px solid var(--pl-tile-b); border-radius: 20px; padding: 14px; display: flex; flex-direction: column; gap: 12px; position: relative; overflow: hidden; }
+        @media(min-width: 600px) { .pl-pc { border-radius: 28px; padding: 20px; gap: 14px; } }
+        @media(prefers-reduced-motion: no-preference) { .pl-pc { transition: transform 0.15s, box-shadow 0.15s; } .pl-pc:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(0,0,0,0.03); } }
+        .pl-pc .h { display: flex; align-items: flex-start; gap: 10px; padding-right: 32px; }
+        @media(min-width: 600px) { .pl-pc .h { gap: 12px; padding-right: 40px; } }
+        .pl-pc .h .pl-go { background: var(--pl-accbg); width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; color: var(--pl-acc); flex: none; }
+        @media(min-width: 600px) { .pl-pc .h .pl-go { width: 40px; height: 40px; } }
+        .pl-pc h3 { flex: 1; margin: 0; font-size: 14px; font-weight: 700; letter-spacing: -0.3px; line-height: 1.2; color: var(--pl-ink); padding-top: 2px; word-break: break-word; hyphens: auto; }
+        @media(min-width: 600px) { .pl-pc h3 { font-size: 17px; padding-top: 4px; } }
+        
+        .pl-kebab { position: absolute; top: 12px; right: 12px; width: 32px; height: 32px; border-radius: 50%; border: 0; background: rgba(255,255,255,0.7); backdrop-filter: blur(4px); color: var(--pl-mute); display: grid; place-items: center; cursor: pointer; transition: background 0.15s; z-index: 10; }
+        .dark .pl-kebab { background: rgba(0,0,0,0.3); }
+        @media(min-width: 600px) { .pl-kebab { top: 18px; right: 18px; width: 36px; height: 36px; background: transparent; } }
+        .pl-kebab:hover { background: var(--pl-soft); }
+        
+        .pl-gg { display: flex; flex-wrap: wrap; gap: 6px; }
+        @media(min-width: 600px) { .pl-gg { display: grid; grid-template-columns: 1fr 1fr; background: var(--pl-soft); border-radius: 22px; padding: 14px 0; text-align: center; gap: 0; } }
+        @media(min-width: 600px) { .pl-gg div+div { border-left: 1px solid var(--pl-tile-b); } }
+        .pl-gg small { display: none; }
+        @media(min-width: 600px) { .pl-gg small { display: block; font-size: 11px; font-weight: 700; letter-spacing: 1.3px; color: var(--pl-mute); } }
+        .pl-gg b { font-size: 12px; font-weight: 700; background: var(--pl-soft); padding: 4px 10px; border-radius: 99px; color: var(--pl-ink); }
+        @media(min-width: 600px) { .pl-gg b { font-size: 34px; line-height: 1.1; letter-spacing: -1px; color: var(--pl-acc); display: block; margin-top: 2px; background: transparent; padding: 0; } }
+        
+        .pl-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+        .pl-chips span { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; border-radius: 99px; padding: 5px 12px; }
+        .pl-chips .p { background: var(--pl-accbg); color: var(--pl-acc); }
+        .pl-chips .e { display: none; background: color-mix(in srgb, var(--pl-w) 16%, transparent); color: var(--pl-w); }
+        @media(min-width: 600px) { .pl-chips .e { display: inline-flex; } }
+        
+        .pl-rep { display: none; font-size: 12px; color: var(--pl-mute); font-weight: 500; border-top: 1px solid var(--pl-tile-b); padding-top: 12px; line-height: 1.4; -webkit-box-orient: vertical; overflow: hidden; }
+        @media(min-width: 600px) { .pl-rep { display: -webkit-box; -webkit-line-clamp: 2; } }
+        
+        .pl-open-btn { margin-top: auto; display: flex; justify-content: center; align-items: center; gap: 6px; height: 36px; width: 100%; border: 0; border-radius: 99px; background: var(--pl-hi); color: var(--pl-hi-ink); font-size: 13px; font-weight: 700; text-decoration: none; transition: transform 0.15s; outline: none; }
+        @media(min-width: 600px) { .pl-open-btn { height: 48px; gap: 8px; font-size: 14px; } }
+        .pl-open-btn:active { transform: scale(0.97); }
+        .pl-open-btn:focus-visible { outline: 2px solid var(--pl-acc); outline-offset: 2px; }
+        
+        .pl-btn-txt { display: none; }
+        @media(min-width: 600px) { .pl-btn-txt { display: inline; } }
+        
+        .pl-none { grid-column: 1/-1; text-align: center; color: var(--pl-mute); padding: 40px; font-size: 14px; background: var(--pl-tile); border: 1px dashed var(--pl-tile-b); border-radius: 28px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+        .pl-none .pl-go { width: 56px; height: 56px; background: var(--pl-soft); border-radius: 50%; display: grid; place-items: center; color: var(--pl-mute); }
+      `}</style>
+
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="pl-ptop">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
-            <FileSpreadsheet className="h-6 w-6 text-emerald-600 dark:text-emerald-500" />
+          <h1>
+            <span className="pl-go"><FileSpreadsheet size={24} strokeWidth={2} /></span>
             Planilla Asistida
           </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+          <p className="pl-sub">
             Registra y calcula las calificaciones de tus estudiantes de forma rápida y sencilla, independiente de los cursos oficiales.
           </p>
         </div>
-        <Button onClick={() => setIsCreateModalOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white shrink-0 shadow-sm">
-          <Plus className="mr-2 h-4 w-4" />
+        <button onClick={() => setIsCreateModalOpen(true)} className="pl-btn pl-add">
+          <Plus size={20} strokeWidth={2.5} />
           Crear materia
-        </Button>
-      </div>
+        </button>
+      </motion.div>
 
       {uniquePeriods.length > 0 && (
-        <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-2">
+        <div className="pl-tabs" role="tablist">
           <button
+            className={selectedPeriod === 'all' ? 'on' : ''}
             onClick={() => setSelectedPeriod('all')}
-            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors whitespace-nowrap ${selectedPeriod === 'all' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800' : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-400 dark:hover:bg-slate-800'}`}
+            role="tab"
           >
             Todos los periodos
           </button>
           {uniquePeriods.map(p => (
             <button
               key={p}
+              className={selectedPeriod === p ? 'on' : ''}
               onClick={() => setSelectedPeriod(p as string)}
-              className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors whitespace-nowrap ${selectedPeriod === p ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800' : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-400 dark:hover:bg-slate-800'}`}
+              role="tab"
             >
               Periodo {p}
             </button>
@@ -150,191 +268,147 @@ export function PlanillaAsistidaListScreen({ initialSubjects }: PlanillaAsistida
         </div>
       )}
 
-      <div className="flex flex-col gap-5 bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
-        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between w-full">
-          <div className="relative w-full sm:max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input
+      <motion.section initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="pl-fil">
+        <div className="pl-frow">
+          <label className="pl-search">
+            <Search size={20} strokeWidth={2.5} />
+            <input
+              type="search"
               placeholder="Buscar por nombre, grado o periodo..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 h-11 rounded-xl w-full"
             />
-          </div>
-          <div className="text-sm font-medium text-slate-500 dark:text-slate-400 shrink-0 bg-slate-50 dark:bg-slate-800/50 px-3 py-1.5 rounded-lg border border-slate-100 dark:border-slate-700/50">
+          </label>
+          <span className="pl-count">
             {filteredSubjects.length} {filteredSubjects.length === 1 ? 'materia' : 'materias'}
+          </span>
+        </div>
+        <div className="pl-sels">
+          <div>
+            <label htmlFor="fm">Materia</label>
+            <div className="pl-sel">
+              <select id="fm" value={selectedSubject} onChange={(e) => setSelectedSubject(e.target.value)}>
+                <option value="all">Todas las materias</option>
+                {uniqueSubjects.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </div>
+          </div>
+          <div>
+            <label htmlFor="fg">Grado</label>
+            <div className="pl-sel">
+              <select id="fg" value={selectedGrade} onChange={(e) => setSelectedGrade(e.target.value)}>
+                <option value="all">Todos los grados</option>
+                {uniqueGrades.map(g => (
+                  <option key={g} value={g}>
+                    {g === '12' ? 'PFC-12 (12°)' : g === '13' ? 'PFC-13 (13°)' : g === '0' ? 'Nivelatorio' : `Grado ${g}°`}
+                  </option>
+                ))}
+              </select>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </div>
+          </div>
+          <div>
+            <label htmlFor="fr">Grupo</label>
+            <div className="pl-sel">
+              <select id="fr" value={selectedGroup} onChange={(e) => setSelectedGroup(e.target.value)}>
+                <option value="all">Todos los grupos</option>
+                {uniqueGroups.map(g => <option key={g} value={g}>Grupo {g}</option>)}
+              </select>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </div>
           </div>
         </div>
-        
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 w-full pt-2 border-t border-slate-100 dark:border-slate-800">
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 ml-0.5">Materia</label>
-            <select
-              value={selectedSubject}
-              onChange={(e) => setSelectedSubject(e.target.value)}
-              className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 h-9 sm:h-10 rounded-xl px-2.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-slate-700 dark:text-slate-300 w-full truncate"
-            >
-              <option value="all">Todas las materias</option>
-              {uniqueSubjects.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 ml-0.5">Grado</label>
-            <select
-              value={selectedGrade}
-              onChange={(e) => setSelectedGrade(e.target.value)}
-              className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 h-9 sm:h-10 rounded-xl px-2.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-slate-700 dark:text-slate-300 w-full truncate"
-            >
-              <option value="all">Todos los grados</option>
-              {uniqueGrades.map(g => (
-                <option key={g} value={g}>
-                  {g === '12' ? 'PFC-12 (12°)' : g === '13' ? 'PFC-13 (13°)' : g === '0' ? 'Nivelatorio' : `Grado ${g}°`}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 ml-0.5">Grupo</label>
-            <select
-              value={selectedGroup}
-              onChange={(e) => setSelectedGroup(e.target.value)}
-              className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 h-9 sm:h-10 rounded-xl px-2.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-slate-700 dark:text-slate-300 w-full truncate"
-            >
-              <option value="all">Todos los grupos</option>
-              {uniqueGroups.map(g => <option key={g} value={g}>Grupo {g}</option>)}
-            </select>
-          </div>
-        </div>
-      </div>
+      </motion.section>
 
       {isLoading ? (
-        <div className="grid gap-4 sm:gap-5 lg:gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="pl-pgrid">
           {[1, 2, 3].map(i => (
-            <div key={i} className="h-48 rounded-2xl bg-slate-100 dark:bg-slate-800/50 animate-pulse border border-slate-100 dark:border-slate-800"></div>
+            <div key={i} className="pl-pc" style={{ minHeight: '280px', opacity: 0.5, animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }} />
           ))}
         </div>
       ) : filteredSubjects.length > 0 ? (
-        <div className="grid gap-4 sm:gap-5 lg:gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="pl-pgrid">
           {filteredSubjects.map((subject, index) => (
-            <motion.div
+            <motion.article
               key={subject.id}
-              initial={{ opacity: 0, y: 10 }}
+              initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05 }}
-              className="group flex flex-col justify-between rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 sm:p-5 shadow-xs hover:shadow-md hover:border-emerald-300 dark:hover:border-emerald-700/60 transition-all duration-200 relative"
+              className="pl-pc"
             >
-              <div className="space-y-3">
-                <div className="flex items-start justify-between gap-2.5">
-                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                    <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 shrink-0 border border-emerald-100 dark:border-emerald-900/50">
-                      <FileSpreadsheet className="h-4 w-4" />
+              <div className="h">
+                <span className="pl-go"><FileText size={20} strokeWidth={2.5} /></span>
+                <h3 style={{ fontSize: '19px', fontWeight: 600 }}>{subject.name}</h3>
+              </div>
+              <div style={{ position: 'absolute', top: 0, right: 0, width: '100%', height: 0 }}>
+                  <button 
+                    className="pl-kebab" 
+                    aria-label="Opciones"
+                    onClick={(e) => toggleDropdown(subject.id, e)}
+                    disabled={deletingId === subject.id}
+                  >
+                    {deletingId === subject.id ? <Loader2 size={20} className="animate-spin" /> : <MoreVertical size={20} />}
+                  </button>
+                  {openDropdownId === subject.id && (
+                    <div className="absolute right-0 top-full mt-2 w-36 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.1)] z-20 py-1.5 overflow-hidden font-semibold text-sm" onClick={(e) => e.stopPropagation()}>
+                      <button 
+                        onClick={(e) => { 
+                          e.preventDefault()
+                          setOpenDropdownId(null)
+                          setEditingSubject(subject)
+                        }}
+                        className="w-full text-left px-4 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/50 flex items-center gap-2.5 transition-colors"
+                      >
+                        <Edit2 size={16} /> Editar
+                      </button>
+                      <button 
+                        onClick={(e) => handleDelete(subject.id, e)}
+                        className="w-full text-left px-4 py-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 flex items-center gap-2.5 transition-colors"
+                      >
+                        <Trash2 size={16} /> Eliminar
+                      </button>
                     </div>
-                    <h3 className="font-bold text-sm sm:text-base text-slate-900 dark:text-white line-clamp-2 leading-snug" title={subject.name}>
-                      {subject.name}
-                    </h3>
-                  </div>
-                  
-                  <div className="relative shrink-0">
-                    <button 
-                      onClick={(e) => toggleDropdown(subject.id, e)}
-                      disabled={deletingId === subject.id}
-                      className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-1.5 -mr-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                      title="Opciones"
-                    >
-                      {deletingId === subject.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreVertical className="h-4 w-4" />}
-                    </button>
-                    {openDropdownId === subject.id && (
-                      <div className="absolute right-0 top-full mt-1 w-32 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg z-20 py-1 overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                        <button 
-                          onClick={(e) => { 
-                            e.preventDefault()
-                            setOpenDropdownId(null)
-                            setEditingSubject(subject)
-                          }}
-                          className="w-full text-left px-3 py-1.5 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/50 flex items-center gap-2"
-                        >
-                          <Edit2 className="h-3 w-3" /> Editar
-                        </button>
-                        <button 
-                          onClick={(e) => handleDelete(subject.id, e)}
-                          className="w-full text-left px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 flex items-center gap-2"
-                        >
-                          <Trash2 className="h-3 w-3" /> Eliminar
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Bloque Grado y Grupo */}
-                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-2.5 sm:p-3 border border-slate-100 dark:border-slate-800 grid grid-cols-2 divide-x divide-slate-200 dark:divide-slate-700 text-center">
-                  <div className="px-1">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-teal-800/70 dark:text-teal-400/70 block">
-                      Grado
-                    </span>
-                    <span className="text-2xl sm:text-[28px] font-black text-teal-700 dark:text-teal-400 tracking-tight leading-none mt-0.5 block truncate">
-                      {subject.grade === 12 ? 'PFC-12' : subject.grade === 13 ? 'PFC-13' : subject.grade === 0 ? 'Nivelatorio' : (subject.grade || '-')}
-                    </span>
-                  </div>
-                  <div className="px-1">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-teal-800/70 dark:text-teal-400/70 block">
-                      Grupo
-                    </span>
-                    <span className="text-2xl sm:text-[28px] font-black text-teal-700 dark:text-teal-400 tracking-tight leading-none mt-0.5 block truncate">
-                      {subject.group_number !== undefined && subject.group_number !== null ? subject.group_number : '1'}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Fila de Badges: Periodo y Estudiantes */}
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  {subject.period && (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/40">
-                      Periodo {subject.period}
-                    </span>
                   )}
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/40">
-                    <Users className="h-3 w-3 shrink-0" />
-                    <span>{subject.students_count || 0} {subject.students_count === 1 ? 'estudiante' : 'estudiantes'}</span>
-                  </span>
-                </div>
-                
-                {subject.description && (
-                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed px-0.5 mt-2" title={subject.description}>
-                    {subject.description}
-                  </p>
-                )}
               </div>
 
-              <div className="mt-3.5 pt-3 border-t border-slate-100 dark:border-slate-800">
-                <Link
-                  href={`/teacher/planilla-asistida/${subject.id}`}
-                  className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 px-3.5 py-2.5 text-xs sm:text-sm font-bold text-white transition-all shadow-xs hover:shadow-sm"
-                >
-                  <span>Abrir Planilla</span>
-                  <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
-                </Link>
+              <div className="pl-gg">
+                <div>
+                  <small>GRADO</small>
+                  <b>{subject.grade === 12 ? 'P-12' : subject.grade === 13 ? 'P-13' : subject.grade === 0 ? 'Niv' : (subject.grade ? `Grado ${subject.grade}` : '-')}</b>
+                </div>
+                <div>
+                  <small>GRUPO</small>
+                  <b>Grupo {subject.group_number !== undefined && subject.group_number !== null ? subject.group_number : '1'}</b>
+                </div>
               </div>
-            </motion.div>
+
+              <div className="pl-chips">
+                {subject.period && <span className="p">Periodo {subject.period}</span>}
+                <span className="e"><Users size={14} strokeWidth={2.5}/> {subject.students_count || 0} estudiantes</span>
+              </div>
+
+              {subject.description ? (
+                <div className="pl-rep" title={subject.description}>{subject.description}</div>
+              ) : (
+                <div className="pl-rep">Reporte de notas del periodo</div>
+              )}
+
+              <Link href={`/teacher/planilla-asistida/${subject.id}`} className="pl-open-btn">
+                <span className="pl-btn-txt">Abrir Planilla</span> <ArrowRight size={18} strokeWidth={2.5} />
+              </Link>
+            </motion.article>
           ))}
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 py-16 px-4 text-center">
-          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-500/20">
-            <FileSpreadsheet className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
+        <div className="pl-pgrid">
+          <div className="pl-none">
+            <span className="pl-go"><FileSpreadsheet size={28} /></span>
+            <div>No hay materias que coincidan con los filtros.</div>
+            <button onClick={() => setIsCreateModalOpen(true)} className="pl-btn pl-add" style={{ marginTop: '8px' }}>
+              Crear materia
+            </button>
           </div>
-          <h3 className="mb-2 text-lg font-bold text-slate-900 dark:text-white">
-            No tienes materias creadas
-          </h3>
-          <p className="mb-6 max-w-sm text-sm text-slate-500 dark:text-slate-400">
-            Comienza creando tu primera materia en Planilla Asistida. Recuerda que estos datos son independientes de los cursos virtuales.
-          </p>
-          <Button onClick={() => setIsCreateModalOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm">
-            <Plus className="mr-2 h-4 w-4" />
-            Crear materia
-          </Button>
         </div>
       )}
 
