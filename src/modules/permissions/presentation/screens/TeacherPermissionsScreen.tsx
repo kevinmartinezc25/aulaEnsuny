@@ -20,12 +20,13 @@ import {
   Trash2,
   UploadCloud,
   CheckCircle2,
-  CalendarCheck
+  CalendarCheck,
+  ChevronDown,
+  ChevronRight,
+  AlertCircle
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { PermissionRequest, PermissionStatsSummary } from '../../domain/entities'
-import { PermissionStatusBadge } from '../components/PermissionStatusBadge'
-import { PermissionStatsCards } from '../components/PermissionStatsCards'
 import {
   getTeacherPermissions,
   cancelPermissionRequest,
@@ -66,7 +67,6 @@ export function TeacherPermissionsScreen() {
       setRequests(data.requests)
       setStats(data.stats)
 
-      // Verificar si hay solicitudes aprobadas cuyo permiso haya finalizado hace más de 5 días sin soporte
       const today = new Date()
       today.setHours(0, 0, 0, 0)
       const foundOverdue = data.requests.find(r => {
@@ -205,269 +205,291 @@ export function TeacherPermissionsScreen() {
     }
   }
 
+  const getStatusClass = (status: string) => {
+    switch (status) {
+      case 'approved': return 'ok'
+      case 'rejected': return 'bad'
+      case 'returned_correction': return 'warn'
+      case 'pending': return 'warn'
+      default: return 'hi'
+    }
+  }
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'approved': return 'Aprobada'
+      case 'rejected': return 'Rechazada'
+      case 'returned_correction': return 'Devuelta'
+      case 'pending': return 'En trámite'
+      default: return 'Borrador'
+    }
+  }
+
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-12">
-      {/* Encabezado Estilo Apple */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-2xl bg-blue-500/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-500/20 shadow-xs shrink-0">
-            <CalendarCheck className="h-5 w-5" />
+    <div className="app">
+      <style>{`
+        .app {
+          --bg:#e9f0ec;--tile:#fff;--tile-b:#d9e4de;--ink:#10231c;--mute:#5f776b;
+          --hi:#0f3d2e;--hi-ink:#fff;--hi-mute:#9fd9bf;--acc:#12a374;--bad:#e5484d;
+          --warn:#d9831a;--hero:#0f3d2e;--soft:#eef4f0;--accbg:rgba(18,163,116,.12);
+          max-width: 1100px; margin: 0 auto; padding: 16px 16px 40px;
+          color: var(--ink);
+        }
+        .dark .app {
+          --bg:#0c1512;--tile:#15221d;--tile-b:#22352d;--ink:#eaf4ef;--mute:#8aa399;
+          --hi:#f4f8f6;--hi-ink:#10231c;--hi-mute:#4d6b5d;--acc:#5ee0b0;--bad:#ff7a85;
+          --warn:#f2b04b;--hero:#13392c;--soft:#1c2c26;--accbg:rgba(94,224,176,.12);
+        }
+        .app h1 { margin: 0; font-size: 34px; line-height: 1.05; font-weight: 600; letter-spacing: -1.2px; }
+        .app .sub { margin: 8px 0 22px; color: var(--mute); font-size: 15px; max-width: 500px; line-height: 1.4; }
+        .app .sub b { color: var(--ink); font-weight: 600; }
+        
+        .app .hero { position: relative; overflow: hidden; background: var(--hero); color: #fff; border-radius: 32px; padding: 22px 24px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+        .app .hero small { display: block; color: var(--hi-mute); font-size: 12px; font-weight: 600; letter-spacing: 1.4px; margin-bottom: 6px; }
+        .app .hero strong { font-size: 26px; font-weight: 600; letter-spacing: -0.6px; }
+        .app .hero .pill { display: flex; align-items: center; gap: 7px; background: rgba(255,255,255,.14); border-radius: 99px; padding: 9px 16px; font-size: 14px; text-decoration: none; color: #fff; font-weight: 600; cursor: pointer; transition: transform 0.15s; border: none; }
+        .app .hero .pill:active { transform: scale(0.96); }
+        
+        .app .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        @media (min-width: 640px) { .app .stats { grid-template-columns: repeat(4, 1fr); } }
+        
+        .app .tile { position: relative; background: var(--tile); border: 1px solid var(--tile-b); border-radius: 28px; color: inherit; text-decoration: none; }
+        .app .stat { padding: 18px; min-height: 132px; display: flex; flex-direction: column; justify-content: space-between; }
+        .app .stat .top { display: flex; justify-content: space-between; align-items: center; }
+        .app .stat small { font-size: 12px; font-weight: 600; letter-spacing: 1.2px; color: var(--mute); }
+        .app .stat .ic { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--soft); }
+        .app .stat .ic svg { width: 18px; color: inherit; }
+        .app .stat strong { font-size: 44px; line-height: 1; font-weight: 700; letter-spacing: -1.5px; }
+        
+        .app .stat.hi { background: var(--hi); border-color: transparent; color: var(--hi-ink); }
+        .app .stat.hi small { color: var(--hi-mute); }
+        .app .stat.hi .ic { background: rgba(128,128,128,.25); color: var(--hi-ink); }
+        .app .ok strong { color: var(--acc); } .app .ok .ic { color: var(--acc); background: var(--accbg); }
+        .app .bad strong { color: var(--bad); } .app .bad .ic { color: var(--bad); background: color-mix(in srgb, var(--bad) 14%, transparent); }
+        .app .warn strong { color: var(--warn); } .app .warn .ic { color: var(--warn); background: color-mix(in srgb, var(--warn) 16%, transparent); }
+        
+        .app .tools { display: flex; flex-direction: column; gap: 12px; margin: 22px 0; }
+        .app .search { display: flex; align-items: center; gap: 12px; padding: 0 20px; height: 56px; border-radius: 99px; }
+        .app .search svg { width: 20px; color: var(--mute); flex: none; }
+        .app .search input { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 15px; outline: none; }
+        .app .search input::placeholder { color: var(--mute); }
+        .app .search:focus-within { outline: 2px solid var(--acc); outline-offset: 2px; }
+        
+        .app .period { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 14px; font-weight: 600; color: var(--mute); flex-wrap: wrap; }
+        .app .sel { position: relative; }
+        .app .sel select { appearance: none; -webkit-appearance: none; background: var(--tile); color: var(--ink); border: 1px solid var(--tile-b); border-radius: 99px; height: 44px; padding: 0 42px 0 18px; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; outline: none; }
+        .app .sel select:focus { outline: 2px solid var(--acc); outline-offset: 2px; }
+        .app .sel svg { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); width: 16px; pointer-events: none; color: var(--mute); }
+        
+        .app .cards { display: grid; grid-template-columns: 1fr; gap: 12px; }
+        @media (min-width: 640px) { .app .cards { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); } }
+        
+        .app .card { padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; cursor: pointer; }
+        .app .card .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+        .app .tag { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--mute); flex-wrap: wrap; }
+        .app .tag b { background: var(--accbg); color: var(--acc); border-radius: 99px; padding: 4px 10px; font-weight: 700; }
+        .app .tag b.warn { background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); }
+        .app .tag b.bad { background: color-mix(in srgb, var(--bad) 14%, transparent); color: var(--bad); }
+        .app .tag b.hi { background: var(--soft); color: var(--mute); }
+        .app .tag b.ok { background: var(--accbg); color: var(--acc); }
+        
+        .app .go { flex: none; width: 32px; height: 32px; border-radius: 50%; background: var(--soft); display: grid; place-items: center; color: var(--mute); transition: all 0.2s; }
+        .app .go svg { width: 16px; }
+        
+        .app .card h3 { margin: 0; font-size: 17px; line-height: 1.2; font-weight: 600; letter-spacing: -0.4px; word-break: break-word; color: var(--ink); }
+        .app .card .teacher { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--mute); margin-top: 6px; }
+        .app .card .teacher svg { width: 15px; flex: none; }
+        
+        .app .card .meta { display: flex; justify-content: space-between; gap: 6px; font-size: 12px; color: var(--mute); border-top: 1px solid var(--tile-b); padding-top: 12px; }
+        .app .card .meta span:first-child { color: var(--ink); font-weight: 600; }
+        
+        .app .cnt { display: flex; gap: 8px; margin-top: auto; flex-wrap: wrap; }
+        .app .cnt span { display: flex; align-items: center; gap: 5px; border-radius: 99px; padding: 6px 12px; font-size: 12px; font-weight: 700; background: var(--soft); color: var(--mute); transition: transform 0.1s; }
+        .app .cnt span:hover { filter: brightness(0.95); }
+        .app .cnt span:active { transform: scale(0.95); }
+        .app .cnt span.active { background: var(--accbg); color: var(--acc); }
+        .app .cnt span.bad { background: color-mix(in srgb, var(--bad) 14%, transparent); color: var(--bad); }
+        .app .cnt span.hi { background: var(--hi); color: var(--hi-ink); }
+        
+        .app .empty { grid-column: 1 / -1; text-align: center; color: var(--mute); padding: 40px; font-size: 15px; border: 1px dashed var(--tile-b); border-radius: 28px; background: var(--tile); }
+        
+        @media (min-width: 760px) {
+          .app { padding: 28px 32px 56px; }
+          .app h1 { font-size: 44px; }
+          .app .tools { flex-direction: row; align-items: center; }
+          .app .search { flex: 1; }
+          .app .cards { gap: 16px; }
+        }
+        @media (prefers-reduced-motion: no-preference) {
+          .app .card { transition: transform 0.15s; }
+          .app .card:hover { transform: translateY(-3px); }
+          .app .card:hover .go { background: var(--hero); color: #fff; transform: translateX(2px); }
+          .app .card:active { transform: scale(0.98); }
+        }
+      `}</style>
+
+      <h1>Permisos Docentes</h1>
+      <p className="sub">Gestione y consulte el historial institucional de sus solicitudes de permisos y licencias.</p>
+
+      <section className="hero">
+        <div>
+          <small>NOVEDADES</small>
+          <strong>Solicitudes de Permiso</strong>
+        </div>
+        <button onClick={() => setShowAdvanceModal(true)} className="pill">
+          <Plus size={18} strokeWidth={2.5} /> Nuevo
+        </button>
+      </section>
+
+      <section className="stats">
+        <div className="tile stat hi">
+          <div className="top">
+            <small>TOTAL SOLICITUDES</small>
+            <span className="ic"><FileText /></span>
           </div>
-          <div>
-            <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-              Permisos Docentes
-            </h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
-              Gestione y consulte el historial institucional de sus solicitudes de permisos y licencias.
-            </p>
+          <strong>{stats.total}</strong>
+        </div>
+        
+        <div className="tile stat warn">
+          <div className="top">
+            <small>EN TRÁMITE</small>
+            <span className="ic"><Clock /></span>
+          </div>
+          <strong>{stats.pending}</strong>
+        </div>
+        
+        <div className="tile stat ok">
+          <div className="top">
+            <small>APROBADAS</small>
+            <span className="ic"><CheckCircle2 /></span>
+          </div>
+          <strong>{stats.approved}</strong>
+        </div>
+        
+        <div className="tile stat bad">
+          <div className="top">
+            <small>RECHAZADAS</small>
+            <span className="ic"><XCircle /></span>
+          </div>
+          <strong>{stats.rejected}</strong>
+        </div>
+      </section>
+
+      <section className="tools">
+        <label className="tile search">
+          <Search />
+          <input 
+            type="search" 
+            placeholder="Buscar por radicado o motivo..." 
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </label>
+        
+        <div className="period">
+          <div className="flex items-center gap-2">
+            <div className="sel">
+              <select aria-label="Estado" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+                <option value="all">Todos los estados</option>
+                <option value="pending">En trámite</option>
+                <option value="approved">Aprobadas</option>
+                <option value="rejected">Rechazadas</option>
+                <option value="returned_correction">Devueltas</option>
+                <option value="draft">Borradores</option>
+              </select>
+              <ChevronDown />
+            </div>
+            
+            <button onClick={() => loadData(true)} className="tile" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '44px', height: '44px', border: '1px solid var(--tile-b)', borderRadius: '99px', cursor: 'pointer', background: 'var(--tile)', color: 'var(--mute)' }}>
+              <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+            </button>
           </div>
         </div>
+      </section>
 
-        <div className="flex items-center gap-2.5">
-          <button
-            onClick={() => loadData(true)}
-            title="Recargar listado"
-            className="p-2.5 rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/70 dark:bg-slate-900/70 backdrop-blur-md text-slate-600 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-slate-800/80 transition-all duration-100 active:scale-95 shadow-xs cursor-pointer"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-          <button
-            onClick={() => setShowAdvanceModal(true)}
-            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-2xl text-xs font-semibold shadow-[0_4px_16px_rgba(37,99,235,0.25)] transition-all duration-100 active:scale-[0.98] cursor-pointer"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Nueva solicitud</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Tarjetas KPI de Resumen */}
-      <PermissionStatsCards
-        stats={stats}
-        activeFilter={statusFilter}
-        onFilterClick={setStatusFilter}
-      />
-
-      {/* Barra de Filtros y Búsqueda Apple Toolbar */}
-      <div className="relative rounded-[22px] bg-white/75 dark:bg-slate-900/75 backdrop-blur-xl p-3 sm:p-3.5 border border-white/80 dark:border-white/10 shadow-[0_4px_20px_rgba(0,0,0,0.02)] overflow-hidden">
-        {/* Línea de luz especular superior */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white dark:via-white/20 to-transparent" />
-
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="relative w-full sm:w-80">
-            <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Buscar por radicado o motivo..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3.5 py-2 text-xs rounded-xl border border-slate-200/70 dark:border-white/10 bg-slate-100/70 dark:bg-slate-800/60 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all"
-            />
-          </div>
-
-          <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto">
-            <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold whitespace-nowrap">Estado:</span>
-            <select
-              value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value)}
-              className="text-xs rounded-xl border border-slate-200/70 dark:border-white/10 bg-slate-100/70 dark:bg-slate-800/60 px-3.5 py-2 text-slate-800 dark:text-slate-200 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all cursor-pointer"
-            >
-              <option value="all">Todos los estados</option>
-              <option value="pending">En trámite</option>
-              <option value="approved">Aprobadas</option>
-              <option value="rejected">Rechazadas</option>
-              <option value="returned_correction">Devueltas</option>
-              <option value="draft">Borradores</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* Lista de Solicitudes */}
-      {loading ? (
-        <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-500 mb-3" />
-          <p className="text-xs font-medium text-slate-500">Cargando solicitudes...</p>
-        </div>
-      ) : filteredRequests.length === 0 ? (
-        <div className="relative overflow-hidden flex flex-col items-center justify-center py-16 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-[28px] border border-white/80 dark:border-white/10 p-8 text-center shadow-[0_8px_30px_rgba(0,0,0,0.03)]">
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white dark:via-white/20 to-transparent" />
-          <div className="p-4 rounded-3xl bg-blue-500/10 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/20 mb-3.5">
-            <FileText className="h-8 w-8" />
-          </div>
-          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">
-            No se encontraron solicitudes de permisos
-          </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mt-1 mb-6 leading-relaxed">
-            {search || statusFilter !== 'all'
-              ? 'No hay registros que coincidan con los filtros seleccionados.'
-              : 'Aún no ha radicado solicitudes. Inicie un nuevo trámite digital de manera ágil.'}
-          </p>
-          <Link
-            href="/teacher/permissions/new"
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-2xl text-xs font-semibold transition-all duration-100 active:scale-[0.98] shadow-[0_4px_16px_rgba(37,99,235,0.25)]"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Crear primera solicitud</span>
-          </Link>
-        </div>
-      ) : (
-        <div className="space-y-3.5">
-          {filteredRequests.map((req, idx) => {
+      <section className="cards">
+        {loading ? (
+          <div className="empty">Cargando solicitudes...</div>
+        ) : filteredRequests.length === 0 ? (
+          <div className="empty">No hay solicitudes que coincidan con tu búsqueda.</div>
+        ) : (
+          filteredRequests.map(req => {
             const isApproved = req.status === 'approved'
             const canCancel = ['draft', 'submitted', 'returned_correction'].includes(req.status)
             const today = new Date()
             today.setHours(0, 0, 0, 0)
-
+            
             return (
-              <motion.div
-                key={req.id}
-                initial={{ opacity: 0, y: shouldReduceMotion ? 0 : 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{
-                  type: 'spring',
-                  damping: 24,
-                  stiffness: 260,
-                  delay: shouldReduceMotion ? 0 : Math.min(idx * 0.04, 0.25)
-                }}
-                className="relative bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-[24px] border border-white/80 dark:border-white/10 p-4 sm:p-5 shadow-[0_4px_20px_rgba(0,0,0,0.02)] hover:shadow-md hover:border-slate-300/80 dark:hover:border-white/20 hover:-translate-y-0.5 transition-all duration-200 flex flex-col md:flex-row md:items-center justify-between gap-4 overflow-hidden"
-              >
-                {/* Línea de luz especular superior */}
-                <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white dark:via-white/20 to-transparent" />
-
-                {/* Info Principal */}
-                <div className="space-y-2 flex-1 min-w-0">
-                  <div className="flex flex-wrap items-center gap-2.5">
-                    <span className="font-mono text-[11px] font-bold text-blue-600 dark:text-blue-400 bg-blue-500/10 dark:bg-blue-500/15 px-2.5 py-0.5 rounded-xl border border-blue-500/20">
-                      {req.requestNumber}
-                    </span>
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate">
-                      {req.typeSnapshot?.name || 'Permiso'}
-                    </h3>
-                    <PermissionStatusBadge status={req.status} size="sm" />
+              <div key={req.id} className="tile card" onClick={() => router.push(`/teacher/permissions/${req.id}`)}>
+                <div className="head">
+                  <div className="tag">
+                    <b className={getStatusClass(req.status)}>
+                      {getStatusText(req.status)}
+                    </b>
+                    {req.requestNumber}
                   </div>
-
-                  <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2 leading-relaxed">
-                    {req.reason}
-                  </p>
-
-                  <div className="flex flex-wrap items-center gap-2.5 text-[11px] text-slate-500 dark:text-slate-400 font-medium pt-1">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100/60 dark:bg-white/5 border border-slate-200/60 dark:border-white/5">
-                      <Calendar className="h-3.5 w-3.5 text-slate-400" />
-                      {req.startDate === req.endDate ? req.startDate : `${req.startDate} al ${req.endDate}`}
-                    </span>
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100/60 dark:bg-white/5 border border-slate-200/60 dark:border-white/5">
-                      <Clock className="h-3.5 w-3.5 text-slate-400" />
-                      {req.isFullDay ? 'Jornada Completa' : `${req.startTime} - ${req.endTime}`}
-                    </span>
-                    {req.affectsAcademicDuty && (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20">
-                        <GraduationCap className="h-3.5 w-3.5" />
-                        {req.academicImpact?.length || 1} clase(s) afectada(s)
-                      </span>
-                    )}
+                  <span className="go"><ChevronRight /></span>
+                </div>
+                
+                <div>
+                  <h3>{req.typeSnapshot?.name || 'Permiso'}</h3>
+                  <div className="teacher">
+                    <AlertCircle />
+                    {req.reason.substring(0, 50)}{req.reason.length > 50 ? '...' : ''}
                   </div>
                 </div>
-
-                {/* Acciones */}
-                <div className="flex flex-wrap items-center gap-2 shrink-0 border-t md:border-t-0 pt-3 md:pt-0 border-slate-100 dark:border-slate-800">
-                  {/* Botones para solicitudes en borrador (Req 5) */}
+                
+                <div className="meta">
+                  <span>
+                    <Calendar size={15} />
+                    {req.startDate === req.endDate ? req.startDate : `${req.startDate} al ${req.endDate}`}
+                  </span>
+                  <span>
+                    <Clock size={15} />
+                    {req.isFullDay ? 'Jornada Completa' : `${req.startTime} - ${req.endTime}`}
+                  </span>
+                </div>
+                
+                <div className="cnt" onClick={e => e.stopPropagation()}>
                   {req.status === 'draft' && (
                     <>
-                      <button
-                        onClick={(e) => handleDraftSubmit(e, req.id)}
-                        className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition-all duration-100 active:scale-[0.98] cursor-pointer shadow-xs"
-                        title="Radicar borrador oficialmente ante Rectoría"
-                      >
-                        <Send className="h-3.5 w-3.5" />
-                        <span>Enviar</span>
-                      </button>
-                      <button
-                        onClick={(e) => handleDraftDelete(e, req.id)}
-                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-500/10 rounded-xl transition-all duration-100 active:scale-95 cursor-pointer"
-                        title="Eliminar borrador"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      <span className="active" onClick={(e) => handleDraftSubmit(e, req.id)}>
+                        <Send size={15} /> Enviar
+                      </span>
+                      <span className="bad" onClick={(e) => handleDraftDelete(e, req.id)}>
+                        <Trash2 size={15} /> Borrar
+                      </span>
                     </>
                   )}
-
-                  {/* Botones y badges de soporte post-permiso (Req 1 y 2) */}
+                  
                   {isApproved && (
                     <>
-                      {today >= new Date(req.endDate) && (
-                        <>
-                          {(!req.postSupportStatus || req.postSupportStatus === 'pending_upload' || req.postSupportStatus === 'rejected') && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                e.preventDefault()
-                                setSelectedPostSupportReq(req)
-                              }}
-                              className="flex items-center gap-1.5 px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-semibold transition-all duration-100 active:scale-[0.98] cursor-pointer shadow-xs"
-                              title="Adjuntar soporte de cumplimiento para revisión de Rectoría"
-                            >
-                              <UploadCloud className="h-3.5 w-3.5" />
-                              <span>Adjuntar Soporte</span>
-                            </button>
-                          )}
-
-                          {req.postSupportStatus === 'submitted' && (
-                            <span
-                              className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-500/10 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 rounded-xl text-[11px] font-semibold border border-blue-500/20"
-                              title="Soporte en revisión por Rectoría (Aprobación máx: 3 días)"
-                            >
-                              <Clock className="h-3.5 w-3.5" />
-                              <span>Soporte en revisión</span>
-                            </span>
-                          )}
-
-                          {req.postSupportStatus === 'approved' && (
-                            <span
-                              className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 rounded-xl text-[11px] font-semibold border border-emerald-500/20"
-                              title="Soporte validado y aprobado por Rectoría"
-                            >
-                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                              <span>Soporte aprobado</span>
-                            </span>
-                          )}
-                        </>
+                      <span className="active" onClick={(e) => handleDownloadPDF(e, req)}>
+                        <Download size={15} /> PDF
+                      </span>
+                      
+                      {today >= new Date(req.endDate) && (!req.postSupportStatus || req.postSupportStatus === 'pending_upload' || req.postSupportStatus === 'rejected') && (
+                        <span className="warn" onClick={(e) => {
+                          e.preventDefault()
+                          setSelectedPostSupportReq(req)
+                        }}>
+                          <UploadCloud size={15} /> Soporte
+                        </span>
                       )}
-
-                      <button
-                        onClick={(e) => handleDownloadPDF(e, req)}
-                        className="flex items-center gap-1.5 px-3 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 rounded-xl text-xs font-semibold transition-all duration-100 active:scale-[0.98] cursor-pointer border border-emerald-500/20"
-                        title="Descargar Constancia Oficial PDF"
-                      >
-                        <Download className="h-3.5 w-3.5" />
-                        <span className="hidden sm:inline">Constancia</span> PDF
-                      </button>
                     </>
                   )}
-
-                  <Link
-                    href={`/teacher/permissions/${req.id}`}
-                    className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100/80 hover:bg-slate-200/80 dark:bg-slate-800/80 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold transition-all duration-100 active:scale-[0.98] cursor-pointer border border-slate-200/60 dark:border-white/5"
-                  >
-                    <Eye className="h-3.5 w-3.5" />
-                    <span>Expediente</span>
-                  </Link>
-
+                  
                   {canCancel && (
-                    <button
-                      onClick={(e) => handleCancel(e, req.id)}
-                      className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-500/10 rounded-xl transition-all duration-100 active:scale-95 cursor-pointer"
-                      title="Cancelar solicitud"
-                    >
-                      <XCircle className="h-4 w-4" />
-                    </button>
+                    <span className="bad" onClick={(e) => handleCancel(e, req.id)}>
+                      <XCircle size={15} /> Cancelar
+                    </span>
                   )}
                 </div>
-              </motion.div>
+              </div>
             )
-          })}
-        </div>
-      )}
+          })
+        )}
+      </section>
 
       {/* Modal Req 6: Aviso preventivo de 8 días de anticipación */}
       <PermissionAdvanceNoticeModal

@@ -31,11 +31,11 @@ const iconMap: Record<string, any> = {
 // Color mapper for Tailwind border/text/bg styling
 const colorMap: Record<string, { border: string, bg: string, text: string, dot: string, accent: string }> = {
   blue: {
-    border: 'border-blue-500',
-    bg: 'bg-blue-50 dark:bg-blue-950/20',
-    text: 'text-blue-600 dark:text-blue-400',
-    dot: 'bg-blue-500',
-    accent: 'bg-blue-500 text-white'
+    border: 'border-emerald-500',
+    bg: 'bg-emerald-50 dark:bg-emerald-950/20',
+    text: 'text-emerald-600 dark:text-emerald-400',
+    dot: 'bg-emerald-500',
+    accent: 'bg-emerald-500 text-white'
   },
   emerald: {
     border: 'border-emerald-500',
@@ -102,7 +102,7 @@ const getComplianceStyles = (compliance: string) => {
     case 'No cumplido':
       return 'bg-rose-55/60 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-900/50'
     case 'Parcialmente cumplido':
-      return 'bg-blue-55/60 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-900/50'
+      return 'bg-emerald-55/60 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/50'
     case 'Pendiente':
     default:
       return 'bg-amber-55/60 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900/50'
@@ -771,12 +771,12 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
         {/* Navigation Toolbar */}
         <div className="flex items-center gap-2">
           {/* View Selection Toggle */}
-          <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+          <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl">
             {(['month', 'week', 'list'] as const).map(mode => (
               <button
                 key={mode}
                 onClick={() => setViewMode(mode)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-all ${
+                className={`px-3 py-1.5 rounded-2xl text-xs font-semibold uppercase tracking-wider transition-all ${
                   viewMode === mode 
                     ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white' 
                     : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
@@ -789,12 +789,12 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
 
           <button 
             onClick={handleToday}
-            className="px-4 py-2 border border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300"
+            className="px-4 py-2 border border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800 rounded-2xl text-xs font-bold text-slate-700 dark:text-slate-300"
           >
             Hoy
           </button>
           
-          <div className="flex items-center border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
+          <div className="flex items-center border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
             <button 
               onClick={handlePrevDate}
               className="p-2 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400"
@@ -813,14 +813,14 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
             <div className="flex gap-2">
               <button 
                 onClick={() => setIsImportModalOpen(true)}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-slate-250 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 shadow-sm transition-all active:scale-[0.98] cursor-pointer"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-2xl border border-slate-250 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 shadow-sm transition-all active:scale-[0.98] cursor-pointer"
               >
                 <FileSpreadsheet className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                 <span>Importar Excel</span>
               </button>
               <button 
                 onClick={openCreateModal}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-xs font-bold text-white shadow-sm transition-transform active:scale-[0.98]"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-xs font-bold text-white shadow-sm transition-transform active:scale-[0.98]"
               >
                 <Plus className="h-4 w-4" />
                 <span>Nueva actividad</span>
@@ -845,19 +845,19 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Buscar actividad, descripción o responsable..."
-                className="w-full pl-10 pr-4 py-2.5 text-sm rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500"
+                className="w-full pl-10 pr-4 py-2.5 text-sm rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500"
               />
             </div>
 
             <div className="relative w-full sm:w-auto">
               <button 
                 onClick={() => setShowFiltersDropdown(!showFiltersDropdown)}
-                className="w-full flex items-center justify-between gap-2 px-4 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                className="w-full flex items-center justify-between gap-2 px-4 py-2.5 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50"
               >
                 <SlidersHorizontal className="h-4 w-4" />
                 <span>Filtros</span>
                 {(selectedCategoryFilter !== 'all' || selectedPriorityFilter !== 'all') && (
-                  <span className="h-2 w-2 rounded-full bg-blue-600"></span>
+                  <span className="h-2 w-2 rounded-full bg-emerald-600"></span>
                 )}
               </button>
 
@@ -867,14 +867,14 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 10 }}
-                    className="absolute right-0 mt-2 w-64 rounded-2xl border border-slate-100 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900 z-30 space-y-4"
+                    className="absolute right-0 mt-2 w-64 rounded-3xl border border-slate-100 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900 z-30 space-y-4"
                   >
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Categoría</label>
                       <select 
                         value={selectedCategoryFilter} 
                         onChange={(e) => setSelectedCategoryFilter(e.target.value)}
-                        className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-xs text-slate-800 dark:text-slate-200 outline-none"
+                        className="w-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-xs text-slate-800 dark:text-slate-200 outline-none"
                       >
                         <option value="all">Todas las categorías</option>
                         {categories.map(c => (
@@ -888,7 +888,7 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
                       <select 
                         value={selectedPriorityFilter} 
                         onChange={(e) => setSelectedPriorityFilter(e.target.value)}
-                        className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-xs text-slate-800 dark:text-slate-200 outline-none"
+                        className="w-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-xs text-slate-800 dark:text-slate-200 outline-none"
                       >
                         <option value="all">Todas las prioridades</option>
                         <option value="high">Alta</option>
@@ -906,9 +906,9 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
           <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
             <button
               onClick={() => setSelectedCategoryFilter('all')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${
+              className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all shrink-0 ${
                 selectedCategoryFilter === 'all'
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/10'
+                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/10'
                   : 'bg-slate-50 text-slate-600 hover:bg-slate-100 dark:bg-slate-850 dark:text-slate-350 dark:hover:bg-slate-800'
               }`}
             >
@@ -921,7 +921,7 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
                 <button
                   key={cat.id}
                   onClick={() => setSelectedCategoryFilter(cat.id)}
-                  className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-2xl text-xs font-bold transition-all shrink-0 ${
                     isSelected
                       ? styles.accent
                       : 'bg-slate-50 text-slate-600 hover:bg-slate-100 dark:bg-slate-850 dark:text-slate-350'
@@ -937,7 +937,7 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
           {/* Render Views */}
           {loading ? (
             <div className="h-64 flex items-center justify-center">
-              <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600"></div>
+              <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-emerald-600"></div>
             </div>
           ) : viewMode === 'list' ? (
             /* Vista Lista */
@@ -977,7 +977,7 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
 
                             <div className="flex flex-1 flex-col md:flex-row items-start md:items-center gap-5 pl-3">
                               {/* Left icon badge */}
-                              <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${styling.bg} ${styling.text} shrink-0`}>
+                              <div className={`flex h-12 w-12 items-center justify-center rounded-3xl ${styling.bg} ${styling.text} shrink-0`}>
                                 <CatIcon className="h-6 w-6" />
                               </div>
 
@@ -995,7 +995,7 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
                                     </span>
                                   )}
                                 </div>
-                                <h3 className="text-lg font-bold text-slate-900 dark:text-white group-hover:text-blue-600 transition-colors">
+                                <h3 className="text-lg font-bold text-slate-900 dark:text-white group-hover:text-emerald-600 transition-colors">
                                   {event.title}
                                 </h3>
                                 {event.description && (
@@ -1007,7 +1007,7 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
                                   <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/40 space-y-1">
                                     {event.resources && (
                                       <div className="flex items-start gap-1.5 text-xs text-slate-650 dark:text-slate-350">
-                                        <Briefcase className="h-3.5 w-3.5 mt-0.5 text-blue-500 shrink-0" />
+                                        <Briefcase className="h-3.5 w-3.5 mt-0.5 text-emerald-500 shrink-0" />
                                         <span>
                                           <strong className="text-slate-800 dark:text-slate-200 font-bold">Recursos: </strong>
                                           {event.resources}
@@ -1063,14 +1063,14 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
                                 <button 
                                   onClick={() => openEditModal(event)}
                                   title="Editar actividad"
-                                  className="p-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                                  className="p-1.5 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
                                 >
                                   <Edit2 className="h-3.5 w-3.5" />
                                 </button>
                                 <button 
                                   onClick={() => handleDeleteEvent(event.id)}
                                   title="Eliminar actividad"
-                                  className="p-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-400 hover:text-red-500"
+                                  className="p-1.5 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-400 hover:text-red-500"
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </button>
@@ -1092,7 +1092,7 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
                   {currentDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
                 </h3>
               </div>
-              <div className="grid grid-cols-7 gap-px bg-slate-100 dark:bg-slate-800 rounded-2xl overflow-hidden">
+              <div className="grid grid-cols-7 gap-px bg-slate-100 dark:bg-slate-800 rounded-3xl overflow-hidden">
                 {/* Days of Week */}
                 {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map(d => (
                   <div key={d} className="bg-slate-50 dark:bg-slate-900/60 py-2.5 text-center text-xs font-bold text-slate-500 uppercase">{d}</div>
@@ -1124,10 +1124,10 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
                     <div 
                       key={`day-${dayNum}`} 
                       className={`bg-white dark:bg-slate-900 min-h-[100px] p-3 border-t border-r border-slate-100 dark:border-slate-800/40 relative flex flex-col justify-between ${
-                        isTodayCell ? 'ring-2 ring-blue-500/20 bg-blue-50/10 dark:bg-blue-950/5' : ''
+                        isTodayCell ? 'ring-2 ring-emerald-500/20 bg-emerald-50/10 dark:bg-emerald-950/5' : ''
                       }`}
                     >
-                      <span className={`text-xs font-bold ${isTodayCell ? 'flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-white shadow-sm' : 'text-slate-700 dark:text-slate-300'}`}>
+                      <span className={`text-xs font-bold ${isTodayCell ? 'flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white shadow-sm' : 'text-slate-700 dark:text-slate-300'}`}>
                         {dayNum}
                       </span>
                       
@@ -1141,7 +1141,7 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
                               onClick={() => {
                                 if (isAdmin) openEditModal(e)
                               }}
-                              className={`text-[9px] font-bold px-1.5 py-0.5 rounded-lg truncate ${styling.bg} ${styling.text} border-l-2 ${styling.border} cursor-pointer`}
+                              className={`text-[9px] font-bold px-1.5 py-0.5 rounded-2xl truncate ${styling.bg} ${styling.text} border-l-2 ${styling.border} cursor-pointer`}
                               title={e.title}
                             >
                               {e.title}
@@ -1203,7 +1203,7 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
                                 <div 
                                   key={e.id}
                                   onClick={() => { if (isAdmin) openEditModal(e) }}
-                                  className={`flex items-center justify-between p-3 rounded-2xl ${styling.bg} border-l-4 ${styling.border} cursor-pointer hover:opacity-90`}
+                                  className={`flex items-center justify-between p-3 rounded-3xl ${styling.bg} border-l-4 ${styling.border} cursor-pointer hover:opacity-90`}
                                 >
                                   <div>
                                     <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">{e.title}</h4>
@@ -1233,7 +1233,7 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
           {/* Widget 1: Próximos eventos */}
           <div className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm dark:border-slate-800/60 dark:bg-slate-900">
             <h3 className="font-bold text-slate-900 dark:text-white text-base mb-4 flex items-center gap-2">
-              <Clock className="h-4 w-4 text-blue-500" />
+              <Clock className="h-4 w-4 text-emerald-500" />
               <span>Próximos eventos</span>
             </h3>
 
@@ -1252,7 +1252,7 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
                       <span>{startTimeStr}</span>
                     </div>
                     <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 line-clamp-1">{e.title}</h4>
-                    <span className={`inline-flex rounded-lg px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${styling.bg} ${styling.text}`}>
+                    <span className={`inline-flex rounded-2xl px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${styling.bg} ${styling.text}`}>
                       {e.event_categories?.name}
                     </span>
                   </div>
@@ -1299,13 +1299,13 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
                     <div key={`mini-day-${dayNum}`} className="relative py-1.5 flex flex-col items-center justify-center">
                       <span className={`text-[10px] font-bold ${
                         isToday 
-                          ? 'flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-white shadow-sm'
+                          ? 'flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white shadow-sm'
                           : 'text-slate-600 dark:text-slate-400'
                       }`}>
                         {dayNum}
                       </span>
                       {hasEvents && !isToday && (
-                        <span className="absolute bottom-0.5 h-1 w-1 rounded-full bg-blue-500"></span>
+                        <span className="absolute bottom-0.5 h-1 w-1 rounded-full bg-emerald-500"></span>
                       )}
                     </div>
                   )
@@ -1340,7 +1340,7 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
                 </div>
                 <button 
                   onClick={() => setIsModalOpen(false)}
-                  className="p-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-400"
+                  className="p-1.5 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-400"
                 >
                   <X className="h-5 w-5" />
                 </button>
@@ -1358,7 +1358,7 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
                     value={formTitle}
                     onChange={(e) => setFormTitle(e.target.value)}
                     placeholder="Ej: Consejo Académico, Capacitación LMS, etc."
-                    className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+                    className="w-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                   />
                 </div>
 
@@ -1370,7 +1370,7 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
                     value={formDesc}
                     onChange={(e) => setFormDesc(e.target.value)}
                     placeholder="Describe los temas o el objetivo de la actividad..."
-                    className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 resize-none"
+                    className="w-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 resize-none"
                   />
                 </div>
 
@@ -1383,7 +1383,7 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
                       required
                       value={formDate}
                       onChange={(e) => setFormDate(e.target.value)}
-                      className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:bg-white focus:border-blue-500"
+                      className="w-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:bg-white focus:border-emerald-500"
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -1393,7 +1393,7 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
                       required
                       value={formStartTime}
                       onChange={(e) => setFormStartTime(e.target.value)}
-                      className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:bg-white focus:border-blue-500"
+                      className="w-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:bg-white focus:border-emerald-500"
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -1403,7 +1403,7 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
                       required
                       value={formEndTime}
                       onChange={(e) => setFormEndTime(e.target.value)}
-                      className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:bg-white focus:border-blue-500"
+                      className="w-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:bg-white focus:border-emerald-500"
                     />
                   </div>
                 </div>
@@ -1417,7 +1417,7 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
                       value={formLocation}
                       onChange={(e) => setFormLocation(e.target.value)}
                       placeholder="Ej: Sala de juntas, Aula TIC"
-                      className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:bg-white focus:border-blue-500"
+                      className="w-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:bg-white focus:border-emerald-500"
                     />
                   </div>
                   
@@ -1426,7 +1426,7 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
                     <select
                       value={formCategoryId}
                       onChange={(e) => setFormCategoryId(e.target.value)}
-                      className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:bg-white focus:border-blue-500"
+                      className="w-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:bg-white focus:border-emerald-500"
                     >
                       {categories.map(c => (
                         <option key={c.id} value={c.id}>{c.name}</option>
@@ -1439,7 +1439,7 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
                     <select
                       value={formPriority}
                       onChange={(e) => setFormPriority(e.target.value as any)}
-                      className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:bg-white focus:border-blue-500"
+                      className="w-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:bg-white focus:border-emerald-500"
                     >
                       <option value="low">Baja</option>
                       <option value="medium">Media</option>
@@ -1466,7 +1466,7 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
                           onChange={() => setFormStatus(statusOpt.id)}
                           className="peer sr-only"
                         />
-                        <span className={`px-4 py-2 rounded-xl border text-xs font-bold transition-all peer-checked:ring-2 peer-checked:ring-slate-900 dark:peer-checked:ring-white ${statusOpt.color}`}>
+                        <span className={`px-4 py-2 rounded-2xl border text-xs font-bold transition-all peer-checked:ring-2 peer-checked:ring-slate-900 dark:peer-checked:ring-white ${statusOpt.color}`}>
                           {statusOpt.name}
                         </span>
                       </label>
@@ -1482,7 +1482,7 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
                     value={formResources}
                     onChange={(e) => setFormResources(e.target.value)}
                     placeholder="Ej: Humanos, Tecnológicos, Espacios físicos..."
-                    className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+                    className="w-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                   />
                 </div>
 
@@ -1494,7 +1494,7 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
                       { id: 'Pendiente', name: 'Pendiente', color: 'text-amber-600 border-amber-250 bg-amber-50 dark:bg-amber-950/20' },
                       { id: 'Cumplido', name: 'Cumplido', color: 'text-emerald-600 border-emerald-250 bg-emerald-50 dark:bg-emerald-950/20' },
                       { id: 'No cumplido', name: 'No cumplido', color: 'text-rose-600 border-rose-250 bg-rose-50 dark:bg-rose-950/20' },
-                      { id: 'Parcialmente cumplido', name: 'Parcial', color: 'text-blue-600 border-blue-250 bg-blue-50 dark:bg-blue-950/20' }
+                      { id: 'Parcialmente cumplido', name: 'Parcial', color: 'text-emerald-600 border-emerald-250 bg-emerald-50 dark:bg-emerald-950/20' }
                     ] as const).map(opt => (
                       <label key={opt.id} className="flex items-center gap-2 cursor-pointer">
                         <input
@@ -1505,7 +1505,7 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
                           onChange={() => setFormCompliance(opt.id)}
                           className="peer sr-only"
                         />
-                        <span className={`px-4 py-2 rounded-xl border text-xs font-bold transition-all peer-checked:ring-2 peer-checked:ring-slate-900 dark:peer-checked:ring-white ${opt.color}`}>
+                        <span className={`px-4 py-2 rounded-2xl border text-xs font-bold transition-all peer-checked:ring-2 peer-checked:ring-slate-900 dark:peer-checked:ring-white ${opt.color}`}>
                           {opt.name}
                         </span>
                       </label>
@@ -1521,7 +1521,7 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
                     value={formObservations}
                     onChange={(e) => setFormObservations(e.target.value)}
                     placeholder="Escribe alguna observación o anotación..."
-                    className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 resize-none"
+                    className="w-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-4 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 resize-none"
                   />
                 </div>
 
@@ -1531,9 +1531,9 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
                   
                   {/* List of currently added custom responsibles */}
                   {customResponsibles.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 p-2 border border-slate-100 dark:border-slate-800 rounded-xl bg-slate-50/20">
+                    <div className="flex flex-wrap gap-1.5 p-2 border border-slate-100 dark:border-slate-800 rounded-2xl bg-slate-50/20">
                       {customResponsibles.map(name => (
-                        <span key={name} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 text-xs font-bold border border-blue-100/50">
+                        <span key={name} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-2xl bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 text-xs font-bold border border-emerald-100/50">
                           <span>{name}</span>
                           <button
                             type="button"
@@ -1563,7 +1563,7 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
                           }
                         }
                       }}
-                      className="flex-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-3 py-2.5 text-xs text-slate-900 dark:text-white outline-none focus:bg-white focus:border-blue-500"
+                      className="flex-1 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-3 py-2.5 text-xs text-slate-900 dark:text-white outline-none focus:bg-white focus:border-emerald-500"
                     />
                     <button
                       type="button"
@@ -1573,7 +1573,7 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
                           setManualResponsibleInput('');
                         }
                       }}
-                      className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold cursor-pointer"
+                      className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-bold cursor-pointer"
                     >
                       Agregar
                     </button>
@@ -1588,7 +1588,7 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
                           toast.success('Guardado como etiqueta frecuente');
                         }}
                         title="Agregar y guardar como etiqueta frecuente"
-                        className="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold cursor-pointer"
+                        className="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-2xl text-xs font-bold cursor-pointer"
                       >
                         ★ Frecuente
                       </button>
@@ -1605,9 +1605,9 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
                           return (
                             <div
                               key={tag}
-                              className={`group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${
+                              className={`group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-2xl text-[11px] font-bold border transition-all cursor-pointer ${
                                 isSelected 
-                                  ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900/50'
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/50'
                                   : 'bg-white text-slate-600 border-slate-200 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-800 hover:bg-slate-50'
                               }`}
                             >
@@ -1638,13 +1638,13 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
                   <button 
                     type="button"
                     onClick={() => setIsModalOpen(false)}
-                    className="px-5 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300"
+                    className="px-5 py-2.5 rounded-2xl border border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300"
                   >
                     Cancelar
                   </button>
                   <button 
                     type="submit"
-                    className="flex items-center gap-1.5 px-6 py-2.5 rounded-xl bg-slate-900 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200 text-xs font-bold shadow-md"
+                    className="flex items-center gap-1.5 px-6 py-2.5 rounded-2xl bg-slate-900 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200 text-xs font-bold shadow-md"
                   >
                     <Save className="h-4 w-4" />
                     <span>Guardar Actividad</span>
@@ -1683,7 +1683,7 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
                     setIsImportModalOpen(false)
                     setImportData([])
                   }}
-                  className="p-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-400 cursor-pointer"
+                  className="p-1.5 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-400 cursor-pointer"
                 >
                   <X className="h-5 w-5" />
                 </button>
@@ -1693,7 +1693,7 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
               <div className="flex-1 overflow-y-auto p-6 space-y-6">
                 
                 {/* Actions & Template Section */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-55/40 dark:bg-slate-800/20 p-5 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-55/40 dark:bg-slate-800/20 p-5 rounded-3xl border border-slate-100 dark:border-slate-800">
                   <div className="space-y-2 text-left">
                     <h4 className="text-sm font-bold text-slate-800 dark:text-white">¿No tienes el formato adecuado?</h4>
                     <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
@@ -1702,7 +1702,7 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
                     <button
                       type="button"
                       onClick={downloadTemplate}
-                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/20 dark:hover:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 rounded-xl text-xs font-bold transition-all cursor-pointer border border-emerald-200 dark:border-emerald-900/50"
+                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/20 dark:hover:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 rounded-2xl text-xs font-bold transition-all cursor-pointer border border-emerald-200 dark:border-emerald-900/50"
                     >
                       <Download className="h-4 w-4" />
                       <span>Descargar Plantilla</span>
@@ -1717,7 +1717,7 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
                         <select
                           value={importMonth}
                           onChange={(e) => setImportMonth(e.target.value)}
-                          className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2 text-xs text-slate-800 dark:text-slate-200 outline-none"
+                          className="w-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2 text-xs text-slate-800 dark:text-slate-200 outline-none"
                         >
                           {Array.from({ length: 12 }).map((_, i) => {
                             const val = (i + 1).toString().padStart(2, '0')
@@ -1733,7 +1733,7 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
                         <select
                           value={importYear}
                           onChange={(e) => setImportYear(e.target.value)}
-                          className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2 text-xs text-slate-800 dark:text-slate-200 outline-none"
+                          className="w-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2 text-xs text-slate-800 dark:text-slate-200 outline-none"
                         >
                           {["2025", "2026", "2027", "2028"].map(yr => (
                             <option key={yr} value={yr}>{yr}</option>
@@ -1748,7 +1748,7 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
                       <select
                         value={defaultCategoryId}
                         onChange={(e) => setDefaultCategoryId(e.target.value)}
-                        className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2 text-xs text-slate-800 dark:text-slate-200 outline-none"
+                        className="w-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2 text-xs text-slate-800 dark:text-slate-200 outline-none"
                       >
                         {categories.map(c => (
                           <option key={c.id} value={c.id}>{c.name}</option>
@@ -1759,7 +1759,7 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
                 </div>
 
                 {/* Dropzone Area */}
-                <div className="relative border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl p-8 text-center bg-slate-50/20 hover:bg-slate-50/40 dark:hover:bg-slate-800/10 transition-all flex flex-col items-center justify-center">
+                <div className="relative border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl p-8 text-center bg-slate-50/20 hover:bg-slate-50/40 dark:hover:bg-slate-800/10 transition-all flex flex-col items-center justify-center">
                   <Upload className="h-10 w-10 text-slate-350 dark:text-slate-650 mb-3" />
                   <p className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                     Selecciona o arrastra el archivo de Excel
@@ -1780,12 +1780,12 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
                   <div className="space-y-3 text-left">
                     <div className="flex items-center justify-between">
                       <h4 className="text-xs font-bold text-slate-450 dark:text-slate-500 uppercase tracking-wider">Vista previa de actividades a importar</h4>
-                      <span className="text-xs font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg">
+                      <span className="text-xs font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-2xl">
                         {importData.filter(r => r.isValid).length} actividades listas
                       </span>
                     </div>
 
-                    <div className="border border-slate-150 dark:border-slate-850 rounded-2xl overflow-hidden max-h-[300px] overflow-y-auto">
+                    <div className="border border-slate-150 dark:border-slate-850 rounded-3xl overflow-hidden max-h-[300px] overflow-y-auto">
                       <table className="w-full text-left text-xs border-collapse">
                         <thead>
                           <tr className="bg-slate-50 dark:bg-slate-850 text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-150 dark:border-slate-800">
@@ -1818,7 +1818,7 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
                                 <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                                   row.compliance === 'Cumplido' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-450' :
                                   row.compliance === 'No cumplido' ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/20 dark:text-rose-450' :
-                                  row.compliance === 'Parcialmente cumplido' ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/20 dark:text-blue-450' :
+                                  row.compliance === 'Parcialmente cumplido' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-450' :
                                   'bg-amber-50 text-amber-700 dark:bg-amber-950/20 dark:text-amber-450'
                                 }`}>
                                   {row.compliance}
@@ -1842,7 +1842,7 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
                     setIsImportModalOpen(false)
                     setImportData([])
                   }}
-                  className="px-5 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer"
+                  className="px-5 py-2.5 rounded-2xl border border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer"
                 >
                   Cancelar
                 </button>
@@ -1850,7 +1850,7 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
                   type="button"
                   disabled={isImporting || importData.length === 0}
                   onClick={confirmImport}
-                  className="flex items-center gap-1.5 px-6 py-2.5 rounded-xl bg-slate-900 text-white hover:bg-slate-855 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200 text-xs font-bold shadow-md disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                  className="flex items-center gap-1.5 px-6 py-2.5 rounded-2xl bg-slate-900 text-white hover:bg-slate-855 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200 text-xs font-bold shadow-md disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                 >
                   {isImporting ? (
                     <div className="h-4 w-4 animate-spin rounded-full border-2 border-white dark:border-slate-900 border-t-transparent"></div>
@@ -1869,3 +1869,4 @@ export function InstitutionalAgendaScreen({ isAdmin }: InstitutionalAgendaScreen
     </div>
   )
 }
+

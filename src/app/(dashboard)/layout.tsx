@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -232,11 +232,11 @@ function AdminSidebar({ onClose, user, enabledModules = [], isCollapsed = false,
                       href={item.href}
                       onClick={onClose}
                       title={isCollapsed ? item.name : undefined}
-                      className={`group flex items-center rounded-xl transition-all duration-150 relative ${
+                      className={`group flex items-center rounded-3xl transition-all duration-150 relative ${
                         isCollapsed ? 'justify-center p-3' : 'justify-between px-3 py-2.5'
                       } text-sm font-semibold ${
                         isActive
-                          ? 'bg-blue-600 text-white shadow-xs'
+                          ? 'bg-emerald-600 text-white shadow-xs'
                           : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-white'
                       }`}
                     >
@@ -259,24 +259,24 @@ function AdminSidebar({ onClose, user, enabledModules = [], isCollapsed = false,
           const GroupIcon = SECTION_ICONS[group.section] || Layers
 
           return (
-            <div key={group.section} className="rounded-2xl transition-all">
+            <div key={group.section} className="rounded-3xl transition-all">
               {/* Encabezado del Grupo (Botón Clicable para Desplegar/Plegar) */}
               <button
                 type="button"
                 onClick={() => !isCollapsed && toggleSection(group.section)}
-                className={`w-full flex items-center rounded-xl transition-all duration-150 ${
+                className={`w-full flex items-center rounded-3xl transition-all duration-150 ${
                   isCollapsed
                     ? 'justify-center p-2.5 cursor-default'
                     : 'justify-between px-3 py-2 cursor-pointer group select-none'
                 } ${
                   hasActiveChild
-                    ? 'bg-blue-50/80 text-blue-900 dark:bg-blue-950/40 dark:text-blue-200 border border-blue-200/60 dark:border-blue-900/40'
+                    ? 'bg-emerald-50/80 text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200 border border-emerald-200/60 dark:border-emerald-900/40'
                     : 'text-slate-600 hover:bg-slate-100/80 dark:text-slate-400 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white'
                 }`}
                 title={isCollapsed ? group.section : undefined}
               >
                 <div className="flex items-center gap-2.5 truncate">
-                  <GroupIcon className={`h-4 w-4 shrink-0 ${hasActiveChild ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-700 dark:group-hover:text-slate-300'}`} />
+                  <GroupIcon className={`h-4 w-4 shrink-0 ${hasActiveChild ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-700 dark:group-hover:text-slate-300'}`} />
                   {!isCollapsed && (
                     <span className="text-xs font-bold truncate tracking-tight">
                       {group.section}
@@ -316,11 +316,11 @@ function AdminSidebar({ onClose, user, enabledModules = [], isCollapsed = false,
                               if (onClose) onClose()
                             }}
                             title={isCollapsed ? item.name : undefined}
-                            className={`group flex items-center rounded-xl transition-all duration-150 relative ${
+                            className={`group flex items-center rounded-3xl transition-all duration-150 relative ${
                               isCollapsed ? 'justify-center p-2.5 my-0.5' : 'justify-between px-2.5 py-2 my-0.5'
                             } text-xs font-medium ${
                               isActive
-                                ? 'bg-blue-600 text-white font-bold shadow-xs'
+                                ? 'bg-emerald-600 text-white font-bold shadow-xs'
                                 : 'text-slate-600 hover:bg-slate-100/70 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-white'
                             }`}
                           >
@@ -348,7 +348,7 @@ function AdminSidebar({ onClose, user, enabledModules = [], isCollapsed = false,
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 8 }}
-              className="absolute bottom-full left-3 right-3 mb-2 rounded-2xl border border-slate-100 bg-white p-2 shadow-xl dark:border-slate-800 dark:bg-slate-900"
+              className="absolute bottom-full left-3 right-3 mb-2 rounded-3xl border border-slate-100 bg-white p-2 shadow-xl dark:border-slate-800 dark:bg-slate-900"
             >
               <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800/60 mb-1">
                 <p className="text-[10px] text-slate-400 uppercase font-semibold tracking-wide">Sesión activa</p>
@@ -356,10 +356,10 @@ function AdminSidebar({ onClose, user, enabledModules = [], isCollapsed = false,
                   {user?.email || 'admin@ensuny.edu.co'}
                 </p>
               </div>
-              <Link href="/admin/profile" onClick={onClose} className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors">
+              <Link href="/admin/profile" onClick={onClose} className="flex items-center gap-2 rounded-3xl px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors">
                 <Settings className="h-4 w-4" /> Configuración
               </Link>
-              <button onClick={handleLogout} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20 transition-colors">
+              <button onClick={handleLogout} className="flex w-full items-center gap-2 rounded-3xl px-3 py-2 text-sm font-medium bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20 transition-colors">
                 <LogOut className="h-4 w-4" /> Cerrar Sesión
               </button>
             </motion.div>
@@ -368,12 +368,12 @@ function AdminSidebar({ onClose, user, enabledModules = [], isCollapsed = false,
 
         <button
           onClick={() => setIsProfileOpen(!isProfileOpen)}
-          className={`flex w-full items-center rounded-2xl p-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer ${
+          className={`flex w-full items-center rounded-3xl p-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer ${
             isCollapsed ? 'justify-center' : 'gap-3'
           }`}
           title={isCollapsed ? user?.name || 'Administrador' : undefined}
         >
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-slate-700 to-slate-900 text-white text-sm font-bold dark:from-slate-200 dark:to-white dark:text-slate-900">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-3xl bg-gradient-to-br from-slate-700 to-slate-900 text-white text-sm font-bold dark:from-slate-200 dark:to-white dark:text-slate-900">
             {user?.name ? user.name[0].toUpperCase() : 'A'}
           </div>
           {!isCollapsed && (
@@ -635,15 +635,15 @@ function SidebarContent({ onClose, isCollapsed = false, user }: SidebarProps) {
                           href={item.href}
                           onClick={onClose}
                           title={isCollapsed ? item.name : undefined}
-                          className={`group flex items-center rounded-xl transition-colors duration-200 ${
+                          className={`group flex items-center rounded-3xl transition-colors duration-200 ${
                             isCollapsed ? 'justify-center p-3' : 'gap-3 px-4 py-2.5'
                           } text-sm font-medium ${
                             isActive
-                              ? 'bg-blue-500/10 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400'
+                              ? 'bg-emerald-500/10 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400'
                               : 'text-slate-500 hover:bg-slate-50 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-white'
                           }`}
                         >
-                          <Icon className={`h-5 w-5 shrink-0 ${isActive ? 'text-blue-700 dark:text-blue-400' : ''}`} />
+                          <Icon className={`h-5 w-5 shrink-0 ${isActive ? 'text-emerald-700 dark:text-emerald-400' : ''}`} />
                           {!isCollapsed && <span className="truncate">{item.name}</span>}
                         </Link>
                       )
@@ -664,7 +664,7 @@ function SidebarContent({ onClose, isCollapsed = false, user }: SidebarProps) {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 10 }}
-              className="absolute bottom-full left-0 mb-3 w-full rounded-2xl border border-slate-100 bg-white p-2 shadow-xl dark:border-slate-800 dark:bg-slate-900"
+              className="absolute bottom-full left-0 mb-3 w-full rounded-3xl border border-slate-100 bg-white p-2 shadow-xl dark:border-slate-800 dark:bg-slate-900"
             >
               <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800/60 mb-1">
                 <p className="text-xs text-slate-400">Sesión iniciada como</p>
@@ -672,7 +672,7 @@ function SidebarContent({ onClose, isCollapsed = false, user }: SidebarProps) {
                   {user?.email || 'estudiante@ensuny.edu.co'}
                 </p>
               </div>
-              <Link href={isTeacher ? '/teacher/settings' : '/student/settings'} onClick={onClose} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors">
+              <Link href={isTeacher ? '/teacher/settings' : '/student/settings'} onClick={onClose} className="flex w-full items-center gap-2 rounded-3xl px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors">
                 <Settings className="h-4 w-4" /> Ajustes
               </Link>
             </motion.div>
@@ -681,7 +681,7 @@ function SidebarContent({ onClose, isCollapsed = false, user }: SidebarProps) {
 
         <div
           onClick={() => setIsProfileOpen(!isProfileOpen)}
-          className={`flex items-center rounded-2xl p-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors ${isCollapsed ? 'justify-center' : 'justify-between'}`}
+          className={`flex items-center rounded-3xl p-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors ${isCollapsed ? 'justify-center' : 'justify-between'}`}
           title={isCollapsed ? (user?.name || 'Estudiante') : undefined}
         >
           <div className="flex items-center gap-3">
@@ -1093,19 +1093,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     window.dispatchEvent(new CustomEvent('open-pwa-install'))
                   }
                 }}
-                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20 text-xs font-semibold transition-all active:scale-[0.98] cursor-pointer"
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-3xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20 text-xs font-semibold transition-all active:scale-[0.98] cursor-pointer"
                 title="Instalar aulaEnsuny en este dispositivo"
               >
                 <Download className="h-3.5 w-3.5" />
                 <span>Instalar</span>
               </button>
-              <button onClick={toggleTheme} className="rounded-xl p-2.5 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors" title="Cambiar tema">
+              <button onClick={toggleTheme} className="rounded-3xl p-2.5 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors" title="Cambiar tema">
                 {isDark ? <Sun className="h-4.5 w-4.5" /> : <Moon className="h-4.5 w-4.5" />}
               </button>
               <div className="relative hidden sm:block">
-                <button onClick={() => setIsNotificationsOpen(!isNotificationsOpen)} className="relative rounded-xl p-2.5 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors">
+                <button onClick={() => setIsNotificationsOpen(!isNotificationsOpen)} className="relative rounded-3xl p-2.5 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors">
                   <Bell className="h-4.5 w-4.5" />
-                  {unreadCount > 0 && <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-blue-500 ring-2 ring-white dark:ring-slate-900" />}
+                  {unreadCount > 0 && <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-900" />}
                 </button>
                 <AnimatePresence>
                 {isNotificationsOpen && (
@@ -1121,7 +1121,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: -6, scale: 0.98 }}
                       transition={{ duration: 0.15 }}
-                      className={`z-50 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900 ${
+                      className={`z-50 overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900 ${
                         isMobile
                           ? 'fixed top-14 right-2 w-[calc(100vw-1rem)] max-w-[360px]'
                           : 'absolute right-0 top-full mt-2 w-80 shadow-xl'
@@ -1131,7 +1131,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         <h3 className="text-sm font-bold text-slate-900 dark:text-white">Notificaciones</h3>
                         <div className="flex items-center gap-2">
                           {unreadCount > 0 && (
-                            <button onClick={markAllNotificationsAsRead} className="text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400">
+                            <button onClick={markAllNotificationsAsRead} className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400">
                               Marcar leídas
                             </button>
                           )}
@@ -1150,10 +1150,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                           </div>
                         ) : notifications.map(notif => (
                           <div key={notif.id}
-                            className={`group flex items-start gap-2 px-3 py-3 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50 ${!notif.read ? 'bg-blue-50/40 dark:bg-blue-900/10' : 'opacity-70'}`}>
+                            className={`group flex items-start gap-2 px-3 py-3 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50 ${!notif.read ? 'bg-emerald-50/40 dark:bg-emerald-900/10' : 'opacity-70'}`}>
                             <div className="flex-1 min-w-0 cursor-pointer" onClick={() => markNotificationAsRead(notif.id)}>
                               <div className="flex items-center gap-1.5">
-                                {!notif.read && <span className="h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0" />}
+                                {!notif.read && <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />}
                                 <h4 className="text-sm font-bold text-slate-900 dark:text-white truncate">{notif.title}</h4>
                               </div>
                               <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mt-0.5">{notif.message}</p>
@@ -1177,7 +1177,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 )}
               </AnimatePresence>
               </div>
-              <button onClick={handleLogout} className="flex items-center gap-2 rounded-xl border border-red-100 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100 hover:border-red-200 transition-all dark:border-red-900/30 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20">
+              <button onClick={handleLogout} className="flex items-center gap-2 rounded-3xl border border-red-100 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100 hover:border-red-200 transition-all dark:border-red-900/30 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20">
                 <LogOut className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">Salir</span>
               </button>
@@ -1326,7 +1326,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     title="Notificaciones"
                   >
                     <Bell className="h-4 w-4" />
-                    {unreadCount > 0 && <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-blue-500 ring-2 ring-white dark:ring-slate-900" />}
+                    {unreadCount > 0 && <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-900" />}
                   </button>
                   <AnimatePresence>
                     {isNotificationsOpen && (
@@ -1342,7 +1342,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                           animate={{ opacity: 1, y: 0, scale: 1 }}
                           exit={{ opacity: 0, y: -6, scale: 0.98 }}
                           transition={{ duration: 0.15 }}
-                          className={`z-50 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900 ${
+                          className={`z-50 overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900 ${
                             isMobile
                               ? 'fixed top-16 right-2 w-[calc(100vw-1rem)] max-w-[360px]'
                               : 'absolute right-0 top-full mt-2 w-80 shadow-xl'
@@ -1352,7 +1352,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                             <h3 className="text-sm font-bold text-slate-900 dark:text-white">Notificaciones</h3>
                             <div className="flex items-center gap-2">
                               {unreadCount > 0 && (
-                                <button onClick={markAllNotificationsAsRead} className="text-xs font-semibold text-blue-600 dark:text-blue-400">
+                                <button onClick={markAllNotificationsAsRead} className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
                                   Marcar leídas
                                 </button>
                               )}
@@ -1371,10 +1371,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                               </div>
                             ) : notifications.map(notif => (
                               <div key={notif.id}
-                                className={`group flex items-start gap-2 px-3 py-3 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50 ${notif.read ? 'opacity-70' : 'bg-blue-50/30 dark:bg-blue-900/10'}`}>
+                                className={`group flex items-start gap-2 px-3 py-3 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50 ${notif.read ? 'opacity-70' : 'bg-emerald-50/30 dark:bg-emerald-900/10'}`}>
                                 <div className="flex-1 min-w-0 cursor-pointer" onClick={() => markNotificationAsRead(notif.id)}>
                                   <div className="flex items-center gap-1.5">
-                                    {!notif.read && <span className="h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0" />}
+                                    {!notif.read && <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />}
                                     <h4 className={`text-sm font-bold truncate ${notif.read ? 'text-slate-700 dark:text-slate-300' : 'text-slate-900 dark:text-white'}`}>{notif.title}</h4>
                                   </div>
                                   <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mt-0.5">{notif.message}</p>
@@ -1462,3 +1462,4 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     </div>
   )
 }
+

@@ -231,20 +231,44 @@ export function StudentPortalScreen() {
   /* ── Skeleton ────────────────────────────────────────────────────── */
   if (loading) {
     return (
-      <div className="portal-student ps-page">
-        <div className="ps-layout">
-          <div className="ps-left-col">
-            <div className="ps-skeleton ps-skeleton-hero animate-pulse" />
-            <div className="ps-skeleton ps-skeleton-hi animate-pulse" />
-          </div>
-          <div className="ps-right-col">
-            <div className="ps-tiles-grid">
-              {[1,2,3,4].map(i => <div key={i} className="ps-skeleton ps-skeleton-tile animate-pulse" />)}
+      <>
+        <style>{`
+          .ps-sk-page { padding: 20px 16px 40px; margin: 0 auto; max-width: 680px; }
+          .ps-sk-layout { display: flex; flex-direction: column; gap: 16px; }
+          .ps-sk-col { display: flex; flex-direction: column; gap: 16px; }
+          .ps-sk-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+          .ps-sk-hero { height: 168px; border-radius: 32px; background: rgba(148, 163, 184, 0.2); }
+          .ps-sk-hi { height: 136px; border-radius: 28px; background: rgba(148, 163, 184, 0.2); }
+          .ps-sk-tile { height: 152px; border-radius: 28px; background: rgba(148, 163, 184, 0.2); }
+          .ps-sk-wide { height: 108px; border-radius: 28px; background: rgba(148, 163, 184, 0.2); }
+          .dark .ps-sk-hero, .dark .ps-sk-hi, .dark .ps-sk-tile, .dark .ps-sk-wide { background: rgba(255, 255, 255, 0.05); }
+          @media(min-width: 1024px) {
+            .ps-sk-page { max-width: 1024px; padding: 32px 32px 60px; }
+            .ps-sk-layout { flex-direction: row; gap: 24px; }
+            .ps-sk-col:first-child { flex: 0 0 340px; }
+            .ps-sk-col:last-child { flex: 1; min-width: 0; }
+            .ps-sk-grid { gap: 16px; }
+            .ps-sk-hero { height: 220px; }
+            .ps-sk-hi { height: 180px; }
+            .ps-sk-tile { height: 178px; }
+            .ps-sk-wide { height: 120px; }
+          }
+        `}</style>
+        <div className="ps-sk-page">
+          <div className="ps-sk-layout">
+            <div className="ps-sk-col">
+              <div className="ps-sk-hero animate-pulse" />
+              <div className="ps-sk-hi animate-pulse" />
             </div>
-            <div className="ps-skeleton ps-skeleton-wide animate-pulse" />
+            <div className="ps-sk-col">
+              <div className="ps-sk-grid">
+                {[1,2,3,4].map(i => <div key={i} className="ps-sk-tile animate-pulse" />)}
+              </div>
+              <div className="ps-sk-wide animate-pulse" />
+            </div>
           </div>
         </div>
-      </div>
+      </>
     )
   }
 
