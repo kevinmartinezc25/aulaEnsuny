@@ -375,11 +375,11 @@ export function PlanillaAsistidaListScreen({ initialSubjects }: PlanillaAsistida
               <div className="pl-gg">
                 <div>
                   <small>GRADO</small>
-                  <b>{subject.grade === 12 ? 'P-12' : subject.grade === 13 ? 'P-13' : subject.grade === 0 ? 'Niv' : (subject.grade ? `Grado ${subject.grade}` : '-')}</b>
+                  <b>{subject.grade === 12 ? 'P-12' : subject.grade === 13 ? 'P-13' : subject.grade === 0 ? 'Niv' : (subject.grade ? `${subject.grade}` : '-')}</b>
                 </div>
                 <div>
                   <small>GRUPO</small>
-                  <b>Grupo {subject.group_number !== undefined && subject.group_number !== null ? subject.group_number : '1'}</b>
+                  <b>{subject.group_number !== undefined && subject.group_number !== null ? subject.group_number : '1'}</b>
                 </div>
               </div>
 

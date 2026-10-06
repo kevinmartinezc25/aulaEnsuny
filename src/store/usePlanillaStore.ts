@@ -160,7 +160,7 @@ export const usePlanillaStore = create<PlanillaState>((set, get) => ({
         newGrades[studentId][activityId] = value
         
         if (existingDirtyIndex >= 0) {
-          newDirty[existingDirtyIndex].grade_value = value
+          newDirty[existingDirtyIndex] = { ...newDirty[existingDirtyIndex], grade_value: value }
         } else {
           newDirty.push({ student_id: studentId, activity_id: activityId, grade_value: value })
         }
@@ -301,9 +301,23 @@ export const usePlanillaStore = create<PlanillaState>((set, get) => ({
 
   setSessions: (sessions) => set({ sessions }),
 
-  addSession: (session) => set(state => ({
-    sessions: [...state.sessions, session].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-  })),
+  addSession: (session) => set(state => {
+    const newAttendance = { ...state.attendance }
+    state.students.forEach(student => {
+      if (!newAttendance[student.id]) {
+        newAttendance[student.id] = {}
+      }
+      newAttendance[student.id] = {
+        ...newAttendance[student.id],
+        [session.id]: 'A'
+      }
+    })
+
+    return {
+      sessions: [...state.sessions, session].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
+      attendance: newAttendance
+    }
+  }),
 
   updateSession: (session) => set(state => ({
     sessions: state.sessions.map(s => s.id === session.id ? session : s).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())

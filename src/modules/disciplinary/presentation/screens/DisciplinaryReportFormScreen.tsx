@@ -298,7 +298,7 @@ export function DisciplinaryReportFormScreen() {
                 Paso 1: Seleccionar Estudiante
               </h2>
               <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-                Selecciona al estudiante involucrado según tu carga académica de horarios o realiza una búsqueda rápida.
+                Selecciona al estudiante involucrado explorando por grado y grupo institucional o realiza una búsqueda rápida.
               </p>
             </div>
 

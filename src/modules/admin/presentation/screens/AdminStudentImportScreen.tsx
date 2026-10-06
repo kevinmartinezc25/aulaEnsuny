@@ -17,7 +17,7 @@ import {
   type ImportRowValidated,
   type ImportResult,
 } from '../../application/studentImportActions'
-import { normalizeGradeLevel } from '@/lib/gradeUtils'
+import { normalizeGradeLevel, normalizeSede, normalizeModality } from '@/lib/gradeUtils'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TIPOS
@@ -33,9 +33,21 @@ type ImportStep = 'upload' | 'preview' | 'importing' | 'done'
 
 const COLUMN_MAP: Record<string, string> = {
   'apellidos y nombres': 'fullName',
+  'apellidos y nombre': 'fullName',
+  'estudiante': 'fullName',
+  'nombre completo': 'fullName',
   'documento': 'documentId',
+  'identificacion': 'documentId',
+  'ti': 'documentId',
+  'cc': 'documentId',
+  'rc': 'documentId',
   'grado': 'gradeLevel',
   'grupo': 'groupName',
+  'sede': 'sede',
+  'sede educativa': 'sede',
+  'plantel': 'sede',
+  'modalidad': 'modalidad',
+  'metodologia': 'modalidad',
   'email': 'email',
   'correo': 'email',
 }
@@ -92,6 +104,8 @@ function parseFileToRows(file: File): Promise<StudentImportRow[]> {
             documentId: rawObj.documentId,
             gradeLevel: normalizeGradeLevel(rawObj.gradeLevel),
             groupName: rawObj.groupName,
+            sede: rawObj.sede ? normalizeSede(rawObj.sede) : 'Sede Principal',
+            modalidad: rawObj.modalidad ? normalizeModality(rawObj.modalidad) : 'Tradicional',
             email: rawObj.email,
           }
 
@@ -551,6 +565,8 @@ export function AdminStudentImportScreen() {
                         <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Documento</th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Grado</th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Grupo</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Sede</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Modalidad</th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Estado</th>
                         <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Excluir</th>
                       </tr>
@@ -575,15 +591,20 @@ export function AdminStudentImportScreen() {
                           >
                             <td className="px-4 py-2.5 text-xs text-slate-400">{index + 1}</td>
 
-                            {(['lastName', 'firstName', 'documentId', 'gradeLevel', 'groupName'] as const).map(field => {
-                              const minWidth = field === 'lastName' || field === 'firstName' ? 'min-w-[180px]' : 'min-w-[80px]'
+                            {(['lastName', 'firstName', 'documentId', 'gradeLevel', 'groupName', 'sede', 'modalidad'] as const).map(field => {
+                              const minWidth = field === 'lastName' || field === 'firstName'
+                                ? 'min-w-[160px]'
+                                : field === 'sede' || field === 'modalidad'
+                                ? 'min-w-[130px]'
+                                : 'min-w-[70px]'
                               return (
-                                <td key={field} className="px-4 py-2">
+                                <td key={field} className="px-3 py-2">
                                   <input
                                     type="text"
                                     value={row[field] || ''}
                                     onChange={e => handleCellEdit(row.rowIndex, field, e.target.value)}
                                     disabled={isExcluded}
+                                    placeholder={field === 'sede' ? 'Sede Principal' : field === 'modalidad' ? 'Tradicional' : ''}
                                     className={`w-full ${minWidth} text-sm rounded-lg px-2 py-1 border transition-colors bg-transparent
                                       ${hasIssue && !isExcluded
                                         ? 'border-amber-200 dark:border-amber-700 focus:border-amber-400'

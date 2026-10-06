@@ -6,8 +6,21 @@ import { revalidatePath } from 'next/cache'
 import {
   AdminUser, AdminCourse, AcademicLevel, AcademicGroup, AdminTeacher, AdminStudent,
   StudentDetails, StudentContact, StudentGuardians, StudentMedicalInfo,
-  StudentDocument, StudentEnrollment, StudentAcademicHistory, FullStudentData
+  StudentDocument, StudentEnrollment, StudentAcademicHistory, FullStudentData,
+  AcademicGroupWithStats, GradeLevelOverviewItem, MissingStudentGroup, AcademicGradeLevelsOverview,
+  InstitutionalSede
 } from './types'
+import {
+  parseMetadataFromNotes,
+  buildNotesWithMetadata,
+  normalizeSede,
+  normalizeModality,
+  normalizeGradeLevel,
+  getGradeLevelHierarchyIndex,
+  DEFAULT_INSTITUTIONAL_SEDES,
+  OFFICIAL_GRADE_LEVELS,
+  OFFICIAL_MODALITIES
+} from '@/lib/gradeUtils'
 
 import {
   ALL_ADMIN_MODULES,
@@ -83,6 +96,10 @@ export async function createAdminUser(data: {
   grade?: string
   password?: string
   documentId?: string
+  teachingLevel?: 'preescolar' | 'primaria' | 'secundaria_media' | 'multigrado'
+  sede?: string
+  isMultigradeTeacher?: boolean
+  assignedGroup?: string
 }) {
   try {
     const adminClient = createAdminClient()
@@ -92,20 +109,26 @@ export async function createAdminUser(data: {
     const firstName = nameParts[0] || 'Nuevo'
     const lastName = nameParts.slice(1).join(' ') || 'Usuario'
 
+    const userMetadata: Record<string, any> = {
+      first_name: firstName,
+      last_name: lastName,
+      full_name: data.name,
+      phone: data.phone || null,
+      document_id: data.documentId || null,
+      role_name: data.role,
+      grade_level: data.role === 'student' ? data.grade : null,
+    }
+    if (data.teachingLevel) userMetadata.teaching_level = data.teachingLevel
+    if (data.sede) userMetadata.sede = data.sede
+    if (data.isMultigradeTeacher !== undefined) userMetadata.is_multigrade_teacher = data.isMultigradeTeacher
+    if (data.assignedGroup) userMetadata.assigned_group = data.assignedGroup
+
     // 1. Crear el usuario en Supabase Auth (confirmado por defecto)
     const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
       email: data.email,
       password: data.password && data.password.trim() !== '' ? data.password.trim() : 'Ensuny2026!',
       email_confirm: true,
-      user_metadata: {
-        first_name: firstName,
-        last_name: lastName,
-        full_name: data.name,
-        phone: data.phone || null,
-        document_id: data.documentId || null,
-        role_name: data.role,
-        grade_level: data.role === 'student' ? data.grade : null,
-      }
+      user_metadata: userMetadata
     })
 
     if (createError) {
@@ -116,13 +139,15 @@ export async function createAdminUser(data: {
       return { error: 'No se pudo crear el usuario en Auth.' }
     }
 
-    // 2. Dado que el trigger handle_new_user() crea el perfil automáticamente al insertarse en auth.users,
-    // actualizamos el estado del perfil recién creado.
+    // 2. Actualizamos el perfil básico
+    const profileUpdate: Record<string, any> = { 
+      status: data.status
+    }
+    if (data.assignedGroup) profileUpdate.group_name = data.assignedGroup
+
     const { error: updateProfileError } = await adminClient
       .from('profiles')
-      .update({ 
-        status: data.status
-      })
+      .update(profileUpdate)
       .eq('id', newUser.user.id)
 
     if (updateProfileError) {
@@ -140,7 +165,21 @@ export async function createAdminUser(data: {
       }
     }
 
+    // Intentar persistir campos extendidos si las columnas existen en la base de datos
+    if (data.teachingLevel || data.sede || data.isMultigradeTeacher !== undefined) {
+      try {
+        const extendedProfile: Record<string, any> = {}
+        if (data.teachingLevel) extendedProfile.teaching_level = data.teachingLevel
+        if (data.sede) extendedProfile.sede = data.sede
+        if (data.isMultigradeTeacher !== undefined) extendedProfile.is_multigrade_teacher = data.isMultigradeTeacher
+        await adminClient.from('profiles').update(extendedProfile).eq('id', newUser.user.id)
+      } catch {
+        // Fallback no bloqueante si la migración aún no se ha corrido en Postgres
+      }
+    }
+
     revalidatePath('/admin/users')
+    revalidatePath('/admin/teachers')
     return { success: true }
   } catch (error: any) {
     console.error('Error en createAdminUser:', error)
@@ -162,6 +201,10 @@ export async function updateAdminUser(
     grade?: string
     password?: string
     documentId?: string
+    teachingLevel?: 'preescolar' | 'primaria' | 'secundaria_media' | 'multigrado'
+    sede?: string
+    isMultigradeTeacher?: boolean
+    assignedGroup?: string
   }
 ) {
   try {
@@ -191,6 +234,9 @@ export async function updateAdminUser(
       grade_level: data.role === 'student' ? data.grade : null,
       status: data.status,
     }
+    if (data.assignedGroup !== undefined) {
+      profileUpdate.group_name = data.assignedGroup || null
+    }
 
     const { error: profileError } = await adminClient
       .from('profiles')
@@ -212,6 +258,19 @@ export async function updateAdminUser(
       }
     }
 
+    // Intentar actualizar campos extendidos en profiles si existen
+    if (data.teachingLevel !== undefined || data.sede !== undefined || data.isMultigradeTeacher !== undefined) {
+      try {
+        const extendedProfile: Record<string, any> = {}
+        if (data.teachingLevel !== undefined) extendedProfile.teaching_level = data.teachingLevel
+        if (data.sede !== undefined) extendedProfile.sede = data.sede
+        if (data.isMultigradeTeacher !== undefined) extendedProfile.is_multigrade_teacher = data.isMultigradeTeacher
+        await adminClient.from('profiles').update(extendedProfile).eq('id', id)
+      } catch {
+        // Fallback no bloqueante si la migración aún no se ha corrido en Postgres
+      }
+    }
+
     // 3. Actualizar Supabase Auth (si el usuario existe en Auth)
     const { data: authUserData, error: getAuthError } = await adminClient.auth.admin.getUserById(id)
 
@@ -225,6 +284,10 @@ export async function updateAdminUser(
       } as any
       if (data.phone !== undefined) metadataPayload.phone = data.phone
       if (data.documentId !== undefined) metadataPayload.document_id = data.documentId || null
+      if (data.teachingLevel !== undefined) metadataPayload.teaching_level = data.teachingLevel
+      if (data.sede !== undefined) metadataPayload.sede = data.sede
+      if (data.isMultigradeTeacher !== undefined) metadataPayload.is_multigrade_teacher = data.isMultigradeTeacher
+      if (data.assignedGroup !== undefined) metadataPayload.assigned_group = data.assignedGroup
 
       // Preparar payload de actualización para Auth
       const authPayload: any = {
@@ -556,20 +619,294 @@ export async function getAcademicLevels(): Promise<AcademicLevel[]> {
 
     if (error) throw error
 
-    return (data || []).map(item => ({
+    const list = (data || []).map(item => ({
       id: item.id,
       name: item.name,
       createdAt: new Date(item.created_at).toISOString().split('T')[0]
     }))
+
+    list.sort((a, b) => getGradeLevelHierarchyIndex(a.name) - getGradeLevelHierarchyIndex(b.name))
+    return list
   } catch (error) {
     console.error('Error al obtener grados, usando fallback mock:', error)
-    // Retorna fallback mock si la tabla no existe o falla
     return [
       { id: '1', name: '8°', createdAt: '2026-01-01' },
       { id: '2', name: '9°', createdAt: '2026-01-01' },
       { id: '3', name: '10°', createdAt: '2026-01-01' },
       { id: '4', name: '11°', createdAt: '2026-01-01' }
     ]
+  }
+}
+
+/**
+ * Obtiene la vista general enriquecida de Grados Escolares, conectada
+ * directamente con la población institucional de Gestión de Estudiantes.
+ */
+export async function getAdminGradeLevelsOverview(selectedSede?: string): Promise<AcademicGradeLevelsOverview> {
+  try {
+    const adminClient = createAdminClient()
+
+    // 1. Obtener niveles académicos oficiales
+    const { data: dbLevels, error: lError } = await adminClient
+      .from('academic_levels')
+      .select('*')
+
+    if (lError) throw lError
+
+    // 2. Obtener grupos académicos registrados
+    const { data: dbGroups, error: gError } = await adminClient
+      .from('academic_groups')
+      .select('*')
+      .order('name', { ascending: true })
+
+    if (gError) throw gError
+
+    // 3. Obtener materias / cursos asignados
+    const { data: dbCourses } = await adminClient
+      .from('courses')
+      .select('grade_level')
+
+    // 4. Obtener la población UNIFICADA de estudiantes (Profiles + Directorio SIMAT)
+    const allStudents = await getAdminStudents()
+
+    // Filtrar por sede si se seleccionó una sede específica distinta de 'all'
+    const filteredStudents = selectedSede && selectedSede !== 'all'
+      ? allStudents.filter(s => normalizeSede(s.sede) === normalizeSede(selectedSede))
+      : allStudents
+
+    // Mapa de grupos registrados agrupados por levelId
+    const groupsByLevelId: Record<string, typeof dbGroups> = {}
+    for (const g of dbGroups || []) {
+      if (!groupsByLevelId[g.academic_level_id]) {
+        groupsByLevelId[g.academic_level_id] = []
+      }
+      groupsByLevelId[g.academic_level_id].push(g)
+    }
+
+    // Mapa de cursos por nombre normalizado de grado
+    const coursesByGrade: Record<string, number> = {}
+    for (const c of dbCourses || []) {
+      if (c.grade_level) {
+        const norm = normalizeGradeLevel(c.grade_level)
+        coursesByGrade[norm] = (coursesByGrade[norm] || 0) + 1
+      }
+    }
+
+    // Calcular estadísticas de estudiantes por grado y grupo
+    const studentStatsByGrade: Record<string, {
+      total: number
+      byGroup: Record<string, number>
+      sedes: Record<string, number>
+      modalidades: Record<string, number>
+    }> = {}
+
+    for (const s of filteredStudents) {
+      const normGrade = normalizeGradeLevel(s.gradeLevel) || s.gradeLevel || 'Sin Grado'
+      if (!studentStatsByGrade[normGrade]) {
+        studentStatsByGrade[normGrade] = {
+          total: 0,
+          byGroup: {},
+          sedes: {},
+          modalidades: {}
+        }
+      }
+      studentStatsByGrade[normGrade].total += 1
+      const gName = (s.groupName || '1').trim()
+      studentStatsByGrade[normGrade].byGroup[gName] = (studentStatsByGrade[normGrade].byGroup[gName] || 0) + 1
+
+      const sSede = normalizeSede(s.sede)
+      studentStatsByGrade[normGrade].sedes[sSede] = (studentStatsByGrade[normGrade].sedes[sSede] || 0) + 1
+
+      const sMod = normalizeModality(s.modalidad)
+      studentStatsByGrade[normGrade].modalidades[sMod] = (studentStatsByGrade[normGrade].modalidades[sMod] || 0) + 1
+    }
+
+    const missingGroups: MissingStudentGroup[] = []
+
+    // Construir la lista de niveles con estadísticas
+    const levelsWithStats: GradeLevelOverviewItem[] = (dbLevels || []).map(lvl => {
+      const normLvl = normalizeGradeLevel(lvl.name)
+      const gradeStat = studentStatsByGrade[normLvl] || {
+        total: 0,
+        byGroup: {},
+        sedes: {},
+        modalidades: {}
+      }
+
+      const levelGroups = groupsByLevelId[lvl.id] || []
+      const registeredGroupNames = new Set(levelGroups.map(g => g.name.trim()))
+
+      const groupsWithStats: AcademicGroupWithStats[] = levelGroups.map(g => {
+        const count = gradeStat.byGroup[g.name.trim()] || 0
+        return {
+          id: g.id,
+          academicLevelId: g.academic_level_id,
+          name: g.name,
+          studentsCount: count,
+          createdAt: new Date(g.created_at).toISOString().split('T')[0]
+        }
+      })
+
+      // Detectar grupos que tienen estudiantes pero aún no existen en academic_groups
+      for (const [stGroup, count] of Object.entries(gradeStat.byGroup)) {
+        if (!registeredGroupNames.has(stGroup) && count > 0) {
+          missingGroups.push({
+            gradeLevel: lvl.name,
+            groupName: stGroup,
+            studentsCount: count,
+            academicLevelId: lvl.id
+          })
+        }
+      }
+
+      return {
+        id: lvl.id,
+        name: lvl.name,
+        createdAt: new Date(lvl.created_at).toISOString().split('T')[0],
+        groups: groupsWithStats,
+        studentsCount: gradeStat.total,
+        coursesCount: coursesByGrade[normLvl] || coursesByGrade[lvl.name] || 0,
+        sedesDistribution: gradeStat.sedes,
+        modalidadesDistribution: gradeStat.modalidades
+      }
+    })
+
+    // Ordenar jerárquicamente por orden pedagógico oficial (Preescolar -> Primaria -> Secundaria -> Media -> PFC/Multigrado)
+    levelsWithStats.sort((a, b) => getGradeLevelHierarchyIndex(a.name) - getGradeLevelHierarchyIndex(b.name))
+
+    return {
+      levels: levelsWithStats,
+      totalStudents: filteredStudents.length,
+      totalCourses: (dbCourses || []).length,
+      totalGroups: (dbGroups || []).length,
+      sedes: Array.from(DEFAULT_INSTITUTIONAL_SEDES),
+      missingGroups
+    }
+  } catch (error) {
+    console.error('Error al obtener vista general de grados escolares:', error)
+    return {
+      levels: [],
+      totalStudents: 0,
+      totalCourses: 0,
+      totalGroups: 0,
+      sedes: Array.from(DEFAULT_INSTITUTIONAL_SEDES),
+      missingGroups: []
+    }
+  }
+}
+
+/**
+ * Obtiene los estudiantes de un grado escolar específico (para el modal visor).
+ */
+export async function getStudentsByGradeLevel(
+  gradeLevel: string,
+  groupName?: string,
+  selectedSede?: string
+): Promise<AdminStudent[]> {
+  try {
+    const allStudents = await getAdminStudents()
+    const normTarget = normalizeGradeLevel(gradeLevel)
+
+    return allStudents.filter(s => {
+      const sNorm = normalizeGradeLevel(s.gradeLevel)
+      if (sNorm !== normTarget && s.gradeLevel !== gradeLevel) return false
+      if (groupName && groupName !== 'all' && (s.groupName || '1').trim() !== groupName.trim()) return false
+      if (selectedSede && selectedSede !== 'all' && normalizeSede(s.sede) !== normalizeSede(selectedSede)) return false
+      return true
+    })
+  } catch (error) {
+    console.error('Error al obtener estudiantes por grado:', error)
+    return []
+  }
+}
+
+/**
+ * Sincroniza automáticamente los grupos presentes en estudiantes que aún no
+ * han sido creados en academic_groups y sch_groups.
+ */
+export async function syncMissingGroupsFromStudents(): Promise<{ success: boolean; createdCount: number; error?: string }> {
+  try {
+    const adminClient = createAdminClient()
+    const overview = await getAdminGradeLevelsOverview()
+    if (!overview.missingGroups || overview.missingGroups.length === 0) {
+      return { success: true, createdCount: 0 }
+    }
+
+    let createdCount = 0
+    for (const missing of overview.missingGroups) {
+      if (!missing.academicLevelId) continue
+
+      // 1. Insertar en academic_groups si no existe
+      const { data: existingGroup } = await adminClient
+        .from('academic_groups')
+        .select('id')
+        .eq('academic_level_id', missing.academicLevelId)
+        .eq('name', missing.groupName)
+        .maybeSingle()
+
+      if (!existingGroup) {
+        await adminClient.from('academic_groups').insert({
+          academic_level_id: missing.academicLevelId,
+          name: missing.groupName
+        })
+        createdCount++
+      }
+
+      // 2. Sincronizar en sch_groups
+      const schGroupName = `${missing.gradeLevel}-${missing.groupName}`
+      const { data: existingSch } = await adminClient
+        .from('sch_groups')
+        .select('id')
+        .eq('name', schGroupName)
+        .maybeSingle()
+
+      if (!existingSch) {
+        let levelCategory = 'Secundaria'
+        const norm = normalizeGradeLevel(missing.gradeLevel)
+        if (['Párvulos', 'Pre-Jardín', 'Jardín', 'Transición'].includes(norm)) levelCategory = 'Preescolar'
+        else if (['1°', '2°', '3°', '4°', '5°'].includes(norm)) levelCategory = 'Primaria'
+        else if (['10°', '11°'].includes(norm)) levelCategory = 'Media'
+        else if (norm.startsWith('PFC') || norm === 'Nivelatorio') levelCategory = 'PFC'
+        else if (norm === 'Aula Multigrado') levelCategory = 'Multigrado'
+
+        await adminClient.from('sch_groups').insert({
+          name: schGroupName,
+          level: levelCategory,
+          is_active: true
+        })
+      }
+    }
+
+    revalidatePath('/admin/grade-levels')
+    return { success: true, createdCount }
+  } catch (error: any) {
+    console.error('Error al sincronizar grupos desde estudiantes:', error)
+    return { success: false, createdCount: 0, error: error.message }
+  }
+}
+
+/**
+ * Aprovisiona en lote los grados oficiales institucionales del MEN que aún no existan.
+ */
+export async function createMissingOfficialGradeLevels(): Promise<{ success: boolean; createdCount: number; error?: string }> {
+  try {
+    const adminClient = createAdminClient()
+    const { data: existing } = await adminClient.from('academic_levels').select('name')
+    const existingSet = new Set((existing || []).map(e => normalizeGradeLevel(e.name).toLowerCase()))
+
+    let createdCount = 0
+    for (const off of OFFICIAL_GRADE_LEVELS) {
+      if (!existingSet.has(off.toLowerCase())) {
+        await adminClient.from('academic_levels').insert({ name: off })
+        createdCount++
+      }
+    }
+
+    revalidatePath('/admin/grade-levels')
+    return { success: true, createdCount }
+  } catch (error: any) {
+    console.error('Error al aprovisionar grados oficiales:', error)
+    return { success: false, createdCount: 0, error: error.message }
   }
 }
 
@@ -581,7 +918,7 @@ export async function createAcademicLevel(name: string) {
     const adminClient = createAdminClient()
     const { error } = await adminClient
       .from('academic_levels')
-      .insert({ name })
+      .insert({ name: name.trim() })
 
     if (error) {
       return { error: error.message }
@@ -618,8 +955,6 @@ export async function deleteAcademicLevel(id: string) {
   }
 }
 
-
-
 /**
  * Obtener los grupos de un grado escolar.
  */
@@ -650,17 +985,52 @@ export async function getAcademicGroups(levelId: string): Promise<AcademicGroup[
 }
 
 /**
- * Crear un nuevo grupo académico para un grado.
+ * Crear un nuevo grupo académico para un grado (sincronizando con sch_groups).
  */
 export async function createAcademicGroup(levelId: string, name: string) {
   try {
     const adminClient = createAdminClient()
+    const cleanName = name.trim()
+
+    // 1. Obtener nivel para construir nombre compuesto (ej: 6°-1)
+    const { data: level } = await adminClient
+      .from('academic_levels')
+      .select('name')
+      .eq('id', levelId)
+      .single()
+
     const { error } = await adminClient
       .from('academic_groups')
-      .insert({ academic_level_id: levelId, name: name.trim() })
+      .insert({ academic_level_id: levelId, name: cleanName })
 
     if (error) {
       return { error: error.message }
+    }
+
+    // 2. Sincronizar en sch_groups
+    if (level?.name) {
+      const schGroupName = `${level.name}-${cleanName}`
+      const { data: existingSch } = await adminClient
+        .from('sch_groups')
+        .select('id')
+        .eq('name', schGroupName)
+        .maybeSingle()
+
+      if (!existingSch) {
+        let levelCategory = 'Secundaria'
+        const norm = normalizeGradeLevel(level.name)
+        if (['Párvulos', 'Pre-Jardín', 'Jardín', 'Transición'].includes(norm)) levelCategory = 'Preescolar'
+        else if (['1°', '2°', '3°', '4°', '5°'].includes(norm)) levelCategory = 'Primaria'
+        else if (['10°', '11°'].includes(norm)) levelCategory = 'Media'
+        else if (norm.startsWith('PFC') || norm === 'Nivelatorio') levelCategory = 'PFC'
+        else if (norm === 'Aula Multigrado') levelCategory = 'Multigrado'
+
+        await adminClient.from('sch_groups').insert({
+          name: schGroupName,
+          level: levelCategory,
+          is_active: true
+        })
+      }
     }
 
     revalidatePath('/admin/grade-levels')
@@ -728,6 +1098,7 @@ export async function getAdminTeachers(): Promise<AdminTeacher[]> {
 
     return (profiles || []).map(p => {
       const authUser = authUsers?.find(u => u.id === p.id)
+      const meta = authUser?.user_metadata || {}
       
       // Buscar cursos reales asignados en la tabla courses
       const teacherCourses = (courses || [])
@@ -743,11 +1114,15 @@ export async function getAdminTeachers(): Promise<AdminTeacher[]> {
         id: p.id,
         name: `${p.first_name} ${p.last_name}`,
         email: authUser?.email || (p as any).email || 'sin-correo@ensuny.edu.co',
-        phone: authUser?.user_metadata?.phone || authUser?.phone || (p as any).phone || 'No registrado',
-        documentId: p.document_id || authUser?.user_metadata?.document_id || '',
+        phone: meta.phone || authUser?.phone || (p as any).phone || 'No registrado',
+        documentId: p.document_id || meta.document_id || '',
         subjects,
         status: (p.status || 'active') as 'active' | 'inactive',
-        joinedDate: new Date(p.created_at).toISOString().split('T')[0]
+        joinedDate: new Date(p.created_at).toISOString().split('T')[0],
+        teachingLevel: (p as any).teaching_level || meta.teaching_level || 'secundaria_media',
+        sede: (p as any).sede || meta.sede || 'Sede Principal',
+        isMultigradeTeacher: (p as any).is_multigrade_teacher ?? (meta.is_multigrade_teacher ?? false),
+        assignedGroup: p.group_name || meta.assigned_group || undefined
       }
     })
   } catch (error) {
@@ -788,6 +1163,12 @@ export async function getAdminStudents(): Promise<AdminStudent[]> {
 
     if (dirError) throw dirError
 
+    // 4. Obtener datos de matrícula para recuperar sedes
+    const { data: allEnrollments } = await adminClient
+      .from('student_enrollments')
+      .select('student_id, sede')
+      .order('academic_year', { ascending: false })
+
     // Consultar student_details para identificar documentos de los estudiantes ya registrados
     const { data: registeredDetails } = await adminClient
       .from('student_details')
@@ -811,6 +1192,7 @@ export async function getAdminStudents(): Promise<AdminStudent[]> {
 
     const registeredStudents = (profiles || []).map(p => {
       const authUser = authUsers?.find(u => u.id === p.id)
+      const enroll = allEnrollments?.find(e => e.student_id === p.id)
       return {
         id: p.id,
         name: `${p.first_name} ${p.last_name}`,
@@ -821,6 +1203,8 @@ export async function getAdminStudents(): Promise<AdminStudent[]> {
         groupName: p.group_name || '',
         status: (p.status || 'active') as 'active' | 'inactive',
         joinedDate: new Date(p.created_at).toISOString().split('T')[0],
+        sede: enroll?.sede || (p as any).sede || 'Sede Principal',
+        modalidad: (enroll as any)?.modalidad || (p as any).modalidad || 'Tradicional',
         source: 'profiles' as const
       }
     })
@@ -837,18 +1221,23 @@ export async function getAdminStudents(): Promise<AdminStudent[]> {
         }
         return true
       })
-      .map(d => ({
-        id: d.id,
-        name: `${d.first_name} ${d.last_name}`,
-        firstName: d.first_name || '',
-        lastName: d.last_name || '',
-        email: 'Sin cuenta virtual',
-        gradeLevel: d.grade_level || '',
-        groupName: d.group_name || '',
-        status: (d.status || 'active') as 'active' | 'inactive',
-        joinedDate: new Date(d.created_at).toISOString().split('T')[0],
-        source: 'directory' as const
-      }))
+      .map(d => {
+        const meta = parseMetadataFromNotes(d.notes)
+        return {
+          id: d.id,
+          name: `${d.first_name} ${d.last_name}`,
+          firstName: d.first_name || '',
+          lastName: d.last_name || '',
+          email: 'Sin cuenta virtual',
+          gradeLevel: d.grade_level || '',
+          groupName: d.group_name || '',
+          status: (d.status || 'active') as 'active' | 'inactive',
+          joinedDate: new Date(d.created_at).toISOString().split('T')[0],
+          sede: d.sede || meta.sede || 'Sede Principal',
+          modalidad: d.modalidad || meta.modalidad || 'Tradicional',
+          source: 'directory' as const
+        }
+      })
 
     return [...registeredStudents, ...unregisteredStudents]
   } catch (error) {
@@ -1427,11 +1816,14 @@ export async function getAdminStudentById(id: string): Promise<FullStudentData |
       let mappedEnrollment: StudentEnrollment
       if (enrollments && enrollments.length > 0) {
         const activeEnroll = enrollments[0]
+        const enrollMeta = parseMetadataFromNotes(activeEnroll.observations)
+        const dirMeta = parseMetadataFromNotes(dirStudent?.notes)
         mappedEnrollment = {
           academicYear: activeEnroll.academic_year || new Date().getFullYear(),
           enrollmentDate: activeEnroll.enrollment_date || new Date().toISOString().split('T')[0],
           enrollmentStatus: (activeEnroll.enrollment_status || profile.status || 'active') as any,
-          sede: activeEnroll.sede || 'Principal',
+          sede: activeEnroll.sede || dirStudent?.sede || enrollMeta.sede || dirMeta.sede || 'Sede Principal',
+          modalidad: (activeEnroll as any).modalidad || enrollMeta.modalidad || dirStudent?.modalidad || dirMeta.modalidad || 'Tradicional',
           jornada: (activeEnroll.jornada || 'Única') as any,
           gradeLevel: activeEnroll.grade_level || profile.grade_level || dirStudent?.grade_level || '',
           groupName: activeEnroll.group_name || profile.group_name || dirStudent?.group_name || '',
@@ -1449,11 +1841,13 @@ export async function getAdminStudentById(id: string): Promise<FullStudentData |
           observations: activeEnroll.observations || undefined
         }
       } else {
+        const dirMeta = parseMetadataFromNotes(dirStudent?.notes)
         mappedEnrollment = {
           academicYear: Number(dirStudent?.academic_year) || new Date().getFullYear(),
           enrollmentDate: new Date().toISOString().split('T')[0],
           enrollmentStatus: (profile.status || dirStudent?.status || 'active') as any,
-          sede: 'Principal',
+          sede: dirStudent?.sede || dirMeta.sede || 'Sede Principal',
+          modalidad: dirStudent?.modalidad || dirMeta.modalidad || 'Tradicional',
           jornada: 'Única',
           gradeLevel: profile.grade_level || dirStudent?.grade_level || '',
           groupName: profile.group_name || dirStudent?.group_name || '',
@@ -1764,7 +2158,7 @@ export async function enrollStudent(data: FullStudentData) {
         previous_department: data.enrollment.previousDepartment || null,
         previous_grade: data.enrollment.previousGrade || null,
         previous_year: data.enrollment.previousYear || null,
-        observations: data.enrollment.observations || null,
+        observations: buildNotesWithMetadata(data.enrollment.observations, data.enrollment.sede, data.enrollment.modalidad),
         created_at: new Date().toISOString()
       }, { onConflict: 'student_id,academic_year' })
     ]
@@ -1885,7 +2279,7 @@ export async function updateStudent(id: string, data: FullStudentData) {
           group_name: data.enrollment.groupName,
           status: data.enrollment.enrollmentStatus === 'active' ? 'active' : 'inactive',
           academic_year: String(data.enrollment.academicYear),
-          notes: data.enrollment.observations || null,
+          notes: buildNotesWithMetadata(data.enrollment.observations, data.enrollment.sede, data.enrollment.modalidad),
           updated_at: new Date().toISOString()
         })
         .eq('id', directoryId)
@@ -2101,7 +2495,7 @@ export async function updateStudent(id: string, data: FullStudentData) {
           previous_department: data.enrollment.previousDepartment || null,
           previous_grade: data.enrollment.previousGrade || null,
           previous_year: data.enrollment.previousYear || null,
-          observations: data.enrollment.observations || null,
+          observations: buildNotesWithMetadata(data.enrollment.observations, data.enrollment.sede, data.enrollment.modalidad),
           updated_at: new Date().toISOString()
         }, { onConflict: 'student_id,academic_year' })
       ]
@@ -2581,6 +2975,221 @@ export async function saveScheduleSlotsAction(slots: {
     return { success: false, error: err.message || 'Error desconocido' }
   }
 }
+
+/**
+ * Obtener sedes institucionales con conteo real de estudiantes asociados.
+ */
+export async function getInstitutionalSedes(): Promise<InstitutionalSede[]> {
+  try {
+    const adminClient = createAdminClient()
+    const { data, error } = await adminClient
+      .from('institutional_sedes')
+      .select('*')
+      .order('created_at', { ascending: true })
+
+    // Obtener conteo de estudiantes agrupados por sede para enriquecer las estadísticas
+    const allStudents = await getAdminStudents()
+    const studentsBySede: Record<string, number> = {}
+    for (const s of allStudents) {
+      const sName = normalizeSede(s.sede)
+      studentsBySede[sName] = (studentsBySede[sName] || 0) + 1
+    }
+
+    if (error || !data || data.length === 0) {
+      return DEFAULT_INSTITUTIONAL_SEDES.map(s => ({
+        id: s,
+        name: s,
+        zone: s === 'Sede Principal' ? 'Urbana' : 'Rural',
+        hasMultigrade: s !== 'Sede Principal',
+        isActive: true,
+        studentsCount: studentsBySede[s] || 0,
+        createdAt: new Date().toISOString()
+      }))
+    }
+
+    return data.map(d => ({
+      id: d.id,
+      name: d.name,
+      daneCode: d.dane_code,
+      zone: (d.zone || (d.name === 'Sede Principal' ? 'Urbana' : 'Rural')) as 'Urbana' | 'Rural',
+      hasMultigrade: !!d.has_multigrade,
+      address: d.address,
+      contactPhone: d.contact_phone,
+      isActive: d.is_active !== false,
+      studentsCount: studentsBySede[normalizeSede(d.name)] || 0,
+      createdAt: d.created_at ? new Date(d.created_at).toISOString().split('T')[0] : ''
+    }))
+  } catch (error) {
+    console.error('Error al obtener sedes institucionales:', error)
+    return DEFAULT_INSTITUTIONAL_SEDES.map(s => ({
+      id: s,
+      name: s,
+      zone: s === 'Sede Principal' ? 'Urbana' : 'Rural',
+      hasMultigrade: s !== 'Sede Principal',
+      isActive: true,
+      studentsCount: 0,
+      createdAt: new Date().toISOString()
+    }))
+  }
+}
+
+/**
+ * Crear una nueva sede institucional.
+ */
+export async function createInstitutionalSede(input: {
+  name: string
+  daneCode?: string
+  zone: 'Urbana' | 'Rural'
+  hasMultigrade?: boolean
+  address?: string
+  contactPhone?: string
+}) {
+  try {
+    const adminClient = createAdminClient()
+    const cleanName = input.name.trim()
+
+    // Validar nombre único
+    const { data: existing } = await adminClient
+      .from('institutional_sedes')
+      .select('id')
+      .ilike('name', cleanName)
+      .maybeSingle()
+
+    if (existing) {
+      return { success: false, error: 'Ya existe una sede registrada con ese nombre.' }
+    }
+
+    const { data, error } = await adminClient
+      .from('institutional_sedes')
+      .insert({
+        name: cleanName,
+        dane_code: input.daneCode?.trim() || null,
+        zone: input.zone,
+        has_multigrade: !!input.hasMultigrade,
+        address: input.address?.trim() || null,
+        contact_phone: input.contactPhone?.trim() || null,
+        is_active: true
+      })
+      .select()
+      .single()
+
+    if (error) throw error
+
+    revalidatePath('/admin/grade-levels')
+    revalidatePath('/admin/students/new')
+    revalidatePath('/admin/students')
+    return { success: true, sede: data }
+  } catch (error: any) {
+    console.error('Error en createInstitutionalSede:', error)
+    return { success: false, error: error.message || 'Error al crear la sede institucional.' }
+  }
+}
+
+/**
+ * Actualizar una sede institucional existente.
+ */
+export async function updateInstitutionalSede(
+  id: string,
+  input: {
+    name: string
+    daneCode?: string
+    zone: 'Urbana' | 'Rural'
+    hasMultigrade?: boolean
+    address?: string
+    contactPhone?: string
+    isActive?: boolean
+  }
+) {
+  try {
+    const adminClient = createAdminClient()
+    const cleanName = input.name.trim()
+
+    // 1. Obtener la sede anterior para saber si cambió el nombre
+    const { data: currentSede } = await adminClient
+      .from('institutional_sedes')
+      .select('name')
+      .eq('id', id)
+      .single()
+
+    const { error } = await adminClient
+      .from('institutional_sedes')
+      .update({
+        name: cleanName,
+        dane_code: input.daneCode?.trim() || null,
+        zone: input.zone,
+        has_multigrade: !!input.hasMultigrade,
+        address: input.address?.trim() || null,
+        contact_phone: input.contactPhone?.trim() || null,
+        is_active: input.isActive !== undefined ? input.isActive : true,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+
+    if (error) throw error
+
+    // Si cambió el nombre de la sede, sincronizar en student_directory y sch_groups si existen
+    if (currentSede && currentSede.name !== cleanName) {
+      await adminClient
+        .from('student_directory')
+        .update({ sede: cleanName })
+        .eq('sede', currentSede.name)
+
+      await adminClient
+        .from('sch_groups')
+        .update({ sede: cleanName })
+        .eq('sede', currentSede.name)
+
+      await adminClient
+        .from('profiles')
+        .update({ sede: cleanName })
+        .eq('sede', currentSede.name)
+    }
+
+    revalidatePath('/admin/grade-levels')
+    revalidatePath('/admin/students/new')
+    revalidatePath('/admin/students')
+    return { success: true }
+  } catch (error: any) {
+    console.error('Error en updateInstitutionalSede:', error)
+    return { success: false, error: error.message || 'Error al actualizar la sede institucional.' }
+  }
+}
+
+/**
+ * Eliminar una sede institucional.
+ */
+export async function deleteInstitutionalSede(id: string, name: string) {
+  try {
+    const adminClient = createAdminClient()
+
+    // Verificar si existen estudiantes vinculados a esta sede
+    const allStudents = await getAdminStudents()
+    const assignedStudents = allStudents.filter(s => normalizeSede(s.sede) === normalizeSede(name))
+
+    if (assignedStudents.length > 0) {
+      return {
+        success: false,
+        error: `No se puede eliminar la sede "${name}" porque tiene ${assignedStudents.length} estudiantes matriculados vinculados. Reasigna los estudiantes a otra sede antes de proceder.`
+      }
+    }
+
+    const { error } = await adminClient
+      .from('institutional_sedes')
+      .delete()
+      .eq('id', id)
+
+    if (error) throw error
+
+    revalidatePath('/admin/grade-levels')
+    revalidatePath('/admin/students/new')
+    revalidatePath('/admin/students')
+    return { success: true }
+  } catch (error: any) {
+    console.error('Error en deleteInstitutionalSede:', error)
+    return { success: false, error: error.message || 'Error al eliminar la sede.' }
+  }
+}
+
 
 
 

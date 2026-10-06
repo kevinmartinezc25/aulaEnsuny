@@ -13,7 +13,7 @@ import { toast } from 'sonner'
 import { getAcademicLevels, getAdminStudents, deleteAdminUser } from '../../application/actions'
 import { getDirectoryStats, syncDirectoryWithProfiles } from '../../application/studentImportActions'
 import { AcademicLevel } from '../../application/types'
-import { normalizeGradeLevel } from '@/lib/gradeUtils'
+import { normalizeGradeLevel, DEFAULT_INSTITUTIONAL_SEDES } from '@/lib/gradeUtils'
 
 interface Student {
   id: string
@@ -23,6 +23,8 @@ interface Student {
   email: string
   gradeLevel: string
   groupName?: string
+  sede?: string
+  modalidad?: string
   status: 'active' | 'inactive'
   joinedDate: string
 }
@@ -35,6 +37,7 @@ export function AdminStudentsScreen() {
   const [search, setSearch] = useState('')
   const [filterGrade, setFilterGrade] = useState<string>('all')
   const [filterGroup, setFilterGroup] = useState<string>('all')
+  const [filterSede, setFilterSede] = useState<string>('all')
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all')
   const [academicLevels, setAcademicLevels] = useState<AcademicLevel[]>([])
   const [successMsg, setSuccessMsg] = useState('')
@@ -87,8 +90,9 @@ export function AdminStudentsScreen() {
       const matchSearch = s.name.toLowerCase().includes(search.toLowerCase()) || s.email.toLowerCase().includes(search.toLowerCase())
       const matchGrade = filterGrade === 'all' || s.gradeLevel === filterGrade || normalizeGradeLevel(s.gradeLevel) === normalizeGradeLevel(filterGrade)
       const matchGroup = filterGroup === 'all' || s.groupName === filterGroup
+      const matchSede = filterSede === 'all' || (s.sede || 'Sede Principal') === filterSede
       const matchStatus = filterStatus === 'all' || s.status === filterStatus
-      return matchSearch && matchGrade && matchGroup && matchStatus
+      return matchSearch && matchGrade && matchGroup && matchSede && matchStatus
     })
 
     return filtered.sort((a, b) => {
@@ -96,7 +100,7 @@ export function AdminStudentsScreen() {
       const lastB = (b.lastName || '').toLowerCase()
       return lastA.localeCompare(lastB)
     })
-  }, [students, search, filterGrade, filterGroup, filterStatus])
+  }, [students, search, filterGrade, filterGroup, filterSede, filterStatus])
 
   const toTitleCase = (str: string) => {
     if (!str) return ''
@@ -312,6 +316,17 @@ export function AdminStudentsScreen() {
           </select>
 
           <select
+            value={filterSede}
+            onChange={e => setFilterSede(e.target.value)}
+            className="border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-950 text-xs focus:outline-none dark:text-white"
+          >
+            <option value="all">Todas las Sedes</option>
+            {DEFAULT_INSTITUTIONAL_SEDES.map(s => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+
+          <select
             value={filterStatus}
             onChange={e => setFilterStatus(e.target.value as any)}
             className="border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-950 text-xs focus:outline-none dark:text-white"
@@ -339,7 +354,8 @@ export function AdminStudentsScreen() {
             <thead className="bg-slate-50 dark:bg-slate-800/40 text-xs text-slate-450 uppercase font-bold border-b border-slate-100 dark:border-slate-800/60">
               <tr>
                 <th className="px-6 py-4">Estudiante</th>
-                <th className="px-6 py-4">Grado / Nivel</th>
+                <th className="px-6 py-4">Grado & Grupo</th>
+                <th className="px-6 py-4">Sede & Modalidad</th>
                 <th className="px-6 py-4">Correo Institucional</th>
                 <th className="px-6 py-4">Fecha de Registro</th>
                 <th className="px-6 py-4">Estado</th>
@@ -354,8 +370,26 @@ export function AdminStudentsScreen() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400 border border-purple-100/30">
-                      Grado {s.gradeLevel} - {s.groupName || '1'}
+                      {s.gradeLevel.startsWith('PFC') || s.gradeLevel.toLowerCase().includes('nivelat') || s.gradeLevel.toLowerCase().includes('transici') || s.gradeLevel.toLowerCase().includes('jard') || s.gradeLevel.toLowerCase().includes('multigrado')
+                        ? s.gradeLevel
+                        : `Grado ${s.gradeLevel}`} - Grupo {s.groupName || '1'}
                     </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex flex-col gap-0.5 items-start">
+                      <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                        {s.sede || 'Sede Principal'}
+                      </span>
+                      {s.modalidad && s.modalidad !== 'Tradicional' ? (
+                        <span className="inline-flex px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/30">
+                          {s.modalidad}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-slate-400">
+                          {s.modalidad || 'Tradicional'}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-6 py-4 text-xs font-mono">
                     <div className="flex flex-col gap-1">

@@ -5,11 +5,21 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Users, Search, UserPlus, X, Save, Trash2, Edit, ChevronDown,
   BookOpen, Filter, CheckCircle, Loader2, AlertCircle, Phone, Mail, Award,
-  Upload, Download, FileSpreadsheet
+  Upload, Download, FileSpreadsheet, ExternalLink
 } from 'lucide-react'
+import Link from 'next/link'
 import { toast } from 'sonner'
 import { createClient } from '@/core/config/supabase/client'
-import { getAdminTeachers, getAdminCourses, createAdminUser, updateAdminUser, deleteAdminUser } from '../../application/actions'
+import {
+  getAdminTeachers,
+  getAdminCourses,
+  createAdminUser,
+  updateAdminUser,
+  deleteAdminUser,
+  getInstitutionalSedes
+} from '../../application/actions'
+import { InstitutionalSede } from '../../application/types'
+import { normalizeSede } from '@/lib/gradeUtils'
 
 interface Teacher {
   id: string
@@ -20,65 +30,57 @@ interface Teacher {
   subjects: string[]
   status: 'active' | 'inactive'
   joinedDate: string
+  teachingLevel?: 'preescolar' | 'primaria' | 'secundaria_media' | 'multigrado'
+  sede?: string
+  isMultigradeTeacher?: boolean
+  assignedGroup?: string
 }
 
 export function AdminTeachersScreen() {
   const [teachers, setTeachers] = useState<Teacher[]>([])
   const [availableCourses, setAvailableCourses] = useState<any[]>([])
+  const [sedesList, setSedesList] = useState<InstitutionalSede[]>([])
+  const [inspectCoursesTeacher, setInspectCoursesTeacher] = useState<Teacher | null>(null)
   const [loading, setLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all')
+  const [filterTeachingLevel, setFilterTeachingLevel] = useState<string>('all')
+  const [filterSede, setFilterSede] = useState<string>('all')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null)
-  const [form, setForm] = useState({ name: '', email: '', phone: '', documentId: '', subjects: '', status: 'active' as 'active' | 'inactive', password: '' })
+  const [form, setForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    documentId: '',
+    subjects: '',
+    status: 'active' as 'active' | 'inactive',
+    teachingLevel: 'secundaria_media' as 'preescolar' | 'primaria' | 'secundaria_media' | 'multigrado',
+    sede: 'Sede Principal',
+    assignedGroup: '',
+    password: ''
+  })
   const [errorMsg, setErrorMsg] = useState('')
   const [successMsg, setSuccessMsg] = useState('')
   const [teacherToDelete, setTeacherToDelete] = useState<Teacher | null>(null)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
 
-  const mockTeachers: Teacher[] = [
-    { id: 't-1', name: 'Alejandro Giraldo', email: 'a.giraldo@ensuny.edu.co', phone: '312 456 7890', subjects: ['Física I', 'Física II'], status: 'active', joinedDate: '2024-01-15' },
-    { id: 't-2', name: 'Beatriz Nuñez', email: 'b.nunez@ensuny.edu.co', phone: '315 987 6543', subjects: ['Matemáticas I', 'Álgebra'], status: 'active', joinedDate: '2024-02-10' },
-    { id: 'd3aa9e2f-bd89-4b90-b47a-f8d6273347e3', name: 'Carlos Pérez', email: 'docente@ensuny.edu.co', phone: '300 111 2222', subjects: ['Programación', 'Robótica'], status: 'active', joinedDate: '2026-05-28' },
-    { id: 't-4', name: 'Diana Rivas', email: 'd.rivas@ensuny.edu.co', phone: '318 444 5555', subjects: ['Inglés I', 'Inglés II'], status: 'inactive', joinedDate: '2023-08-20' }
-  ]
-
-  const mockCourses = [
-    { id: 'c-1', title: 'Física I', grade: '8°' },
-    { id: 'c-2', title: 'Física II', grade: '9°' },
-    { id: 'c-3', title: 'Matemáticas I', grade: '8°' },
-    { id: 'c-4', title: 'Álgebra', grade: '9°' },
-    { id: 'c-5', title: 'Programación', grade: '10°' },
-    { id: 'c-6', title: 'Robótica', grade: '11°' },
-    { id: 'c-7', title: 'Inglés I', grade: '10°' },
-    { id: 'c-8', title: 'Inglés II', grade: '11°' }
-  ]
-
   useEffect(() => {
     async function loadTeachers() {
       setLoading(true)
-      const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL ||
-        process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project-id')
-
-      if (isDemoMode) {
-        setTimeout(() => {
-          setTeachers(mockTeachers)
-          setAvailableCourses(mockCourses)
-          setLoading(false)
-        }, 500)
-        return
-      }
-
       try {
-        const [mapped, coursesData] = await Promise.all([
+        const [mapped, coursesData, sedesData] = await Promise.all([
           getAdminTeachers(),
-          getAdminCourses()
+          getAdminCourses(),
+          getInstitutionalSedes()
         ])
         setTeachers(mapped)
         setAvailableCourses(coursesData)
+        setSedesList(sedesData)
       } catch (err) {
-        console.error(err)
+        console.error('Error al cargar docentes y sedes:', err)
+        toast.error('Error al conectar con la base de datos.')
       } finally {
         setLoading(false)
       }
@@ -86,17 +88,54 @@ export function AdminTeachersScreen() {
     loadTeachers()
   }, [])
 
+  const teacherVirtualCourses = useMemo(() => {
+    if (!inspectCoursesTeacher) return []
+    const foundCourses = availableCourses.filter(c => 
+      c.teacherId === inspectCoursesTeacher.id || 
+      inspectCoursesTeacher.subjects.includes(c.title)
+    )
+    const foundTitles = new Set(foundCourses.map(c => c.title))
+    
+    // Si hay materias en t.subjects no registradas en la tabla courses, incluirlas como items informativos
+    const extraCourses = inspectCoursesTeacher.subjects
+      .filter(sub => !foundTitles.has(sub))
+      .map((sub, idx) => ({
+        id: `extra-${idx}`,
+        title: sub,
+        grade: inspectCoursesTeacher.teachingLevel === 'preescolar' ? 'Preescolar' : inspectCoursesTeacher.teachingLevel === 'primaria' ? 'Primaria' : inspectCoursesTeacher.teachingLevel === 'multigrado' ? 'Multigrado' : 'Secundaria/Media',
+        subject: sub,
+        students: 0,
+        status: 'active' as const,
+        createdAt: inspectCoursesTeacher.joinedDate
+      }))
+
+    return [...foundCourses, ...extraCourses]
+  }, [inspectCoursesTeacher, availableCourses])
+
   const filteredTeachers = useMemo(() => {
     return teachers.filter(t => {
       const matchSearch = t.name.toLowerCase().includes(search.toLowerCase()) || t.email.toLowerCase().includes(search.toLowerCase())
       const matchStatus = filterStatus === 'all' || t.status === filterStatus
-      return matchSearch && matchStatus
+      const matchLevel = filterTeachingLevel === 'all' || (t.teachingLevel || 'secundaria_media') === filterTeachingLevel
+      const matchSede = filterSede === 'all' || normalizeSede(t.sede) === normalizeSede(filterSede)
+      return matchSearch && matchStatus && matchLevel && matchSede
     }).sort((a, b) => a.name.localeCompare(b.name))
-  }, [teachers, search, filterStatus])
+  }, [teachers, search, filterStatus, filterTeachingLevel, filterSede])
 
   const openCreate = () => {
     setEditingTeacher(null)
-    setForm({ name: '', email: '', phone: '', documentId: '', subjects: '', status: 'active', password: '' })
+    setForm({
+      name: '',
+      email: '',
+      phone: '',
+      documentId: '',
+      subjects: '',
+      status: 'active',
+      teachingLevel: 'secundaria_media',
+      sede: sedesList[0]?.name || 'Sede Principal',
+      assignedGroup: '',
+      password: ''
+    })
     setErrorMsg('')
     setIsModalOpen(true)
   }
@@ -110,6 +149,9 @@ export function AdminTeachersScreen() {
       documentId: t.documentId || '',
       subjects: t.subjects.join(', '), 
       status: t.status,
+      teachingLevel: t.teachingLevel || 'secundaria_media',
+      sede: t.sede || 'Sede Principal',
+      assignedGroup: t.assignedGroup || '',
       password: ''
     })
     setErrorMsg('')
@@ -177,6 +219,10 @@ export function AdminTeachersScreen() {
           documentId: form.documentId.trim() || undefined,
           role: 'teacher',
           status: form.status,
+          teachingLevel: form.teachingLevel,
+          sede: form.sede,
+          isMultigradeTeacher: form.teachingLevel === 'multigrado',
+          assignedGroup: form.assignedGroup || undefined,
           password: form.password || undefined
         })
 
@@ -219,6 +265,10 @@ export function AdminTeachersScreen() {
           documentId: form.documentId.trim() || undefined,
           role: 'teacher',
           status: form.status,
+          teachingLevel: form.teachingLevel,
+          sede: form.sede,
+          isMultigradeTeacher: form.teachingLevel === 'multigrado',
+          assignedGroup: form.assignedGroup || undefined,
           password: form.password || undefined
         })
 
@@ -278,9 +328,11 @@ export function AdminTeachersScreen() {
 
   const handleDownloadTemplate = async () => {
     const XLSX = await import('xlsx')
+    const primarySede = sedesList[0]?.name || 'Sede Principal'
+    const secondarySede = sedesList[1]?.name || 'Sede El Porvenir'
     const ws = XLSX.utils.json_to_sheet([
-      { Nombre: 'Juan Perez', Correo: 'juan.perez@ejemplo.com', Telefono: '3001234567' },
-      { Nombre: 'Maria Gomez', Correo: 'maria.gomez@ejemplo.com', Telefono: '3109876543' }
+      { Nombre: 'Juan Perez', Correo: 'juan.perez@ejemplo.com', Telefono: '3001234567', Sede: primarySede },
+      { Nombre: 'Maria Gomez', Correo: 'maria.gomez@ejemplo.com', Telefono: '3109876543', Sede: secondarySede }
     ])
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Docentes')
@@ -315,6 +367,7 @@ export function AdminTeachersScreen() {
         const name = row['Nombre'] || row['name'] || row['NOMBRE']
         const email = row['Correo'] || row['Email'] || row['email'] || row['CORREO']
         const phone = row['Telefono'] || row['Teléfono'] || row['phone'] || row['TELEFONO']
+        const rowSede = row['Sede'] || row['SEDE'] || row['sede'] || sedesList[0]?.name || 'Sede Principal'
 
         if (!name || !email) {
           errorCount++
@@ -326,7 +379,8 @@ export function AdminTeachersScreen() {
           email: email.toString().trim(),
           phone: phone ? phone.toString().trim().replace(/[^0-9]/g, '') : '',
           role: 'teacher',
-          status: 'active'
+          status: 'active',
+          sede: rowSede.toString().trim()
         })
 
         if (res.error) {
@@ -419,7 +473,7 @@ export function AdminTeachersScreen() {
         {[
           { title: 'Total Docentes', value: teachers.length, icon: Users, color: 'text-blue-500 bg-blue-50 dark:bg-blue-950/30' },
           { title: 'Activos', value: teachers.filter(t => t.status === 'active').length, icon: CheckCircle, color: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-950/30' },
-          { title: 'Materias Dictadas', value: Array.from(new Set(teachers.flatMap(t => t.subjects))).length, icon: BookOpen, color: 'text-purple-500 bg-purple-50 dark:bg-purple-950/30' }
+          { title: 'Cursos Virtuales', value: availableCourses.length > 0 ? availableCourses.length : Array.from(new Set(teachers.flatMap(t => t.subjects))).length, icon: BookOpen, color: 'text-purple-500 bg-purple-50 dark:bg-purple-950/30' }
         ].map(stat => {
           const Icon = stat.icon
           return (
@@ -449,8 +503,31 @@ export function AdminTeachersScreen() {
           />
         </div>
 
-        <div className="flex items-center gap-2 self-stretch sm:self-auto justify-end">
+        <div className="flex items-center gap-2 self-stretch sm:self-auto justify-end flex-wrap">
           <Filter className="h-4 w-4 text-slate-400" />
+          <select
+            value={filterTeachingLevel}
+            onChange={e => setFilterTeachingLevel(e.target.value)}
+            className="border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-950 text-xs focus:outline-none dark:text-white"
+          >
+            <option value="all">Todos los Niveles</option>
+            <option value="preescolar">Preescolar</option>
+            <option value="primaria">Básica Primaria</option>
+            <option value="secundaria_media">Secundaria y Media</option>
+            <option value="multigrado">Multigrado / Esc. Nueva</option>
+          </select>
+
+          <select
+            value={filterSede}
+            onChange={e => setFilterSede(e.target.value)}
+            className="border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 bg-slate-50 dark:bg-slate-950 text-xs focus:outline-none dark:text-white"
+          >
+            <option value="all">Todas las Sedes</option>
+            {sedesList.map(s => (
+              <option key={s.id} value={s.name}>{s.name}</option>
+            ))}
+          </select>
+
           <select
             value={filterStatus}
             onChange={e => setFilterStatus(e.target.value as any)}
@@ -479,6 +556,7 @@ export function AdminTeachersScreen() {
             <thead className="bg-slate-50 dark:bg-slate-800/40 text-xs text-slate-450 uppercase font-bold border-b border-slate-100 dark:border-slate-800/60">
               <tr>
                 <th className="px-6 py-4">Docente</th>
+                <th className="px-6 py-4">Nivel & Sede</th>
                 <th className="px-6 py-4">Materias</th>
                 <th className="px-6 py-4">Información de Contacto</th>
                 <th className="px-6 py-4">Fecha de Ingreso</th>
@@ -496,19 +574,49 @@ export function AdminTeachersScreen() {
                     )}
                   </td>
                   <td className="px-6 py-4">
-                    <div className="flex flex-wrap gap-1">
-                      {t.subjects.length > 0 ? (
-                        t.subjects.map((sub, idx) => (
-                          <span key={`${sub}-${idx}`} className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 border border-blue-100/30">
-                            {sub}
-                          </span>
-                        ))
-                      ) : (
-                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-550 dark:bg-slate-800/60 dark:text-slate-400 border border-slate-200/30">
-                          Sin cursos
+                    <div className="flex flex-col gap-1 items-start">
+                      <span className={`inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                        t.teachingLevel === 'preescolar'
+                          ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
+                          : t.teachingLevel === 'primaria'
+                          ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+                          : t.teachingLevel === 'multigrado'
+                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                          : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                      }`}>
+                        {t.teachingLevel === 'preescolar'
+                          ? 'Preescolar'
+                          : t.teachingLevel === 'primaria'
+                          ? 'Primaria'
+                          : t.teachingLevel === 'multigrado'
+                          ? 'Multigrado / Esc. Nueva'
+                          : 'Secundaria / Media'}
+                      </span>
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                        {t.sede || 'Sede Principal'}
+                      </span>
+                      {t.assignedGroup && (
+                        <span className="text-[10px] text-slate-400 font-medium">
+                          Titular: {t.assignedGroup}
                         </span>
                       )}
                     </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    {t.subjects.length > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => setInspectCoursesTeacher(t)}
+                        className="inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-900/50 border border-blue-200/60 dark:border-blue-800/40 transition-all cursor-pointer shadow-2xs hover:scale-[1.02] active:scale-[0.98]"
+                        title="Ver listado de cursos virtuales de este docente"
+                      >
+                        Ver Cursos ({t.subjects.length})
+                      </button>
+                    ) : (
+                      <span className="inline-flex px-2.5 py-1 rounded-xl text-[10px] font-semibold bg-slate-100 text-slate-400 dark:bg-slate-800/60 dark:text-slate-500 border border-slate-200/40">
+                        Sin cursos
+                      </span>
+                    )}
                   </td>
                   <td className="px-6 py-4 space-y-1 text-xs">
                     <p className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5 text-slate-400" /> {t.email}</p>
@@ -647,6 +755,47 @@ export function AdminTeachersScreen() {
                 </div>
 
                 <div>
+                  <label className="block text-xs font-bold text-slate-450 uppercase mb-1">Nivel de Enseñanza</label>
+                  <select
+                    value={form.teachingLevel}
+                    onChange={e => setForm({ ...form, teachingLevel: e.target.value as any })}
+                    className="w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 focus:outline-none dark:text-white text-sm"
+                  >
+                    <option value="preescolar">Preescolar (Párvulos, Jardín, Transición)</option>
+                    <option value="primaria">Básica Primaria (1° a 5°)</option>
+                    <option value="secundaria_media">Secundaria y Media (6° a 11° y PFC)</option>
+                    <option value="multigrado">Escuela Nueva / Aula Multigrado</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-450 uppercase mb-1">Sede Institucional Asignada</label>
+                  <select
+                    value={form.sede}
+                    onChange={e => setForm({ ...form, sede: e.target.value })}
+                    className="w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 focus:outline-none dark:text-white text-sm"
+                  >
+                    {sedesList.map(s => (
+                      <option key={s.id} value={s.name}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {form.teachingLevel !== 'secundaria_media' && (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-450 uppercase mb-1">Grupo Titular Asignado (Opcional)</label>
+                    <input
+                      type="text"
+                      value={form.assignedGroup}
+                      onChange={e => setForm({ ...form, assignedGroup: e.target.value })}
+                      placeholder="Ej: Transición-1, 1°-1, Aula Multigrado-1"
+                      className="w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 focus:outline-none dark:text-white text-sm"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1">Para docentes de primaria o preescolar a cargo del grupo completo.</p>
+                  </div>
+                )}
+
+                <div>
                   <label className="block text-xs font-bold text-slate-450 uppercase mb-2">Asignaturas / Cursos</label>
                   <div className="max-h-40 overflow-y-auto border border-slate-200 dark:border-slate-800 rounded-xl p-3 bg-slate-50 dark:bg-slate-950 space-y-1.5">
                     {availableCourses.map(course => {
@@ -764,6 +913,117 @@ export function AdminTeachersScreen() {
               </div>
             </motion.div>
           </>
+        )}
+      </AnimatePresence>
+
+      {/* Modal: Listado de Cursos Virtuales del Docente */}
+      <AnimatePresence>
+        {inspectCoursesTeacher && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: -10 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="w-full max-w-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] text-left"
+            >
+              {/* Header Modal */}
+              <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                <div className="flex items-center gap-3.5">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-500/10 text-blue-600 dark:bg-blue-500/20">
+                    <BookOpen className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900 dark:text-white text-lg flex items-center gap-2">
+                      <span>Cursos Virtuales</span>
+                      <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+                        {teacherVirtualCourses.length}
+                      </span>
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 flex items-center gap-2">
+                      <span>Docente: <strong className="text-slate-800 dark:text-slate-200">{inspectCoursesTeacher.name}</strong></span>
+                      <span>•</span>
+                      <span>{inspectCoursesTeacher.sede || 'Sede Principal'}</span>
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setInspectCoursesTeacher(null)}
+                  className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Lista de Cursos */}
+              <div className="p-6 overflow-y-auto space-y-3 flex-1">
+                {teacherVirtualCourses.length === 0 ? (
+                  <div className="py-12 text-center text-slate-400 text-sm">
+                    Este docente no tiene cursos virtuales registrados actualmente.
+                  </div>
+                ) : (
+                  teacherVirtualCourses.map((c, idx) => (
+                    <div
+                      key={c.id || idx}
+                      className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40 hover:bg-slate-50 dark:hover:bg-slate-800/20 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="font-bold text-slate-900 dark:text-white text-sm">
+                            {c.title}
+                          </h4>
+                          {c.grade && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+                              Grado {c.grade}
+                            </span>
+                          )}
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            c.status === 'active'
+                              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
+                              : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                          }`}>
+                            {c.status === 'active' ? 'Activo' : 'Borrador'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          Asignatura / Área: <strong className="text-slate-700 dark:text-slate-300">{c.subject || c.title}</strong>
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-200/60 dark:border-slate-700/60 shadow-2xs">
+                          <Users className="h-3.5 w-3.5 text-slate-400" />
+                          <span>{c.students || 0} Alumnos</span>
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Footer Modal */}
+              <div className="p-4 bg-slate-50 dark:bg-slate-950 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
+                <span className="text-slate-400">
+                  Mostrando {teacherVirtualCourses.length} curso(s) asignados
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setInspectCoursesTeacher(null)}
+                    className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                  >
+                    Cerrar
+                  </button>
+                  <Link
+                    href="/admin/courses"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all cursor-pointer shadow-sm"
+                  >
+                    <span>Gestionar Cursos</span>
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </Link>
+                </div>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>

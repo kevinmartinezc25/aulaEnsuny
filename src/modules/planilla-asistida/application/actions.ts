@@ -38,6 +38,35 @@ export async function getAssistedSubjects(): Promise<AssistedSubject[]> {
   })) as AssistedSubject[]
 }
 
+export async function getTeacherScheduleSubjects(): Promise<string[]> {
+  const supabase = await createClient()
+  const { data: userData, error: authError } = await supabase.auth.getUser()
+  if (authError || !userData?.user) return []
+
+  const { data, error } = await supabase
+    .from('sch_curriculum')
+    .select(`
+      subject:sch_subjects (
+        name
+      )
+    `)
+    .eq('teacher_id', userData.user.id)
+
+  if (error || !data) {
+    console.error('Error fetching teacher schedule subjects:', error)
+    return []
+  }
+
+  const subjectNames = new Set<string>()
+  data.forEach((row: any) => {
+    if (row.subject && row.subject.name) {
+      subjectNames.add(row.subject.name)
+    }
+  })
+
+  return Array.from(subjectNames).sort()
+}
+
 export async function createAssistedSubject(data: { name: string, description?: string, grade?: number, group_number?: number, period?: string }): Promise<AssistedSubject> {
   const supabase = await createClient()
   const { data: user, error: userError } = await supabase.auth.getUser()
@@ -670,7 +699,7 @@ export async function saveAssistedGrades(gradesToSave: { student_id: string, act
   if (toUpsert.length > 0) {
     const { error } = await supabase
       .from('assisted_grades')
-      .upsert(toUpsert, { onConflict: 'student_id, activity_id' })
+      .upsert(toUpsert, { onConflict: 'student_id,activity_id' })
 
     if (error) {
       console.error('Error al guardar notas:', error)
@@ -1016,26 +1045,14 @@ export async function getPlanillaDirectoryCandidates(
     console.error('Error al obtener perfiles:', pError)
   }
 
-  // Obtener documentos de student_details para los perfiles encontrados
-  const profileIds = (profiles || []).map(p => p.id)
-  const detailsMap = new Map<string, string>()
-  if (profileIds.length > 0) {
-    const { data: details } = await adminClient
-      .from('student_details')
-      .select('student_id, document_number')
-      .in('student_id', profileIds)
+  const profileList = profiles || []
+  const profileIds = profileList.map(p => p.id)
 
-    for (const d of details || []) {
-      if (d.document_number) detailsMap.set(d.student_id, d.document_number)
-    }
-  }
-
-  // 5. Obtener del directorio (sin cuenta en campus: profile_id IS NULL)
+  // 5. Obtener del directorio institucional (todos los estudiantes del grado y grupo)
   let dirQuery = adminClient
     .from('student_directory')
     .select('id, first_name, last_name, document_id, grade_level, group_name, status, profile_id')
     .in('grade_level', gradeVariants)
-    .is('profile_id', null)
     .eq('status', 'active')
 
   if (groupVariants.length > 0) {
@@ -1048,17 +1065,123 @@ export async function getPlanillaDirectoryCandidates(
     console.error('Error al obtener directorio:', dError)
   }
 
-  // 6. Unificar y determinar estado contra la planilla
+  // Obtener además registros de directorio vinculados por profile_id si existen
+  let linkedDirRecords: any[] = []
+  if (profileIds.length > 0) {
+    const { data: linkedDir } = await adminClient
+      .from('student_directory')
+      .select('id, first_name, last_name, document_id, grade_level, group_name, status, profile_id')
+      .in('profile_id', profileIds)
+    if (linkedDir && linkedDir.length > 0) {
+      linkedDirRecords = linkedDir
+    }
+  }
+
+  // Indexar directorio para búsqueda y resolución de documentos
+  const allDirRecords = [...(directory || []), ...linkedDirRecords]
+  const dirByProfileId = new Map<string, any>()
+  const dirByName = new Map<string, any>()
+  const dirById = new Map<string, any>()
+
+  for (const d of allDirRecords) {
+    if (d.id) dirById.set(d.id, d)
+    if (d.profile_id) dirByProfileId.set(d.profile_id, d)
+    const dLastFirst = normalizeStudentName(`${d.last_name || ''} ${d.first_name || ''}`)
+    const dFirstLast = normalizeStudentName(`${d.first_name || ''} ${d.last_name || ''}`)
+    if (dLastFirst) dirByName.set(dLastFirst, d)
+    if (dFirstLast) dirByName.set(dFirstLast, d)
+  }
+
+  // 6. Obtener documentos de student_details para los perfiles encontrados
+  const detailsMap = new Map<string, string>()
+  if (profileIds.length > 0) {
+    const { data: details } = await adminClient
+      .from('student_details')
+      .select('student_id, document_number')
+      .in('student_id', profileIds)
+
+    for (const d of details || []) {
+      if (d.document_number && String(d.document_number).trim()) {
+        detailsMap.set(d.student_id, String(d.document_number).trim())
+      }
+    }
+  }
+
+  // 7. Unificar y determinar estado contra la planilla
   const candidates: PlanillaCandidateStudent[] = []
   const seenDocs = new Set<string>()
   const seenNames = new Set<string>()
+  const seenProfileIds = new Set<string>()
+  const seenDirectoryIds = new Set<string>()
 
   // A. Agregar estudiantes con cuenta (profiles)
-  for (const p of profiles || []) {
+  for (const p of profileList) {
+    seenProfileIds.add(p.id)
     const fullName = `${p.last_name || ''} ${p.first_name || ''}`.trim().toUpperCase()
-    const norm = normalizeStudentName(fullName)
-    const docNumber = detailsMap.get(p.id) || null
+    const normLastFirst = normalizeStudentName(fullName)
+    const normFirstLast = normalizeStudentName(`${p.first_name || ''} ${p.last_name || ''}`)
+
+    // Búsqueda en directorio por profile_id o por coincidencia de nombres
+    const dirMatch = dirByProfileId.get(p.id) || dirByName.get(normLastFirst) || dirByName.get(normFirstLast)
+    if (dirMatch) {
+      seenDirectoryIds.add(dirMatch.id)
+    }
+
+    // Resolución de Documento de Identidad multi-fuente:
+    // 1) student_details.document_number
+    // 2) student_directory.document_id (por profile_id o por nombre)
+    let docNumber = detailsMap.get(p.id) || dirMatch?.document_id?.trim() || null
+
+    // 3) Si aún falta documento, consultar en Auth Metadata
+    if (!docNumber) {
+      try {
+        const { data: authUser } = await adminClient.auth.admin.getUserById(p.id)
+        const meta = authUser?.user?.user_metadata
+        if (meta) {
+          const authDoc = meta.document_number || meta.document_id || meta.document || meta.cedula
+          if (authDoc) docNumber = String(authDoc).trim()
+        }
+      } catch (e) {
+        // Ignorar error individual de auth
+      }
+    }
+
+    // Auto-sanación: sincronizar con student_details si se resolvió desde otra fuente
+    if (docNumber && !detailsMap.has(p.id)) {
+      const parts = (p.last_name || '').trim().split(/\s+/)
+      const nameParts = (p.first_name || '').trim().split(/\s+/)
+      ;(async () => {
+        try {
+          await adminClient.from('student_details').upsert({
+            student_id: p.id,
+            document_type: 'TI',
+            document_number: docNumber,
+            first_name: nameParts[0] || '',
+            second_name: nameParts.slice(1).join(' ') || null,
+            first_surname: parts[0] || '',
+            second_surname: parts.slice(1).join(' ') || null,
+            birth_date: '2009-01-01',
+            gender: 'M',
+            nationality: 'Colombiana'
+          }, { onConflict: 'student_id' })
+
+          if (dirMatch && !dirMatch.profile_id) {
+            await adminClient.from('student_directory').update({ profile_id: p.id }).eq('id', dirMatch.id)
+          }
+        } catch {
+          // Fallback silencioso para no bloquear carga de planilla
+        }
+      })()
+    }
+
+    if (docNumber) seenDocs.add(docNumber.toLowerCase())
+    if (normLastFirst) seenNames.add(normLastFirst)
+    if (normFirstLast) seenNames.add(normFirstLast)
+
     const candidateIds = [p.id, `prof-${p.id}`, `dir-${p.id}`]
+    if (dirMatch) {
+      candidateIds.push(dirMatch.id, `dir-${dirMatch.id}`, `prof-${dirMatch.id}`)
+    }
 
     let isInPlanilla = false
     let currentNumber: number | null = null
@@ -1070,16 +1193,18 @@ export async function getPlanillaDirectoryCandidates(
       }
     }
 
-    if (!isInPlanilla && existingNames.has(norm)) {
-      isInPlanilla = true
-      currentNumber = existingNames.get(norm) ?? null
-    } else if (isInPlanilla) {
+    if (!isInPlanilla) {
+      if (existingNames.has(normLastFirst)) {
+        isInPlanilla = true
+        currentNumber = existingNames.get(normLastFirst) ?? null
+      } else if (existingNames.has(normFirstLast)) {
+        isInPlanilla = true
+        currentNumber = existingNames.get(normFirstLast) ?? null
+      }
+    } else {
       const match = (existingStudents || []).find(e => candidateIds.includes(e.directory_id))
-      currentNumber = match?.number ?? existingNames.get(norm) ?? null
+      currentNumber = match?.number ?? existingNames.get(normLastFirst) ?? existingNames.get(normFirstLast) ?? null
     }
-
-    if (docNumber) seenDocs.add(docNumber.trim().toLowerCase())
-    seenNames.add(norm)
 
     candidates.push({
       id: `prof-${p.id}`,
@@ -1096,15 +1221,24 @@ export async function getPlanillaDirectoryCandidates(
     })
   }
 
-  // B. Agregar estudiantes del directorio (sin cuenta)
+  // B. Agregar estudiantes del directorio (sin duplicados con perfiles)
   for (const d of directory || []) {
-    const fullName = `${d.last_name || ''} ${d.first_name || ''}`.trim().toUpperCase()
-    const norm = normalizeStudentName(fullName)
-    const doc = d.document_id ? d.document_id.trim() : null
+    if (seenDirectoryIds.has(d.id)) continue
+    if (d.profile_id && seenProfileIds.has(d.profile_id)) continue
 
-    // Deduplicación preventiva si el estudiante ya fue procesado como perfil
+    const doc = d.document_id ? String(d.document_id).trim() : null
     if (doc && seenDocs.has(doc.toLowerCase())) continue
-    if (seenNames.has(norm)) continue
+
+    const fullName = `${d.last_name || ''} ${d.first_name || ''}`.trim().toUpperCase()
+    const normLastFirst = normalizeStudentName(fullName)
+    const normFirstLast = normalizeStudentName(`${d.first_name || ''} ${d.last_name || ''}`)
+
+    if (seenNames.has(normLastFirst) || seenNames.has(normFirstLast)) continue
+
+    seenDirectoryIds.add(d.id)
+    if (doc) seenDocs.add(doc.toLowerCase())
+    if (normLastFirst) seenNames.add(normLastFirst)
+    if (normFirstLast) seenNames.add(normFirstLast)
 
     const candidateIds = [d.id, `dir-${d.id}`, `prof-${d.id}`]
 
@@ -1118,12 +1252,17 @@ export async function getPlanillaDirectoryCandidates(
       }
     }
 
-    if (!isInPlanilla && existingNames.has(norm)) {
-      isInPlanilla = true
-      currentNumber = existingNames.get(norm) ?? null
-    } else if (isInPlanilla) {
+    if (!isInPlanilla) {
+      if (existingNames.has(normLastFirst)) {
+        isInPlanilla = true
+        currentNumber = existingNames.get(normLastFirst) ?? null
+      } else if (existingNames.has(normFirstLast)) {
+        isInPlanilla = true
+        currentNumber = existingNames.get(normFirstLast) ?? null
+      }
+    } else {
       const match = (existingStudents || []).find(e => candidateIds.includes(e.directory_id))
-      currentNumber = match?.number ?? existingNames.get(norm) ?? null
+      currentNumber = match?.number ?? existingNames.get(normLastFirst) ?? existingNames.get(normFirstLast) ?? null
     }
 
     candidates.push({

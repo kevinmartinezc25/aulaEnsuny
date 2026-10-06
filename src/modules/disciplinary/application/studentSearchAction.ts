@@ -283,54 +283,86 @@ export interface TeacherWorkloadResponse {
 }
 
 /**
- * Parsea el nombre de un grupo (ej: '8°-1', 'PFC-12', '10°-2') y extrae
+ * Parsea el nombre de un grupo (ej: '8°-1', 'PFC-12', '10°-2', 'Transición-1') y extrae
  * su grado normalizado, su código de grupo y el nombre para mostrar.
- * Descarta grupos que no sean de estudiantes (ej: 'Jornada Institucional', 'Nucleo Ciencias').
+ * Descarta grupos administrativos o institucionales que no sean de estudiantes (ej: 'Jornada Institucional', 'Nucleo Ciencias').
  */
 function parseGroup(name: string): { gradeLevel: string; groupCode: string; displayName: string } | null {
   const clean = (name || '').trim()
+  if (!clean) return null
+
+  // Descartar grupos claramente administrativos o de reuniones de profesores
+  if (/^(jornada|nucleo|núcleo|comite|comité|area|área|consejo|directivo|reunión|reunion)/i.test(clean)) {
+    return null
+  }
+
+  // 1. Patrón clásico "8°-1" o "8-1" o "10°-2"
   const parts = clean.split('-')
   if (parts.length === 2 && /^\d+°?$/.test(parts[0])) {
     const grade = parts[0].includes('°') ? parts[0] : `${parts[0]}°`
     return {
       gradeLevel: grade,
       groupCode: parts[1],
-      displayName: `${clean} (Grupo ${parts[1]})`
+      displayName: `Grupo ${parts[1]} (${clean})`
     }
   }
+
+  // 2. PFC (Programa de Formación Complementaria)
   if (/^PFC[\s\-_]?12$/i.test(clean)) {
-    return { gradeLevel: 'PFC-12', groupCode: '1', displayName: 'PFC-12 (Grupo 1)' }
+    return { gradeLevel: 'PFC-12', groupCode: '1', displayName: 'Grupo 1 (PFC-12)' }
   }
   if (/^PFC[\s\-_]?13$/i.test(clean)) {
-    return { gradeLevel: 'PFC-13', groupCode: '1', displayName: 'PFC-13 (Grupo 1)' }
+    return { gradeLevel: 'PFC-13', groupCode: '1', displayName: 'Grupo 1 (PFC-13)' }
   }
   if (/^PFC[\s\-_]?12[\-_](\d+)$/i.test(clean)) {
     const num = clean.match(/\d+$/)?.[0] || '1'
-    return { gradeLevel: 'PFC-12', groupCode: num, displayName: `PFC-12 (Grupo ${num})` }
+    return { gradeLevel: 'PFC-12', groupCode: num, displayName: `Grupo ${num} (PFC-12)` }
   }
   if (/^PFC[\s\-_]?13[\-_](\d+)$/i.test(clean)) {
     const num = clean.match(/\d+$/)?.[0] || '1'
-    return { gradeLevel: 'PFC-13', groupCode: num, displayName: `PFC-13 (Grupo ${num})` }
+    return { gradeLevel: 'PFC-13', groupCode: num, displayName: `Grupo ${num} (PFC-13)` }
   }
+
+  // 3. Nivelatorio
   if (/^Nivelatorio/i.test(clean)) {
-    return { gradeLevel: 'Nivelatorio', groupCode: '1', displayName: 'Nivelatorio' }
+    return { gradeLevel: 'Nivelatorio', groupCode: '1', displayName: 'Nivelatorio (Grupo 1)' }
   }
+
+  // 4. Patrón numérico con guión bajo (ej: "8_1")
   const matchNum = clean.match(/^(\d+)[\-_](\d+)$/)
   if (matchNum) {
     return {
       gradeLevel: `${matchNum[1]}°`,
       groupCode: matchNum[2],
-      displayName: `${matchNum[1]}°-${matchNum[2]} (Grupo ${matchNum[2]})`
+      displayName: `Grupo ${matchNum[2]} (${matchNum[1]}°-${matchNum[2]})`
     }
   }
+
+  // 5. Patrón con nombre y sufijo (ej: "Transición-1", "Jardín-A", "Preescolar-1")
+  if (parts.length === 2 && parts[0].trim() && parts[1].trim()) {
+    return {
+      gradeLevel: parts[0].trim(),
+      groupCode: parts[1].trim(),
+      displayName: `Grupo ${parts[1].trim()} (${clean})`
+    }
+  }
+
+  // 6. Preescolar / Transición sin sufijo
+  if (/^(Transición|Jardín|Preescolar|Párvulos)/i.test(clean)) {
+    return {
+      gradeLevel: clean,
+      groupCode: '1',
+      displayName: clean
+    }
+  }
+
   return null
 }
 
 /**
- * Obtiene los grados y grupos asignados al docente autenticado
- * estrictamente de acuerdo con su CARGA ACADÉMICA (módulo horarios: academic_assignments
- * y sch_groups donde es director).
- * Si el usuario es admin o superadmin, tiene acceso a todos los grupos de estudiantes.
+ * Obtiene todos los grados y grupos institucionales registrados en la base de datos (sch_groups).
+ * Permite a cualquier docente o directivo reportar faltas disciplinarias de cualquier estudiante
+ * de la institución educativa.
  */
 export async function getTeacherWorkloadGradesAndGroups(): Promise<TeacherWorkloadResponse> {
   try {
@@ -352,82 +384,36 @@ export async function getTeacherWorkloadGradesAndGroups(): Promise<TeacherWorklo
 
     const groupsMap = new Map<string, TeacherGroupItem>()
 
-    if (isAdmin) {
-      // SuperAdmin / Admin: ver todos los grupos válidos de estudiantes
-      const { data: allSchGroups } = await adminClient
-        .from('sch_groups')
-        .select('id, name, level')
-        .order('name', { ascending: true })
+    // Siempre permitir ver todos los grupos válidos de estudiantes a todos los roles
+    const { data: allSchGroups } = await adminClient
+      .from('sch_groups')
+      .select('id, name, level')
+      .order('name', { ascending: true })
 
-      for (const g of allSchGroups || []) {
-        const parsed = parseGroup(g.name)
-        if (parsed) {
-          groupsMap.set(g.id, {
-            id: g.id,
-            name: g.name,
-            groupCode: parsed.groupCode,
-            gradeLevel: parsed.gradeLevel,
-            displayName: parsed.displayName,
-            level: g.level || '',
-            isDirector: false
-          })
-        }
-      }
-    } else {
-      // DOCENTE: Cargar ÚNICAMENTE los grupos de su carga académica en el módulo horarios
-      const { data: assignments, error: asgError } = await adminClient
-        .from('academic_assignments')
-        .select('group:sch_groups!inner(id, name, level), teacher:academic_teachers!inner(profile_id)')
-        .eq('teacher.profile_id', user.id)
-
-      if (asgError) {
-        console.error('Error al consultar academic_assignments del docente:', asgError)
-      }
-
-      for (const row of assignments || []) {
-        const g = row.group as any
-        if (g && g.id && g.name) {
-          const parsed = parseGroup(g.name)
-          if (parsed) {
-            groupsMap.set(g.id, {
-              id: g.id,
-              name: g.name,
-              groupCode: parsed.groupCode,
-              gradeLevel: parsed.gradeLevel,
-              displayName: parsed.displayName,
-              level: g.level || '',
-              isDirector: false
-            })
-          }
-        }
-      }
-
-      // Adicionalmente, incluir grupos donde el docente es director de grupo
-      const { data: directorGroups } = await adminClient
-        .from('sch_groups')
-        .select('id, name, level')
-        .eq('director_id', user.id)
-
-      for (const dg of directorGroups || []) {
-        const parsed = parseGroup(dg.name)
-        if (parsed) {
-          groupsMap.set(dg.id, {
-            id: dg.id,
-            name: dg.name,
-            groupCode: parsed.groupCode,
-            gradeLevel: parsed.gradeLevel,
-            displayName: parsed.displayName,
-            level: dg.level || '',
-            isDirector: true
-          })
-        }
+    for (const g of allSchGroups || []) {
+      const parsed = parseGroup(g.name)
+      if (parsed) {
+        groupsMap.set(g.id, {
+          id: g.id,
+          name: g.name,
+          groupCode: parsed.groupCode,
+          gradeLevel: parsed.gradeLevel,
+          displayName: parsed.displayName,
+          level: g.level || '',
+          isDirector: false
+        })
       }
     }
 
     const allGroups = Array.from(groupsMap.values())
 
     // Agrupar por gradeLevel
-    const gradeOrder = ['6°', '7°', '8°', '9°', '10°', '11°', 'PFC-12', 'PFC-13', 'Nivelatorio']
+    const gradeOrder = [
+      'Párvulos', 'Preescolar', 'Jardín', 'Transición',
+      '0°', '1°', '2°', '3°', '4°', '5°',
+      '6°', '7°', '8°', '9°', '10°', '11°',
+      'PFC-12', 'PFC-13', 'Nivelatorio'
+    ]
     const gradeMap = new Map<string, TeacherGroupItem[]>()
 
     for (const g of allGroups) {
@@ -442,7 +428,7 @@ export async function getTeacherWorkloadGradesAndGroups(): Promise<TeacherWorklo
       list.sort((a, b) => a.groupCode.localeCompare(b.groupCode, undefined, { numeric: true }) || a.name.localeCompare(b.name))
     })
 
-    // Construir lista de grados ordenada
+    // Construir lista de grados ordenada institucionalmente
     const sortedGrades: TeacherGradeWorkload[] = Array.from(gradeMap.entries())
       .map(([gradeLevel, groups]) => ({ gradeLevel, groups }))
       .sort((a, b) => {
@@ -451,6 +437,9 @@ export async function getTeacherWorkloadGradesAndGroups(): Promise<TeacherWorklo
         if (idxA !== -1 && idxB !== -1) return idxA - idxB
         if (idxA !== -1) return -1
         if (idxB !== -1) return 1
+        const numA = parseInt(a.gradeLevel, 10)
+        const numB = parseInt(b.gradeLevel, 10)
+        if (!isNaN(numA) && !isNaN(numB)) return numA - numB
         return a.gradeLevel.localeCompare(b.gradeLevel)
       })
 
@@ -460,15 +449,116 @@ export async function getTeacherWorkloadGradesAndGroups(): Promise<TeacherWorklo
       isTeacher: !isAdmin
     }
   } catch (error) {
-    console.error('Error al obtener grados y grupos de carga académica:', error)
+    console.error('Error al obtener grados y grupos institucionales:', error)
     return { grades: [], allGroups: [], isTeacher: true }
   }
 }
 
+// ── UTILIDADES DE COMPARACIÓN ESTRICTA DE GRADOS Y GRUPOS ─────────────────────
+
+function buildGradeVariants(grade?: string | null): string[] {
+  const gradeStr = String(grade || '').trim()
+  if (!gradeStr) return []
+  const gradeDigits = gradeStr.replace(/\D/g, '')
+  const variants = new Set<string>([
+    gradeStr,
+    `${gradeStr}°`,
+    gradeDigits,
+    `${gradeDigits}°`,
+    `${gradeDigits} °`
+  ])
+  if (gradeDigits === '12' || /pfc[\s\-_]?12/i.test(gradeStr)) {
+    variants.add('PFC-12')
+    variants.add('PFC 12')
+    variants.add('PFC-12°')
+    variants.add('PFC')
+    variants.add('12')
+    variants.add('12°')
+  }
+  if (gradeDigits === '13' || /pfc[\s\-_]?13/i.test(gradeStr)) {
+    variants.add('PFC-13')
+    variants.add('PFC 13')
+    variants.add('PFC-13°')
+    variants.add('PFC')
+    variants.add('13')
+    variants.add('13°')
+  }
+  if (/nivelat/i.test(gradeStr)) {
+    variants.add('Nivelatorio')
+    variants.add('NIVELATORIO')
+    variants.add('nivelatorio')
+  }
+  if (/transici[oó]n/i.test(gradeStr)) {
+    variants.add('Transición')
+    variants.add('Transicion')
+    variants.add('TRANSICIÓN')
+    variants.add('TRANSICION')
+  }
+  return Array.from(variants).filter(Boolean)
+}
+
+function buildGroupVariants(groupInput: string, groupCode: string, gradeLevel: string): string[] {
+  const cleanInput = (groupInput || '').trim()
+  const cleanCode = (groupCode || '').trim()
+  const gradeDigits = gradeLevel.replace(/\D/g, '')
+
+  const variants = new Set<string>([
+    cleanInput,
+    cleanCode,
+    cleanCode ? `0${cleanCode}` : '',
+    `Grupo ${cleanCode}`,
+    `Grupo ${cleanInput}`,
+    gradeDigits && cleanCode ? `${gradeDigits}-${cleanCode}` : '',
+    gradeDigits && cleanCode ? `${gradeDigits}°-${cleanCode}` : '',
+    gradeDigits && cleanCode ? `${gradeDigits}° ${cleanCode}` : '',
+    gradeDigits && cleanCode ? `${gradeDigits}_${cleanCode}` : '',
+    gradeDigits && cleanCode ? `${gradeDigits}${cleanCode}` : ''
+  ])
+  return Array.from(variants).filter(Boolean)
+}
+
+function isStrictGradeMatch(studentGrade?: string | null, targetGrade?: string | null): boolean {
+  if (!studentGrade || !targetGrade) return false
+  const s = studentGrade.trim().toLowerCase().replace(/[^a-z0-9]/g, '')
+  const t = targetGrade.trim().toLowerCase().replace(/[^a-z0-9]/g, '')
+  if (s === t) return true
+
+  const numS = parseInt(s, 10)
+  const numT = parseInt(t, 10)
+  if (!isNaN(numS) && !isNaN(numT)) {
+    return numS === numT
+  }
+
+  if (/pfc/i.test(s) && /pfc/i.test(t)) {
+    return s.replace(/\D/g, '') === t.replace(/\D/g, '')
+  }
+
+  return false
+}
+
+function isStrictGroupMatch(studentGroup?: string | null, groupInput?: string | null, groupCode?: string | null): boolean {
+  if (!studentGroup) return false
+  const s = studentGroup.trim().toLowerCase()
+  const cleanS = s.replace(/[^a-z0-9]/g, '')
+  const cleanInput = (groupInput || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '')
+  const cleanCode = (groupCode || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '')
+
+  if (cleanInput && cleanS === cleanInput) return true
+
+  if (cleanCode) {
+    if (cleanS === cleanCode) return true
+    if (s === `grupo ${cleanCode}` || s === `g${cleanCode}`) return true
+    const suffix = s.split('-').pop()?.replace(/[^a-z0-9]/g, '')
+    if (suffix === cleanCode) return true
+  }
+
+  return false
+}
+
 /**
  * Obtiene todos los estudiantes de un grupo específico seleccionado por el docente,
- * consultando la fuente unificada de SuperAdmin (profiles con rol estudiante + student_directory)
- * con desduplicación por documento de identidad, profile_id y nombre.
+ * consultando la fuente unificada (profiles, student_enrollments y student_directory)
+ * con validación estricta de que el grado y el grupo coincidan simultáneamente.
  */
 export async function getStudentsForTeacherGroup(
   gradeLevel: string,
@@ -478,25 +568,59 @@ export async function getStudentsForTeacherGroup(
 
   try {
     const adminClient = createAdminClient()
-    const cleanStr = (s?: string | null) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '')
 
     const parsed = parseGroup(groupInput)
     const groupCode = parsed ? parsed.groupCode : (groupInput.split('-').pop() || groupInput).trim()
-    const possibleGroups = Array.from(new Set([groupInput, groupCode]))
 
-    // 1. Obtener perfiles de estudiantes
-    const { data: profiles, error: pError } = await adminClient
+    const gradeVariants = buildGradeVariants(gradeLevel)
+    const groupVariants = buildGroupVariants(groupInput, groupCode, gradeLevel)
+
+    // 1. Obtener matrículas en student_enrollments filtradas ESTRICTAMENTE por grado Y grupo
+    const { data: enrollments, error: eError } = await adminClient
+      .from('student_enrollments')
+      .select('student_id, grade_level, group_name, academic_year, enrollment_status')
+      .in('grade_level', gradeVariants)
+      .in('group_name', groupVariants)
+      .order('academic_year', { ascending: false })
+
+    if (eError) console.error('Error buscando student_enrollments para grupo:', eError)
+
+    const enrolledMatchingStudentIds = new Set<string>()
+    const enrolledDataMap = new Map<string, { gradeLevel: string; groupName: string }>()
+
+    for (const e of enrollments || []) {
+      if (e.enrollment_status === 'cancelled' || e.enrollment_status === 'withdrawn') continue
+      if (isStrictGradeMatch(e.grade_level, gradeLevel) && isStrictGroupMatch(e.group_name, groupInput, groupCode)) {
+        enrolledMatchingStudentIds.add(e.student_id)
+        if (!enrolledDataMap.has(e.student_id)) {
+          enrolledDataMap.set(e.student_id, {
+            gradeLevel: e.grade_level,
+            groupName: e.group_name
+          })
+        }
+      }
+    }
+
+    // 2. Obtener perfiles de estudiantes restringidos por grade_level o matrícula confirmada
+    let profilesQuery = adminClient
       .from('profiles')
       .select('id, first_name, last_name, grade_level, group_name, roles!inner(name), status')
       .eq('roles.name', 'student')
 
+    const { data: profiles, error: pError } = await profilesQuery
     if (pError) console.error('Error buscando profiles para grupo:', pError)
 
+    // Filtrar perfiles: DEBE coincidir obligatoriamente el grado Y el grupo
     const matchingProfiles = (profiles || []).filter(p => {
       if (p.status === 'inactive') return false
-      const gMatch = cleanStr(p.grade_level) === cleanStr(gradeLevel)
-      const grpMatch = possibleGroups.some(g => cleanStr(p.group_name) === cleanStr(g))
-      return gMatch && grpMatch
+
+      // Si tiene matrícula activa en este grado y grupo, es válido
+      if (enrolledMatchingStudentIds.has(p.id)) return true
+
+      // Si no está en enrollment, sus campos en profiles DEBEN coincidir en grado Y grupo
+      const gradeMatches = isStrictGradeMatch(p.grade_level, gradeLevel)
+      const groupMatches = isStrictGroupMatch(p.group_name, groupInput, groupCode)
+      return gradeMatches && groupMatches
     })
 
     // Consultar documentos en student_details
@@ -513,7 +637,7 @@ export async function getStudentsForTeacherGroup(
       }
     }
 
-    // 2. Obtener estudiantes del directorio (student_directory)
+    // 3. Obtener estudiantes del directorio (student_directory)
     const { data: directory, error: dError } = await adminClient
       .from('student_directory')
       .select('id, first_name, last_name, document_id, grade_level, group_name, profile_id, status')
@@ -522,17 +646,17 @@ export async function getStudentsForTeacherGroup(
     if (dError) console.error('Error buscando student_directory para grupo:', dError)
 
     const matchingDir = (directory || []).filter(d => {
-      const gMatch = cleanStr(d.grade_level) === cleanStr(gradeLevel)
-      const grpMatch = possibleGroups.some(g => cleanStr(d.group_name) === cleanStr(g))
-      return gMatch && grpMatch
+      if (d.status !== 'active') return false
+      return isStrictGradeMatch(d.grade_level, gradeLevel) && isStrictGroupMatch(d.group_name, groupInput, groupCode)
     })
 
-    // 3. Fusionar y desduplicar (exacto a la gestión del SuperAdmin)
+    // 4. Fusionar y desduplicar
     const seenProfileIds = new Set<string>()
     const seenDocs = new Set<string>()
     const seenNames = new Set<string>()
     const results: StudentRef[] = []
 
+    const cleanDoc = (s?: string | null) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '')
     const normName = (first?: string | null, last?: string | null) =>
       `${last || ''} ${first || ''}`.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim()
 
@@ -540,6 +664,8 @@ export async function getStudentsForTeacherGroup(
       const docId = docMap[p.id] || null
       const formattedFirst = formatCapitalizedWords(p.first_name)
       const formattedLast = formatCapitalizedWords(p.last_name)
+      const enrollData = enrolledDataMap.get(p.id)
+
       results.push({
         source: 'profile',
         id: p.id,
@@ -547,17 +673,17 @@ export async function getStudentsForTeacherGroup(
         lastName: formattedLast,
         fullName: `${formattedLast} ${formattedFirst}`.trim(),
         documentId: docId,
-        gradeLevel: p.grade_level || gradeLevel,
-        groupName: p.group_name || groupCode
+        gradeLevel: enrollData?.gradeLevel || p.grade_level || gradeLevel,
+        groupName: enrollData?.groupName || p.group_name || groupCode
       })
       seenProfileIds.add(p.id)
-      if (docId) seenDocs.add(cleanStr(docId))
+      if (docId) seenDocs.add(cleanDoc(docId))
       seenNames.add(normName(p.first_name, p.last_name))
     }
 
     for (const d of matchingDir) {
       if (d.profile_id && seenProfileIds.has(d.profile_id)) continue
-      if (d.document_id && seenDocs.has(cleanStr(d.document_id))) continue
+      if (d.document_id && seenDocs.has(cleanDoc(d.document_id))) continue
       const dName = normName(d.first_name, d.last_name)
       if (dName && seenNames.has(dName)) continue
 
@@ -575,7 +701,10 @@ export async function getStudentsForTeacherGroup(
       })
     }
 
-    return results.sort((a, b) => a.lastName.localeCompare(b.lastName))
+    // Verificación final estricta de grado: ningún estudiante de otro grado puede estar presente
+    const verifiedResults = results.filter(r => isStrictGradeMatch(r.gradeLevel, gradeLevel))
+
+    return verifiedResults.sort((a, b) => a.lastName.localeCompare(b.lastName))
   } catch (error) {
     console.error('Error al obtener estudiantes del grupo:', error)
     return []

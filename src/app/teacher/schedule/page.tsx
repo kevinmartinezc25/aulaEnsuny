@@ -184,7 +184,7 @@ export default function TeacherSchedulePage() {
                 </button>
               )}
 
-              {/* 3. Carga Académica */}
+              {/* 3. Asignación Académica */}
               <button
                 onClick={() => setActiveTab('workload')}
                 className={`py-1.5 md:py-1 px-1 sm:px-3 text-[11px] sm:text-xs font-bold rounded-lg transition-all text-center select-none flex items-center justify-center ${
@@ -193,8 +193,8 @@ export default function TeacherSchedulePage() {
                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                 }`}
               >
-                <span className="md:hidden">Carga</span>
-                <span className="hidden md:inline">Carga Académica</span>
+                <span className="md:hidden">Asignación</span>
+                <span className="hidden md:inline">Asignación Academica</span>
               </button>
 
 
@@ -235,7 +235,7 @@ export default function TeacherSchedulePage() {
                       : activeTab === 'group'
                       ? `Horario ${directorGroups.find(g => g.id === activeGroupId)?.name || 'de Grupo'}`
                       : activeTab === 'workload'
-                      ? 'Carga Académica'
+                      ? 'Asignación Academica'
                       : ''
                   }
                 </span>
@@ -303,7 +303,7 @@ export default function TeacherSchedulePage() {
                 </div>
               </div>
               <h1 className="text-xl font-black uppercase tracking-wide text-slate-900 text-center mt-2">
-                Carga Académica Docente
+                Asignación Academica Docente
               </h1>
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs font-bold text-slate-800 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 p-3 rounded-lg border border-slate-300 dark:border-slate-700 mt-2">
                 <span>Docente: <b className="text-indigo-600 dark:text-indigo-400">{teacherProfile?.first_name} {teacherProfile?.last_name}</b></span>

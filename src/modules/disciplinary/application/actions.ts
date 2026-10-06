@@ -667,26 +667,21 @@ export async function getTeacherAssignedGroups(): Promise<{ id: string, name: st
 
     const adminClient = createAdminClient()
 
+    // Devolver todos los grupos institucionales registrados para permitir filtrado completo de reportes
     const { data, error } = await adminClient
-      .from('academic_assignments')
-      .select('group:sch_groups!inner(id, name, level), teacher:academic_teachers!inner(profile_id)')
-      .eq('teacher.profile_id', user.id)
+      .from('sch_groups')
+      .select('id, name, level')
+      .order('name', { ascending: true })
 
     if (error) throw error
 
-    // Extraer los grupos y eliminar duplicados
-    const groupsMap = new Map<string, { id: string, name: string, level: string }>()
-    
-    data?.forEach((row: any) => {
-      const g = row.group
-      if (g && !Array.isArray(g)) {
-        groupsMap.set(g.id, { id: g.id, name: g.name, level: g.level || '' })
-      }
-    })
-
-    return Array.from(groupsMap.values()).sort((a, b) => a.name.localeCompare(b.name))
+    return (data || []).map((g: any) => ({
+      id: g.id,
+      name: g.name,
+      level: g.level || ''
+    }))
   } catch (error) {
-    console.error('Error al obtener grupos del docente:', error)
+    console.error('Error al obtener grupos institucionales:', error)
     return []
   }
 }
