@@ -1,8 +1,8 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { usePlanillaStore } from '@/store/usePlanillaStore'
-import { Plus, Trash2, Edit2, CalendarDays, Lock, Unlock, MoreVertical } from 'lucide-react'
+import { Plus, Trash2, Edit2, CalendarDays, Lock, Unlock, MoreVertical, ArrowRight } from 'lucide-react'
 import { CreateSessionModal } from '@/modules/planilla-asistida/presentation/components/CreateSessionModal'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
@@ -21,6 +21,24 @@ export function AttendanceTable({ subjectId }: AttendanceTableProps) {
   
   // Para permitir desbloquear temporalmente clases pasadas que se auto-bloquean
   const [unlockedPastSessions, setUnlockedPastSessions] = useState<Set<string>>(new Set())
+  const tableContainerRef = useRef<HTMLDivElement>(null)
+
+  const todayStr = useMemo(() => {
+    const d = new Date()
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }, [])
+
+  const handleScrollToLatest = () => {
+    if (tableContainerRef.current) {
+      tableContainerRef.current.scrollTo({
+        left: tableContainerRef.current.scrollWidth,
+        behavior: 'smooth'
+      })
+    }
+  }
 
   // Cerrar menú contextual al hacer clic fuera
   useEffect(() => {
@@ -190,11 +208,11 @@ export function AttendanceTable({ subjectId }: AttendanceTableProps) {
     }
 
     switch (status) {
-      case 'A': return <span className="text-emerald-600 font-bold bg-emerald-50 px-1 py-1 rounded w-full h-full flex items-center justify-center text-[11px]" title="Asiste">Asiste</span>
-      case 'T': return <span className="text-amber-700 dark:text-amber-300 font-bold bg-amber-100 dark:bg-amber-900/40 px-1 py-1 rounded w-full h-full flex items-center justify-center text-[11px]" title="Llega Tarde">Tarde</span>
-      case 'I': return <span className="text-red-600 font-bold bg-red-50 px-1 py-1 rounded w-full h-full flex items-center justify-center text-[11px]" title="Inasistencia">Inasistencia</span>
-      case 'E': return <span className="text-amber-600 font-bold bg-amber-50 px-1 py-1 rounded w-full h-full flex items-center justify-center text-[11px]" title="Excusa">Excusa</span>
-      default: return <span className="text-slate-300 w-full h-full flex items-center justify-center">-</span>
+      case 'A': return <span className="text-emerald-700 dark:text-emerald-300 font-bold bg-emerald-50 dark:bg-emerald-950/40 px-1 py-1 rounded-md w-full h-full flex items-center justify-center text-[11px] active:scale-95 transition-transform" title="Asiste">Asiste</span>
+      case 'T': return <span className="text-amber-700 dark:text-amber-300 font-bold bg-amber-100 dark:bg-amber-900/40 px-1 py-1 rounded-md w-full h-full flex items-center justify-center text-[11px] active:scale-95 transition-transform" title="Llega Tarde">Tarde</span>
+      case 'I': return <span className="text-red-700 dark:text-red-300 font-bold bg-red-50 dark:bg-red-950/40 px-1 py-1 rounded-md w-full h-full flex items-center justify-center text-[11px] active:scale-95 transition-transform" title="Inasistencia">Inasistencia</span>
+      case 'E': return <span className="text-amber-800 dark:text-amber-200 font-bold bg-amber-50 dark:bg-amber-900/30 px-1 py-1 rounded-md w-full h-full flex items-center justify-center text-[11px] active:scale-95 transition-transform" title="Excusa">Excusa</span>
+      default: return <span className="text-slate-300 dark:text-slate-600 font-bold w-full h-full flex items-center justify-center text-xs">-</span>
     }
   }
 
@@ -202,44 +220,61 @@ export function AttendanceTable({ subjectId }: AttendanceTableProps) {
     <div className="flex flex-col h-full bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden min-h-0">
       
       {/* Header Actions */}
-      <div className="flex flex-col sm:flex-row gap-3 sm:justify-between sm:items-center px-4 py-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-        <h3 className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2 text-sm sm:text-base">
-          <CalendarDays className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600" />
-          Registro de Asistencia
+      <div className="flex flex-col sm:flex-row gap-2 sm:justify-between sm:items-center px-3 sm:px-4 py-2 sm:py-2.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
+        <div className="flex items-center justify-between sm:justify-start gap-2">
+          <h3 className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 text-xs sm:text-base">
+            <CalendarDays className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 shrink-0" />
+            <span>Registro de Asistencia</span>
+          </h3>
           {isSaving ? (
-            <span className="text-xs font-normal text-amber-600 ml-4 flex items-center"><span className="h-2 w-2 bg-amber-500 rounded-full animate-pulse mr-1"></span> Guardando...</span>
+            <span className="text-[11px] font-normal text-amber-600 flex items-center"><span className="h-1.5 w-1.5 bg-amber-500 rounded-full animate-pulse mr-1"></span> Guardando...</span>
           ) : hasUnsavedChanges ? (
-            <span className="text-xs font-normal text-slate-400 ml-4">Cambios sin guardar</span>
+            <span className="text-[11px] font-normal text-slate-400">Sin guardar</span>
           ) : (
-            <span className="text-xs font-normal text-emerald-600 ml-4 flex items-center"><span className="h-2 w-2 bg-emerald-500 rounded-full mr-1"></span> Guardado</span>
+            <span className="text-[11px] font-normal text-emerald-600 flex items-center"><span className="h-1.5 w-1.5 bg-emerald-500 rounded-full mr-1"></span> Guardado</span>
           )}
-        </h3>
-        <Button onClick={handleOpenCreate} size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white h-8 w-full sm:w-auto">
-          <Plus className="h-4 w-4 mr-1" />
-          Nueva Clase
-        </Button>
+        </div>
+
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          {sessions.length > 2 && (
+            <button
+              type="button"
+              onClick={handleScrollToLatest}
+              className="text-xs h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-1 shrink-0 font-medium shadow-xs"
+              title="Desplazarse a la última clase"
+            >
+              <span>Última clase</span>
+              <ArrowRight className="h-3.5 w-3.5 text-emerald-600" />
+            </button>
+          )}
+          <Button onClick={handleOpenCreate} size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white h-8 flex-1 sm:flex-none">
+            <Plus className="h-4 w-4 mr-1" />
+            Nueva Clase
+          </Button>
+        </div>
       </div>
 
       {/* Table Container */}
-      <div className="flex-1 overflow-auto custom-scrollbar relative">
+      <div ref={tableContainerRef} className="flex-1 overflow-auto custom-scrollbar relative">
         <table className="w-full text-sm text-left border-collapse min-w-max">
-          <thead className="text-xs text-slate-500 bg-slate-50 dark:bg-slate-900 sticky top-0 z-20 shadow-sm">
+          <thead className="text-xs text-slate-500 bg-slate-50 dark:bg-slate-900 sticky top-0 z-30 shadow-xs">
             <tr>
-              <th className="hidden md:table-cell px-4 py-3 font-bold border-b border-r border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 sticky left-0 z-30 w-[50px]">
+              <th className="hidden md:table-cell px-3 py-2.5 font-bold border-b border-r border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 sticky left-0 z-40 w-[45px] min-w-[45px] text-center">
                 N°
               </th>
-              <th className="px-2 md:px-4 py-3 font-bold border-b border-r border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 sticky left-0 md:left-[50px] z-30 w-40 min-w-[160px] md:w-auto md:min-w-[250px] shadow-[4px_0_10px_rgba(0,0,0,0.05)]">
+              <th className="px-2.5 md:px-4 py-2.5 font-bold border-b border-r border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 sticky left-0 md:left-[45px] z-40 w-36 min-w-[130px] max-w-[130px] md:w-auto md:min-w-[220px] md:max-w-none shadow-[4px_0_12px_rgba(0,0,0,0.06)]">
                 Estudiante
               </th>
               {sessions.map(session => {
                 const locked = isSessionLocked(session)
                 const isMenuOpen = activeMenuSessionId === session.id
+                const isToday = session.date === todayStr
                 return (
                 <th 
                   key={session.id} 
                   className={`relative px-1 py-1.5 font-semibold border-b border-r border-slate-200 dark:border-slate-800 text-center w-[96px] min-w-[96px] max-w-[96px] ${
-                    locked ? 'bg-slate-100/90 dark:bg-slate-800/60' : 'bg-slate-50 dark:bg-slate-900'
-                  } ${isMenuOpen ? 'z-40' : 'z-20'}`}
+                    locked ? 'bg-slate-100/90 dark:bg-slate-800/60' : isToday ? 'bg-emerald-50/50 dark:bg-emerald-950/20' : 'bg-slate-50 dark:bg-slate-900'
+                  } ${isMenuOpen ? 'z-30' : 'z-10'}`}
                 >
                   <div className="flex flex-col items-center justify-center relative" data-session-menu={isMenuOpen ? "true" : undefined}>
                     {/* Fila superior: Candado (si bloqueado) + Fecha + Menú ⋮ */}
@@ -250,13 +285,18 @@ export function AttendanceTable({ subjectId }: AttendanceTableProps) {
                             <Lock className="h-3 w-3 text-amber-500 dark:text-amber-400" />
                           </span>
                         )}
-                        <span className={`text-xs font-bold truncate ${locked ? 'text-slate-500 dark:text-slate-400' : 'text-slate-900 dark:text-white'}`}>
+                        <span className={`text-xs font-bold truncate ${locked ? 'text-slate-500 dark:text-slate-400' : isToday ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-900 dark:text-white'}`}>
                           {(() => {
                             const [year, month, day] = session.date.split('-');
                             const localDate = new Date(Number(year), Number(month) - 1, Number(day));
                             return localDate.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
                           })()}
                         </span>
+                        {isToday && (
+                          <span className="text-[9px] font-extrabold uppercase bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 px-1 py-0.2 rounded shrink-0">
+                            Hoy
+                          </span>
+                        )}
                       </div>
 
                       <button 
@@ -380,13 +420,13 @@ export function AttendanceTable({ subjectId }: AttendanceTableProps) {
               const ePercentage = totalMarcadas > 0 ? Math.round((eCount / totalMarcadas) * 100) : 0
 
               return (
-                <tr key={student.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 group/row transition-colors">
-                  <td className="hidden md:table-cell px-4 py-2 border-r border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-950 sticky left-0 z-10 text-center text-slate-400 group-hover/row:bg-slate-50/50 dark:group-hover/row:bg-slate-800/30">
+                <tr key={student.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 group/row transition-colors">
+                  <td className="hidden md:table-cell px-3 py-2 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 sticky left-0 z-20 text-center text-slate-400 font-mono text-xs group-hover/row:bg-slate-50 dark:group-hover/row:bg-slate-800 transition-colors">
                     {student.number}
                   </td>
                   <td 
                     title={student.full_name}
-                    className="px-2 md:px-4 py-2 border-r border-slate-100 dark:border-slate-800 font-medium text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-950 sticky left-0 md:left-[50px] z-10 w-40 min-w-[160px] md:w-auto md:min-w-[250px] group-hover/row:bg-slate-50/50 dark:group-hover/row:bg-slate-800/30 shadow-[4px_0_10px_rgba(0,0,0,0.05)] uppercase whitespace-normal break-words text-[11px] md:text-sm leading-tight"
+                    className="px-2.5 md:px-4 py-2 border-r border-slate-200 dark:border-slate-800 font-semibold text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-900 sticky left-0 md:left-[45px] z-20 w-36 min-w-[130px] max-w-[130px] md:w-auto md:min-w-[220px] md:max-w-none group-hover/row:bg-slate-50 dark:group-hover/row:bg-slate-800 transition-colors shadow-[4px_0_12px_rgba(0,0,0,0.06)] uppercase truncate text-xs leading-tight select-none"
                   >
                     {student.full_name}
                   </td>
@@ -396,14 +436,14 @@ export function AttendanceTable({ subjectId }: AttendanceTableProps) {
                     return (
                       <td 
                         key={session.id} 
-                        className={`border-r border-slate-100 dark:border-slate-800 p-0 text-center select-none transition-colors w-[96px] min-w-[96px] max-w-[96px] overflow-hidden ${locked ? 'bg-slate-100 dark:bg-slate-800/60 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                        className={`border-r border-slate-100 dark:border-slate-800 p-0 text-center select-none transition-colors w-[96px] min-w-[96px] max-w-[96px] overflow-hidden ${locked ? 'bg-slate-100 dark:bg-slate-800/60 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 active:bg-slate-200 dark:active:bg-slate-700'}`}
                         onClick={() => handleToggleAttendance(student.id, session)}
                       >
                         <div className="w-full h-10 flex items-center justify-center p-1 relative">
                           {locked && (
                             <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPjxyZWN0IHdpZHRoPSI0IiBoZWlnaHQ9IjQiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMCIvPjxwYXRoIGQ9Ik0tMSwxIGwyLC0yIE0wLDQgbDQsLTQgTTMsNSBsMiwtMiIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utb3BhY2l0eT0iMC4wNSIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9zdmc+')] z-0 pointer-events-none"></div>
                           )}
-                          <div className="relative z-10 w-full h-full">
+                          <div className="w-full h-full flex items-center justify-center">
                             {getStatusDisplay(attendance[student.id]?.[session.id], locked)}
                           </div>
                         </div>

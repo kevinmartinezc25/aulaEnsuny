@@ -19,6 +19,74 @@ const LOGRO_COLORS = [
   { bg: 'bg-amber-50 dark:bg-amber-950/20', text: 'text-amber-800 dark:text-amber-300', border: 'border-amber-200 dark:border-amber-800' },
 ]
 
+/**
+ * Divide el nombre de una actividad en líneas balanceadas (máx ~10 caracteres por línea)
+ * para realizar un salto de línea si sobrepasa la celda y evitar que sobrepase las líneas divisorias.
+ */
+function formatActivityLines(name: string, maxCharsPerLine = 10, maxLines = 3): string[] {
+  if (!name) return []
+  const trimmed = name.trim()
+  if (trimmed.length <= maxCharsPerLine) {
+    return [trimmed]
+  }
+
+  const words = trimmed.split(/\s+/)
+  if (words.length === 1) {
+    const word = words[0]
+    const lines: string[] = []
+    for (let i = 0; i < word.length; i += maxCharsPerLine - 1) {
+      const part = word.slice(i, i + maxCharsPerLine - 1)
+      if (i + maxCharsPerLine - 1 < word.length) {
+        lines.push(part + '-')
+      } else {
+        lines.push(part)
+      }
+      if (lines.length >= maxLines) break
+    }
+    return lines
+  }
+
+  const lines: string[] = []
+  let currentLine = ''
+
+  for (const word of words) {
+    if (lines.length >= maxLines - 1 && currentLine) {
+      const candidate = currentLine + ' ' + word
+      if (candidate.length <= maxCharsPerLine) {
+        currentLine = candidate
+      } else {
+        lines.push(currentLine)
+        currentLine = word.length > maxCharsPerLine ? word.slice(0, maxCharsPerLine - 1) + '…' : word
+        break
+      }
+      continue
+    }
+
+    if (!currentLine) {
+      if (word.length > maxCharsPerLine) {
+        lines.push(word.slice(0, maxCharsPerLine - 1) + '-')
+        currentLine = word.slice(maxCharsPerLine - 1)
+      } else {
+        currentLine = word
+      }
+    } else if ((currentLine + ' ' + word).length <= maxCharsPerLine) {
+      currentLine += ' ' + word
+    } else {
+      lines.push(currentLine)
+      if (word.length > maxCharsPerLine) {
+        lines.push(word.slice(0, maxCharsPerLine - 1) + '-')
+        currentLine = word.slice(maxCharsPerLine - 1)
+      } else {
+        currentLine = word
+      }
+    }
+  }
+  if (currentLine && lines.length < maxLines) {
+    lines.push(currentLine)
+  }
+  return lines.slice(0, maxLines)
+}
+
 // Subcomponente para manejar el estado local del input y permitir escribir decimales como "4." antes de que se parsee.
 const GradeCell = React.memo(({ 
   studentId, 
@@ -675,7 +743,7 @@ export function SpreadsheetTable({ subjectId }: SpreadsheetTableProps) {
                     <th
                       key={`${ach.id}-prom`}
                       rowSpan={2}
-                      className={`border-b border-r ${color.border} ${color.bg} align-bottom pb-3 w-12 min-w-[48px]`}
+                      className={`border-b border-r ${color.border} ${color.bg} align-bottom pb-3 w-12 min-w-[48px] overflow-hidden`}
                     >
                       <div className={`writing-vertical-rl transform rotate-180 text-xs font-bold ${color.text} whitespace-nowrap mx-auto h-20 text-left uppercase tracking-wide`}>
                         Promedio
@@ -687,7 +755,7 @@ export function SpreadsheetTable({ subjectId }: SpreadsheetTableProps) {
 
               <th
                 rowSpan={2}
-                className="bg-slate-100 dark:bg-slate-800 border-b border-l border-slate-200 dark:border-slate-700 font-bold sticky right-0 z-50 shadow-[-4px_0_10px_rgba(0,0,0,0.05)] w-16 min-w-[64px] align-bottom pb-4"
+                className="bg-slate-100 dark:bg-slate-800 border-b border-l border-slate-200 dark:border-slate-700 font-bold sticky right-0 z-50 shadow-[-4px_0_10px_rgba(0,0,0,0.05)] w-16 min-w-[64px] align-bottom pb-4 overflow-hidden"
               >
                 <div className="writing-vertical-rl transform rotate-180 text-xs font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap mx-auto h-24 text-left uppercase tracking-wide">
                   Promedio final
@@ -712,31 +780,39 @@ export function SpreadsheetTable({ subjectId }: SpreadsheetTableProps) {
                         )
                       }
 
-                      return compActivities.map(act => (
-                        <th
-                          key={act.id}
-                          className="px-1 pt-6 pb-2 border-b border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 w-12 min-w-[48px] relative group"
-                        >
-                          <button
-                            onClick={() => handleTogglePublish(act.id, act.name, !!act.is_published)}
-                            className={`absolute top-1 right-1 p-0.5 rounded-md z-10 transition-all ${
-                              act.is_published
-                                ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 shadow-sm'
-                                : 'text-slate-400 dark:text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-                            }`}
-                            title={act.is_published ? "Ocultar a estudiantes" : "Publicar a estudiantes"}
+                      return compActivities.map(act => {
+                        const lines = formatActivityLines(act.name)
+                        return (
+                          <th
+                            key={act.id}
+                            className="px-1 pt-6 pb-2 border-b border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 w-12 min-w-[48px] max-w-[64px] relative group overflow-hidden"
+                            title={act.name}
                           >
-                            {act.is_published ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
-                          </button>
-                          <div
-                            className={`writing-vertical-rl transform rotate-180 text-[11px] font-bold ${
-                              act.is_published ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-800 dark:text-slate-200'
-                            } whitespace-nowrap mx-auto h-20 text-left uppercase tracking-wide flex items-center justify-start gap-1`}
-                          >
-                            {act.name}
-                          </div>
-                        </th>
-                      ))
+                            <button
+                              onClick={() => handleTogglePublish(act.id, act.name, !!act.is_published)}
+                              className={`absolute top-1 right-1 p-0.5 rounded-md z-10 transition-all ${
+                                act.is_published
+                                  ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 shadow-sm'
+                                  : 'text-slate-400 dark:text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                              }`}
+                              title={act.is_published ? "Ocultar a estudiantes" : "Publicar a estudiantes"}
+                            >
+                              {act.is_published ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                            </button>
+                            <div
+                              className={`writing-vertical-rl transform rotate-180 text-[10px] sm:text-[11px] font-bold ${
+                                act.is_published ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-800 dark:text-slate-200'
+                              } mx-auto max-h-[85px] overflow-hidden uppercase tracking-wider text-left leading-tight select-none`}
+                            >
+                              {lines.map((line, idx) => (
+                                <span key={idx} className="block whitespace-nowrap">
+                                  {line}
+                                </span>
+                              ))}
+                            </div>
+                          </th>
+                        )
+                      })
                     })}
                   </React.Fragment>
                 )
