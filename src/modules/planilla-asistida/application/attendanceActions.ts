@@ -58,6 +58,28 @@ export async function createAssistedSession(subjectId: string, date: string, top
     throw new Error('Error al crear la sesión de asistencia')
   }
 
+  // Pre-cargar la asistencia con 'A' (Asiste) para todos los estudiantes
+  const { data: students } = await supabase
+    .from('assisted_students')
+    .select('id')
+    .eq('subject_id', subjectId)
+
+  if (students && students.length > 0) {
+    const attendanceRecords = students.map(student => ({
+      session_id: data.id,
+      student_id: student.id,
+      status: 'A' as any
+    }))
+    
+    const { error: attError } = await supabase
+      .from('assisted_attendance')
+      .insert(attendanceRecords)
+      
+    if (attError) {
+      console.warn('Error auto-filling attendance:', attError)
+    }
+  }
+
   return data as AssistedSession
 }
 
@@ -161,7 +183,7 @@ export async function saveAssistedAttendance(records: { session_id: string, stud
   if (toUpsert.length > 0) {
     const { error } = await supabase
       .from('assisted_attendance')
-      .upsert(toUpsert, { onConflict: 'session_id, student_id' })
+      .upsert(toUpsert, { onConflict: 'session_id,student_id' })
 
     if (error) {
       console.error('Error saving attendance:', error)

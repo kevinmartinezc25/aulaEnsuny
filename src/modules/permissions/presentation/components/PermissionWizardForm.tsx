@@ -26,51 +26,53 @@ import {
   PermissionType,
   TeacherSnapshot,
   AcademicImpactItem,
-  StudentActivityPlan
+  StudentActivityPlan,
+  PermissionRequest
 } from '../../domain/entities'
 import { AcademicImpactSelector } from './AcademicImpactSelector'
-import { createPermissionRequest } from '../../application/actions'
+import { createPermissionRequest, updatePermissionDraft } from '../../application/actions'
 import { formatPermissionDateRange } from '../utils/dateUtils'
 
 interface Props {
   teacher: TeacherSnapshot
   availableTypes: PermissionType[]
   availableCourses: Array<{ id: string; title: string; subject: string; gradeLevel: string; groupName: string }>
+  initialData?: PermissionRequest | null
 }
 
-export function PermissionWizardForm({ teacher, availableTypes, availableCourses }: Props) {
+export function PermissionWizardForm({ teacher, availableTypes, availableCourses, initialData }: Props) {
   const router = useRouter()
   const shouldReduceMotion = useReducedMotion()
   const [currentStep, setCurrentStep] = useState(1)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Step 2: Tipo
-  const [selectedTypeId, setSelectedTypeId] = useState(availableTypes[0]?.id || '')
+  const [selectedTypeId, setSelectedTypeId] = useState(initialData?.typeId || availableTypes[0]?.id || '')
 
   // Step 3: Fechas y Horario
   const todayStr = new Date().toISOString().split('T')[0]
-  const [isSingleDay, setIsSingleDay] = useState(true)
-  const [startDate, setStartDate] = useState(todayStr)
-  const [endDate, setEndDate] = useState(todayStr)
-  const [isFullDay, setIsFullDay] = useState(true)
-  const [startTime, setStartTime] = useState('07:00')
-  const [endTime, setEndTime] = useState('13:00')
+  const [isSingleDay, setIsSingleDay] = useState(initialData ? initialData.startDate === initialData.endDate : true)
+  const [startDate, setStartDate] = useState(initialData?.startDate || todayStr)
+  const [endDate, setEndDate] = useState(initialData?.endDate || todayStr)
+  const [isFullDay, setIsFullDay] = useState(initialData ? initialData.isFullDay : true)
+  const [startTime, setStartTime] = useState(initialData?.startTime || '07:00')
+  const [endTime, setEndTime] = useState(initialData?.endTime || '13:00')
 
   // Step 4: Motivo y Soportes
-  const [reason, setReason] = useState('')
+  const [reason, setReason] = useState(initialData?.reason || '')
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null)
-  const [attachmentName, setAttachmentName] = useState<string | null>(null)
+  const [attachmentName, setAttachmentName] = useState<string | null>(initialData?.attachmentName || null)
 
   // Step 5: Afectación Académica
-  const [affectsDuty, setAffectsDuty] = useState(false)
-  const [impactItems, setImpactItems] = useState<AcademicImpactItem[]>([])
+  const [affectsDuty, setAffectsDuty] = useState(initialData ? initialData.affectsAcademicDuty : false)
+  const [impactItems, setImpactItems] = useState<AcademicImpactItem[]>(initialData?.academicImpact || [])
 
   // Step 6: Plan de Contingencia
-  const [leavesActivities, setLeavesActivities] = useState(false)
+  const [leavesActivities, setLeavesActivities] = useState(initialData ? initialData.leavesStudentActivities : false)
   const [activityTitle, setActivityTitle] = useState('')
   const [activityGroup, setActivityGroup] = useState('')
   const [activityInstructions, setActivityInstructions] = useState('')
-  const [activitiesList, setActivitiesList] = useState<StudentActivityPlan[]>([])
+  const [activitiesList, setActivitiesList] = useState<StudentActivityPlan[]>(initialData?.studentActivities || [])
 
   // Tipo activo garantizado en todo momento
   const activeTypeId = selectedTypeId || availableTypes[0]?.id || ''
@@ -147,10 +149,6 @@ export function PermissionWizardForm({ teacher, availableTypes, availableCourses
         toast.error('El motivo o descripción debe tener al menos 10 caracteres')
         return
       }
-      if (selectedType?.requiresAttachment && !attachmentName && !attachmentFile) {
-        toast.error(`El tipo de permiso "${selectedType.name}" requiere adjuntar soporte documental obligatorio.`)
-        return
-      }
     }
 
     // Paso 5: Indicar clases o grupos específicos es opcional
@@ -207,11 +205,11 @@ export function PermissionWizardForm({ teacher, availableTypes, availableCourses
         ? activitiesList.length > 0
           ? activitiesList
           : activityTitle
-          ? [{ title: activityTitle, groupName: activityGroup || 'General', instructions: activityInstructions }]
+          ? [{ id: `act-${Date.now()}`, title: activityTitle, groupName: activityGroup || 'General', instructions: activityInstructions }]
           : []
         : []
 
-      const res = await createPermissionRequest({
+      const payload = {
         typeId: activeTypeId,
         startDate,
         endDate: isSingleDay ? startDate : endDate,
@@ -220,14 +218,21 @@ export function PermissionWizardForm({ teacher, availableTypes, availableCourses
         endTime: !isFullDay ? endTime : undefined,
         reason: reason.trim(),
         attachmentName,
-        attachmentUrl: attachmentName ? `https://storage.ensuny.edu.co/permissions/${attachmentName}` : null,
-        attachmentType: attachmentName?.split('.').pop()?.toLowerCase() || null,
+        attachmentUrl: attachmentName && attachmentName !== initialData?.attachmentName ? `https://storage.ensuny.edu.co/permissions/${attachmentName}` : (initialData?.attachmentUrl || null),
+        attachmentType: attachmentName ? attachmentName.split('.').pop()?.toLowerCase() || null : null,
         affectsAcademicDuty: affectsDuty,
         academicImpact: affectsDuty ? impactItems : [],
         leavesStudentActivities: leavesActivities,
         studentActivities: finalActivities,
         isDraft,
-      })
+      }
+
+      let res
+      if (initialData?.id) {
+        res = await updatePermissionDraft(initialData.id, payload)
+      } else {
+        res = await createPermissionRequest(payload)
+      }
 
       if (res.error) {
         toast.error(res.error)
@@ -235,11 +240,13 @@ export function PermissionWizardForm({ teacher, availableTypes, availableCourses
       }
 
       if (isDraft) {
-        toast.success('Borrador guardado correctamente')
+        toast.success(initialData?.id ? 'Borrador actualizado correctamente' : 'Borrador guardado correctamente')
         router.push('/teacher/permissions')
       } else {
-        toast.success(`Solicitud enviada correctamente. Radicado: ${res.requestNumber}`)
-        router.push(`/teacher/permissions/${res.id}`)
+        const reqNum = 'requestNumber' in res ? res.requestNumber : undefined
+        const targetId = ('id' in res && res.id ? res.id : initialData?.id)
+        toast.success(initialData?.id ? 'Solicitud actualizada y enviada' : `Solicitud enviada correctamente. Radicado: ${reqNum || ''}`)
+        router.push(`/teacher/permissions/${targetId || ''}`)
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error al enviar la solicitud.'
@@ -797,13 +804,9 @@ export function PermissionWizardForm({ teacher, availableTypes, availableCourses
                   <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                     Documento de Soporte
                   </label>
-                  {selectedType?.requiresAttachment ? (
-                    <span className="text-[11px] text-amber-700 dark:text-amber-400 font-bold bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800">
-                      Obligatorio para {selectedType.name}
-                    </span>
-                  ) : (
-                    <span className="text-[11px] text-slate-400">Opcional</span>
-                  )}
+                  <span className="text-[11px] text-blue-600 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-900/40 px-2 py-0.5 rounded-full border border-blue-200 dark:border-blue-800">
+                    Opcional (Recomendado)
+                  </span>
                 </div>
 
                 <div className="flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl p-6 bg-slate-50/50 dark:bg-slate-800/30 text-center hover:bg-slate-50 transition-colors relative">

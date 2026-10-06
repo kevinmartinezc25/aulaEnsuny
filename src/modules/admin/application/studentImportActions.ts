@@ -3,7 +3,13 @@
 import { createClient, createAdminClient } from '@/core/config/supabase/server'
 import { revalidatePath } from 'next/cache'
 import * as XLSX from 'xlsx'
-import { normalizeGradeLevel } from '@/lib/gradeUtils'
+import {
+  normalizeGradeLevel,
+  normalizeSede,
+  normalizeModality,
+  parseMetadataFromNotes,
+  buildNotesWithMetadata
+} from '@/lib/gradeUtils'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TIPOS
@@ -17,6 +23,8 @@ export interface DirectoryStudent {
   documentId: string | null
   gradeLevel: string
   groupName: string
+  sede?: string
+  modalidad?: string
   status: 'active' | 'inactive'
   profileId: string | null
   hasAccount: boolean
@@ -30,6 +38,8 @@ export interface StudentImportRow {
   gradeLevel: string
   groupName: string
   email?: string
+  sede?: string
+  modalidad?: string
 }
 
 export interface ImportRowValidated extends StudentImportRow {
@@ -72,6 +82,8 @@ function toTitleCase(str: string): string {
 export async function getStudentDirectory(filters?: {
   grade?: string
   group?: string
+  sede?: string
+  modalidad?: string
   search?: string
   status?: 'active' | 'inactive' | 'all'
 }): Promise<DirectoryStudent[]> {
@@ -102,20 +114,48 @@ export async function getStudentDirectory(filters?: {
 
     if (error) throw error
 
-    return (data || []).map(row => ({
-      id: row.id,
-      firstName: row.first_name,
-      lastName: row.last_name,
-      fullName: `${row.last_name} ${row.first_name}`,
-      documentId: row.document_id || null,
-      gradeLevel: row.grade_level,
-      groupName: row.group_name,
-      email: null,
-      status: row.status as 'active' | 'inactive',
-      profileId: row.profile_id || null,
-      hasAccount: !!row.profile_id,
-      importedAt: row.imported_at,
-    }))
+    let result: DirectoryStudent[] = (data || []).map(row => {
+      const meta = parseMetadataFromNotes(row.notes)
+      const sede = row.sede || meta.sede
+      const modalidad = row.modalidad || meta.modalidad
+
+      return {
+        id: row.id,
+        firstName: row.first_name,
+        lastName: row.last_name,
+        fullName: `${row.last_name} ${row.first_name}`,
+        documentId: row.document_id || null,
+        gradeLevel: row.grade_level,
+        groupName: row.group_name,
+        sede,
+        modalidad,
+        email: null,
+        status: row.status as 'active' | 'inactive',
+        profileId: row.profile_id || null,
+        hasAccount: !!row.profile_id,
+        importedAt: row.imported_at || row.created_at,
+      }
+    })
+
+    if (filters?.sede && filters.sede !== 'all') {
+      const sFilter = filters.sede.toLowerCase()
+      result = result.filter(s => (s.sede || '').toLowerCase().includes(sFilter))
+    }
+
+    if (filters?.modalidad && filters.modalidad !== 'all') {
+      const mFilter = filters.modalidad.toLowerCase()
+      result = result.filter(s => (s.modalidad || '').toLowerCase().includes(mFilter))
+    }
+
+    if (filters?.search && filters.search.trim()) {
+      const q = filters.search.toLowerCase().trim()
+      result = result.filter(s =>
+        s.fullName.toLowerCase().includes(q) ||
+        (s.documentId && s.documentId.toLowerCase().includes(q))
+      )
+    }
+
+    return result
   } catch (error) {
     console.error('Error al obtener directorio:', error)
     return []
@@ -330,14 +370,20 @@ export async function importStudentsBatch(
         const existingProfileId = cleanDoc ? detailsMap.get(cleanDoc) || null : null
         const existingDirId = cleanDoc ? existingDirDocMap.get(cleanDoc) : undefined
 
-        const payload = {
+        const targetSede = normalizeSede(row.sede)
+        const targetModalidad = normalizeModality(row.modalidad)
+        const notesWithMeta = buildNotesWithMetadata(null, targetSede, targetModalidad)
+
+        const payload: Record<string, unknown> = {
           first_name: toTitleCase(row.firstName),
           last_name: toTitleCase(row.lastName),
           document_id: row.documentId?.trim() || null,
           grade_level: normalizeGradeLevel(row.gradeLevel),
           group_name: row.groupName.trim(),
           profile_id: existingProfileId,
-          status: 'active' as const
+          status: 'active' as const,
+          notes: notesWithMeta,
+          import_source: 'excel_import'
         }
 
         if (existingDirId) {
@@ -403,12 +449,26 @@ export async function updateDirectoryStudent(
   try {
     const adminClient = createAdminClient()
 
+    // 1. Obtener registro previo para conservar o actualizar notas con metadata
+    const { data: prevRecord } = await adminClient
+      .from('student_directory')
+      .select('notes')
+      .eq('id', id)
+      .maybeSingle()
+
     const updatePayload: Record<string, unknown> = {}
     if (data.firstName !== undefined) updatePayload.first_name = toTitleCase(data.firstName)
     if (data.lastName !== undefined) updatePayload.last_name = toTitleCase(data.lastName)
     if (data.documentId !== undefined) updatePayload.document_id = data.documentId || null
     if (data.gradeLevel !== undefined) updatePayload.grade_level = normalizeGradeLevel(data.gradeLevel)
     if (data.groupName !== undefined) updatePayload.group_name = data.groupName.trim()
+
+    if (data.sede !== undefined || data.modalidad !== undefined) {
+      const prevMeta = parseMetadataFromNotes(prevRecord?.notes)
+      const nextSede = data.sede !== undefined ? data.sede : prevMeta.sede
+      const nextMod = data.modalidad !== undefined ? data.modalidad : prevMeta.modalidad
+      updatePayload.notes = buildNotesWithMetadata(prevRecord?.notes, nextSede, nextMod)
+    }
 
     const { error } = await adminClient
       .from('student_directory')
@@ -450,51 +510,67 @@ export async function deactivateDirectoryStudent(
 }
 
 /**
- * Generar plantilla Excel para descarga.
+ * Generar plantilla Excel para descarga con soporte multi-nivel (Preescolar, Primaria, Secundaria, PFC, Sedes y Modalidades).
  * Retorna el buffer del archivo como base64 para descarga en el cliente.
  */
 export async function generateImportTemplate(): Promise<string> {
   try {
     const wb = XLSX.utils.book_new()
 
-    // Hoja de datos
+    // Hoja de datos representativa de toda la población institucional
     const templateData = [
-      ['APELLIDOS Y NOMBRES', 'Documento', 'Grado', 'Grupo'],
-      ['MARTÍNEZ LÓPEZ JUAN CARLOS', '1001234567', '10°', '2'],
-      ['TORRES GARCÍA ANA MARÍA', '', '11°', '1'],
-      ['PÉREZ RIVERA CARLOS ANDRÉS', '', 'PFC-12', '1'],
+      ['APELLIDOS Y NOMBRES', 'Documento', 'Grado', 'Grupo', 'Sede', 'Modalidad'],
+      ['MARTÍNEZ LÓPEZ JUAN CARLOS', '1001234567', '10°', '2', 'Sede Principal', 'Tradicional'],
+      ['TORRES GARCÍA ANA MARÍA', '', 'Transición', '1', 'Sede Principal', 'Tradicional'],
+      ['GÓMEZ PEÑA VALENTINA', '', '3°', '1', 'Sede San José', 'Escuela Nueva'],
+      ['RODRÍGUEZ RINCÓN MATEO', '', 'Aula Multigrado', '1', 'Sede La Ceiba', 'Aula Multigrado'],
+      ['PÉREZ RIVERA CARLOS ANDRÉS', '', 'PFC-12', '1', 'Sede Principal', 'Tradicional'],
     ]
 
     const ws = XLSX.utils.aoa_to_sheet(templateData)
 
     // Anchos de columna
     ws['!cols'] = [
-      { wch: 50 }, // APELLIDOS Y NOMBRES
+      { wch: 45 }, // APELLIDOS Y NOMBRES
       { wch: 15 }, // Documento
-      { wch: 10 }, // Grado
+      { wch: 18 }, // Grado
       { wch: 10 }, // Grupo
+      { wch: 22 }, // Sede
+      { wch: 20 }, // Modalidad
     ]
 
     XLSX.utils.book_append_sheet(wb, ws, 'Estudiantes')
 
-    // Hoja de instrucciones
+    // Hoja de instrucciones detalladas para SIMAT y modelos flexibles
     const instrData = [
-      ['INSTRUCCIONES DE IMPORTACIÓN'],
+      ['INSTRUCCIONES DE IMPORTACIÓN - COBERTURA INSTITUCIONAL COMPLETA'],
       [''],
       ['Columnas requeridas: APELLIDOS Y NOMBRES, Grado, Grupo'],
-      ['Columnas opcionales: Documento, Email'],
+      ['Columnas opcionales: Documento, Sede, Modalidad, Email'],
       [''],
       ['APELLIDOS Y NOMBRES: Requerido. Ej: MARTÍNEZ LÓPEZ JUAN CARLOS'],
-      ['(El sistema asignará las dos primeras palabras como apellidos y el resto como nombres)'],
-      ['Documento: Opcional. Número de cédula o TI. Debe ser único.'],
-      ['Grado: Requerido. Ej: 10°, 11°, PFC-12, PFC-13, Nivelatorio'],
-      ['Grupo: Requerido. Ej: 1, 2, A, B'],
+      ['(El sistema identificará automáticamente los apellidos y nombres)'],
+      ['Documento: Opcional. Cédula, Tarjeta de Identidad, Registro Civil o NUIP.'],
       [''],
-      ['Límite: 500 estudiantes por importación.'],
-      ['Los nombres se guardan en Title Case automáticamente.'],
+      ['Grados reconocidos:'],
+      ['• Preescolar: Párvulos, Pre-Jardín, Jardín, Transición (o 0°)'],
+      ['• Primaria: 1°, 2°, 3°, 4°, 5°'],
+      ['• Secundaria y Media: 6°, 7°, 8°, 9°, 10°, 11°'],
+      ['• Formación Docente: PFC-12, PFC-13, Nivelatorio'],
+      ['• Modelos Flexibles: Aula Multigrado'],
+      [''],
+      ['Sedes institucionales:'],
+      ['• Sede Principal, Sede San José, Sede La Ceiba, Sede El Porvenir'],
+      ['(Si se deja vacío, se asignará Sede Principal por defecto)'],
+      [''],
+      ['Modalidades pedagógicas:'],
+      ['• Tradicional, Escuela Nueva, Aula Multigrado'],
+      ['(Si se deja vacío, se asignará Tradicional por defecto)'],
+      [''],
+      ['Límite de procesamiento: hasta 500 estudiantes por archivo.'],
     ]
     const wsInstr = XLSX.utils.aoa_to_sheet(instrData)
-    wsInstr['!cols'] = [{ wch: 55 }]
+    wsInstr['!cols'] = [{ wch: 65 }]
     XLSX.utils.book_append_sheet(wb, wsInstr, 'Instrucciones')
 
     const buf = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' })

@@ -561,6 +561,108 @@ export async function createPermissionRequest(
 }
 
 /**
+ * Actualizar una solicitud en estado borrador
+ */
+export async function updatePermissionDraft(
+  id: string,
+  input: CreatePermissionRequestInput
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const validated = createPermissionRequestSchema.safeParse(input)
+    if (!validated.success) {
+      return { success: false, error: validated.error.issues[0]?.message || 'Datos de solicitud inválidos.' }
+    }
+
+    const adminClient = createAdminClient()
+    const { data: req } = await adminClient
+      .from('permission_requests')
+      .select('status')
+      .eq('id', id)
+      .single()
+
+    const currentStatus = req?.status || fallbackPermissions.find(p => p.id === id)?.status
+    if (currentStatus !== 'draft') {
+      return { success: false, error: 'Solo se pueden editar solicitudes en estado borrador.' }
+    }
+
+    const types = await getPermissionTypes()
+    const selectedType = types.find(t => t.id === input.typeId) || DEFAULT_PERMISSION_TYPES[0]
+
+    let dbTypeId = selectedType.id
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!uuidRegex.test(dbTypeId)) {
+      try {
+        const { data: dbType } = await adminClient.from('permission_types').select('id').eq('code', selectedType.code).maybeSingle()
+        if (dbType?.id) dbTypeId = dbType.id
+      } catch (e) {}
+    }
+
+    const { error: updErr } = await adminClient
+      .from('permission_requests')
+      .update({
+        type_id: dbTypeId,
+        type_snapshot: {
+          code: selectedType.code,
+          name: selectedType.name,
+          requiresAttachment: selectedType.requiresAttachment,
+          affectsClasses: selectedType.affectsClasses
+        },
+        start_date: input.startDate,
+        end_date: input.endDate,
+        is_full_day: input.isFullDay,
+        start_time: input.startTime || null,
+        end_time: input.endTime || null,
+        reason: input.reason,
+        attachment_url: input.attachmentUrl || null,
+        attachment_name: input.attachmentName || null,
+        attachment_type: input.attachmentType || null,
+        affects_academic_duty: input.affectsAcademicDuty,
+        academic_impact: input.academicImpact || [],
+        leaves_student_activities: input.leavesStudentActivities,
+        student_activities: input.studentActivities || [],
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+
+    if (updErr) {
+      console.error('Error updating draft in Supabase:', updErr)
+      return { success: false, error: 'Error al actualizar el borrador en la base de datos' }
+    }
+    
+    // Si no es borrador y el status actual es draft (usuario decide enviar), lo debe hacer con submitDraftPermission
+    // Esta función asume que se mantiene en borrador o se actualiza antes de enviarlo.
+    // Aunque el wizard permite enviarlo directamente. 
+    // Si input.isDraft es falso, deberíamos también cambiar el status a submitted y crear el historial.
+    if (!input.isDraft) {
+      await adminClient
+        .from('permission_requests')
+        .update({ status: 'submitted' })
+        .eq('id', id)
+
+      try {
+        const teacher = await getTeacherPermissionProfile()
+        await adminClient.from('permission_request_history').insert({
+          request_id: id,
+          changed_by: teacher.id,
+          action: 'submitted',
+          from_status: 'draft',
+          to_status: 'submitted',
+          notes: 'Solicitud actualizada y enviada a Rectoría para revisión'
+        })
+      } catch (hErr) {}
+    }
+
+    revalidatePath('/teacher/permissions')
+    revalidatePath('/admin/permissions')
+    return { success: true }
+  } catch (err: unknown) {
+    console.error('Error en updatePermissionDraft:', err)
+    const message = err instanceof Error ? err.message : 'Error al actualizar el borrador.'
+    return { success: false, error: message }
+  }
+}
+
+/**
  * Cancelar una solicitud por el docente (si aún no ha sido aprobada)
  */
 export async function cancelPermissionRequest(id: string): Promise<{ success: boolean; error?: string }> {

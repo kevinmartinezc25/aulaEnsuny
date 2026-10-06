@@ -37,7 +37,7 @@ interface Props {
 export function TeacherWorkloadStudentSelector({ value, onChange, error }: Props) {
   const shouldReduceMotion = useReducedMotion()
 
-  // ── ESTADOS DE CARGA ACADÉMICA ─────────────────────────────────────────────
+  // ── ESTADOS DE GRUPOS INSTITUCIONALES ─────────────────────────────────────────────
   const [workloadLoading, setWorkloadLoading] = useState(true)
   const [gradesWorkload, setGradesWorkload] = useState<TeacherGradeWorkload[]>([])
   const [allGroups, setAllGroups] = useState<TeacherGroupItem[]>([])
@@ -59,7 +59,7 @@ export function TeacherWorkloadStudentSelector({ value, onChange, error }: Props
   const [directResults, setDirectResults] = useState<StudentRef[]>([])
   const [loadingDirect, setLoadingDirect] = useState(false)
 
-  // 1. Cargar carga académica del docente desde el módulo horarios
+  // 1. Cargar todos los grados y grupos de la institución
   useEffect(() => {
     async function loadWorkload() {
       setWorkloadLoading(true)
@@ -69,7 +69,7 @@ export function TeacherWorkloadStudentSelector({ value, onChange, error }: Props
         setAllGroups(res.allGroups)
         setIsTeacher(res.isTeacher)
 
-        // Si solo tiene un grado asignado, auto-seleccionarlo
+        // Si solo hay un grado disponible, auto-seleccionarlo
         if (res.grades.length === 1) {
           const onlyGrade = res.grades[0]
           setSelectedGrade(onlyGrade.gradeLevel)
@@ -78,7 +78,7 @@ export function TeacherWorkloadStudentSelector({ value, onChange, error }: Props
           }
         }
       } catch (err) {
-        console.error('Error cargando carga académica del docente:', err)
+        console.error('Error cargando grupos institucionales:', err)
       } finally {
         setWorkloadLoading(false)
       }
@@ -92,6 +92,11 @@ export function TeacherWorkloadStudentSelector({ value, onChange, error }: Props
     const gradeObj = gradesWorkload.find((g) => g.gradeLevel === selectedGrade)
     return gradeObj ? gradeObj.groups : []
   }, [selectedGrade, gradesWorkload])
+
+  // Objeto del grupo actualmente seleccionado
+  const selectedGroupObj = useMemo(() => {
+    return availableGroupsForGrade.find((g) => g.name === selectedGroup)
+  }, [availableGroupsForGrade, selectedGroup])
 
   // 2. Al cambiar de grado, resetear grupo si ya no pertenece a ese grado
   const handleGradeChange = (newGrade: string) => {
@@ -255,20 +260,20 @@ export function TeacherWorkloadStudentSelector({ value, onChange, error }: Props
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // VISTA DE SELECCIÓN CON FILTRO DE CARGA ACADÉMICA (HORARIOS)
+  // VISTA DE SELECCIÓN DE GRUPOS INSTITUCIONALES
   // ─────────────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-4">
-      {/* Selector de modo y contexto de carga académica */}
+      {/* Selector de modo y contexto institucional */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200/70 dark:border-blue-800/40">
-            <Clock className="h-3.5 w-3.5 text-blue-500" />
-            <span>Carga Académica (Módulo Horarios)</span>
+            <Users className="h-3.5 w-3.5 text-blue-500" />
+            <span>Todos los grupos institucionales</span>
           </span>
           {gradesWorkload.length > 0 && (
             <span className="text-xs text-slate-500 dark:text-slate-400 hidden sm:inline">
-              ({allGroups.length} grupos asignados)
+              ({allGroups.length} grupos encontrados)
             </span>
           )}
         </div>
@@ -300,7 +305,7 @@ export function TeacherWorkloadStudentSelector({ value, onChange, error }: Props
         </div>
       </div>
 
-      {/* MODO 1: ROSTER POR GRADO Y GRUPO DE SU CARGA ACADÉMICA */}
+      {/* MODO 1: ROSTER POR GRADO Y GRUPO INSTITUCIONAL */}
       {mode === 'roster' && (
         <div className="rounded-2xl border border-slate-200/90 dark:border-white/10 bg-slate-50/60 dark:bg-slate-800/30 p-4 sm:p-5 space-y-4 backdrop-blur-md">
           {/* Controles de Grado y Grupo */}
@@ -309,7 +314,7 @@ export function TeacherWorkloadStudentSelector({ value, onChange, error }: Props
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
                 <GraduationCap className="h-4 w-4 text-blue-500" />
-                <span>1. Grado Asignado</span>
+                <span>1. Grado Institucional</span>
               </label>
               <select
                 value={selectedGrade}
@@ -330,7 +335,7 @@ export function TeacherWorkloadStudentSelector({ value, onChange, error }: Props
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
                 <Users className="h-4 w-4 text-indigo-500" />
-                <span>2. Grupo Asignado</span>
+                <span>2. Grupo Institucional</span>
               </label>
               <select
                 value={selectedGroup}
@@ -346,21 +351,55 @@ export function TeacherWorkloadStudentSelector({ value, onChange, error }: Props
                 </option>
                 {availableGroupsForGrade.map((grp) => (
                   <option key={grp.id} value={grp.name}>
-                    {grp.displayName} {grp.isDirector ? '⭐ (Director)' : ''}
+                    Grupo {grp.groupCode} ({grp.name}) {grp.isDirector ? '⭐ (Director)' : ''}
                   </option>
                 ))}
               </select>
             </div>
           </div>
 
-          {/* Aviso si el docente no tiene carga asignada en horarios */}
+          {/* Botones de selección directa de grupo (ej: Grupo 1, Grupo 2) */}
+          {selectedGrade && availableGroupsForGrade.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 pt-0.5">
+              <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                Selección rápida:
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {availableGroupsForGrade.map((grp) => {
+                  const isSelected = selectedGroup === grp.name
+                  return (
+                    <button
+                      key={grp.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedGroup(grp.name)
+                        setInGroupFilter('')
+                      }}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                        isSelected
+                          ? 'bg-blue-600 text-white shadow-xs ring-2 ring-blue-500/30'
+                          : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-200/90 dark:border-white/10 hover:border-blue-400 hover:text-blue-600'
+                      }`}
+                    >
+                      <span>Grupo {grp.groupCode}</span>
+                      <span className={`text-[10px] ${isSelected ? 'text-blue-100' : 'text-slate-400'}`}>
+                        ({grp.name})
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Aviso si no hay grupos institucionales */}
           {!workloadLoading && gradesWorkload.length === 0 && (
             <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 text-amber-800 dark:text-amber-300 text-xs flex items-start gap-2.5">
               <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-amber-600" />
               <div>
-                <p className="font-semibold">Sin asignaciones en el módulo de horarios</p>
+                <p className="font-semibold">Sin grupos configurados en la institución</p>
                 <p className="mt-0.5 text-amber-700 dark:text-amber-400">
-                  No se encontraron grupos vinculados a tu carga académica actual. Puedes usar la pestaña &quot;Buscar por Nombre/Doc&quot; o solicitar al administrador verificar tus asignaciones en el módulo de horarios.
+                  No se encontraron grupos configurados en el sistema institucional. Puedes usar la pestaña &quot;Buscar por Nombre/Doc&quot;.
                 </p>
               </div>
             </div>
@@ -374,7 +413,7 @@ export function TeacherWorkloadStudentSelector({ value, onChange, error }: Props
                   <label className="text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
                     <FileSpreadsheet className="h-4 w-4 text-emerald-500" />
                     <span>
-                      Estudiantes de {selectedGroup} ({filteredGroupStudents.length} de {groupStudents.length})
+                      Estudiantes de Grado {selectedGrade} • Grupo {selectedGroupObj?.groupCode || selectedGroup} ({filteredGroupStudents.length} de {groupStudents.length})
                     </span>
                   </label>
                   <button
@@ -457,7 +496,9 @@ export function TeacherWorkloadStudentSelector({ value, onChange, error }: Props
                                 <span className="italic">Sin documento</span>
                               )}
                               <span>•</span>
-                              <span>{st.gradeLevel} - {st.groupName}</span>
+                              <span className="font-medium text-slate-700 dark:text-slate-300">
+                                Grado {st.gradeLevel} • Grupo {st.groupName.replace(/^grupo\s*/i, '')}
+                              </span>
                             </div>
                           </div>
                         </div>

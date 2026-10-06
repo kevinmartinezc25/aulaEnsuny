@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
-import { createAssistedSubject, updateAssistedSubject, AssistedSubject } from '../../application/actions'
+import { createAssistedSubject, updateAssistedSubject, AssistedSubject, getTeacherScheduleSubjects } from '../../application/actions'
 import { Loader2 } from 'lucide-react'
 
 interface CreateSubjectModalProps {
@@ -21,6 +21,7 @@ interface CreateSubjectModalProps {
 export function CreateSubjectModal({ isOpen, onClose, onSuccess, initialData, existingSubjects }: CreateSubjectModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showWarningModal, setShowWarningModal] = useState(false)
+  const [scheduleSubjects, setScheduleSubjects] = useState<string[]>([])
   const [formData, setFormData] = useState({
     name: '',
     grade: '',
@@ -28,6 +29,13 @@ export function CreateSubjectModal({ isOpen, onClose, onSuccess, initialData, ex
     period: '',
     description: ''
   })
+
+  // Cargar materias del horario oficial
+  React.useEffect(() => {
+    if (isOpen) {
+      getTeacherScheduleSubjects().then(setScheduleSubjects).catch(console.error)
+    }
+  }, [isOpen])
 
   // Cargar datos iniciales cuando se abre en modo edición
   React.useEffect(() => {
@@ -150,7 +158,7 @@ export function CreateSubjectModal({ isOpen, onClose, onSuccess, initialData, ex
               required
             />
             <datalist id="existing-subjects-list">
-              {Array.from(new Set(existingSubjects.map(s => s.name))).map(name => (
+              {Array.from(new Set([...existingSubjects.map(s => s.name), ...scheduleSubjects])).map(name => (
                 <option key={name} value={name} />
               ))}
             </datalist>

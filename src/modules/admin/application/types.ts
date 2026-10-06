@@ -33,6 +33,41 @@ export interface AcademicGroup {
   createdAt: string
 }
 
+export interface AcademicGroupWithStats {
+  id: string
+  academicLevelId: string
+  name: string
+  studentsCount: number
+  createdAt: string
+}
+
+export interface GradeLevelOverviewItem {
+  id: string
+  name: string
+  createdAt: string
+  groups: AcademicGroupWithStats[]
+  studentsCount: number
+  coursesCount: number
+  sedesDistribution: Record<string, number>
+  modalidadesDistribution: Record<string, number>
+}
+
+export interface MissingStudentGroup {
+  gradeLevel: string
+  groupName: string
+  studentsCount: number
+  academicLevelId?: string
+}
+
+export interface AcademicGradeLevelsOverview {
+  levels: GradeLevelOverviewItem[]
+  totalStudents: number
+  totalCourses: number
+  totalGroups: number
+  sedes: string[]
+  missingGroups: MissingStudentGroup[]
+}
+
 export interface AdminTeacher {
   id: string
   name: string
@@ -42,6 +77,10 @@ export interface AdminTeacher {
   subjects: string[]
   status: 'active' | 'inactive'
   joinedDate: string
+  teachingLevel?: 'preescolar' | 'primaria' | 'secundaria_media' | 'multigrado'
+  sede?: string
+  isMultigradeTeacher?: boolean
+  assignedGroup?: string
 }
 
 export interface AdminStudent {
@@ -54,7 +93,25 @@ export interface AdminStudent {
   groupName?: string
   status: 'active' | 'inactive'
   joinedDate: string
+  sede?: string
+  modalidad?: string
 }
+
+export interface InstitutionalSede {
+  id: string
+  name: string
+  daneCode?: string | null
+  zone: 'Urbana' | 'Rural'
+  hasMultigrade: boolean
+  address?: string | null
+  contactPhone?: string | null
+  isActive: boolean
+  isMain?: boolean
+  zoneType?: string
+  studentsCount?: number
+  createdAt?: string
+}
+
 
 export interface StudentDetails {
   documentType: string
@@ -128,6 +185,8 @@ export interface StudentEnrollment {
   enrollmentDate: string
   enrollmentStatus: 'active' | 'pending' | 'withdrawn' | 'cancelled'
   sede: string
+  modalidad?: string
+  sedeId?: string
   jornada: 'Mañana' | 'Tarde' | 'Completa' | 'Única' | 'Nocturna'
   gradeLevel: string
   groupName: string

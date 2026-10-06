@@ -23,7 +23,8 @@ import {
   CalendarCheck,
   ChevronDown,
   ChevronRight,
-  AlertCircle
+  AlertCircle,
+  Edit2
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { PermissionRequest, PermissionStatsSummary } from '../../domain/entities'
@@ -37,6 +38,7 @@ import { generatePermissionPDF } from '../../infrastructure/PermissionPDFGenerat
 import { PermissionAdvanceNoticeModal } from '../components/PermissionAdvanceNoticeModal'
 import { PermissionSupportOverdueModal } from '../components/PermissionSupportOverdueModal'
 import { PermissionPostSupportModal } from '../components/PermissionPostSupportModal'
+import { PermissionConfirmModal } from '../components/PermissionConfirmModal'
 
 export function TeacherPermissionsScreen() {
   const router = useRouter()
@@ -59,6 +61,22 @@ export function TeacherPermissionsScreen() {
   const [showOverdueModal, setShowOverdueModal] = useState(false)
   const [overdueRequest, setOverdueRequest] = useState<PermissionRequest | null>(null)
   const [selectedPostSupportReq, setSelectedPostSupportReq] = useState<PermissionRequest | null>(null)
+  
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean
+    title: string
+    description: string
+    confirmText: string
+    type: 'danger' | 'warning' | 'info'
+    action: () => Promise<void>
+  }>({
+    isOpen: false,
+    title: '',
+    description: '',
+    confirmText: '',
+    type: 'warning',
+    action: async () => {}
+  })
 
   const loadData = useCallback(async (showLoading = false) => {
     if (showLoading) setLoading(true)
@@ -154,55 +172,76 @@ export function TeacherPermissionsScreen() {
   const handleCancel = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation()
     e.preventDefault()
-    if (!confirm('¿Está seguro de que desea cancelar esta solicitud? Esta acción no se puede deshacer.')) {
-      return
-    }
-
-    try {
-      const res = await cancelPermissionRequest(id)
-      if (res.error) {
-        toast.error(res.error)
-      } else {
-        toast.success('Solicitud cancelada correctamente')
-        loadData(true)
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Cancelar Solicitud',
+      description: '¿Está seguro de que desea cancelar esta solicitud? Esta acción no se puede deshacer.',
+      confirmText: 'Sí, Cancelar',
+      type: 'danger',
+      action: async () => {
+        try {
+          const res = await cancelPermissionRequest(id)
+          if (res.error) {
+            toast.error(res.error)
+          } else {
+            toast.success('Solicitud cancelada correctamente')
+            loadData(true)
+          }
+        } catch {
+          toast.error('Error al cancelar solicitud')
+        }
       }
-    } catch {
-      toast.error('Error al cancelar solicitud')
-    }
+    })
   }
 
   const handleDraftSubmit = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation()
     e.preventDefault()
-    if (!confirm('¿Desea radicar oficialmente este borrador para revisión de Rectoría?')) return
-    try {
-      const res = await submitDraftPermission(id)
-      if (res.error) {
-        toast.error(res.error)
-      } else {
-        toast.success('Borrador radicado exitosamente ante Rectoría')
-        loadData(true)
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Radicar Borrador',
+      description: '¿Desea radicar oficialmente este borrador para revisión de Rectoría?',
+      confirmText: 'Sí, Radicar',
+      type: 'info',
+      action: async () => {
+        try {
+          const res = await submitDraftPermission(id)
+          if (res.error) {
+            toast.error(res.error)
+          } else {
+            toast.success('Borrador radicado exitosamente ante Rectoría')
+            loadData(true)
+          }
+        } catch {
+          toast.error('Error al radicar el borrador')
+        }
       }
-    } catch {
-      toast.error('Error al radicar el borrador')
-    }
+    })
   }
 
   const handleDraftDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation()
     e.preventDefault()
-    if (!confirm('¿Está seguro de eliminar este borrador permanentemente? Esta acción no se puede deshacer.')) return
-    try {
-      const res = await deleteDraftPermission(id)
-      if (res.error) {
-        toast.error(res.error)
-      } else {
-        toast.success('Borrador eliminado correctamente')
-        loadData(true)
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Eliminar Borrador',
+      description: '¿Está seguro de eliminar este borrador permanentemente? Esta acción no se puede deshacer.',
+      confirmText: 'Sí, Eliminar',
+      type: 'danger',
+      action: async () => {
+        try {
+          const res = await deleteDraftPermission(id)
+          if (res.error) {
+            toast.error(res.error)
+          } else {
+            toast.success('Borrador eliminado correctamente')
+            loadData(true)
+          }
+        } catch {
+          toast.error('Error al eliminar el borrador')
+        }
       }
-    } catch {
-      toast.error('Error al eliminar el borrador')
-    }
+    })
   }
 
   const getStatusClass = (status: string) => {
@@ -433,9 +472,11 @@ export function TeacherPermissionsScreen() {
                 
                 <div>
                   <h3>{req.typeSnapshot?.name || 'Permiso'}</h3>
-                  <div className="teacher">
-                    <AlertCircle />
-                    {req.reason.substring(0, 50)}{req.reason.length > 50 ? '...' : ''}
+                  <div className="teacher" style={{ wordBreak: 'break-word', display: 'flex', alignItems: 'flex-start' }}>
+                    <AlertCircle style={{ flexShrink: 0, marginTop: '1px' }} />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                      {req.reason}
+                    </span>
                   </div>
                 </div>
                 
@@ -453,6 +494,9 @@ export function TeacherPermissionsScreen() {
                 <div className="cnt" onClick={e => e.stopPropagation()}>
                   {req.status === 'draft' && (
                     <>
+                      <span className="hi" onClick={(e) => { e.stopPropagation(); router.push('/teacher/permissions/new?edit=' + req.id); }}>
+                        <Edit2 size={15} /> Editar
+                      </span>
                       <span className="active" onClick={(e) => handleDraftSubmit(e, req.id)}>
                         <Send size={15} /> Enviar
                       </span>
@@ -522,6 +566,17 @@ export function TeacherPermissionsScreen() {
           onSuccess={() => loadData(true)}
         />
       )}
+
+      {/* Reemplazo nativo confirm() */}
+      <PermissionConfirmModal
+        isOpen={confirmConfig.isOpen}
+        title={confirmConfig.title}
+        description={confirmConfig.description}
+        confirmText={confirmConfig.confirmText}
+        type={confirmConfig.type}
+        onClose={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmConfig.action}
+      />
     </div>
   )
 }

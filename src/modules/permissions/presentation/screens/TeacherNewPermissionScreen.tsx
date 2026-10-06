@@ -1,21 +1,26 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, Suspense } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { ArrowLeft, Loader2, CalendarCheck } from 'lucide-react'
 import { PermissionWizardForm } from '../components/PermissionWizardForm'
 import {
   getTeacherPermissionProfile,
   getPermissionTypes,
-  getTeacherAcademicCourses
+  getTeacherAcademicCourses,
+  getPermissionById
 } from '../../application/actions'
-import { TeacherSnapshot, PermissionType } from '../../domain/entities'
+import { TeacherSnapshot, PermissionType, PermissionRequest } from '../../domain/entities'
 
-export function TeacherNewPermissionScreen() {
+function TeacherNewPermissionContent() {
   const [loading, setLoading] = useState(true)
   const [teacher, setTeacher] = useState<TeacherSnapshot | null>(null)
   const [types, setTypes] = useState<PermissionType[]>([])
   const [courses, setCourses] = useState<Array<{ id: string; title: string; subject: string; gradeLevel: string; groupName: string }>>([])
+  const [initialData, setInitialData] = useState<PermissionRequest | null>(null)
+  const searchParams = useSearchParams()
+  const editId = searchParams.get('edit')
 
   useEffect(() => {
     async function loadData() {
@@ -28,6 +33,13 @@ export function TeacherNewPermissionScreen() {
         setTeacher(profileData)
         setTypes(typesData)
         setCourses(coursesData)
+        
+        if (editId) {
+          const req = await getPermissionById(editId)
+          if (req && req.status === 'draft') {
+            setInitialData(req)
+          }
+        }
       } catch (e) {
         console.error('Error al cargar datos del formulario:', e)
       } finally {
@@ -35,7 +47,7 @@ export function TeacherNewPermissionScreen() {
       }
     }
     loadData()
-  }, [])
+  }, [editId])
 
   if (loading || !teacher || types.length === 0) {
     return (
@@ -63,7 +75,7 @@ export function TeacherNewPermissionScreen() {
           </div>
           <div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-              Nueva Solicitud de Permiso
+              {initialData ? 'Editar Borrador de Permiso' : 'Nueva Solicitud de Permiso'}
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
               Diligencie el formulario por pasos para radicar su permiso o licencia institucional.
@@ -76,7 +88,18 @@ export function TeacherNewPermissionScreen() {
         teacher={teacher}
         availableTypes={types}
         availableCourses={courses}
+        initialData={initialData}
       />
     </div>
   )
 }
+
+export function TeacherNewPermissionScreen() {
+  return (
+    <Suspense fallback={<div className="flex justify-center p-12"><Loader2 className="animate-spin text-blue-500" /></div>}>
+      <TeacherNewPermissionContent />
+    </Suspense>
+  )
+}
+
+

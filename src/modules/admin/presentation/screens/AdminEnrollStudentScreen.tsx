@@ -9,11 +9,17 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
-  getAcademicLevels, getAcademicGroups, getAdminCourses, getAdminStudentById, enrollStudent, updateStudent
+  getAcademicLevels, getAcademicGroups, getAdminCourses, getAdminStudentById, enrollStudent, updateStudent, getInstitutionalSedes
 } from '../../application/actions'
 import {
-  AcademicLevel, AcademicGroup, AdminCourse, FullStudentData, StudentDetails, StudentContact, StudentGuardians, StudentMedicalInfo, StudentEnrollment, StudentAcademicHistory, StudentDocument
+  AcademicLevel, AcademicGroup, AdminCourse, FullStudentData, StudentDetails, StudentContact, StudentGuardians, StudentMedicalInfo, StudentEnrollment, StudentAcademicHistory, StudentDocument, InstitutionalSede
 } from '../../application/types'
+import {
+  DEFAULT_INSTITUTIONAL_SEDES,
+  OFFICIAL_MODALITIES,
+  normalizeSede,
+  normalizeModality
+} from '@/lib/gradeUtils'
 
 interface Props {
   studentId?: string
@@ -153,7 +159,8 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
     academicYear: new Date().getFullYear(),
     enrollmentDate: new Date().toISOString().split('T')[0],
     enrollmentStatus: 'active',
-    sede: 'Principal',
+    sede: 'Sede Principal',
+    modalidad: 'Tradicional',
     jornada: 'Única',
     gradeLevel: '',
     groupName: '',
@@ -175,6 +182,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
   const [academicHistory, setAcademicHistory] = useState<StudentAcademicHistory[]>([])
   const [selectedCourses, setSelectedCourses] = useState<string[]>([])
   const [newPassword, setNewPassword] = useState('')
+  const [availableSedes, setAvailableSedes] = useState<InstitutionalSede[]>([])
 
   // --- Edad calculada ---
   const calculatedAge = useMemo(() => {
@@ -194,16 +202,21 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
     async function loadAuxData() {
       setLoadingAux(true)
       try {
-        const [levels, courses] = await Promise.all([
+        const [levels, courses, sedes] = await Promise.all([
           getAcademicLevels(),
-          getAdminCourses()
+          getAdminCourses(),
+          getInstitutionalSedes()
         ])
         setAcademicLevels(levels)
         setAllCourses(courses.filter(c => c.status === 'active'))
+        setAvailableSedes(sedes)
         
         // Seleccionar primer nivel si está vacío y no estamos en modo edición
         if (!isEditMode && levels.length > 0 && !enrollment.gradeLevel) {
           setEnrollment(prev => ({ ...prev, gradeLevel: levels[0].name }))
+        }
+        if (!isEditMode && sedes.length > 0 && !enrollment.sede) {
+          setEnrollment(prev => ({ ...prev, sede: sedes[0].name }))
         }
       } catch (err) {
         console.error('Error cargando datos auxiliares:', err)
@@ -1297,7 +1310,7 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                     🏫 Registro de Matrícula y Ubicación del Curso
                   </h3>
                   
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     <div>
                       <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase mb-1">Año Lectivo</label>
                       <input 
@@ -1309,13 +1322,45 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase mb-1">Sede de Matrícula</label>
-                      <input 
-                        type="text" 
+                      <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase mb-1">Sede Educativa *</label>
+                      <select 
                         value={enrollment.sede}
-                        onChange={e => setEnrollment({ ...enrollment, sede: e.target.value })}
+                        onChange={e => {
+                          const selectedName = e.target.value
+                          const matchedSede = availableSedes.find(s => s.name === selectedName)
+                          setEnrollment(prev => ({
+                            ...prev,
+                            sede: selectedName,
+                            modalidad: matchedSede?.hasMultigrade ? 'Escuela Nueva' : (prev.modalidad || 'Tradicional')
+                          }))
+                        }}
                         className="w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 focus:outline-none dark:text-white text-sm"
-                      />
+                      >
+                        {availableSedes.length > 0 ? (
+                          availableSedes.map(s => (
+                            <option key={s.id} value={s.name}>
+                              {s.name} ({s.zone}{s.hasMultigrade ? ' · Multigrado' : ''})
+                            </option>
+                          ))
+                        ) : (
+                          DEFAULT_INSTITUTIONAL_SEDES.map(s => (
+                            <option key={s} value={s}>{s}</option>
+                          ))
+                        )}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase mb-1">Modalidad / Metodología *</label>
+                      <select 
+                        value={enrollment.modalidad || 'Tradicional'}
+                        onChange={e => setEnrollment({ ...enrollment, modalidad: e.target.value })}
+                        className="w-full px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 focus:outline-none dark:text-white text-sm"
+                      >
+                        {OFFICIAL_MODALITIES.map(m => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
                     </div>
 
                     <div>
@@ -1342,13 +1387,15 @@ export function AdminEnrollStudentScreen({ studentId }: Props) {
                       >
                         {academicLevels.map(lvl => (
                           <option key={lvl.id} value={lvl.name}>
-                            {lvl.name.startsWith('PFC') || lvl.name.toLowerCase().includes('nivelat') ? lvl.name : `Grado ${lvl.name}`}
+                            {lvl.name.startsWith('PFC') || lvl.name.toLowerCase().includes('nivelat') || lvl.name.toLowerCase().includes('transici') || lvl.name.toLowerCase().includes('jard') || lvl.name.toLowerCase().includes('multigrado')
+                              ? lvl.name
+                              : `Grado ${lvl.name}`}
                           </option>
                         ))}
                       </select>
                     </div>
 
-                    <div className="md:col-span-2">
+                    <div>
                       <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase mb-1">Grupo Asignado *</label>
                       <select 
                         value={enrollment.groupName}
