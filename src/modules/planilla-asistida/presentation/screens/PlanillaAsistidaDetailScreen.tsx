@@ -1,8 +1,11 @@
 'use client'
 
 import React, { useState, useCallback } from 'react'
-import { motion } from 'framer-motion'
-import { FileSpreadsheet, ArrowLeft, Users, Save, Download, Settings } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { 
+  FileSpreadsheet, ArrowLeft, Users, Save, Download, Settings,
+  Menu, X, ChevronRight, CalendarDays, TrendingUp, Layers
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -45,8 +48,53 @@ interface PlanillaAsistidaDetailScreenProps {
   subjectId: string
 }
 
+export const NAV_SECTIONS: {
+  id: 'planilla' | 'asistencia' | 'estudiantes' | 'actividades' | 'promedio'
+  label: string
+  shortLabel: string
+  description: string
+  icon: React.ElementType
+}[] = [
+  {
+    id: 'planilla',
+    label: 'Planilla de Calificaciones',
+    shortLabel: 'Planilla',
+    description: 'Registro de calificaciones, logros y ponderaciones',
+    icon: FileSpreadsheet,
+  },
+  {
+    id: 'asistencia',
+    label: 'Registro de Asistencia',
+    shortLabel: 'Asistencia',
+    description: 'Control de sesiones diarias, faltas y justificaciones',
+    icon: CalendarDays,
+  },
+  {
+    id: 'estudiantes',
+    label: 'Gestión de Estudiantes',
+    shortLabel: 'Estudiantes',
+    description: 'Directorio institucional y nómina del grupo',
+    icon: Users,
+  },
+  {
+    id: 'actividades',
+    label: 'Estructura Curricular',
+    shortLabel: 'Estructura',
+    description: 'Configuración de logros, actividades y periodos',
+    icon: Layers,
+  },
+  {
+    id: 'promedio',
+    label: 'Promedio General',
+    shortLabel: 'Promedio General',
+    description: 'Dashboard analítico y desempeño acumulado',
+    icon: TrendingUp,
+  },
+]
+
 export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDetailScreenProps) {
   const [activeTab, setActiveTab] = useState<'planilla' | 'promedio' | 'actividades' | 'estudiantes' | 'asistencia' | 'configuracion'>('planilla')
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [students, setStudents] = useState<{ id: string, number: number, fullName: string, directoryId?: string }[]>([])
   const [isSaving, setIsSaving] = useState(false)
   const [isLoadingFromDir, setIsLoadingFromDir] = useState(false)
@@ -114,6 +162,16 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
   React.useEffect(() => {
     loadEvaluationStructure()
   }, [loadEvaluationStructure])
+
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsMenuOpen(false)
+    }
+    if (isMenuOpen) {
+      window.addEventListener('keydown', handleKeyDown)
+    }
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isMenuOpen])
 
 
 
@@ -327,58 +385,245 @@ export function PlanillaAsistidaDetailScreen({ subjectId }: PlanillaAsistidaDeta
   return (
     <div className="flex h-full min-h-0 flex-col bg-slate-50 dark:bg-slate-950">
       {/* Header Fijo */}
-      <div className="shrink-0 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 sm:px-6">
-        <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-3 pt-2">
+      <div className="shrink-0 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 sm:px-6 py-2 sm:py-2.5">
+        <div className="flex items-center justify-between gap-2 sm:gap-4">
           
-          <div className="flex items-center gap-3 mb-1 xl:mb-0">
-            <Link href="/teacher/planilla-asistida" className="p-1.5 -ml-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-slate-300">
+          {/* Lado Izquierdo: Regreso + Asignatura + Grado + Indicador móvil */}
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <Link 
+              href="/teacher/planilla-asistida" 
+              className="p-1.5 -ml-1 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-slate-300 transition-colors shrink-0"
+              title="Volver a mis planillas"
+            >
               <ArrowLeft className="h-4 w-4" />
             </Link>
-            <div className="flex items-center gap-2">
-              <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                <FileSpreadsheet className="h-4 w-4 text-emerald-600 dark:text-emerald-500" />
-                {subjectData?.name || 'Cargando...'}
+
+            <div className="flex items-center gap-2 min-w-0">
+              <h1 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white flex items-center gap-1.5 truncate">
+                <FileSpreadsheet className="h-4 w-4 text-emerald-600 dark:text-emerald-500 shrink-0" />
+                <span className="truncate">{subjectData?.name || 'Cargando...'}</span>
               </h1>
-              <span className="text-[11px] font-semibold text-slate-500 px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 rounded-md">
-                {subjectData?.grade ? `G${subjectData.grade}${subjectData.group_number ? ` - ${subjectData.group_number}` : ''}` : 'Planilla Asistida'}
+              <span className="text-[11px] font-semibold text-slate-500 px-2 py-0.5 bg-slate-100 dark:bg-slate-800 rounded-md shrink-0">
+                {subjectData?.grade ? `G${subjectData.grade}${subjectData.group_number ? ` - ${subjectData.group_number}` : ''}` : 'Planilla'}
               </span>
             </div>
+
+            {/* Píldora de sección activa visible solo en móvil (< md) para contexto rápido */}
+            <div className="md:hidden">
+              {(() => {
+                const currentSection = NAV_SECTIONS.find(s => s.id === activeTab) || NAV_SECTIONS[0]
+                return (
+                  <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-md border border-emerald-200/60 dark:border-emerald-800/60 truncate">
+                    {currentSection.shortLabel}
+                  </span>
+                )
+              })()}
+            </div>
           </div>
-          
-          {/* Tabs */}
-          <div className="flex items-center gap-5 overflow-x-auto custom-scrollbar flex-1 xl:ml-6">
-            {[
-              { id: 'planilla', label: 'Planilla' },
-              { id: 'asistencia', label: 'Asistencia' },
-              { id: 'estudiantes', label: 'Estudiantes' },
-              { id: 'actividades', label: 'Estructura' },
-              { id: 'promedio', label: 'Promedio General' },
-            ].map((tab) => {
+
+          {/* Pestañas para Escritorio (Desktop): visibles en pantallas md o mayores */}
+          <div className="hidden md:flex items-center gap-1 lg:gap-1.5 mx-2 flex-1 justify-center overflow-x-auto custom-scrollbar">
+            {NAV_SECTIONS.map((tab) => {
               const isActive = activeTab === tab.id
+              const Icon = tab.icon
               return (
                 <button
                   key={tab.id}
-                  onClick={() => handleTabChange(tab.id as any)}
-                  className={`pb-2 text-[13px] font-semibold border-b-2 transition-colors whitespace-nowrap ${
+                  onClick={() => handleTabChange(tab.id)}
+                  className={`flex items-center gap-1.5 px-2.5 lg:px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
                     isActive
-                      ? 'border-emerald-600 text-emerald-700 dark:text-emerald-500'
-                      : 'border-transparent text-slate-500 hover:text-slate-700'
+                      ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/80 shadow-2xs font-bold'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-slate-800/70 border border-transparent'
                   }`}
                 >
-                  {tab.label}
+                  <Icon className={`h-3.5 w-3.5 ${isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'}`} />
+                  <span>{tab.shortLabel}</span>
                 </button>
               )
             })}
           </div>
-          
-          <div className="flex items-center pb-2 xl:pb-1 shrink-0">
-            <Button onClick={handleExportExcel} variant="outline" className="text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border-emerald-200 h-7 text-xs px-2.5">
-              <Download className="h-3 w-3 mr-1.5" />
-              Exportar
+
+          {/* Lado Derecho: Exportar en escritorio, Hamburguesa en móvil */}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Botón Exportar para Escritorio */}
+            <Button
+              onClick={handleExportExcel}
+              variant="outline"
+              size="sm"
+              className="hidden md:inline-flex text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/50 border-emerald-200 dark:border-emerald-800 h-8 text-xs px-3 font-semibold gap-1.5 cursor-pointer shadow-2xs"
+            >
+              <Download className="h-3.5 w-3.5" />
+              <span>Exportar</span>
+            </Button>
+
+            {/* Botón Hamburguesa solo para Móviles (< md) */}
+            <Button
+              onClick={() => setIsMenuOpen(true)}
+              variant="outline"
+              size="sm"
+              className="md:hidden h-8 px-2.5 text-xs font-semibold gap-1.5 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-700 shadow-2xs cursor-pointer"
+              aria-label="Abrir menú de navegación"
+            >
+              <Menu className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+              <span>Menú</span>
             </Button>
           </div>
         </div>
       </div>
+
+      {/* Drawer Hamburguesa con Pestañas y Botón Exportar */}
+      <AnimatePresence>
+        {isMenuOpen && (
+          <>
+            {/* Backdrop con desenfoque suave */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18 }}
+              onClick={() => setIsMenuOpen(false)}
+              className="fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-xs cursor-pointer"
+              aria-hidden="true"
+            />
+
+            {/* Panel Lateral Drawer */}
+            <motion.aside
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 26, stiffness: 260 }}
+              className="fixed inset-y-0 right-0 z-50 w-full max-w-sm sm:max-w-md bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col overflow-hidden"
+              role="dialog"
+              aria-label="Menú de navegación de planilla"
+            >
+              {/* Encabezado del Menú */}
+              <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3 bg-slate-50/50 dark:bg-slate-900/50">
+                <div className="min-w-0">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                    <FileSpreadsheet className="h-3.5 w-3.5" />
+                    <span>Planilla Asistida</span>
+                  </div>
+                  <h2 className="text-base font-bold text-slate-900 dark:text-white truncate mt-0.5">
+                    {subjectData?.name || 'Asignatura'}
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                    {subjectData?.grade ? `Grado ${subjectData.grade}${subjectData.group_number ? ` - Grupo ${subjectData.group_number}` : ''}` : 'Sin grado'}
+                    {storeState.students.length > 0 && ` • ${storeState.students.length} estudiantes`}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsMenuOpen(false)}
+                  className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition-colors shrink-0 cursor-pointer"
+                  aria-label="Cerrar menú"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Contenido Scrollable */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {/* Sección de Vistas */}
+                <div>
+                  <div className="px-1 pb-2 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                    Secciones del Cuaderno
+                  </div>
+                  <div className="space-y-1.5">
+                    {NAV_SECTIONS.map((section) => {
+                      const isActive = activeTab === section.id
+                      const Icon = section.icon
+                      return (
+                        <button
+                          key={section.id}
+                          onClick={() => {
+                            handleTabChange(section.id)
+                            setIsMenuOpen(false)
+                          }}
+                          className={`w-full flex items-center justify-between p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                            isActive
+                              ? 'bg-emerald-50/90 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 shadow-2xs'
+                              : 'bg-white dark:bg-slate-900/50 border-slate-200/80 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:border-slate-300'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className={`p-2 rounded-lg shrink-0 transition-colors ${
+                              isActive 
+                                ? 'bg-emerald-600 text-white shadow-2xs' 
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                            }`}>
+                              <Icon className="h-4 w-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className={`text-xs sm:text-sm font-semibold truncate ${
+                                isActive ? 'text-emerald-900 dark:text-emerald-200 font-bold' : 'text-slate-800 dark:text-slate-200'
+                              }`}>
+                                {section.label}
+                              </div>
+                              <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                                {section.description}
+                              </div>
+                            </div>
+                          </div>
+                          {isActive ? (
+                            <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-600 text-white shadow-2xs">
+                              Activo
+                            </span>
+                          ) : (
+                            <ChevronRight className="h-4 w-4 text-slate-400 shrink-0" />
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Separador */}
+                <div className="border-t border-slate-200/80 dark:border-slate-800" />
+
+                {/* Sección de Exportación */}
+                <div>
+                  <div className="px-1 pb-2 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                    Acciones & Descargas
+                  </div>
+                  <button
+                    onClick={() => {
+                      handleExportExcel()
+                      setIsMenuOpen(false)
+                    }}
+                    className="w-full flex items-center justify-between p-3.5 rounded-xl border border-emerald-300/80 dark:border-emerald-800/80 bg-linear-to-r from-emerald-50 via-teal-50 to-emerald-50 dark:from-emerald-950/40 dark:via-teal-950/20 dark:to-emerald-950/40 text-emerald-900 dark:text-emerald-200 hover:shadow-sm hover:border-emerald-400 dark:hover:border-emerald-700 transition-all group cursor-pointer text-left"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="p-2.5 rounded-xl bg-emerald-600 text-white shadow-2xs group-hover:scale-105 transition-transform shrink-0">
+                        <Download className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                          <span>Exportar a Excel</span>
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 bg-emerald-200 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 rounded">
+                            .XLSX
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-emerald-700/80 dark:text-emerald-400 truncate">
+                          Planilla de notas y registro de asistencia
+                        </div>
+                      </div>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-emerald-600 dark:text-emerald-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Pie del Drawer */}
+              <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/60 text-[11px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
+                <span>Aula Ensuny • Planilla Asistida</span>
+                <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Sincronizado
+                </span>
+              </div>
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* Contenido Principal Scrollable */}
       <div className={`flex-1 ${['planilla', 'asistencia'].includes(activeTab) ? 'overflow-hidden flex flex-col p-2 sm:p-4' : activeTab === 'promedio' ? 'overflow-hidden flex flex-col p-0' : 'overflow-auto p-3.5 sm:p-6'}`}>
