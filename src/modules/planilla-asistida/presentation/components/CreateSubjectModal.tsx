@@ -40,14 +40,9 @@ export function CreateSubjectModal({ isOpen, onClose, onSuccess, initialData, ex
   // Cargar datos iniciales cuando se abre en modo edición
   React.useEffect(() => {
     if (isOpen && initialData) {
-      let displayGrade = initialData.grade?.toString() || ''
-      if (initialData.grade === 0) displayGrade = 'Nivelatorio'
-      else if (initialData.grade === 12) displayGrade = '12'
-      else if (initialData.grade === 13) displayGrade = '13'
-
       setFormData({
         name: initialData.name,
-        grade: displayGrade,
+        grade: initialData.grade !== undefined && initialData.grade !== null ? initialData.grade.toString() : '',
         group_number: initialData.group_number?.toString() || '',
         period: initialData.period || '',
         description: initialData.description || ''
@@ -66,21 +61,12 @@ export function CreateSubjectModal({ isOpen, onClose, onSuccess, initialData, ex
     }
 
     let newGrade: number | undefined = undefined
-    if (formData.grade) {
-      const gStr = formData.grade.trim()
-      if (/^nivelat/i.test(gStr)) {
-        newGrade = 0
-      } else if (/pfc[\s\-_]?12/i.test(gStr)) {
-        newGrade = 12
-      } else if (/pfc[\s\-_]?13/i.test(gStr)) {
-        newGrade = 13
-      } else {
-        const num = parseInt(gStr.replace(/\D/g, ''), 10)
-        if (!isNaN(num)) newGrade = num
-      }
+    if (formData.grade !== '') {
+      const num = parseInt(formData.grade.trim(), 10)
+      if (!isNaN(num)) newGrade = num
     }
 
-    const newGroup = formData.group_number ? parseInt(formData.group_number) : undefined
+    const newGroup = formData.group_number ? parseInt(formData.group_number, 10) : undefined
 
     const isDuplicate = existingSubjects.some(s => 
       s.name.toLowerCase() === formData.name.toLowerCase() && 
@@ -107,15 +93,15 @@ export function CreateSubjectModal({ isOpen, onClose, onSuccess, initialData, ex
 
       if (initialData) {
         await updateAssistedSubject(initialData.id, submitData)
-        toast.success('Materia actualizada')
+        toast.success('Planilla actualizada')
       } else {
         await createAssistedSubject(submitData)
-        toast.success('Materia creada exitosamente')
+        toast.success('Planilla creada exitosamente')
       }
       setFormData({ name: '', grade: '', group_number: '', period: '', description: '' })
       onSuccess()
     } catch (error: any) {
-      toast.error(error.message || 'Error al crear la materia')
+      toast.error(error.message || 'Error al crear la planilla')
     } finally {
       setIsSubmitting(false)
     }
@@ -126,9 +112,9 @@ export function CreateSubjectModal({ isOpen, onClose, onSuccess, initialData, ex
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>{initialData ? 'Editar Materia' : 'Nueva Materia (Planilla Asistida)'}</DialogTitle>
+          <DialogTitle>{initialData ? 'Editar Planilla' : 'Nueva Planilla Asistida'}</DialogTitle>
           <DialogDescription>
-            {initialData ? 'Modifica los datos de la materia.' : 'Crea una materia aislada para calificar a tu manera. Solo tú tendrás acceso a estos datos.'}
+            {initialData ? 'Modifica los datos de la planilla.' : 'Crea una planilla aislada para calificar a tu manera. Solo tú tendrás acceso a estos datos.'}
           </DialogDescription>
         </DialogHeader>
         
@@ -169,23 +155,12 @@ export function CreateSubjectModal({ isOpen, onClose, onSuccess, initialData, ex
                 <Label htmlFor="grade">Grado</Label>
                 <Input
                   id="grade"
-                  type="text"
-                  list="assisted-grade-options"
-                  placeholder="Ej: 7, 12, Nivelatorio"
+                  type="number"
+                  min="0"
+                  placeholder="Ej: 7"
                   value={formData.grade}
                   onChange={(e) => setFormData(prev => ({ ...prev, grade: e.target.value }))}
                 />
-                <datalist id="assisted-grade-options">
-                  <option value="6">6°</option>
-                  <option value="7">7°</option>
-                  <option value="8">8°</option>
-                  <option value="9">9°</option>
-                  <option value="10">10°</option>
-                  <option value="11">11°</option>
-                  <option value="12">PFC-12 (12°)</option>
-                  <option value="13">PFC-13 (13°)</option>
-                  <option value="Nivelatorio">Nivelatorio</option>
-                </datalist>
               </div>
               
               <div className="space-y-2">
@@ -194,7 +169,7 @@ export function CreateSubjectModal({ isOpen, onClose, onSuccess, initialData, ex
                   id="group_number"
                   type="number"
                   min="1"
-                  placeholder="Ej: 2"
+                  placeholder="Ej: 1"
                   value={formData.group_number}
                   onChange={(e) => setFormData(prev => ({ ...prev, group_number: e.target.value }))}
                 />
@@ -229,7 +204,7 @@ export function CreateSubjectModal({ isOpen, onClose, onSuccess, initialData, ex
               <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>Cancelar</Button>
               <Button type="submit" disabled={isSubmitting} className="bg-emerald-600 hover:bg-emerald-700 text-white">
                 {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                {initialData ? 'Guardar Cambios' : 'Crear Materia'}
+                {initialData ? 'Guardar Cambios' : 'Crear Planilla'}
               </Button>
             </div>
           </form>
@@ -240,7 +215,7 @@ export function CreateSubjectModal({ isOpen, onClose, onSuccess, initialData, ex
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle className="text-amber-600 flex items-center gap-2">
-              ⚠️ Materia Duplicada
+              ⚠️ Planilla Duplicada
             </DialogTitle>
             <DialogDescription className="text-slate-600 dark:text-slate-300 text-base pt-2">
               Ya tienes una planilla registrada con el nombre <strong>{formData.name.toUpperCase()}</strong> para el <strong>Grado {formData.grade}</strong> y <strong>Grupo {formData.group_number}</strong>.

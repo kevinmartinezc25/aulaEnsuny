@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -109,7 +109,7 @@ function isStudentVirtualCampusRoute(pathname: string): boolean {
   )
 }
 
-function AdminSidebar({ onClose, user, enabledModules = [], isCollapsed = false, onLogout }: { onClose?: () => void; user: UserSessionInfo | null; enabledModules?: string[], isCollapsed?: boolean, onLogout?: () => void }) {
+function AdminSidebar({ onClose, user, enabledModules = [], isCollapsed = false, onLogout, pendingPermissionsCount = 0 }: { onClose?: () => void; user: UserSessionInfo | null; enabledModules?: string[], isCollapsed?: boolean, onLogout?: () => void, pendingPermissionsCount?: number }) {
   const pathname = usePathname()
   const router = useRouter()
   const [isProfileOpen, setIsProfileOpen] = useState(false)
@@ -175,6 +175,7 @@ function AdminSidebar({ onClose, user, enabledModules = [], isCollapsed = false,
     useUserSessionStore.getState().clearSession()
     if (typeof window !== 'undefined') {
       sessionStorage.removeItem('pending_permissions_popup_dismissed')
+      sessionStorage.removeItem('pending_permissions_profile_dismissed')
     }
     try {
       await logout()
@@ -273,10 +274,15 @@ function AdminSidebar({ onClose, user, enabledModules = [], isCollapsed = false,
                     ? 'bg-emerald-50/80 text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200 border border-emerald-200/60 dark:border-emerald-900/40'
                     : 'text-slate-600 hover:bg-slate-100/80 dark:text-slate-400 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white'
                 }`}
-                title={isCollapsed ? group.section : undefined}
+                title={isCollapsed ? (group.section === 'Gestión Institucional' && pendingPermissionsCount > 0 ? `${group.section} (${pendingPermissionsCount} pendientes)` : group.section) : undefined}
               >
                 <div className="flex items-center gap-2.5 truncate">
-                  <GroupIcon className={`h-4 w-4 shrink-0 ${hasActiveChild ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-700 dark:group-hover:text-slate-300'}`} />
+                  <div className="relative shrink-0 flex items-center justify-center">
+                    <GroupIcon className={`h-4 w-4 shrink-0 ${hasActiveChild ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-700 dark:group-hover:text-slate-300'}`} />
+                    {isCollapsed && group.section === 'Gestión Institucional' && pendingPermissionsCount > 0 && (
+                      <span className="absolute -top-1 -right-1 flex h-2 w-2 rounded-full bg-amber-500 ring-2 ring-white dark:ring-slate-900" />
+                    )}
+                  </div>
                   {!isCollapsed && (
                     <span className="text-xs font-bold truncate tracking-tight">
                       {group.section}
@@ -285,7 +291,12 @@ function AdminSidebar({ onClose, user, enabledModules = [], isCollapsed = false,
                 </div>
 
                 {!isCollapsed && (
-                  <div className="flex items-center shrink-0">
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {!isOpen && group.section === 'Gestión Institucional' && pendingPermissionsCount > 0 && (
+                      <span className="inline-flex items-center justify-center min-w-[18px] h-4 px-1 rounded-full bg-amber-500 text-[10px] font-black text-white shadow-xs">
+                        {pendingPermissionsCount > 99 ? '99+' : pendingPermissionsCount}
+                      </span>
+                    )}
                     <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${isOpen ? 'rotate-0 text-slate-600 dark:text-slate-300' : '-rotate-90 text-slate-400 dark:text-slate-500'}`} />
                   </div>
                 )}
@@ -306,6 +317,9 @@ function AdminSidebar({ onClose, user, enabledModules = [], isCollapsed = false,
                       {group.items.map((item) => {
                         const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
                         const Icon = item.icon
+                        const isPermissionsItem = item.href === '/admin/permissions'
+                        const showPermissionsBadge = isPermissionsItem && pendingPermissionsCount > 0
+
                         return (
                           <Link
                             key={item.name}
@@ -315,7 +329,7 @@ function AdminSidebar({ onClose, user, enabledModules = [], isCollapsed = false,
                               setOpenSections(prev => ({ ...prev, [group.section]: true }))
                               if (onClose) onClose()
                             }}
-                            title={isCollapsed ? item.name : undefined}
+                            title={isCollapsed ? (showPermissionsBadge ? `${item.name} (${pendingPermissionsCount} pendientes)` : item.name) : undefined}
                             className={`group flex items-center rounded-3xl transition-all duration-150 relative ${
                               isCollapsed ? 'justify-center p-2.5 my-0.5' : 'justify-between px-2.5 py-2 my-0.5'
                             } text-xs font-medium ${
@@ -324,10 +338,30 @@ function AdminSidebar({ onClose, user, enabledModules = [], isCollapsed = false,
                                 : 'text-slate-600 hover:bg-slate-100/70 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-white'
                             }`}
                           >
-                            <span className={`flex items-center gap-2.5 ${isCollapsed ? '' : 'truncate'}`}>
-                              <Icon className="h-3.5 w-3.5 shrink-0" />
+                            <span className={`flex items-center gap-2.5 ${isCollapsed ? 'relative' : 'truncate flex-1 min-w-0 pr-1'}`}>
+                              <div className="relative shrink-0 flex items-center justify-center">
+                                <Icon className="h-3.5 w-3.5 shrink-0" />
+                                {isCollapsed && showPermissionsBadge && (
+                                  <span className="absolute -top-1.5 -right-2 flex items-center justify-center min-w-[16px] h-4 px-1 text-[9px] font-black rounded-full bg-amber-500 text-white shadow-xs ring-2 ring-white dark:ring-slate-900 animate-pulse">
+                                    {pendingPermissionsCount > 9 ? '9+' : pendingPermissionsCount}
+                                  </span>
+                                )}
+                              </div>
                               {!isCollapsed && <span className="truncate">{item.name}</span>}
                             </span>
+
+                            {!isCollapsed && showPermissionsBadge && (
+                              <span
+                                className={`ml-auto shrink-0 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-[11px] font-black rounded-full shadow-xs ${
+                                  isActive
+                                    ? 'bg-amber-400 text-amber-950 ring-1 ring-white/50'
+                                    : 'bg-amber-500 text-white'
+                                }`}
+                                title={`${pendingPermissionsCount} solicitudes pendientes de revisión`}
+                              >
+                                {pendingPermissionsCount > 99 ? '99+' : pendingPermissionsCount}
+                              </span>
+                            )}
                           </Link>
                         )
                       })}
@@ -776,6 +810,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const isStudentVirtualCourses = isStudentVirtualCampusRoute(pathname)
   const isStudentPortal = isStudent && !isStudentVirtualCourses
   const [enabledModules, setEnabledModules] = useState<string[]>([])
+  const [pendingPermissionsCount, setPendingPermissionsCount] = useState<number>(0)
   const [pendingAlertModal, setPendingAlertModal] = useState<{ isOpen: boolean; count: number }>({
     isOpen: false,
     count: 0
@@ -841,16 +876,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       // Si es Admin, validar que tenga habilitado el módulo de permisos
       if (user.role === 'admin') {
         const hasPermsModule = enabledModules.length === 0 || enabledModules.includes('permissions')
-        if (!hasPermsModule) return
-      }
-
-      // Si el usuario ya está en la vista de permisos, no mostrar el pop-up
-      if (pathname.startsWith('/admin/permissions')) return
-
-      // Verificar si ya fue cerrado o atendido durante la sesión actual
-      if (typeof window !== 'undefined') {
-        const isDismissed = sessionStorage.getItem('pending_permissions_popup_dismissed') === 'true'
-        if (isDismissed) return
+        if (!hasPermsModule) {
+          setPendingPermissionsCount(0)
+          return
+        }
       }
 
       try {
@@ -866,20 +895,49 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           pendingCount = counts.coordinatorPending > 0 ? counts.coordinatorPending : counts.totalPending
         }
 
-        if (pendingCount > 0) {
-          setPendingAlertModal({ isOpen: true, count: pendingCount })
+        // Siempre actualizar el conteo para el badge ámbar en el menú del sidebar
+        setPendingPermissionsCount(pendingCount)
+
+        // Si no hay pendientes o ya está en la vista de permisos, no abrir modal
+        if (pendingCount === 0 || pathname.startsWith('/admin/permissions')) {
+          setPendingAlertModal({ isOpen: false, count: 0 })
+          return
         }
+
+        // Verificar si ya fue cerrado o atendido durante la sesión actual
+        if (typeof window !== 'undefined') {
+          const isDismissed = sessionStorage.getItem('pending_permissions_popup_dismissed') === 'true'
+          const isProfileDismissed = sessionStorage.getItem('pending_permissions_profile_dismissed') === 'true'
+
+          // Si el usuario entra al perfil del SuperAdmin o Admin (/admin/profile),
+          // abrir el modal a menos que ya lo haya cerrado en la pantalla de perfil
+          if (pathname.startsWith('/admin/profile')) {
+            if (isProfileDismissed) return
+          } else if (isDismissed) {
+            return
+          }
+        }
+
+        setPendingAlertModal({ isOpen: true, count: pendingCount })
       } catch (err) {
         console.warn('Error al verificar alertas de permisos pendientes:', err)
       }
     }
 
     checkPendingPermissionsAlert()
+
+    // Escuchar evento personalizado en caso de que se creen o actualicen permisos en tiempo real
+    const handlePermissionsRefresh = () => {
+      checkPendingPermissionsAlert()
+    }
+    window.addEventListener('permissions-updated', handlePermissionsRefresh)
+    return () => window.removeEventListener('permissions-updated', handlePermissionsRefresh)
   }, [user?.id, user?.role, enabledModulesKey, pathname])
 
   const handleReviewPermissions = () => {
     if (typeof window !== 'undefined') {
       sessionStorage.setItem('pending_permissions_popup_dismissed', 'true')
+      sessionStorage.setItem('pending_permissions_profile_dismissed', 'true')
     }
     setPendingAlertModal({ isOpen: false, count: 0 })
     router.push('/admin/permissions')
@@ -888,8 +946,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const handleClosePermissionsAlert = () => {
     if (typeof window !== 'undefined') {
       sessionStorage.setItem('pending_permissions_popup_dismissed', 'true')
+      if (pathname.startsWith('/admin/profile')) {
+        sessionStorage.setItem('pending_permissions_profile_dismissed', 'true')
+      }
     }
-    setPendingAlertModal({ isOpen: false, count: 0 })
+    setPendingAlertModal(prev => ({ ...prev, isOpen: false }))
   }
 
   const [notifications, setNotifications] = useState<any[]>([])
@@ -1030,6 +1091,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     useUserSessionStore.getState().clearSession()
     if (typeof window !== 'undefined') {
       sessionStorage.removeItem('pending_permissions_popup_dismissed')
+      sessionStorage.removeItem('pending_permissions_profile_dismissed')
     }
     try {
       await logout()
@@ -1056,7 +1118,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Admin Sidebar Desktop */}
         {!isDocsPage && (
           <aside className={`fixed inset-y-0 left-0 z-20 hidden lg:flex flex-col transition-all duration-300 ${isAdminSidebarVisible ? 'w-60' : 'w-20'}`}>
-            <AdminSidebar user={user} enabledModules={enabledModules} isCollapsed={!isAdminSidebarVisible} onLogout={handleLogout} />
+            <AdminSidebar user={user} enabledModules={enabledModules} isCollapsed={!isAdminSidebarVisible} onLogout={handleLogout} pendingPermissionsCount={pendingPermissionsCount} />
           </aside>
         )}
 
@@ -1197,7 +1259,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <motion.aside initial={{ x: '-100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }}
                 transition={{ type: 'spring', damping: 25, stiffness: 200 }}
                 className="fixed inset-y-0 left-0 z-50 w-64 lg:hidden bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 shadow-2xl">
-                <AdminSidebar user={user} onClose={() => setIsMobileMenuOpen(false)} enabledModules={enabledModules} isCollapsed={false} onLogout={handleLogout} />
+                <AdminSidebar user={user} onClose={() => setIsMobileMenuOpen(false)} enabledModules={enabledModules} isCollapsed={false} onLogout={handleLogout} pendingPermissionsCount={pendingPermissionsCount} />
                 <button onClick={() => setIsMobileMenuOpen(false)} className="absolute top-4 right-4 rounded-lg p-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 shadow-sm z-50 transition-colors">
                   <X className="h-5 w-5" />
                 </button>
@@ -1205,6 +1267,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </>
           )}
         </AnimatePresence>
+
+        {/* Pop-up de Alerta de Solicitudes Pendientes para SuperAdmin y Admin */}
+        <PendingPermissionsAlertModal
+          isOpen={pendingAlertModal.isOpen}
+          count={pendingAlertModal.count}
+          role={(user?.role === 'superadmin' ? 'superadmin' : 'admin')}
+          onClose={handleClosePermissionsAlert}
+          onReview={handleReviewPermissions}
+        />
       </div>
     )
   }
