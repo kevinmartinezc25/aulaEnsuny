@@ -242,7 +242,7 @@ export function PlanillaAsistidaListScreen({ initialSubjects }: PlanillaAsistida
         </div>
         <button onClick={() => setIsCreateModalOpen(true)} className="pl-btn pl-add">
           <Plus size={20} strokeWidth={2.5} />
-          Crear materia
+          Crear planilla
         </button>
       </motion.div>
 
@@ -404,9 +404,9 @@ export function PlanillaAsistidaListScreen({ initialSubjects }: PlanillaAsistida
         <div className="pl-pgrid">
           <div className="pl-none">
             <span className="pl-go"><FileSpreadsheet size={28} /></span>
-            <div>No hay materias que coincidan con los filtros.</div>
+            <div>No hay planillas que coincidan con los filtros.</div>
             <button onClick={() => setIsCreateModalOpen(true)} className="pl-btn pl-add" style={{ marginTop: '8px' }}>
-              Crear materia
+              Crear planilla
             </button>
           </div>
         </div>

@@ -145,6 +145,9 @@ export function AdminPermissionDetailScreen({ permissionId }: Props) {
             ? 'Solicitud devuelta al docente para corrección'
             : 'Solicitud rechazada institucionalmente'
         )
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('permissions-updated'))
+        }
         loadData()
       }
     } else {
@@ -160,6 +163,9 @@ export function AdminPermissionDetailScreen({ permissionId }: Props) {
         toast.error(res.error)
       } else {
         toast.success('Solicitud rechazada por Coordinación Académica')
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('permissions-updated'))
+        }
         loadData()
       }
     }
@@ -178,6 +184,9 @@ export function AdminPermissionDetailScreen({ permissionId }: Props) {
       toast.error(res.error)
     } else {
       toast.success('Cobertura guardada y permiso aprobado definitivamente')
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('permissions-updated'))
+      }
       loadData()
     }
   }
