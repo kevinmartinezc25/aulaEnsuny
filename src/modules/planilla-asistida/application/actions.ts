@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient, createAdminClient } from '@/core/config/supabase/server'
+import { parseMetadataFromNotes, normalizeSede } from '@/lib/gradeUtils'
 
 export interface AssistedSubject {
   id: string
@@ -10,6 +11,7 @@ export interface AssistedSubject {
   grade?: number
   group_number?: number
   period?: string
+  sede?: string
   created_at: string
   students_count?: number
 }
@@ -67,7 +69,7 @@ export async function getTeacherScheduleSubjects(): Promise<string[]> {
   return Array.from(subjectNames).sort()
 }
 
-export async function createAssistedSubject(data: { name: string, description?: string, grade?: number, group_number?: number, period?: string }): Promise<AssistedSubject> {
+export async function createAssistedSubject(data: { name: string, description?: string, grade?: number, group_number?: number, period?: string, sede?: string }): Promise<AssistedSubject> {
   const supabase = await createClient()
   const { data: user, error: userError } = await supabase.auth.getUser()
   if (userError || !user.user) throw new Error('Usuario no autenticado')
@@ -562,12 +564,17 @@ export async function getAssistedStudents(subjectId: string) {
     if (needsFallback.length > 0) {
       const { data: subData } = await adminClient
         .from('assisted_subjects')
-        .select('grade, group_number')
+        .select('grade, group_number, sede')
         .eq('id', subjectId)
         .maybeSingle()
 
       let dirQuery = adminClient.from('student_directory').select('id, first_name, last_name, grade_level, group_name')
       let profQuery = adminClient.from('profiles').select('id, first_name, last_name, grade_level, group_name, roles!inner(name)').eq('roles.name', 'student')
+
+      if (subData?.sede) {
+        dirQuery = dirQuery.eq('sede', subData.sede)
+        profQuery = profQuery.eq('sede', subData.sede)
+      }
 
       if (subData?.grade) {
         const gradeVariants = buildPlanillaGradeVariants(subData.grade)
@@ -761,7 +768,7 @@ export async function getAssistedSubjectById(subjectId: string): Promise<Assiste
   return data as AssistedSubject
 }
 
-export async function updateAssistedSubject(subjectId: string, data: { name: string, description?: string, grade?: number, group_number?: number, period?: string }): Promise<void> {
+export async function updateAssistedSubject(subjectId: string, data: { name: string, description?: string, grade?: number, group_number?: number, period?: string, sede?: string }): Promise<void> {
   const supabase = await createClient()
   const { error } = await supabase
     .from('assisted_subjects')
@@ -815,6 +822,13 @@ export async function createAssistedStudent(subjectId: string, fullName: string,
     number: data.number,
     directory_id: data.directory_id
   }
+}
+
+export async function getPlanillaInstitutionalSedes(): Promise<{id: string, name: string}[]> {
+  const supabase = await createClient()
+  const { data, error } = await supabase.from('institutional_sedes').select('id, name').order('name', { ascending: true })
+  if (error || !data) return []
+  return data
 }
 
 export async function addDirectoryStudents(subjectId: string, students: { full_name: string, directory_id: string }[]): Promise<AssistedStudent[]> {
@@ -987,22 +1001,16 @@ export async function getPlanillaDirectoryCandidates(
 
   const adminClient = createAdminClient()
 
-  // 1. Si no se pasaron grado o grupo, obtenerlos de la materia
-  let grade = rawGrade
-  let groupNumber = rawGroup
+  // 1. Obtener la materia para asegurar que tenemos grado, grupo y sede
+  const { data: subject } = await adminClient
+    .from('assisted_subjects')
+    .select('grade, group_number, sede')
+    .eq('id', subjectId)
+    .maybeSingle()
 
-  if (!grade || !groupNumber) {
-    const { data: subject } = await adminClient
-      .from('assisted_subjects')
-      .select('grade, group_number')
-      .eq('id', subjectId)
-      .maybeSingle()
-
-    if (subject) {
-      if (!grade) grade = subject.grade
-      if (!groupNumber) groupNumber = subject.group_number
-    }
-  }
+  const grade = rawGrade || subject?.grade
+  const groupNumber = rawGroup || subject?.group_number
+  const sede = subject?.sede
 
   // 2. Estudiantes existentes en la materia asistida
   const { data: existingStudents, error: existErr } = await adminClient
@@ -1039,6 +1047,10 @@ export async function getPlanillaDirectoryCandidates(
     profQuery = profQuery.in('group_name', groupVariants)
   }
 
+  if (groupVariants.length > 0) {
+    profQuery = profQuery.in('group_name', groupVariants)
+  }
+
   const { data: profiles, error: pError } = await profQuery
 
   if (pError) {
@@ -1051,9 +1063,13 @@ export async function getPlanillaDirectoryCandidates(
   // 5. Obtener del directorio institucional (todos los estudiantes del grado y grupo)
   let dirQuery = adminClient
     .from('student_directory')
-    .select('id, first_name, last_name, document_id, grade_level, group_name, status, profile_id')
+    .select('id, first_name, last_name, document_id, grade_level, group_name, status, profile_id, notes')
     .in('grade_level', gradeVariants)
     .eq('status', 'active')
+
+  if (groupVariants.length > 0) {
+    dirQuery = dirQuery.in('group_name', groupVariants)
+  }
 
   if (groupVariants.length > 0) {
     dirQuery = dirQuery.in('group_name', groupVariants)
@@ -1070,7 +1086,7 @@ export async function getPlanillaDirectoryCandidates(
   if (profileIds.length > 0) {
     const { data: linkedDir } = await adminClient
       .from('student_directory')
-      .select('id, first_name, last_name, document_id, grade_level, group_name, status, profile_id')
+      .select('id, first_name, last_name, document_id, grade_level, group_name, status, profile_id, notes')
       .in('profile_id', profileIds)
     if (linkedDir && linkedDir.length > 0) {
       linkedDirRecords = linkedDir
@@ -1114,6 +1130,10 @@ export async function getPlanillaDirectoryCandidates(
   const seenProfileIds = new Set<string>()
   const seenDirectoryIds = new Set<string>()
 
+  const parseMeta = (notes?: string | null) => {
+    return parseMetadataFromNotes(notes)
+  }
+
   // A. Agregar estudiantes con cuenta (profiles)
   for (const p of profileList) {
     seenProfileIds.add(p.id)
@@ -1123,6 +1143,14 @@ export async function getPlanillaDirectoryCandidates(
 
     // Búsqueda en directorio por profile_id o por coincidencia de nombres
     const dirMatch = dirByProfileId.get(p.id) || dirByName.get(normLastFirst) || dirByName.get(normFirstLast)
+
+    let itemSede = 'Sede Principal'
+    if (dirMatch && dirMatch.notes) {
+      const meta = parseMeta(dirMatch.notes)
+      if (meta.sede) itemSede = meta.sede
+    }
+    if (sede && normalizeSede(itemSede) !== normalizeSede(sede)) continue
+
     if (dirMatch) {
       seenDirectoryIds.add(dirMatch.id)
     }
@@ -1225,6 +1253,13 @@ export async function getPlanillaDirectoryCandidates(
   for (const d of directory || []) {
     if (seenDirectoryIds.has(d.id)) continue
     if (d.profile_id && seenProfileIds.has(d.profile_id)) continue
+
+    let itemSede = 'Sede Principal'
+    if (d.notes) {
+      const meta = parseMeta(d.notes)
+      if (meta.sede) itemSede = meta.sede
+    }
+    if (sede && normalizeSede(itemSede) !== normalizeSede(sede)) continue
 
     const doc = d.document_id ? String(d.document_id).trim() : null
     if (doc && seenDocs.has(doc.toLowerCase())) continue

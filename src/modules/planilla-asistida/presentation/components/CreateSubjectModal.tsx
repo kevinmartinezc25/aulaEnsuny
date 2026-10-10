@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
-import { createAssistedSubject, updateAssistedSubject, AssistedSubject, getTeacherScheduleSubjects } from '../../application/actions'
+import { createAssistedSubject, updateAssistedSubject, AssistedSubject, getTeacherScheduleSubjects, getPlanillaInstitutionalSedes } from '../../application/actions'
 import { Loader2 } from 'lucide-react'
 
 interface CreateSubjectModalProps {
@@ -22,18 +22,21 @@ export function CreateSubjectModal({ isOpen, onClose, onSuccess, initialData, ex
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showWarningModal, setShowWarningModal] = useState(false)
   const [scheduleSubjects, setScheduleSubjects] = useState<string[]>([])
+  const [institutionalSedes, setInstitutionalSedes] = useState<{id: string, name: string}[]>([])
   const [formData, setFormData] = useState({
     name: '',
     grade: '',
     group_number: '',
     period: '',
-    description: ''
+    description: '',
+    sede: ''
   })
 
-  // Cargar materias del horario oficial
+  // Cargar materias del horario oficial y sedes
   React.useEffect(() => {
     if (isOpen) {
       getTeacherScheduleSubjects().then(setScheduleSubjects).catch(console.error)
+      getPlanillaInstitutionalSedes().then(setInstitutionalSedes).catch(console.error)
     }
   }, [isOpen])
 
@@ -45,10 +48,11 @@ export function CreateSubjectModal({ isOpen, onClose, onSuccess, initialData, ex
         grade: initialData.grade !== undefined && initialData.grade !== null ? initialData.grade.toString() : '',
         group_number: initialData.group_number?.toString() || '',
         period: initialData.period || '',
-        description: initialData.description || ''
+        description: initialData.description || '',
+        sede: initialData.sede || ''
       })
     } else if (isOpen && !initialData) {
-      setFormData({ name: '', grade: '', group_number: '', period: '', description: '' })
+      setFormData({ name: '', grade: '', group_number: '', period: '', description: '', sede: '' })
     }
   }, [isOpen, initialData])
 
@@ -73,6 +77,7 @@ export function CreateSubjectModal({ isOpen, onClose, onSuccess, initialData, ex
       s.grade?.toString() === formData.grade &&
       s.group_number?.toString() === formData.group_number &&
       s.period?.toString() === formData.period &&
+      (s.sede || '') === formData.sede &&
       s.id !== initialData?.id
     )
 
@@ -88,7 +93,8 @@ export function CreateSubjectModal({ isOpen, onClose, onSuccess, initialData, ex
         grade: newGrade,
         group_number: newGroup,
         period: formData.period.trim(),
-        description: formData.description.trim()
+        description: formData.description.trim(),
+        sede: formData.sede || undefined
       }
 
       if (initialData) {
@@ -98,7 +104,7 @@ export function CreateSubjectModal({ isOpen, onClose, onSuccess, initialData, ex
         await createAssistedSubject(submitData)
         toast.success('Planilla creada exitosamente')
       }
-      setFormData({ name: '', grade: '', group_number: '', period: '', description: '' })
+      setFormData({ name: '', grade: '', group_number: '', period: '', description: '', sede: '' })
       onSuccess()
     } catch (error: any) {
       toast.error(error.message || 'Error al crear la planilla')
@@ -176,6 +182,21 @@ export function CreateSubjectModal({ isOpen, onClose, onSuccess, initialData, ex
               </div>
 
               <div className="space-y-2 col-span-2">
+                <Label htmlFor="sede">Sede (Opcional pero Recomendado)</Label>
+                <select
+                  id="sede"
+                  value={formData.sede}
+                  onChange={(e) => setFormData(prev => ({ ...prev, sede: e.target.value }))}
+                  className="flex h-10 w-full items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-950 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:ring-offset-slate-950 dark:placeholder:text-slate-400 dark:focus:ring-slate-300"
+                >
+                  <option value="">Sede Principal (Por defecto)</option>
+                  {institutionalSedes.map(s => (
+                    <option key={s.id} value={s.name}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2 col-span-2">
                 <Label htmlFor="period">Período</Label>
                 <Input
                   id="period"
@@ -218,9 +239,9 @@ export function CreateSubjectModal({ isOpen, onClose, onSuccess, initialData, ex
               ⚠️ Planilla Duplicada
             </DialogTitle>
             <DialogDescription className="text-slate-600 dark:text-slate-300 text-base pt-2">
-              Ya tienes una planilla registrada con el nombre <strong>{formData.name.toUpperCase()}</strong> para el <strong>Grado {formData.grade}</strong> y <strong>Grupo {formData.group_number}</strong>.
+              Ya tienes una planilla registrada con el nombre <strong>{formData.name.toUpperCase()}</strong> para el <strong>Grado {formData.grade}</strong> y <strong>Grupo {formData.group_number}</strong>{formData.sede ? <> en la sede <strong>{formData.sede}</strong></> : ''}.
               <br/><br/>
-              Por favor, revisa tus planillas existentes o cambia el nombre, grado o grupo para evitar confusiones.
+              Por favor, revisa tus planillas existentes o cambia el nombre, grado, grupo o sede para evitar confusiones.
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end pt-4">

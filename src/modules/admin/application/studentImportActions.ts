@@ -515,16 +515,21 @@ export async function deactivateDirectoryStudent(
  */
 export async function generateImportTemplate(): Promise<string> {
   try {
+    const adminClient = createAdminClient()
+    const { data: sedesData } = await adminClient.from('institutional_sedes').select('name').order('name')
+    const sedesList = sedesData && sedesData.length > 0 ? sedesData.map(s => s.name) : ['Sede Principal']
+    const sedesString = sedesList.join(', ')
+
     const wb = XLSX.utils.book_new()
 
     // Hoja de datos representativa de toda la población institucional
     const templateData = [
       ['APELLIDOS Y NOMBRES', 'Documento', 'Grado', 'Grupo', 'Sede', 'Modalidad'],
-      ['MARTÍNEZ LÓPEZ JUAN CARLOS', '1001234567', '10°', '2', 'Sede Principal', 'Tradicional'],
-      ['TORRES GARCÍA ANA MARÍA', '', 'Transición', '1', 'Sede Principal', 'Tradicional'],
-      ['GÓMEZ PEÑA VALENTINA', '', '3°', '1', 'Sede San José', 'Escuela Nueva'],
-      ['RODRÍGUEZ RINCÓN MATEO', '', 'Aula Multigrado', '1', 'Sede La Ceiba', 'Aula Multigrado'],
-      ['PÉREZ RIVERA CARLOS ANDRÉS', '', 'PFC-12', '1', 'Sede Principal', 'Tradicional'],
+      ['MARTÍNEZ LÓPEZ JUAN CARLOS', '1001234567', '10°', '2', sedesList[0], 'Tradicional'],
+      ['TORRES GARCÍA ANA MARÍA', '', 'Transición', '1', sedesList[0], 'Tradicional'],
+      ['GÓMEZ PEÑA VALENTINA', '', '3°', '1', sedesList[1] || sedesList[0], 'Escuela Nueva'],
+      ['RODRÍGUEZ RINCÓN MATEO', '', 'Aula Multigrado', '1', sedesList[2] || sedesList[0], 'Aula Multigrado'],
+      ['PÉREZ RIVERA CARLOS ANDRÉS', '', 'PFC-12', '1', sedesList[0], 'Tradicional'],
     ]
 
     const ws = XLSX.utils.aoa_to_sheet(templateData)
@@ -559,8 +564,8 @@ export async function generateImportTemplate(): Promise<string> {
       ['• Formación Docente: PFC-12, PFC-13, Nivelatorio'],
       ['• Modelos Flexibles: Aula Multigrado'],
       [''],
-      ['Sedes institucionales:'],
-      ['• Sede Principal, Sede San José, Sede La Ceiba, Sede El Porvenir'],
+      ['Sedes institucionales vigentes:'],
+      [`• ${sedesString}`],
       ['(Si se deja vacío, se asignará Sede Principal por defecto)'],
       [''],
       ['Modalidades pedagógicas:'],

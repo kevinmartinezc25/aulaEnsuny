@@ -43,8 +43,11 @@ export const DEFAULT_INSTITUTIONAL_SEDES = [
  */
 export function normalizeGradeLevel(grade?: string | null): string {
   if (!grade) return ''
-  const clean = grade.trim()
+  let clean = grade.trim()
   if (!clean) return ''
+  
+  // Remover la palabra "Grado" al inicio si existe (ej. "Grado 5" -> "5")
+  clean = clean.replace(/^grado\s+/i, '').trim()
 
   // 1. Preescolar
   if (/^transici[oó]n|grado\s*0|^0°?$/i.test(clean)) return 'Transición'

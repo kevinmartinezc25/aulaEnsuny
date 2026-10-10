@@ -78,7 +78,7 @@ export function CreateSessionModal({ isOpen, onClose, subjectId, onSuccess, sess
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Nueva Clase</DialogTitle>
+          <DialogTitle>{sessionToEdit ? 'Editar Asistencia' : 'Tomar Asistencia'}</DialogTitle>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4 py-4">

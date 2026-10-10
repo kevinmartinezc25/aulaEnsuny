@@ -249,7 +249,7 @@ export function AttendanceTable({ subjectId }: AttendanceTableProps) {
           )}
           <Button onClick={handleOpenCreate} size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white h-8 flex-1 sm:flex-none">
             <Plus className="h-4 w-4 mr-1" />
-            Nueva Clase
+            Tomar Asistencia
           </Button>
         </div>
       </div>

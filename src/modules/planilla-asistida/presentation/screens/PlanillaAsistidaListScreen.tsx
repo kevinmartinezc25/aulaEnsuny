@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Plus, Search, FileSpreadsheet, FileText, MoreVertical, Edit2, Trash2, Loader2, Users, ArrowRight } from 'lucide-react'
+import { Plus, Search, FileSpreadsheet, FileText, MoreVertical, Edit2, Trash2, Loader2, Users, ArrowRight, MapPin } from 'lucide-react'
 import { getAssistedSubjects, deleteAssistedSubject, AssistedSubject } from '../../application/actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -385,6 +385,9 @@ export function PlanillaAsistidaListScreen({ initialSubjects }: PlanillaAsistida
 
               <div className="pl-chips">
                 {subject.period && <span className="p">Periodo {subject.period}</span>}
+                <span className="s" style={{ background: 'color-mix(in srgb, var(--pl-hi) 10%, transparent)', color: 'var(--pl-hi)' }}>
+                  <MapPin size={14} strokeWidth={2.5} /> {subject.sede ? (subject.sede.toLowerCase().startsWith('sede') ? subject.sede : `Sede ${subject.sede}`) : 'Sede Principal'}
+                </span>
                 <span className="e"><Users size={14} strokeWidth={2.5}/> {subject.students_count || 0} estudiantes</span>
               </div>
 
