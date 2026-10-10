@@ -203,7 +203,7 @@
 
 ### Email transaccional
 - [x] SMTP personalizado configurado con **Resend** en Supabase.
-- [ ] Pendiente: Vincular y verificar el dominio institucional (ej. `ensuny.edu.co`) en Resend para permitir el envío de correos a cualquier dirección (actualmente en modo Sandbox restringido a `kevin.martinez@ensuny.edu.co`).
+- [x] Pendiente: Propagación DNS para verificar el dominio `aula.ensuny.edu.co` en Resend (en proceso).
 
 ### Notificaciones UI — Sonner
 - [x] **Sonner es la librería estándar y única** para notificaciones toast en todo el proyecto.

@@ -85,8 +85,8 @@ export const NAV_SECTIONS: {
   },
   {
     id: 'promedio',
-    label: 'Promedio General',
-    shortLabel: 'Promedio General',
+    label: 'Resumen Académico',
+    shortLabel: 'Resumen Académico',
     description: 'Dashboard analítico y desempeño acumulado',
     icon: TrendingUp,
   },
